@@ -2,6 +2,18 @@
 
 Append-only, newest on top. Per Constitution §4.
 
+## 2026-10-03 - Desktop first, as an Electron app running the Bare worklet
+Tier: T0 (product scope and build order)
+Context: Tim asked to start with desktop, then mobile (Android first).
+Choice: an Electron app for Linux, macOS and Windows. Electron starts the same
+Bare worklet bundle the phones will run, and the renderer hosts the same web UI
+the mobile WebView will load.
+Alternatives: a helper program plus a browser tab (two pieces to install);
+pure browser (needs a bridge server); Node inside Electron as in PearGuard
+(rejected - a second copy of the P2P code for mobile).
+Consequences: spikes ran on the desktop; the emulator run moves to the start of
+the mobile phase.
+
 ## 2026-10-03 - .xlsx library = SheetJS CE from its CDN, pinned in the repo
 Tier: T1
 Context: v1 needs .xlsx import and export, not perfect round-trips.
