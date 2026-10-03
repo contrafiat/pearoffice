@@ -1,0 +1,122 @@
+import React, { useCallback, useEffect, useState } from 'react'
+import { call, on } from './bridge.js'
+
+const ROLE_LABEL = { owner: 'Owner', editor: 'Can edit', viewer: 'Can view' }
+
+function hoursLeft (expiresAt) {
+  const h = Math.round((expiresAt - Date.now()) / 3600000)
+  return h <= 0 ? 'less than an hour left' : h === 1 ? '1 hour left' : h + ' hours left'
+}
+
+export function SharePanel ({ sheetId, onClose, onError }) {
+  const [data, setData] = useState(null)
+  const [link, setLink] = useState(null) // { link, role }
+  const [copied, setCopied] = useState(false)
+
+  const load = useCallback(async () => {
+    try { setData(await call('sheet:members', { sheetId })) } catch (err) { onError(err.message) }
+  }, [sheetId, onError])
+
+  useEffect(() => { load() }, [load])
+  useEffect(() => on('sheet:members', (d) => { if (d.sheetId === sheetId) load() }), [sheetId, load])
+
+  async function invite (role) {
+    try {
+      const r = await call('sheet:invite', { sheetId, role })
+      setLink(r)
+      setCopied(false)
+      load()
+    } catch (err) { onError(err.message) }
+  }
+
+  async function copy () {
+    try {
+      await navigator.clipboard.writeText(link.link)
+      setCopied(true)
+    } catch {
+      const el = document.querySelector('.invite-link input')
+      if (el) { el.select(); document.execCommand('copy'); setCopied(true) }
+    }
+  }
+
+  const isOwner = data && data.myRole === 'owner'
+
+  return (
+    <div className='panel-backdrop' onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
+      <section className='panel' role='dialog' aria-label='Share this sheet'>
+        <header>
+          <h2>Share</h2>
+          <button className='close' aria-label='Close' onClick={onClose}>×</button>
+        </header>
+
+        {!data && <p className='muted'>Loading...</p>}
+
+        {data && (
+          <>
+            {isOwner && (
+              <div className='invite-actions'>
+                <p>Invite someone. Each link works once and expires after 24 hours.</p>
+                <div className='row'>
+                  <button className='primary' onClick={() => invite('editor')}>Invite to edit</button>
+                  <button onClick={() => invite('viewer')}>Invite to view</button>
+                </div>
+                {link && (
+                  <div className='invite-link'>
+                    <label>Send this link to one person ({link.role === 'editor' ? 'can edit' : 'can view'}):</label>
+                    <div className='row'>
+                      <input readOnly value={link.link} onFocus={(e) => e.target.select()} aria-label='Invite link' />
+                      <button className='primary' onClick={copy}>{copied ? 'Copied' : 'Copy'}</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            {!isOwner && <p className='muted'>Only the owner can invite people or change roles.</p>}
+
+            <h3>People</h3>
+            <ul className='people'>
+              {data.members.map((p) => (
+                <li key={p.identity}>
+                  <span className='who'>{p.name || 'Unnamed'}{p.isMe ? ' (you)' : ''}</span>
+                  {isOwner && p.role !== 'owner'
+                    ? (
+                      <select
+                        aria-label={'Role for ' + (p.name || 'this person')}
+                        value={p.role}
+                        onChange={async (e) => {
+                          try { await call('sheet:setRole', { sheetId, identity: p.identity, role: e.target.value }) } catch (err) { onError(err.message) }
+                        }}
+                      >
+                        <option value='editor'>Can edit</option>
+                        <option value='viewer'>Can view</option>
+                      </select>
+                      )
+                    : <span className='role'>{ROLE_LABEL[p.role]}</span>}
+                </li>
+              ))}
+            </ul>
+
+            {isOwner && data.invites.length > 0 && (
+              <>
+                <h3>Open invites</h3>
+                <ul className='people'>
+                  {data.invites.map((i) => (
+                    <li key={i.inviteId}>
+                      <span className='who'>{i.role === 'editor' ? 'Can edit' : 'Can view'} <span className='muted'>{i.expired ? 'expired' : hoursLeft(i.expiresAt)}</span></span>
+                      <button
+                        className='link-button'
+                        onClick={async () => { try { await call('sheet:cancelInvite', { sheetId, inviteId: i.inviteId }) } catch (err) { onError(err.message) } }}
+                      >
+                        Cancel
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </>
+        )}
+      </section>
+    </div>
+  )
+}

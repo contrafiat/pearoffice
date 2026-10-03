@@ -199,3 +199,58 @@ button, input, select { font: inherit; color: inherit; }
 .tab.active { background: var(--panel); color: var(--ink); font-weight: 600; border-bottom-color: var(--pear); }
 .tab.add { font-size: 17px; padding: 0 12px; }
 .tab.rename { background: var(--panel); border: 1px solid var(--pear); border-radius: 4px; margin: 4px 0; padding: 0 8px; width: 140px; color: var(--ink); }
+
+[hidden] { display: none !important; }
+
+.join-sheet {
+  background: none;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  padding: 7px 12px;
+  cursor: pointer;
+  margin-top: -4px;
+}
+.join-sheet:hover { border-color: var(--pear); color: var(--pear-dark); }
+.sheet-link { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.sheet-link:disabled { color: var(--muted); font-style: italic; cursor: default; }
+.badge { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); background: var(--head); border-radius: 999px; padding: 2px 8px; white-space: nowrap; }
+.badge.view-only { color: var(--pear-dark); background: var(--pear-soft); }
+.my-name { margin-top: auto; display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); padding: 0 4px; }
+.my-name input { border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; background: var(--paper); font-size: 13px; color: var(--ink); }
+.my-name input:focus { outline: none; border-color: var(--pear); }
+
+.toolbar .share {
+  margin-left: auto;
+  background: var(--pear);
+  color: #fff;
+  border: 0;
+  border-radius: 8px;
+  padding: 6px 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.toolbar .share:hover { background: var(--pear-dark); }
+
+.link-button { background: none; border: 0; color: var(--pear-dark); cursor: pointer; padding: 2px 4px; text-decoration: underline; }
+
+.panel-backdrop { position: fixed; inset: 0; background: rgb(0 0 0 / 0.28); display: flex; align-items: flex-start; justify-content: center; padding-top: 10vh; z-index: 20; }
+.panel { background: var(--panel); border: 1px solid var(--line-strong); border-radius: 12px; box-shadow: 0 18px 50px rgb(0 0 0 / 0.25); width: min(520px, calc(100vw - 32px)); padding: 18px 20px 20px; display: flex; flex-direction: column; gap: 12px; max-height: 80vh; overflow-y: auto; }
+.panel header { display: flex; align-items: center; justify-content: space-between; }
+.panel h2 { margin: 0; font-size: 18px; }
+.panel h3 { margin: 6px 0 0; font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+.panel p { margin: 0; color: var(--muted); line-height: 1.45; }
+.panel .close { background: none; border: 0; font-size: 22px; line-height: 1; cursor: pointer; color: var(--muted); }
+.panel input { border: 1px solid var(--line-strong); border-radius: 8px; padding: 8px 10px; background: var(--paper); flex: 1; min-width: 0; }
+.panel input:focus { outline: none; border-color: var(--pear); }
+.panel button:where(:not(.close):not(.link-button)) { border: 1px solid var(--line-strong); background: var(--panel); border-radius: 8px; padding: 8px 14px; cursor: pointer; }
+.panel button.primary { background: var(--pear); border-color: var(--pear); color: #fff; font-weight: 600; }
+.panel button.primary:disabled { opacity: 0.5; cursor: default; }
+.panel .row { display: flex; gap: 8px; align-items: center; }
+.panel .row.end { justify-content: flex-end; }
+.invite-actions { display: flex; flex-direction: column; gap: 10px; }
+.invite-link { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--muted); }
+.invite-link input { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-size: 12px; }
+.people { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.people li { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--line); gap: 8px; }
+.people .role { color: var(--muted); font-size: 13px; }
+.people select { border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; background: var(--panel); }

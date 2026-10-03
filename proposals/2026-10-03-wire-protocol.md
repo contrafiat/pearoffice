@@ -416,3 +416,22 @@ are affected.
   `fmt` `"<rowId>:<colId>:<attr>"` -> value, instead of one object per cell.
   With one object per cell, two people changing different attributes of the
   same cell at once would lose one change.
+- 2026-10-03, invites: the invite record publishes an Ed25519 public key
+  (`invitePub`, from the 32-byte secret used as a seed) instead of
+  `blake2b(secret)`. The joiner signs its request and its claim with the
+  secret. With only a hash in the view, an editor who read an unused invite
+  record could have appended an `inviteUse` for anyone; with a public key,
+  `apply` checks that the claim was signed by whoever holds the secret.
+- 2026-10-03, invites: the `inviteUse` op carries two signed objects, the
+  joiner's `claim` (signed with the invite secret) and its `device` proof
+  (signed with its identity), so `apply` can check both without trusting the
+  admitting writer.
+- 2026-10-03, membership: new `name` op so a member can rename themselves.
+  Signed by their identity, appended only by their own devices, with a version
+  counter so an old rename cannot be replayed. Viewers cannot append, so they
+  keep the name they joined with.
+- 2026-10-03, membership: core's own `addWriter` ops are always refused and
+  core never mints them. Writers are added only by `inviteUse` and `role`.
+- 2026-10-03, joining: the joiner looks the topic up again every few seconds
+  while a join is pending. Hyperswarm otherwise waits minutes before a second
+  lookup, so a joiner who looked before any member announced sat idle.

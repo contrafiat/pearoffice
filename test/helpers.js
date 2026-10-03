@@ -24,7 +24,9 @@ function cleanup () {
 async function waitFor (label, fn, { timeout = 30000, interval = 50 } = {}) {
   const start = Date.now()
   while (Date.now() - start < timeout) {
-    if (await fn()) return
+    let ok = false
+    try { ok = await fn() } catch {}
+    if (ok) return
     await new Promise((resolve) => setTimeout(resolve, interval))
   }
   throw new Error('timed out waiting for: ' + label)

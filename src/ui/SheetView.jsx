@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { call, on } from './bridge.js'
 import { Grid } from './Grid.jsx'
 import { colName } from './a1.js'
+import { SharePanel } from './SharePanel.jsx'
 
 const NUMBER_FORMATS = [
   ['', 'Automatic'],
@@ -21,6 +22,7 @@ export function SheetView ({ sheetId, onTitleChange, onError }) {
   const [editing, setEditing] = useState(null) // { row, col, value } | null
   const [menu, setMenu] = useState(null) // { kind, index, x, y } | null
   const [renaming, setRenaming] = useState(null) // { id, value } | null
+  const [sharing, setSharing] = useState(false)
   const gridRef = useRef(null)
 
   const load = useCallback(async () => {
@@ -35,6 +37,15 @@ export function SheetView ({ sheetId, onTitleChange, onError }) {
 
   useEffect(() => { load() }, [load])
   useEffect(() => on('sheet:changed', (d) => { if (d.sheetId === sheetId) load() }), [sheetId, load])
+  useEffect(() => on('sheet:members', (d) => { if (d.sheetId === sheetId) load() }), [sheetId, load])
+  // Content for a just-joined sheet arrives over the network; poll until it does.
+  useEffect(() => {
+    if (!view || !view.loading) return
+    const t = setInterval(load, 1000)
+    return () => clearInterval(t)
+  }, [view, load])
+
+  const canEdit = !!view && (view.myRole === 'owner' || view.myRole === 'editor')
 
   const cells = useMemo(() => {
     const m = new Map()
@@ -86,6 +97,11 @@ export function SheetView ({ sheetId, onTitleChange, onError }) {
 
   function onKeyDown (e) {
     if (editing) return
+    if (!canEdit) {
+      const moves = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1], Tab: [0, e.shiftKey ? -1 : 1] }
+      if (moves[e.key]) { e.preventDefault(); moveBy(...moves[e.key]) }
+      return
+    }
     const mod = e.ctrlKey || e.metaKey
     const k = e.key
     if (mod && (k === 'z' || k === 'Z')) { e.preventDefault(); run(e.shiftKey ? 'sheet:redo' : 'sheet:undo'); return }
@@ -117,6 +133,7 @@ export function SheetView ({ sheetId, onTitleChange, onError }) {
   }
 
   if (!view) return <div className='loading'>Opening sheet...</div>
+  if (view.loading) return <div className='loading'>Waiting for the sheet to arrive from the people in it...</div>
 
   const fmt = (selected && selected.fmt) || {}
   const barValue = editing && editing.row === sel.row && editing.col === sel.col ? editing.value : (selected ? selected.input : '')
@@ -129,10 +146,12 @@ export function SheetView ({ sheetId, onTitleChange, onError }) {
           aria-label='Sheet title'
           defaultValue={view.title}
           key={view.title}
+          readOnly={!canEdit}
           onBlur={async (e) => { if (e.target.value !== view.title) { await run('sheet:setTitle', { title: e.target.value }); onTitleChange() } }}
           onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur() }}
         />
-        <div className='tools' role='toolbar' aria-label='Formatting'>
+        {!canEdit && <span className='badge view-only'>View only</span>}
+        <div className='tools' role='toolbar' aria-label='Formatting' hidden={!canEdit}>
           <button title='Undo (Ctrl+Z)' disabled={!view.canUndo} onClick={() => run('sheet:undo')}>Undo</button>
           <button title='Redo (Ctrl+Y)' disabled={!view.canRedo} onClick={() => run('sheet:redo')}>Redo</button>
           <span className='sep' />
@@ -146,6 +165,7 @@ export function SheetView ({ sheetId, onTitleChange, onError }) {
             {NUMBER_FORMATS.map(([code, label]) => <option key={code} value={code}>{label}</option>)}
           </select>
         </div>
+        <button className='share' onClick={() => setSharing(true)}>Share</button>
       </header>
 
       <div className='formula-bar'>
@@ -153,8 +173,9 @@ export function SheetView ({ sheetId, onTitleChange, onError }) {
         <span className='fx' aria-hidden='true'>fx</span>
         <input
           aria-label='Cell contents'
+          readOnly={!canEdit}
           value={barValue}
-          onFocus={() => { if (!editing) setEditing({ ...sel, value: selected ? selected.input : '', source: 'bar' }) }}
+          onFocus={() => { if (canEdit && !editing) setEditing({ ...sel, value: selected ? selected.input : '', source: 'bar' }) }}
           onChange={(e) => setEditing({ ...sel, value: e.target.value, source: 'bar' })}
           onKeyDown={onEditKey}
           onBlur={() => { if (editing) commit(null) }}
@@ -168,14 +189,16 @@ export function SheetView ({ sheetId, onTitleChange, onError }) {
         sel={sel}
         editing={editing}
         onSelect={(row, col) => { if (editing) commit(null); setSel({ row, col }) }}
-        onEdit={(row, col) => { setSel({ row, col }); setEditing({ row, col, value: (cells.get(row + ',' + col) || {}).input || '' }) }}
+        onEdit={(row, col) => { setSel({ row, col }); if (canEdit) setEditing({ row, col, value: (cells.get(row + ',' + col) || {}).input || '' }) }}
         onEditChange={(value) => setEditing((ed) => ({ ...ed, value }))}
         onEditKey={onEditKey}
         onEditBlur={() => commit(null)}
         onKeyDown={onKeyDown}
-        onHeaderMenu={(kind, index, x, y) => setMenu({ kind, index, x, y })}
-        onResize={(col, px) => run('sheet:setWidth', { col, px })}
+        onHeaderMenu={(kind, index, x, y) => { if (canEdit) setMenu({ kind, index, x, y }) }}
+        onResize={(col, px) => { if (canEdit) run('sheet:setWidth', { col, px }) }}
       />
+
+      {sharing && <SharePanel sheetId={sheetId} onClose={() => setSharing(false)} onError={onError} />}
 
       {menu && (
         <ul className='menu' style={{ left: menu.x, top: menu.y }} role='menu'>
@@ -209,12 +232,12 @@ export function SheetView ({ sheetId, onTitleChange, onError }) {
               className={'tab' + (t.id === view.tabId ? ' active' : '')}
               title='Double-click to rename'
               onClick={() => { setTabId(t.id); setSel({ row: 1, col: 1 }) }}
-              onDoubleClick={() => setRenaming({ id: t.id, value: t.name })}
+              onDoubleClick={() => { if (canEdit) setRenaming({ id: t.id, value: t.name }) }}
             >
               {t.name}
             </button>
             ))}
-        <button className='tab add' title='Add tab' onClick={async () => { const r = await run('sheet:addTab', {}); if (r) setTabId(r.tabId) }}>+</button>
+        {canEdit && <button className='tab add' title='Add tab' onClick={async () => { const r = await run('sheet:addTab', {}); if (r) setTabId(r.tabId) }}>+</button>}
       </footer>
     </div>
   )
