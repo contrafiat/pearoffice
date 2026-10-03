@@ -7,6 +7,23 @@
 const b4a = require('b4a')
 const model = require('../shared/sheetModel')
 const { displayNumber } = require('../shared/formula')
+const SSF = require('../shared/formula/vendor/fast-formula-parser/ssf/ssf')
+
+// The text a cell shows, and what kind of value it is (the UI right-aligns
+// numbers). Number formats use Excel format codes through SSF.
+function present (v, fmt) {
+  if (v.error) return { display: v.error, kind: 'error' }
+  const value = v.value
+  if (value === null || value === undefined) return { display: '', kind: 'empty' }
+  if (typeof value === 'number') {
+    if (fmt && fmt.num) {
+      try { return { display: SSF.format(fmt.num, value), kind: 'number' } } catch {}
+    }
+    return { display: displayNumber(value), kind: 'number' }
+  }
+  if (typeof value === 'boolean') return { display: value ? 'TRUE' : 'FALSE', kind: 'bool' }
+  return { display: String(value), kind: 'text' }
+}
 
 function createSheetMethods (sheets) {
   async function commit (ctx, sheetId, update) {
@@ -52,7 +69,10 @@ function createSheetMethods (sheets) {
     'sheet:list': async (args, ctx) => {
       const out = []
       for await (const { value } of ctx.localDb.createReadStream({ gt: 'groups:joined:', lt: 'groups:joined:~' })) {
-        if (value && value.groupId) out.push({ sheetId: value.groupId, title: value.name || '' })
+        if (!value || !value.groupId) continue
+        // Prefer the live title: the stored name is what it was called at join.
+        const e = sheets.peek(value.groupId)
+        out.push({ sheetId: value.groupId, title: (e && model.title(e.guarded.doc)) || value.name || '' })
       }
       return out
     },
@@ -74,15 +94,8 @@ function createSheetMethods (sheets) {
         const col = colIndex.get(colId)
         if (row === undefined || col === undefined) continue
         const v = values.get(row + ',' + col) || { value: null }
-        cells.push({
-          row,
-          col,
-          input: model.getInput(doc, tab, row, col),
-          display: v.error ? v.error : typeof v.value === 'number' ? displayNumber(v.value) : v.value === null ? '' : String(v.value),
-          error: v.error ? true : undefined,
-          volatile: v.volatile,
-          fmt: model.getFormat(doc, tab, row, col)
-        })
+        const fmt = model.getFormat(doc, tab, row, col)
+        cells.push({ row, col, input: model.getInput(doc, tab, row, col), ...present(v, fmt), volatile: v.volatile, fmt })
       }
       const widths = {}
       for (const [colId, px] of t.get('widths').entries()) if (colIndex.has(colId)) widths[colIndex.get(colId)] = px
@@ -108,6 +121,7 @@ function createSheetMethods (sheets) {
     'sheet:deleteCols': mutate((doc, tab, a) => model.deleteCols(doc, tab, a.at, a.count || 1)),
     'sheet:renameTab': mutate((doc, tab, a) => model.renameTab(doc, tab, String(a.name))),
     'sheet:setTitle': mutate((doc, tab, a) => model.setTitle(doc, String(a.title))),
+    'sheet:setWidth': mutate((doc, tab, a) => model.setWidth(doc, tab, a.col, a.px)),
 
     'sheet:addTab': async ({ sheetId, name }, ctx) => {
       const { doc } = await docFor(sheetId)

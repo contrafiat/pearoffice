@@ -95,7 +95,10 @@ function createSheets ({ emit, getBase }) {
   function trackUndo (e) {
     const doc = e.guarded.doc
     const scope = [doc.getMap('meta'), doc.getArray('tabs'), ...model.tabIds(doc).map((id) => doc.getMap('tab:' + id))]
-    if (!e.undo) e.undo = new Y.UndoManager(scope, { trackedOrigins: new Set(['local']) })
+    // captureTimeout 0: every edit is its own undo step. The default (500 ms)
+    // merged an edit with the one before it, so undoing a bold also removed
+    // the formula typed just before.
+    if (!e.undo) e.undo = new Y.UndoManager(scope, { trackedOrigins: new Set(['local']), captureTimeout: 0 })
     else for (const t of scope) e.undo.addToScope(t)
   }
 
@@ -127,7 +130,12 @@ function createSheets ({ emit, getBase }) {
     open.delete(sheetId)
   }
 
-  return { load, onUpdate, noteLocal, values, forget, entryFor, yKey }
+  function peek (sheetId) {
+    const e = open.get(sheetId)
+    return e && e.loading ? e : null
+  }
+
+  return { load, onUpdate, noteLocal, values, forget, entryFor, peek, yKey }
 }
 
 module.exports = { createSheets, GuardedDoc, yKey, Y_PREFIX }

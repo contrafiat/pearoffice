@@ -29,7 +29,8 @@ Origin, competitor survey and open hard parts: the PearSheet entry in
 v1 wire protocol approved: `proposals/2026-10-03-wire-protocol.md`. Desktop
 first (Electron), then mobile (Android first). The engine is scaffolded: the
 Bare worklet, the Yjs sheet model, the vendored formula engine and sync over
-`@peerloom/core`. Invites, roles, the seeder and the Electron shell are next.
+`@peerloom/core`. The Electron shell and grid UI work on Linux. Invites, roles and the seeder
+are next.
 See `TODO.md`.
 
 ## Layout
@@ -41,7 +42,19 @@ See `TODO.md`.
 - `src/worklet/` - the Bare program: `bare.js` entry, `engine.js` (core
   wiring), `sheetWire.js` (apply rules), `sheetMethods.js` (IPC),
   `sheets.js` (live documents).
+- `src/ui/` - the React spreadsheet UI. Talks only to `window.pearsheet`
+  (`call`, `on`), which the desktop preload provides and the mobile WebView
+  will provide later. Built to `dist/ui` by `scripts/build-ui.mjs`.
+- `desktop/` - the Electron shell: `main.js` starts the worklet bundle with
+  the bare-runtime binary and relays IPC, `preload.js` is the bridge,
+  `smoke.js` + `smoke-run.js` are the offscreen smoke test. Has its own
+  `package.json` (Electron): `npm install --prefix desktop`.
 - `spikes/` - the 2026-10-03 research spikes and their `RESULTS.md`.
+
+## Running
+
+`npm run desktop` builds the UI and worklet and opens the app, using
+`~/.pearsheet-dev` for data (override with `PEARSHEET_DATA`).
 
 ## Verify
 
@@ -54,6 +67,10 @@ See `TODO.md`.
 - `npm run test:bare`: bundles for this machine and runs the real Bare binary.
   The formula corpus must match the golden file bit for bit, and the worklet
   bundle must create, edit and read a sheet over stdin/stdout.
+- `npm run smoke:desktop`: launches Electron with an offscreen window and a
+  throwaway data folder, creates a sheet through the UI, types with real key
+  events and checks formula, bold, undo and rename. About 15 s. Skipped (with
+  a message) when there is no display.
 
 After a deliberate formula change, regenerate the golden file with
 `UPDATE_GOLDEN=1 node --test test/formula.test.js` and say why in the commit.

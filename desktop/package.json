@@ -1,0 +1,15 @@
+{
+  "name": "pearsheet-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "PearSheet desktop app (Electron). Starts the shared Bare worklet and hosts the web UI.",
+  "license": "MIT",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "smoke": "node smoke.js"
+  },
+  "devDependencies": {
+    "electron": "^44.5.1"
+  }
+}

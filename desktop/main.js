@@ -1,0 +1,100 @@
+// PearSheet desktop: Electron main process. Starts the shared Bare worklet
+// (the same bundle the phones will run), opens the window and relays calls and
+// events between the UI and the worklet. See proposal section 9.
+
+const { app, BrowserWindow, ipcMain, shell } = require('electron')
+const path = require('node:path')
+const { Worklet } = require('./worklet')
+const { resolvePaths } = require('./paths')
+
+const SMOKE = !!process.env.PEARSHEET_SMOKE
+
+// One running copy per data folder: the worklet holds a lock on its store.
+if (!SMOKE && !app.requestSingleInstanceLock()) app.exit(0)
+
+const paths = resolvePaths({ packaged: app.isPackaged, resourcesPath: process.resourcesPath })
+const dataDir = process.env.PEARSHEET_DATA || path.join(app.getPath('userData'), 'data')
+
+let win = null
+let worklet = null
+let quitting = false
+
+function log (...args) {
+  if (!app.isPackaged || SMOKE) console.log('[pearsheet]', ...args)
+}
+
+function startWorklet () {
+  worklet = new Worklet({
+    barePath: paths.bare,
+    bundlePath: paths.bundle,
+    dataDir,
+    onLog: (kind, text) => log(kind, text.trimEnd())
+  })
+  worklet.on('event', (msg) => {
+    if (win && !win.isDestroyed()) win.webContents.send('worklet:event', msg)
+  })
+  worklet.on('exit', ({ code, signal }) => {
+    log('worklet exited', code, signal)
+    if (!quitting && win && !win.isDestroyed()) {
+      win.webContents.send('worklet:event', { name: 'worklet:exit', data: { code, signal } })
+    }
+  })
+  return worklet.start()
+}
+
+ipcMain.handle('worklet:call', async (_e, method, args) => {
+  if (typeof method !== 'string' || !/^(sheet|app):[A-Za-z]+$/.test(method)) throw new Error('bad method')
+  return worklet.call(method, args || {})
+})
+
+function createWindow () {
+  win = new BrowserWindow({
+    width: 1280,
+    height: 820,
+    minWidth: 640,
+    minHeight: 400,
+    title: 'PearSheet',
+    show: !SMOKE,
+    backgroundColor: '#f7f7f4',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      offscreen: SMOKE
+    }
+  })
+  win.removeMenu()
+  // Links open in the system browser, never inside the app.
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^https?:/.test(url)) shell.openExternal(url)
+    return { action: 'deny' }
+  })
+  win.webContents.on('will-navigate', (e) => e.preventDefault())
+  win.loadFile(paths.ui)
+  return win
+}
+
+app.whenReady().then(async () => {
+  log('data', dataDir)
+  const ready = startWorklet().catch((err) => {
+    log('worklet failed to start:', err.message)
+    throw err
+  })
+  createWindow()
+  if (SMOKE) require('./smoke-run').run({ app, win, ready, log })
+})
+
+app.on('second-instance', () => {
+  if (win) { if (win.isMinimized()) win.restore(); win.focus() }
+})
+
+app.on('window-all-closed', () => app.quit())
+
+app.on('before-quit', async (e) => {
+  if (quitting || !worklet) return
+  e.preventDefault()
+  quitting = true
+  await worklet.stop()
+  app.quit()
+})

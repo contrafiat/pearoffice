@@ -7,8 +7,11 @@
   "scripts": {
     "test": "node --test test/*.test.js",
     "build:worklet": "node scripts/build-worklet.js",
+    "build:ui": "node scripts/build-ui.mjs",
+    "desktop": "node scripts/run-desktop.js",
     "test:bare": "node scripts/bare-test.js",
-    "verify": "npm test && npm run test:bare"
+    "smoke:desktop": "node scripts/smoke-desktop.js",
+    "verify": "npm test && npm run test:bare && npm run smoke:desktop"
   },
   "dependencies": {
     "@formulajs/formulajs": "^4.6.1",
@@ -39,7 +42,10 @@
   "devDependencies": {
     "@hyperswarm/testnet": "^3.1.4",
     "bare-pack": "^2.0.0",
-    "bare-runtime": "^1.34.1"
+    "bare-runtime": "^1.34.1",
+    "esbuild": "^0.28.2",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
   },
   "overrides": {
     "rocksdb-native": "3.17.2",

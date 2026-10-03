@@ -12,7 +12,17 @@ function createSheetEngine (opts = {}) {
     emit: (event, data) => engine && engine.emit(event, data),
     getBase: (sheetId) => engine && engine.bases.get(sheetId)
   })
-  const methods = createSheetMethods(sheets)
+  const methods = {
+    ...createSheetMethods(sheets),
+    // Close stores cleanly, then exit. The desktop shell calls this on quit.
+    'app:close': async () => {
+      setTimeout(async () => {
+        try { await engine.close() } catch {}
+        if (typeof Bare !== 'undefined') Bare.exit(0)
+      }, 0)
+      return { ok: true }
+    }
+  }
   engine = createGroupEngine({
     appId: 'pearsheet',
     applyOps: createApplyOps({ onUpdate: sheets.onUpdate }),
