@@ -52,7 +52,7 @@ process layout.
 | Merging | Yjs 13.6. One Yjs document per sheet. |
 | Formulas | Vendored fast-formula-parser with deterministic maths (see `DECISIONS.md`). Formulas are computed on each device and never synced. |
 | Seeder | Holepunch `blind-peer` server, with devices using the `blind-peering` client. |
-| Relay | The suite blind relay already used by PearTune and PearCircle, used only when hole-punching fails (`relayThroughFor` pattern). |
+| Relay | None in v1 (Tim, 2026-10-03). People on networks that never allow a direct connection sync only through the seeder, if they can reach it. |
 
 Hypercore 11.37.1 still has the `DefaultEncryption._reload` bug, so PearCircle's
 `hypercoreEncryptionPatch.js` is applied at worklet start before any core opens.
@@ -172,7 +172,11 @@ are harmless. To keep opening fast, each device keeps a local snapshot
 (`Y.encodeStateAsUpdate` plus the view length it covers) in its local Hyperbee
 and replays only newer entries. The snapshot is never synced.
 
-A `y` update that makes Yjs throw is skipped and logged. See open questions.
+**Bad updates** (Tim, 2026-10-03: test each one first). Before a `y` update
+is applied to the real document, it is applied to a scratch copy. If that
+throws, the update is skipped and logged. Every device runs the same check on
+the same bytes, so every device skips the same updates. The view still records
+the `y/` entry, so a later Yjs fix can re-read it.
 
 ## 5. Invites and joining
 
@@ -244,8 +248,9 @@ core keys.
    identity key, joins the new base and replaces `sheets:joined:<sheetId>`.
 4. The removed person sees the move but cannot open any sealed entry. They keep
    what they already had and nothing after.
-5. Members' devices register the new base with the seeder. The seeder can drop
-   the old cores once the move is a week old.
+5. Members' devices register the new base with the seeder, and a paired device
+   tells the seeder the old base has moved. The seeder deletes the old cores a
+   week later (section 8).
 
 Demoting an editor to viewer needs no move: it revokes their writers and they
 keep reading.
@@ -273,9 +278,26 @@ on `pearcircle/seeder-launcher`. Two ways to run it in v1:
    This lets it announce the device's cores and gives them priority. Nothing
    about any sheet is sent here.
 4. The device stores `seederKey` and appends `seeder { seederKey }` to every
-   sheet it is in, now and in future. Every member's device then registers
-   that sheet with the seeder through `blind-peering`, so each member's writer
-   cores reach it even when the pairing device is off.
+   sheet it is in, now and in future. Its own `blind-peering` registration of
+   a sheet (`addAutobase`) tells the seeder that sheet's bootstrap key, and the
+   seeder records it as an allowed sheet.
+5. Every member's device sees the `seeder` record and registers the sheet with
+   the seeder too, so each member's writer cores reach it even when the
+   pairing device is off.
+
+**Who the seeder stores data for.** Only sheets that a paired device has
+registered (Tim, 2026-10-03). A core is accepted when it arrives from a paired
+device, or when its Autobase target is a bootstrap key already on the allowed
+list. Anything else is refused. Strangers would need a registered sheet's
+bootstrap key, which only members and the seeder hold. `blind-peer` does not do
+this today: untrusted peers only lose the `announce` flag. PearSheet wraps or
+patches its `add-core` handling to enforce the list.
+
+**Old copies after a move.** The seeder deletes a sheet's old cores one week
+after a member's device registers the new base with a `move` notice for the old
+bootstrap key (Tim, 2026-10-03). The seeder cannot read the `move` op itself,
+so a paired device sends the notice over channel `pearsheet/seeder/1`, which
+paired devices open on every connection to the seeder.
 
 ### What the seeder receives
 
@@ -343,7 +365,12 @@ v1 is the first version, so there are no old peers. For later versions:
    - a new device syncs from the seeder alone;
    - removal moves everyone except the removed person, who cannot open the new
      base;
-   - plaintext scan of every core the seeder holds, writer and view cores both.
+   - plaintext scan of every core the seeder holds, writer and view cores both;
+   - the seeder refuses cores from an unpaired device for an unknown sheet, and
+     accepts an unpaired member's cores for a registered sheet;
+   - a bad Yjs update is skipped the same way on every device;
+   - the seeder deletes old cores a week after a move notice (with a test
+     clock).
 3. **Desktop, two real machines** (Linux dev box and the Mac Mini, then a
    Windows box): invite by link, edit live, one machine offline and then back,
    seeder pairing by QR, then sync while both members are offline except the
@@ -364,21 +391,15 @@ v1 is the first version, so there are no old peers. For later versions:
 
 ## Open questions
 
-1. **Seeder storage abuse.** `blind-peer` accepts cores from any peer that
-   knows its key; untrusted peers only lose the `announce` flag. Should the
-   PearSheet seeder refuse untrusted peers outright? That needs a small patch
-   or wrapper around `blind-peer`. Recommended: yes.
-2. **Bad Yjs updates.** An update that makes Yjs throw halfway could leave
-   devices with different documents. Plan: check each update on a scratch
-   document before applying it to the real one, and skip it if the check
-   throws. Needs a test with crafted bad updates.
-3. **Long-lived sheets.** Opening replays every update after the last local
-   snapshot. A new device replays everything, which may be slow after years of
-   edits. A shared compaction step (the owner writes a full-state `y` op and
-   members prune) can come later without a format change. Measure first.
-4. **Seeder retention after a move.** The proposal says to drop old cores a
-   week after a move. Is a week right, and should the seeder drop them itself
-   or wait for a member to ask?
-5. **The relay.** Use the existing suite relay key (as PearCircle does) with a
-   setting to turn it off. Recommended: yes, so it works on networks where
-   hole-punching never succeeds.
+Settled on 2026-10-03 and folded in above: the seeder stores only sheets a
+paired device registered (section 8); each update is tested on a scratch copy
+first (section 4); old copies are deleted a week after a move (section 8); no
+relay in v1 (section 1).
+
+Still open:
+
+1. **Long-lived sheets.** Opening replays every update after the last local
+   snapshot, and a new device replays everything, which may be slow after
+   years of edits. A shared compaction step (the owner writes a full-state `y`
+   op and members prune) can be added later without a format change. Measure
+   during the desktop build before designing it.
