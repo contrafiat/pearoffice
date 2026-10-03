@@ -1,13 +1,10 @@
-// Two PearSheet engines over a local DHT testnet: create, join, offline edits
-// on both sides, convergence, restart. The real invite flow (keys handed over
-// only after a check) comes in a later change; this test joins with core's
-// built-in invite so the sync path can be tested now.
+// Two PearSheet engines over a local DHT testnet: create, invite, join,
+// concurrent edits on both sides, convergence, restart.
 
 const test = require('node:test')
 const assert = require('node:assert/strict')
 const Hyperswarm = require('hyperswarm')
 const createTestnet = require('@hyperswarm/testnet')
-const { defaultEncodeInvite } = require('@peerloom/core/engine')
 const { createSheetEngine } = require('../src/worklet/engine')
 const Corestore = require('corestore')
 const { tmpDir, cleanup, waitFor, call, grid } = require('./helpers')
@@ -35,15 +32,15 @@ test('two devices converge after concurrent offline edits, and survive a restart
   await call(A, 'sheet:setCell', { sheetId, row: 2, col: 2, input: '450.5' })
   await call(A, 'sheet:setCell', { sheetId, row: 3, col: 2, input: '=SUM(B1:B2)' })
 
-  const m = (await A.localDb.get('groups:joined:' + sheetId)).value
-  await B.joinGroup({ inviteKey: defaultEncodeInvite(m) })
+  const { link } = await call(A, 'sheet:invite', { sheetId, role: 'editor' })
+  await call(B, 'sheet:join', { link })
 
   await waitFor('B sees the sheet', async () => {
     if (!B.bases.get(sheetId)) return false
     const g = await grid(B, sheetId).catch(() => null)
     return g && g['3,2'] === '=SUM(B1:B2) -> 1650.5'
   })
-  await waitFor('B is a writer', async () => B.bases.get(sheetId).writable)
+  await waitFor('B is a writer', async () => B.bases.get(sheetId).writable && (await call(B, 'sheet:view', { sheetId })).myRole === 'editor')
 
   // Concurrent edits while both are connected but before either sees the
   // other's: same cell, different cells, row inserts.

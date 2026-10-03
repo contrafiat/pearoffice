@@ -100,6 +100,14 @@ async function run ({ app, win, ready, log }) {
     await waitFor('title in list', "[...document.querySelectorAll('.sheet-link')].some((b) => b.textContent === 'Household budget')")
     step('renamed')
 
+    // Share: the owner gets a single-use invite link.
+    await js("document.querySelector('.toolbar .share').click()")
+    await waitFor('share panel', "!!document.querySelector('.panel .invite-actions')")
+    await js("[...document.querySelectorAll('.panel button')].find((b) => b.textContent === 'Invite to edit').click()")
+    await waitFor('invite link', "(document.querySelector('.invite-link input') || {}).value?.startsWith('pearsheet://join?')")
+    result.inviteLink = (await js("document.querySelector('.invite-link input').value")).slice(0, 24)
+    step('invite link')
+
     await sleep(300)
     const shot = process.env.PEARSHEET_SMOKE_SHOT
     if (shot) {
@@ -107,7 +115,7 @@ async function run ({ app, win, ready, log }) {
       fs.writeFileSync(shot, image.toPNG())
       step('screenshot', shot)
     }
-    result.ok = result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
+    result.ok = result.inviteLink === 'pearsheet://join?s=' + result.inviteLink.slice(19) && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
   } catch (err) {
     result.error = err.message
   }

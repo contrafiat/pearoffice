@@ -82,3 +82,20 @@ test('a malformed update is skipped without changing the document', () => {
   assert.equal(g.apply(new Uint8Array([255, 255, 255, 255, 255])), false)
   assert.equal(g.skipped >= 1, true)
 })
+
+test('asking for a sheet before it exists does not break loading it later', async () => {
+  const { createSheets } = require('../src/worklet/sheets')
+  let base = null
+  const sheets = createSheets({ emit: () => {}, getBase: () => base })
+  await assert.rejects(sheets.load('s1'), /unknown sheet/)
+  const Hyperbee = require('hyperbee')
+  const Corestore = require('corestore')
+  const store = new Corestore(require('./helpers').tmpDir())
+  const view = new Hyperbee(store.get({ name: 'v' }), { keyEncoding: 'utf-8', valueEncoding: 'json' })
+  const src = model.createDoc()
+  await view.put('y/aa/000000000001', { data: Buffer.from(model.initSheet(src)).toString('base64') })
+  base = { ready: async () => {}, view }
+  const e = await sheets.load('s1')
+  assert.equal(model.tabIds(e.guarded.doc).length, 1)
+  await store.close()
+})

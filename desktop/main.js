@@ -12,6 +12,22 @@ const SMOKE = !!process.env.PEARSHEET_SMOKE
 // One running copy per data folder: the worklet holds a lock on its store.
 if (!SMOKE && !app.requestSingleInstanceLock()) app.exit(0)
 
+// pearsheet:// invite links open the app. Registration only makes sense for an
+// installed copy; a dev checkout still handles links passed on the command line.
+if (app.isPackaged) app.setAsDefaultProtocolClient('pearsheet')
+
+let pendingLink = linkIn(process.argv)
+
+function linkIn (argv) {
+  return (argv || []).find((a) => typeof a === 'string' && a.startsWith('pearsheet://')) || null
+}
+
+function sendLink (url) {
+  if (!url) return
+  if (win && !win.isDestroyed() && !win.webContents.isLoading()) win.webContents.send('worklet:event', { name: 'app:deeplink', data: { url } })
+  else pendingLink = url
+}
+
 const paths = resolvePaths({ packaged: app.isPackaged, resourcesPath: process.resourcesPath })
 const dataDir = process.env.PEARSHEET_DATA || path.join(app.getPath('userData'), 'data')
 
@@ -72,6 +88,8 @@ function createWindow () {
   })
   win.webContents.on('will-navigate', (e) => e.preventDefault())
   win.loadFile(paths.ui)
+  // Give React a moment to subscribe before replaying a link from start-up.
+  win.webContents.on('did-finish-load', () => setTimeout(() => { if (pendingLink) { const url = pendingLink; pendingLink = null; sendLink(url) } }, 800))
   return win
 }
 
@@ -85,9 +103,12 @@ app.whenReady().then(async () => {
   if (SMOKE) require('./smoke-run').run({ app, win, ready, log })
 })
 
-app.on('second-instance', () => {
+app.on('second-instance', (_e, argv) => {
   if (win) { if (win.isMinimized()) win.restore(); win.focus() }
+  sendLink(linkIn(argv))
 })
+
+app.on('open-url', (e, url) => { e.preventDefault(); sendLink(url) }) // macOS
 
 app.on('window-all-closed', () => app.quit())
 

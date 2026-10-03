@@ -8,6 +8,10 @@ const b4a = require('b4a')
 const model = require('../shared/sheetModel')
 const { displayNumber } = require('../shared/formula')
 const SSF = require('../shared/formula/vendor/fast-formula-parser/ssf/ssf')
+const m = require('./membership')
+
+const hex = (buf) => b4a.toString(buf, 'hex')
+const INVITE_HOURS = 24
 
 // The text a cell shows, and what kind of value it is (the UI right-aligns
 // numbers). Number formats use Excel format codes through SSF.
@@ -25,7 +29,29 @@ function present (v, fmt) {
   return { display: String(value), kind: 'text' }
 }
 
-function createSheetMethods (sheets) {
+function createSheetMethods (sheets, { getJoin }) {
+  async function profileName (ctx) {
+    const p = await ctx.localDb.get('profile')
+    return (p && p.value && p.value.name) || ''
+  }
+
+  async function viewGet (ctx, sheetId, key) {
+    const base = ctx.bases.get(sheetId)
+    if (!base) throw new Error('unknown sheet: ' + sheetId)
+    await base.ready()
+    const node = await base.view.get(key)
+    return node ? node.value : null
+  }
+
+  async function myRole (ctx, sheetId) {
+    const me = await viewGet(ctx, sheetId, 'member/' + hex(ctx.identity.publicKey))
+    return me ? me.role : null
+  }
+
+  async function requireOwner (ctx, sheetId) {
+    if ((await myRole(ctx, sheetId)) !== 'owner') throw new Error('Only the owner can do that')
+  }
+
   async function commit (ctx, sheetId, update) {
     if (!update) return { changed: false }
     sheets.noteLocal(sheetId, update)
@@ -47,6 +73,8 @@ function createSheetMethods (sheets) {
 
   function mutate (fn) {
     return async (args, ctx) => {
+      const role = await myRole(ctx, args.sheetId)
+      if (role !== 'owner' && role !== 'editor') throw new Error('You can view this sheet but not edit it')
       const { doc } = await docFor(args.sheetId)
       const tabId = firstTab(doc, args.tabId)
       return commit(ctx, args.sheetId, fn(doc, tabId, args))
@@ -56,10 +84,14 @@ function createSheetMethods (sheets) {
   return {
     'sheet:create': async ({ title = 'Untitled sheet' } = {}, ctx) => {
       const { groupId } = await ctx.createGroup({ name: title })
+      const base = ctx.bases.get(groupId)
       const e = sheets.entryFor(groupId)
       e.loading = Promise.resolve()
       const update = model.initSheet(e.guarded.doc, { title })
-      await ctx.append(groupId, { type: 'sheet', version: 1, owner: b4a.toString(ctx.identity.publicKey, 'hex') })
+      for (const op of m.foundingOps({ sheetId: groupId, identity: ctx.identity, writerKey: hex(base.local.key), name: await profileName(ctx) })) {
+        await ctx.append(groupId, op)
+      }
+      if (getJoin()) getJoin().addSheet(groupId)
       // noteLocal (inside commit) starts undo tracking after the founding
       // layout already exists, so the layout itself cannot be undone.
       await commit(ctx, groupId, update)
@@ -68,18 +100,26 @@ function createSheetMethods (sheets) {
 
     'sheet:list': async (args, ctx) => {
       const out = []
+      const joining = new Map((getJoin() ? getJoin().pending() : []).map((p) => [p.sheetId, p]))
       for await (const { value } of ctx.localDb.createReadStream({ gt: 'groups:joined:', lt: 'groups:joined:~' })) {
         if (!value || !value.groupId) continue
         // Prefer the live title: the stored name is what it was called at join.
         const e = sheets.peek(value.groupId)
-        out.push({ sheetId: value.groupId, title: (e && model.title(e.guarded.doc)) || value.name || '' })
+        out.push({ sheetId: value.groupId, title: (e && model.title(e.guarded.doc)) || value.name || '', joining: joining.has(value.groupId) || undefined })
+        joining.delete(value.groupId)
       }
+      // Joins that have not been welcomed yet have no base.
+      for (const p of joining.values()) out.push({ sheetId: p.sheetId, title: '', joining: true, waiting: true })
       return out
     },
 
     // Everything the UI needs to draw one tab.
-    'sheet:view': async ({ sheetId, tabId }) => {
+    'sheet:view': async ({ sheetId, tabId }, ctx) => {
       const { e, doc } = await docFor(sheetId)
+      // Just joined: the content has not arrived yet.
+      if (!model.tabIds(doc).length) {
+        return { sheetId, title: model.title(doc), tabs: [], tabId: null, rows: 0, cols: 0, cells: [], widths: {}, loading: true, myRole: await myRole(ctx, sheetId), canUndo: false, canRedo: false }
+      }
       const tab = firstTab(doc, tabId)
       const t = model.tabMap(doc, tab)
       const values = sheets.values(e).get(tab) || new Map()
@@ -108,6 +148,7 @@ function createSheetMethods (sheets) {
         cols: cols.length,
         cells,
         widths,
+        myRole: await myRole(ctx, sheetId),
         canUndo: !!(e.undo && e.undo.canUndo()),
         canRedo: !!(e.undo && e.undo.canRedo())
       }
@@ -128,6 +169,76 @@ function createSheetMethods (sheets) {
       const { id, update } = model.addTab(doc, String(name || 'Sheet' + (model.tabIds(doc).length + 1)))
       await commit(ctx, sheetId, update)
       return { tabId: id }
+    },
+
+    'sheet:invite': async ({ sheetId, role = 'editor', hours = INVITE_HOURS }, ctx) => {
+      await requireOwner(ctx, sheetId)
+      const mine = (await ctx.localDb.get('groups:joined:' + sheetId)).value
+      const expiresAt = Date.now() + Math.max(1, Math.min(24 * 7, Number(hours) || INVITE_HOURS)) * 3600 * 1000
+      const { op, inviteId, seed } = m.inviteOp({ sheetId, owner: ctx.identity, role, expiresAt })
+      await ctx.append(sheetId, op)
+      const link = m.inviteLink({ sheetId, groupKey: mine.groupKey, inviteId, seed, owner: hex(ctx.identity.publicKey), role })
+      return { link, inviteId, role, expiresAt }
+    },
+
+    'sheet:cancelInvite': async ({ sheetId, inviteId }, ctx) => {
+      await requireOwner(ctx, sheetId)
+      await ctx.append(sheetId, m.cancelOp({ sheetId, owner: ctx.identity, inviteId }))
+      return { ok: true }
+    },
+
+    'sheet:setRole': async ({ sheetId, identity, role }, ctx) => {
+      await requireOwner(ctx, sheetId)
+      const member = await viewGet(ctx, sheetId, 'member/' + identity)
+      if (!member) throw new Error('Not a member of this sheet')
+      if (member.role === 'owner') throw new Error('The owner role cannot change')
+      if (member.role === role) return { changed: false }
+      await ctx.append(sheetId, m.roleOp({ sheetId, owner: ctx.identity, identity, role, v: (member.v || 1) + 1 }))
+      return { changed: true }
+    },
+
+    'sheet:members': async ({ sheetId }, ctx) => {
+      const base = ctx.bases.get(sheetId)
+      if (!base) throw new Error('unknown sheet: ' + sheetId)
+      await base.ready()
+      const me = hex(ctx.identity.publicKey)
+      const members = []
+      for await (const { value } of base.view.createReadStream({ gt: 'member/', lt: 'member/~' })) {
+        members.push({ identity: value.identity, name: value.name, role: value.role, isMe: value.identity === me })
+      }
+      const order = { owner: 0, editor: 1, viewer: 2 }
+      members.sort((a, b) => order[a.role] - order[b.role] || a.name.localeCompare(b.name))
+      const invites = []
+      for await (const { value } of base.view.createReadStream({ gt: 'invite/', lt: 'invite/~' })) {
+        const used = await base.view.get('invite-used/' + value.inviteId)
+        if (used) continue
+        invites.push({ inviteId: value.inviteId, role: value.role, expiresAt: value.expiresAt, expired: Date.now() > value.expiresAt })
+      }
+      return { members, invites, myRole: (members.find((x) => x.isMe) || {}).role || null }
+    },
+
+    'sheet:join': async ({ link }, ctx) => {
+      if (!getJoin()) throw new Error('Not ready yet')
+      return getJoin().start(link, { name: await profileName(ctx) })
+    },
+
+    'app:me': async (args, ctx) => ({ identity: hex(ctx.identity.publicKey), name: await profileName(ctx) }),
+
+    // Saves the name locally and updates it in every sheet this device can
+    // write to. Viewers keep the name they joined with.
+    'app:setName': async ({ name }, ctx) => {
+      const clean = m.cleanName(name)
+      await ctx.localDb.put('profile', { name: clean })
+      const me = hex(ctx.identity.publicKey)
+      for (const [sheetId, base] of ctx.bases) {
+        try {
+          if (!base.writable) continue
+          const member = await viewGet(ctx, sheetId, 'member/' + me)
+          if (!member || member.name === clean) continue
+          await ctx.append(sheetId, m.nameOp({ sheetId, identity: ctx.identity, name: clean, n: (member.n || 0) + 1 }))
+        } catch {}
+      }
+      return { ok: true }
     },
 
     'sheet:undo': async ({ sheetId }, ctx) => undoRedo(sheetId, ctx, 'undo'),

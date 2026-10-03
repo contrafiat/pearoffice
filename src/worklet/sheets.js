@@ -77,6 +77,9 @@ function createSheets ({ emit, getBase }) {
 
   // Load (once) every update in the view into the live document.
   function load (sheetId) {
+    // Asked about a sheet this device does not hold (yet): fail without
+    // leaving an entry behind, so a later call after joining loads it.
+    if (!open.has(sheetId) && !getBase(sheetId)) return Promise.reject(new Error('unknown sheet: ' + sheetId))
     const e = entryFor(sheetId)
     if (!e.loading) {
       e.loading = (async () => {
@@ -88,6 +91,7 @@ function createSheets ({ emit, getBase }) {
         }
         trackUndo(e)
       })()
+      e.loading.catch(() => { if (open.get(sheetId) === e) open.delete(sheetId) })
     }
     return e.loading.then(() => e)
   }

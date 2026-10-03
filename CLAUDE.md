@@ -29,8 +29,9 @@ Origin, competitor survey and open hard parts: the PearSheet entry in
 v1 wire protocol approved: `proposals/2026-10-03-wire-protocol.md`. Desktop
 first (Electron), then mobile (Android first). The engine is scaffolded: the
 Bare worklet, the Yjs sheet model, the vendored formula engine and sync over
-`@peerloom/core`. The Electron shell and grid UI work on Linux. Invites, roles and the seeder
-are next.
+`@peerloom/core`. The Electron shell and grid UI work on Linux. Sharing works: single-use
+invites, owner, editor and viewer roles, renames. The seeder and removal by
+key move are next.
 See `TODO.md`.
 
 ## Layout
@@ -40,8 +41,9 @@ See `TODO.md`.
   (evaluator, deterministic maths, formulajs fills, vendored
   fast-formula-parser).
 - `src/worklet/` - the Bare program: `bare.js` entry, `engine.js` (core
-  wiring), `sheetWire.js` (apply rules), `sheetMethods.js` (IPC),
-  `sheets.js` (live documents).
+  wiring), `sheetWire.js` (apply rules), `membership.js` (signed membership
+  ops, built and checked), `join.js` (the `pearsheet/join/1` handshake),
+  `sheetMethods.js` (IPC), `sheets.js` (live documents).
 - `src/ui/` - the React spreadsheet UI. Talks only to `window.pearsheet`
   (`call`, `on`), which the desktop preload provides and the mobile WebView
   will provide later. Built to `dist/ui` by `scripts/build-ui.mjs`.
@@ -62,8 +64,9 @@ See `TODO.md`.
 
 - `npm test`: `node --test test/*.test.js`. Formula corpus against Excel and a
   golden file, the same corpus in four timezones, formula reference
-  translation, Yjs merging, bad-update handling and a two-engine sync test
-  over a local DHT testnet.
+  translation, Yjs merging, bad-update handling, a two-engine sync test and
+  the invite and role rules (single use, expiry, viewers cannot write, forged
+  and replayed ops skipped), all over a local DHT testnet.
 - `npm run test:bare`: bundles for this machine and runs the real Bare binary.
   The formula corpus must match the golden file bit for bit, and the worklet
   bundle must create, edit and read a sheet over stdin/stdout.
