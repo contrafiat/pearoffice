@@ -17,17 +17,50 @@ It uses the same three-layer architecture as the rest of the suite:
 - WebView React UI
 - Bare worklet (P2P backend)
 
-Expected to build on `@peerloom/core` (`/home/tim/peerloomllc/peerloom-core/`)
-for identity, pairing and sync rather than copy-forking. Confirm in the wire
-protocol proposal.
+Builds on `@peerloom/core` (`/home/tim/peerloomllc/peerloom-core/`)
+for identity, pairing and sync rather than copy-forking (confirmed in the wire
+protocol proposal).
 
 Origin, competitor survey and open hard parts: the PearSheet entry in
 `/home/tim/peerloomllc/APP-IDEAS.md`.
 
 ## Status
 
-Pre-scaffold. No wire protocol or code yet. The first piece of work is the v1
-wire protocol proposal (T3) in `proposals/`. See `TODO.md`.
+v1 wire protocol approved: `proposals/2026-10-03-wire-protocol.md`. Desktop
+first (Electron), then mobile (Android first). The engine is scaffolded: the
+Bare worklet, the Yjs sheet model, the vendored formula engine and sync over
+`@peerloom/core`. Invites, roles, the seeder and the Electron shell are next.
+See `TODO.md`.
+
+## Layout
+
+- `src/shared/` - runs anywhere (Bare, Node, browser): `sheetModel.js` (the
+  Yjs document), `refs.js` (A1 <-> id formula references), `formula/`
+  (evaluator, deterministic maths, formulajs fills, vendored
+  fast-formula-parser).
+- `src/worklet/` - the Bare program: `bare.js` entry, `engine.js` (core
+  wiring), `sheetWire.js` (apply rules), `sheetMethods.js` (IPC),
+  `sheets.js` (live documents).
+- `spikes/` - the 2026-10-03 research spikes and their `RESULTS.md`.
+
+## Verify
+
+`npm run verify` is the merge gate (Constitution §5). It runs:
+
+- `npm test`: `node --test test/*.test.js`. Formula corpus against Excel and a
+  golden file, the same corpus in four timezones, formula reference
+  translation, Yjs merging, bad-update handling and a two-engine sync test
+  over a local DHT testnet.
+- `npm run test:bare`: bundles for this machine and runs the real Bare binary.
+  The formula corpus must match the golden file bit for bit, and the worklet
+  bundle must create, edit and read a sheet over stdin/stdout.
+
+After a deliberate formula change, regenerate the golden file with
+`UPDATE_GOLDEN=1 node --test test/formula.test.js` and say why in the commit.
+
+Formula code must never use `**`, and `Math.pow`, `Math.sin` and `Math.cos`
+are replaced at start-up (`src/shared/formula/detmath.js`). A test fails if a
+`**` appears under `src/shared/formula/`.
 
 ## The things to get right
 
@@ -35,9 +68,9 @@ wire protocol proposal (T3) in `proposals/`. See `TODO.md`.
   never given the sheet's encryption key. Nothing the seeder receives at
   pairing may let it decrypt. PearSheet ships its own seeder. See `DECISIONS.md`.
 - **Deterministic merge and formulas.** Every device must reach the same cell
-  values whatever order edits arrive in. Use an existing CRDT library (Yjs or
-  Automerge) for merging, and make formula evaluation a pure function of the
-  merged cells so the seeder never needs to compute anything.
+  values whatever order edits arrive in. Yjs does the merging. Formula
+  evaluation is a pure function of the merged cells, so the seeder never needs
+  to compute anything.
 - **File compatibility.** .xlsx import and export, not perfect round-trips, in v1.
 
 ## Prior art in this repo family

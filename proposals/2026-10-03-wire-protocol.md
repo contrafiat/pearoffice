@@ -403,3 +403,16 @@ Still open:
    years of edits. A shared compaction step (the owner writes a full-state `y`
    op and members prune) can be added later without a format change. Measure
    during the desktop build before designing it.
+
+## Changes after approval
+
+Recorded here so the approved text stays readable. Pre-release, so no peers
+are affected.
+
+- 2026-10-03, engine scaffold: the topic is core's `topicForKey(topicKey)`,
+  which is `blake2b(topicKey)`, instead of a PearSheet-prefixed hash. Core
+  derives topics itself and the seeder still never gets `topicKey`.
+- 2026-10-03, engine scaffold: formatting is stored one attribute per key,
+  `fmt` `"<rowId>:<colId>:<attr>"` -> value, instead of one object per cell.
+  With one object per cell, two people changing different attributes of the
+  same cell at once would lose one change.
