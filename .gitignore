@@ -1,0 +1,13 @@
+node_modules/
+.DS_Store
+*.log
+dist/
+build/
+.expo/
+# Local P2P storage / identity - never commit
+*.cores/
+store/
+corestore/
+# Local-only working notes
+TODO.md
+DONE.md
