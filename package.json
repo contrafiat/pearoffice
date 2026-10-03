@@ -11,7 +11,9 @@
     "desktop": "node scripts/run-desktop.js",
     "test:bare": "node scripts/bare-test.js",
     "smoke:desktop": "node scripts/smoke-desktop.js",
-    "verify": "npm test && npm run test:bare && npm run smoke:desktop"
+    "verify": "npm test && npm run test:bare && npm run smoke:desktop",
+    "build:seeder": "node scripts/build-seeder.js",
+    "seeder": "node scripts/run-seeder.js"
   },
   "dependencies": {
     "@formulajs/formulajs": "^4.6.1",
@@ -25,7 +27,10 @@
     "bare-encoding": "^1.0.3",
     "bare-fs": "4.7.3",
     "bare-process": "^4.5.1",
+    "bare-signals": "^5.0.0",
     "bessel": "^1.0.2",
+    "blind-peer": "3.15.1",
+    "blind-peering": "2.10.0",
     "chevrotain": "^7.1.2",
     "compact-encoding": "^2.19.2",
     "corestore": "^7.13.0",
@@ -36,6 +41,7 @@
     "hyperswarm": "^4.17.2",
     "jstat": "^1.9.6",
     "protomux": "^3.10.3",
+    "protomux-wakeup": "2.9.0",
     "sodium-universal": "^5.0.1",
     "yjs": "^13.6.33"
   },

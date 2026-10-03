@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react'
 import { call, on } from './bridge.js'
 import { SheetView } from './SheetView.jsx'
 import { JoinPanel } from './JoinPanel.jsx'
+import { SeederPanel } from './SeederPanel.jsx'
 
 export function App () {
   const [sheets, setSheets] = useState(null)
@@ -9,6 +10,7 @@ export function App () {
   const [error, setError] = useState(null)
   const [joining, setJoining] = useState(null) // initial link text, or '' for an empty panel
   const [name, setName] = useState(null)
+  const [seeder, setSeeder] = useState(false)
 
   const refresh = useCallback(async () => {
     try {
@@ -70,6 +72,7 @@ export function App () {
             </button>
           ))}
         </nav>
+        <button className='seeder-button' onClick={() => setSeeder(true)}>Seeder</button>
         <label className='my-name'>
           <span>Your name</span>
           <input
@@ -89,6 +92,7 @@ export function App () {
           onJoined={async () => { setJoining(null); await refresh() }}
         />
       )}
+      {seeder && <SeederPanel onClose={() => setSeeder(false)} onError={setError} />}
       <main className='main'>
         {error && <div className='banner' role='alert'>{error} <button className='link-button' onClick={() => setError(null)}>Dismiss</button></div>}
         {current
