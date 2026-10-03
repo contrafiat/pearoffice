@@ -261,6 +261,16 @@ function deleteCols (doc, tabId, at, count = 1) {
   return deleteLine(doc, tabId, 'col', at, count)
 }
 
+function setWidth (doc, tabId, col, px) {
+  return capture(doc, () => {
+    const t = tabMap(doc, tabId)
+    const colId = t.get('cols').get(col - 1)
+    if (!colId) return
+    const w = Math.max(24, Math.min(1000, Math.round(Number(px) || 0)))
+    if (t.get('widths').get(colId) !== w) t.get('widths').set(colId, w)
+  })
+}
+
 function addTab (doc, name) {
   let id = null
   const update = capture(doc, () => {
@@ -300,6 +310,7 @@ module.exports = {
   insertCols,
   deleteRows,
   deleteCols,
+  setWidth,
   addTab,
   renameTab
 }
