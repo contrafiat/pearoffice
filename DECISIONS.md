@@ -2,6 +2,45 @@
 
 Append-only, newest on top. Per Constitution §4.
 
+## 2026-10-03 - .xlsx library = SheetJS CE from its CDN, pinned in the repo
+Tier: T1
+Context: v1 needs .xlsx import and export, not perfect round-trips.
+Choice: SheetJS Community Edition 0.20.3 (Apache-2.0), tarball checked into the
+repo with its checksum. Values and formulas only, no formatting in v1.
+Alternatives: ExcelJS (MIT, writes styles, but does not run under Bare);
+npm `xlsx` 0.18.5 (rejected - abandoned there, known advisories).
+Consequences: formatting is lost on export. See `spikes/xlsx/RESULTS.md`.
+
+## 2026-10-03 - Formula engine = vendored fast-formula-parser with fixes
+Tier: T2
+Context: every device must compute the same value for every cell. The spike
+found that formulajs date functions follow the device timezone, and that
+`Math.pow/sin/cos` and `**` differ in the last bits between V8 versions.
+Choice: vendor fast-formula-parser (MIT) into the repo. Fill its stubbed
+functions from @formulajs/formulajs (never its date functions). Replace `**`,
+`Math.pow`, `Math.sin` and `Math.cos` with pure-JS fdlibm ports
+(@stdlib, Apache-2.0) and lint against them. Replace `localeCompare` with a
+fixed comparison. NOW, TODAY, RAND and RANDBETWEEN are device-local by design.
+A golden-file corpus test runs under Node and Bare.
+Alternatives: HyperFormula (GPL-3.0 or paid - rejected for licence, kept as
+the fallback if paid); IronCalc (WebAssembly, blocked on iOS);
+hot-formula-parser (wrong answers, timezone-dependent dates).
+Consequences: we own and maintain the formula code. 50/50 on the spike corpus,
+bit-identical across Node, Bare and four timezones. See
+`spikes/formula/RESULTS.md`.
+
+## 2026-10-03 - CRDT library = Yjs
+Tier: T2
+Context: merging must be deterministic whatever order edits arrive in, inside
+an encrypted Autobase that a blind seeder can hold.
+Choice: Yjs. Each Autobase entry carries one Yjs update; the view is every
+update in log order, so the sheet is always rebuilt the same way.
+Alternatives: Automerge (passed every check on desktop, but needs WebAssembly,
+which jitless V8 on iOS does not have; also 5 MB and 4.5x larger updates).
+Consequences: concurrent writes to one cell keep one value and drop the other,
+with no record of the loser. Needs a small `node:crypto` shim under Bare. Not
+yet run on an emulator or phone. See `spikes/crdt/RESULTS.md`.
+
 ## 2026-10-03 - PearSheet ships its own seeder
 Tier: T2
 Context: the suite-wide shared seeder proposal
