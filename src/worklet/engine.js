@@ -21,7 +21,9 @@ function createSheetEngine (opts = {}) {
 
   const sheets = createSheets({
     emit,
-    getBase: (sheetId) => engine && engine.bases.get(sheetId)
+    getBase: (sheetId) => engine && engine.bases.get(sheetId),
+    getLocalDb: () => engine && engine.localDb,
+    getStore: () => engine && engine.store
   })
 
   const methods = {
@@ -87,6 +89,7 @@ function createSheetEngine (opts = {}) {
   })
   const coreClose = engine.close
   engine.close = async () => {
+    try { await sheets.flushSnapshots() } catch {}
     if (join) join.close()
     if (seeding) await seeding.close()
     if (moves) moves.close()
