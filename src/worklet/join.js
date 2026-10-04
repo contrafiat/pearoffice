@@ -9,6 +9,11 @@
 //   joiner -> members  claim    { claim, device }      repeated until applied
 //   writer             appends  inviteUse { claim, device }
 //
+// Members also use the channel to hand a writer something to append for
+// them: `device` (a new device after a move) and `profile` (a viewer's signed
+// name or picture change, proposals/2026-10-04-profiles-with-avatars.md).
+// Older builds ignore message types they do not know.
+//
 // One channel type carries both roles: a device answers requests for sheets
 // it holds and runs its own joins on the same channels.
 
@@ -29,7 +34,7 @@ const CLAIM_RESEND_MS = 3000
 const LOOKUP_EVERY_MS = [3000, 5000, 10000, 15000]
 const hex = (buf) => b4a.toString(buf, 'hex')
 
-function createJoinService ({ engine, emit, log = () => {}, now = () => Date.now() }) {
+function createJoinService ({ engine, emit, onProfile = async () => {}, log = () => {}, now = () => Date.now() }) {
   const muxes = new Set()
   const joins = new Map() // sheetId -> { link, welcome, channels:Set, timer, done }
   const recentlyAppended = new Map() // inviteId -> time
@@ -98,6 +103,7 @@ function createJoinService ({ engine, emit, log = () => {}, now = () => Date.now
     if (msg.t === 'request') return answerRequest(ch, sheetId, msg)
     if (msg.t === 'claim') return takeClaim(ch, sheetId, msg)
     if (msg.t === 'device') return takeDevice(sheetId, msg)
+    if (msg.t === 'profile') return onProfile(sheetId, msg.op)
     const j = joins.get(sheetId)
     if (!j || j.done) return
     log('join got ' + msg.t + (msg.reason ? ': ' + msg.reason : ''))
@@ -166,15 +172,19 @@ function createJoinService ({ engine, emit, log = () => {}, now = () => Date.now
     await engine.append(sheetId, m.admitOp({ device: d }))
   }
 
-  // Send a device proof to every peer reachable for a sheet.
-  function sendDevice (sheetId, device) {
+  // Send a message to every peer reachable for a sheet.
+  function sendToMembers (sheetId, msg) {
     for (const mux of muxes) {
       const id = b4a.from(sheetId)
       let ch = null
       for (const c of mux) if (c.protocol === PROTOCOL && b4a.equals(c.id, id)) ch = c
       if (!ch) ch = openChannel(mux, sheetId)
-      if (ch && ch.opened && ch.msg) ch.msg.send({ t: 'device', device })
+      if (ch && ch.opened && ch.msg) ch.msg.send(msg)
     }
+  }
+
+  function sendDevice (sheetId, device) {
+    sendToMembers(sheetId, { t: 'device', device })
   }
 
   // --- joiner side -----------------------------------------------------------
@@ -286,7 +296,7 @@ function createJoinService ({ engine, emit, log = () => {}, now = () => Date.now
     for (const j of joins.values()) { clearInterval(j.timer); clearTimeout(j.lookup) }
   }
 
-  return { onConnection, addSheet, start, resume, pending, close, sendDevice }
+  return { onConnection, addSheet, start, resume, pending, close, sendDevice, sendToMembers }
 }
 
 module.exports = { createJoinService, PROTOCOL }

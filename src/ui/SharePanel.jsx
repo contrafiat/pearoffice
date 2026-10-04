@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { call, on } from './bridge.js'
 import { QrCode } from './Qr.jsx'
+import { MemberAvatar } from './Avatar.jsx'
 
 const ROLE_LABEL = { owner: 'Owner', editor: 'Can edit', viewer: 'Can view' }
 
@@ -97,7 +98,7 @@ export function SharePanel ({ sheetId, onClose, onError }) {
             <ul className='people'>
               {data.members.map((p) => (
                 <li key={p.identity}>
-                  <span className='who'>{p.name || 'Unnamed'}{p.isMe ? ' (you)' : ''}</span>
+                  <span className='who'><MemberAvatar sheetId={sheetId} member={p} size={28} />{p.name || 'Unnamed'}{p.isMe ? ' (you)' : ''}</span>
                   {isOwner && p.role !== 'owner' && confirming === p.identity && (
                     <span className='confirm'>
                       <button className='danger' disabled={removing} onClick={() => remove(p.identity)}>{removing ? 'Removing...' : 'Remove'}</button>

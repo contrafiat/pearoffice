@@ -5,6 +5,7 @@ import { JoinPanel } from './JoinPanel.jsx'
 import { SeederPanel } from './SeederPanel.jsx'
 import { DevicesPanel } from './DevicesPanel.jsx'
 import { importFile, pickAndImport, isMobile } from './xlsx.js'
+import { Avatar, shrinkPicture } from './Avatar.jsx'
 
 export function App () {
   const [sheets, setSheets] = useState(null)
@@ -12,6 +13,9 @@ export function App () {
   const [error, setError] = useState(null)
   const [joining, setJoining] = useState(null) // initial link text, or '' for an empty panel
   const [name, setName] = useState(null)
+  const [avatar, setAvatar] = useState(null) // { data, mime, hash } or null
+  const [myId, setMyId] = useState(null)
+  const picRef = useRef(null)
   const [seeder, setSeeder] = useState(false)
   const [navOpen, setNavOpen] = useState(false) // phone layout: the sheet list slides in
   const [devices, setDevices] = useState(null) // { link } | { startWith } | {} when open
@@ -38,7 +42,8 @@ export function App () {
 
   useEffect(() => {
     refresh()
-    call('app:me').then((me) => { setName(me.name); setNudge(!!me.phraseNudge) }).catch(() => {})
+    const loadMe = () => call('app:me').then((me) => { setName(me.name); setAvatar(me.avatar || null); setMyId(me.identity); setNudge(!!me.phraseNudge) }).catch(() => {})
+    loadMe()
     if (desktop) call('app:settings').then((s) => { setKeepOnline(!!s.keepOnline); setStartAtLogin(!!s.startAtLogin) }).catch(() => {})
     const offs = [
       on('worklet:exit', () => setError('The sync engine stopped. Restart PearSheet.')),
@@ -51,6 +56,8 @@ export function App () {
       // the sidebar stay live. Batched, since edits arrive in bursts.
       on('sheet:changed', refreshSoon),
       on('sheet:members', refreshSoon),
+      // Another of this person's devices changed their name or picture.
+      on('profile:changed', loadMe),
       // A sheet left this device (removed here, deleted by its owner, or an
       // old copy after a move).
       on('sheet:gone', async ({ sheetId }) => { setCurrent((c) => (c === sheetId ? null : c)); await refresh() }),
@@ -171,16 +178,51 @@ export function App () {
         )}
         <button className={'seeder-button' + (desktop ? ' second' : '')} onClick={() => setDevices({})}>Devices</button>
         <button className='seeder-button second' onClick={() => setSeeder(true)}>Seeder</button>
-        <label className='my-name'>
-          <span>Your name</span>
+        <div className='me'>
+          <button
+            className='me-picture'
+            title={avatar ? 'Change or remove your picture' : 'Add a picture'}
+            onClick={() => picRef.current && picRef.current.click()}
+          >
+            <Avatar name={name} src={avatar ? 'data:' + avatar.mime + ';base64,' + avatar.data : null} seed={myId} size={40} />
+          </button>
           <input
-            placeholder='Shown to people you share with'
-            defaultValue={name || ''}
-            key={name === null ? 'loading' : 'ready'}
-            onBlur={async (e) => { const v = e.target.value.trim(); if (v !== (name || '')) { await call('app:setName', { name: v }); setName(v) } }}
-            onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur() }}
+            ref={picRef}
+            type='file'
+            accept='image/*'
+            hidden
+            onChange={async (e) => {
+              const file = e.target.files && e.target.files[0]
+              e.target.value = ''
+              if (!file) return
+              try {
+                const pic = await shrinkPicture(file)
+                await call('app:setAvatar', pic)
+                const me = await call('app:me')
+                setAvatar(me.avatar || null)
+              } catch (err) { setError(err.message) }
+            }}
           />
-        </label>
+          <div className='my-name'>
+            <label htmlFor='my-name-input'>Your name</label>
+            <input
+              id='my-name-input'
+              placeholder='Shown to people you share with'
+              defaultValue={name || ''}
+              key={name === null ? 'loading' : 'name:' + name}
+              onBlur={async (e) => { const v = e.target.value.trim(); if (v !== (name || '')) { await call('app:setName', { name: v }); setName(v) } }}
+              onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur() }}
+            />
+            {avatar && (
+              <button
+                className='link-button remove-picture' onClick={async () => {
+                  try { await call('app:setAvatar', { data: '' }); setAvatar(null) } catch (err) { setError(err.message) }
+                }}
+              >Remove picture
+              </button>
+            )}
+          </div>
+        </div>
       </aside>
       {joining !== null && (
         <JoinPanel

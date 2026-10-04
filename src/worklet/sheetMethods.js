@@ -29,7 +29,7 @@ function present (v, fmt) {
   return { display: String(value), kind: 'text' }
 }
 
-function createSheetMethods (sheets, { getJoin, getMoves }) {
+function createSheetMethods (sheets, { getJoin, getMoves, getProfiles }) {
   // The method table refers to itself (sheet:import builds on sheet:create).
   let methods = null
   async function profileName (ctx) {
@@ -273,7 +273,7 @@ function createSheetMethods (sheets, { getJoin, getMoves }) {
       const me = hex(ctx.identity.publicKey)
       const members = []
       for await (const { value } of base.view.createReadStream({ gt: 'member/', lt: 'member/~' })) {
-        members.push({ identity: value.identity, name: value.name, role: value.role, isMe: value.identity === me })
+        members.push({ identity: value.identity, name: value.name, role: value.role, avatarHash: value.avatarHash || null, isMe: value.identity === me })
       }
       const order = { owner: 0, editor: 1, viewer: 2 }
       members.sort((a, b) => order[a.role] - order[b.role] || a.name.localeCompare(b.name))
@@ -300,26 +300,24 @@ function createSheetMethods (sheets, { getJoin, getMoves }) {
       let hasSheet = false
       for await (const _ of ctx.localDb.createReadStream({ gt: 'groups:joined:', lt: 'groups:joined:~', limit: 1 })) hasSheet = true
       const nudged = !!(await ctx.localDb.get('phraseNudged'))
-      return { identity: hex(ctx.identity.publicKey), name: await profileName(ctx), phraseNudge: hasSheet && !nudged }
+      const p = await getProfiles().local()
+      return { identity: hex(ctx.identity.publicKey), name: p.name, avatar: p.avatar, phraseNudge: hasSheet && !nudged }
     },
     'app:phraseNudged': async (args, ctx) => { await ctx.localDb.put('phraseNudged', { at: Date.now() }); return { ok: true } },
 
-    // Saves the name locally and updates it in every sheet this device can
-    // write to. Viewers keep the name they joined with.
-    'app:setName': async ({ name }, ctx) => {
-      const clean = m.cleanName(name)
-      await ctx.localDb.put('profile', { name: clean })
-      const me = hex(ctx.identity.publicKey)
-      for (const [sheetId, base] of ctx.bases) {
-        try {
-          if (!base.writable) continue
-          const member = await viewGet(ctx, sheetId, 'member/' + me)
-          if (!member || member.name === clean) continue
-          await ctx.append(sheetId, m.nameOp({ sheetId, identity: ctx.identity, name: clean, n: (member.n || 0) + 1 }))
-        } catch {}
-      }
+    // Saves the name or picture locally and updates it in every sheet
+    // (proposals/2026-10-04-profiles-with-avatars.md).
+    'app:setName': async ({ name }) => {
+      await getProfiles().setName(name)
       return { ok: true }
     },
+    'app:setAvatar': async ({ data, mime }) => {
+      await getProfiles().setAvatar({ data: data || '', mime })
+      return { ok: true }
+    },
+
+    // One member's picture, { data, mime, hash } or null.
+    'sheet:avatar': async ({ sheetId, identity }) => getProfiles().avatarOf(sheetId, identity),
 
     'sheet:undo': async ({ sheetId }, ctx) => undoRedo(sheetId, ctx, 'undo'),
     'sheet:redo': async ({ sheetId }, ctx) => undoRedo(sheetId, ctx, 'redo')

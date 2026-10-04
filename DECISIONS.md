@@ -2,6 +2,20 @@
 
 Append-only, newest on top. Per Constitution §4.
 
+## 2026-10-04 - Profile pictures live inside each sheet's encrypted log
+Tier: T2
+Context: profiles with avatars, as in the other suite apps
+(proposals/2026-10-04-profiles-with-avatars.md).
+Choice: a signed `avatar` op carries a 128 x 128 JPEG (16 KB cap) in each
+sheet the person is in. Any writer may append a member's signed `name` or
+`avatar` op, so viewers can change theirs by handing it to a writer.
+Alternatives: a per-device Hyperblobs core with a reference on the member
+record, as in PearList and PearPetal (rejected - not encrypted with the sheet
+key and not held by the blind seeder, so a picture would only load while its
+owner is online).
+Consequences: one copy of each picture per sheet per change, about 5 to 10 KB.
+Old builds skip the op and show no pictures, and keep a viewer's old name.
+
 ## 2026-10-03 - Desktop first, as an Electron app running the Bare worklet
 Tier: T0 (product scope and build order)
 Context: Tim asked to start with desktop, then mobile (Android first).

@@ -74,12 +74,18 @@ test('blind seeder', async (t) => {
 
   await t.test('a member syncs from the seeder alone', async () => {
     await B.close()
+    // A picture comes from the seeder too (proposals/2026-10-04-profiles-with-avatars.md).
+    const pic = b4a.alloc(300, 7)
+    pic[0] = 0xff; pic[1] = 0xd8; pic[2] = 0xff
+    await call(A, 'app:setAvatar', { data: b4a.toString(pic, 'base64'), mime: 'image/jpeg' })
     await call(A, 'sheet:setCell', { sheetId, row: 3, col: 1, input: 'while-B-away' })
     const a = A.bases.get(sheetId)
     await waitFor('seeder has the new edit', async () => seederHas(seeder, a.local.key, a.local.length))
     await A.close()
     B = await mk(dirB)
     await waitFor('B gets the edit with only the seeder online', async () => (await grid(B, sheetId))['3,1'] === 'while-B-away', { timeout: 30000 })
+    const pa = await call(B, 'sheet:avatar', { sheetId, identity: hex(A.identity.publicKey) })
+    assert.equal(pa.data, b4a.toString(pic, 'base64'))
   })
 
   await t.test('the seeder holds no readable sheet data', async () => {

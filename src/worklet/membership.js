@@ -25,6 +25,7 @@ const P = {
   join: 'pearsheet/join/v1',
   role: 'pearsheet/role/v1',
   name: 'pearsheet/name/v1',
+  avatar: 'pearsheet/avatar/v1',
   seeder: 'pearsheet/seeder/v1',
   seederOff: 'pearsheet/seeder-off/v1',
   move: 'pearsheet/move/v1',
@@ -93,9 +94,40 @@ function roleOp ({ sheetId, owner, identity, role, v }) {
 }
 
 // A member renaming themselves. `n` names the version it replaces, so an old
-// signed rename cannot be appended again to bring back an old name.
-function nameOp ({ sheetId, identity, name, n }) {
-  return { type: 'name', name: signValue({ purpose: P.name, sheetId, identity: hex(identity.publicKey), name: cleanName(name), n }, identity.secretKey) }
+// signed rename cannot be appended again to bring back an old name. `at` is
+// when the person made the change; their linked devices use it to tell which
+// copy of the profile is newer (proposals/2026-10-04-profiles-with-avatars.md).
+function nameOp ({ sheetId, identity, name, n, at }) {
+  return { type: 'name', name: signValue({ purpose: P.name, sheetId, identity: hex(identity.publicKey), name: cleanName(name), n, at }, identity.secretKey) }
+}
+
+// A member's profile picture: a small JPEG or PNG, base64, or '' to remove
+// it. Signed by the member, so any writer may append it for them.
+function avatarOp ({ sheetId, identity, data, mime, hash, n, at }) {
+  return { type: 'avatar', avatar: signValue({ purpose: P.avatar, sheetId, identity: hex(identity.publicKey), data: data || '', mime: data ? mime : '', hash: data ? hash : '', n, at }, identity.secretKey) }
+}
+
+const AVATAR_MAX_BYTES = 16 * 1024
+const AVATAR_MIMES = ['image/jpeg', 'image/png']
+
+function avatarHash (bytes) {
+  const out = b4a.alloc(32)
+  sodium.crypto_generichash(out, bytes)
+  return hex(out)
+}
+
+// Checks picture bytes: size, JPEG or PNG magic bytes matching `mime`, and
+// the hash. Returns the bytes, or null.
+function checkAvatar ({ data, mime, hash }) {
+  if (typeof data !== 'string' || !AVATAR_MIMES.includes(mime) || !HEX64.test(hash || '')) return null
+  if (data.length > Math.ceil(AVATAR_MAX_BYTES / 3) * 4) return null
+  const bytes = b4a.from(data, 'base64')
+  if (bytes.length < 8 || bytes.length > AVATAR_MAX_BYTES) return null
+  const jpeg = bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff
+  const png = bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47
+  if (mime === 'image/jpeg' ? !jpeg : !png) return null
+  if (avatarHash(bytes) !== hash) return null
+  return bytes
 }
 
 // "Back this sheet up to that seeder". Any owner or editor can add one.
@@ -336,14 +368,30 @@ async function applyMembershipOp (op, { view, base, groupId, node, log }) {
     return true
   }
 
+  // Name and picture changes are signed by the member, so any owner or
+  // editor device may append them on a viewer's behalf. `n` stops replays.
   if (op.type === 'name') {
     const r = op.name
     if (!signedBy(r, 'identity', P.name, sheetId)) return skip('bad signature')
     const actor = await actorOf(view, node)
-    if (!actor || actor.identity !== r.identity) return skip('can only rename yourself')
+    if (!actor || (actor.identity !== r.identity && actor.role !== 'owner' && actor.role !== 'editor')) return skip('not appended by a writer')
     const member = await get(view, 'member/' + r.identity)
     if (!member || r.n !== (member.n || 0) + 1) return skip('stale rename')
-    await view.put('member/' + r.identity, { ...member, name: r.name, n: r.n })
+    await view.put('member/' + r.identity, { ...member, name: cleanName(r.name), n: r.n, nameAt: typeof r.at === 'number' ? r.at : 0 })
+    return true
+  }
+
+  if (op.type === 'avatar') {
+    const r = op.avatar
+    if (!signedBy(r, 'identity', P.avatar, sheetId)) return skip('bad signature')
+    const actor = await actorOf(view, node)
+    if (!actor || (actor.identity !== r.identity && actor.role !== 'owner' && actor.role !== 'editor')) return skip('not appended by a writer')
+    const member = await get(view, 'member/' + r.identity)
+    if (!member || r.n !== (member.avatarN || 0) + 1) return skip('stale picture')
+    if (r.data && !checkAvatar(r)) return skip('bad picture')
+    if (r.data) await view.put('avatar/' + r.identity, { data: r.data, mime: r.mime, hash: r.hash })
+    else await view.del('avatar/' + r.identity)
+    await view.put('member/' + r.identity, { ...member, avatarHash: r.data ? r.hash : null, avatarN: r.n, avatarAt: typeof r.at === 'number' ? r.at : 0 })
     return true
   }
 
@@ -409,6 +457,10 @@ module.exports = {
   cancelOp,
   roleOp,
   nameOp,
+  avatarOp,
+  avatarHash,
+  checkAvatar,
+  AVATAR_MAX_BYTES,
   seederOp,
   seederOffOp,
   memberOp,

@@ -10,6 +10,7 @@ const { createSeeding } = require('./seeding')
 const { createMoves } = require('./moves')
 const { createLinking } = require('./linking')
 const { createDeleting } = require('./deleting')
+const { createProfiles } = require('./profiles')
 
 function createSheetEngine (opts = {}) {
   const { createSwarm: makeSwarm, log = () => {}, ...rest } = opts
@@ -19,6 +20,7 @@ function createSheetEngine (opts = {}) {
   let moves = null
   let linking = null
   let deleting = null
+  let profiles = null
   const emit = (event, data) => engine && engine.emit(event, data)
 
   const sheets = createSheets({
@@ -29,7 +31,7 @@ function createSheetEngine (opts = {}) {
   })
 
   const methods = {
-    ...createSheetMethods(sheets, { getJoin: () => join, getMoves: () => moves }),
+    ...createSheetMethods(sheets, { getJoin: () => join, getMoves: () => moves, getProfiles: () => profiles }),
     'seeder:pair': async ({ link }) => seeding.pair(link),
     'seeder:list': async () => seeding.list(),
     'seeder:sheet': async ({ sheetId }) => seeding.sheetSeeders(sheetId),
@@ -63,6 +65,8 @@ function createSheetEngine (opts = {}) {
         if ((type === 'seeder' || type === 'seederOff') && seeding) setTimeout(() => seeding.sweep().catch(() => {}), 200)
         if (type === 'move' && moves) moves.onMoved(sheetId).catch((e) => log('move failed: ' + e.message))
         if (type === 'delete' && deleting) deleting.onDeleted(sheetId).catch((e) => log('delete failed: ' + e.message))
+        // Bring this person's name and picture in step with the sheet.
+        if (profiles) setTimeout(() => profiles.reconcile(sheetId).catch(() => {}), 200)
       },
       log
     }),
@@ -76,7 +80,8 @@ function createSheetEngine (opts = {}) {
     // connection. Core calls this during init, after localDb is ready.
     createSwarm: (args) => {
       const swarm = makeSwarm ? makeSwarm(args) : new (require('hyperswarm'))(args)
-      join = createJoinService({ engine, emit, log })
+      profiles = createProfiles({ engine, getJoin: () => join, emit, log })
+      join = createJoinService({ engine, emit, onProfile: (sheetId, op) => profiles.take(sheetId, op), log })
       // Let core attach replication first, then add our channel.
       swarm.on('connection', (conn) => { Promise.resolve().then(() => { join.onConnection(conn); if (linking) linking.listen(conn) }) })
       setTimeout(() => join.resume().catch((e) => log('resume joins failed: ' + e.message)), 0)
@@ -93,6 +98,7 @@ function createSheetEngine (opts = {}) {
           try { await linking.resume() } catch (e) { log('link resume failed: ' + e.message) }
           try { await moves.resume() } catch {}
           try { await deleting.resume() } catch {}
+          try { await profiles.reconcileAll() } catch {}
         }, ms)
         if (t.unref) t.unref()
       }
@@ -107,6 +113,7 @@ function createSheetEngine (opts = {}) {
     if (seeding) await seeding.close()
     if (moves) moves.close()
     if (linking) linking.close()
+    if (profiles) profiles.close()
     return coreClose()
   }
   engine.sheets = sheets
@@ -114,6 +121,7 @@ function createSheetEngine (opts = {}) {
   Object.defineProperty(engine, 'join', { get: () => join })
   Object.defineProperty(engine, 'seeding', { get: () => seeding })
   Object.defineProperty(engine, 'deleting', { get: () => deleting })
+  Object.defineProperty(engine, 'profiles', { get: () => profiles })
   return engine
 }
 

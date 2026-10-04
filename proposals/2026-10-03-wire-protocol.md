@@ -430,6 +430,9 @@ are affected.
   Signed by their identity, appended only by their own devices, with a version
   counter so an old rename cannot be replayed. Viewers cannot append, so they
   keep the name they joined with.
+- 2026-10-04, profiles: new `avatar` op, and any writer may append a
+  member's signed `name` or `avatar` op on their behalf. See
+  proposals/2026-10-04-profiles-with-avatars.md.
 - 2026-10-03, membership: core's own `addWriter` ops are always refused and
   core never mints them. Writers are added only by `inviteUse` and `role`.
 - 2026-10-03, joining: the joiner looks the topic up again every few seconds
