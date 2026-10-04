@@ -89,6 +89,8 @@ button, input, select { font: inherit; color: inherit; }
 .loading, .empty { margin: auto; text-align: center; color: var(--muted); }
 .empty h1 { color: var(--ink); font-size: 22px; font-weight: 650; margin: 0 0 8px; }
 .empty p { margin: 0 0 18px; }
+.empty-actions { display: flex; gap: 10px; justify-content: center; align-items: center; }
+.empty-actions .join-sheet { margin-top: 0; padding: 10px 18px; font-size: 15px; color: var(--ink); }
 
 .sheet { display: flex; flex-direction: column; height: 100%; min-height: 0; }
 
@@ -105,6 +107,8 @@ button, input, select { font: inherit; color: inherit; }
   cursor: pointer;
   min-width: 32px;
 }
+.tools button { display: inline-flex; align-items: center; justify-content: center; height: 30px; color: var(--ink); }
+.tools select { height: 30px; }
 .tools button:hover:not(:disabled), .tools select:hover { border-color: var(--line-strong); }
 .tools button:disabled { opacity: 0.45; cursor: default; }
 .tools button.on { background: var(--pear-soft); border-color: var(--pear); color: var(--pear-dark); }
@@ -199,7 +203,7 @@ button, input, select { font: inherit; color: inherit; }
 .tab { border: 0; background: none; padding: 0 14px; cursor: pointer; color: var(--muted); border-bottom: 2px solid transparent; }
 .tab:hover { color: var(--ink); }
 .tab.active { background: var(--panel); color: var(--ink); font-weight: 600; border-bottom-color: var(--pear); }
-.tab.add { font-size: 17px; padding: 0 12px; }
+.tab.add { padding: 0 12px; display: inline-flex; align-items: center; }
 .tab.rename { background: var(--panel); border: 1px solid var(--pear); border-radius: 4px; margin: 4px 0; padding: 0 8px; width: 140px; color: var(--ink); }
 
 [hidden] { display: none !important; }
@@ -216,6 +220,7 @@ button, input, select { font: inherit; color: inherit; }
 .sheet-link { display: flex; align-items: center; gap: 8px; }
 .sheet-link .sheet-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .sheet-owner { display: inline-flex; flex: none; }
+.sheet-owner.placeholder { width: 20px; height: 20px; border-radius: 50%; border: 1px dashed var(--line-strong); box-sizing: border-box; }
 .sheet-owner .avatar { font-size: 9px !important; }
 .people-count { display: inline-flex; align-items: center; gap: 3px; flex: none; color: var(--muted); font-size: 12px; font-weight: 400; }
 .people-stack { display: inline-flex; align-items: center; margin-left: auto; background: none; border: 0; padding: 0 4px; cursor: pointer; }
@@ -234,9 +239,7 @@ button, input, select { font: inherit; color: inherit; }
 .me-row .gear { color: var(--muted); flex: none; }
 
 .panel.settings { gap: 10px; }
-.panel.settings header { gap: 8px; }
-.panel.settings header h2 { flex: 1; }
-.panel .back { padding: 0; text-decoration: none; font-size: 14px; }
+.panel .back { padding: 0; text-decoration: none; font-size: 14px; display: inline-flex; align-items: center; gap: 2px; white-space: nowrap; }
 .panel .check { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; color: var(--ink); font-size: 14px; line-height: 1.4; margin: 0; padding: 0; }
 .panel .check input { flex: none; margin-top: 3px; padding: 0; }
 .panel .check .muted { margin: 0; }
@@ -278,7 +281,9 @@ button, input, select { font: inherit; color: inherit; }
 
 .panel-backdrop { position: fixed; inset: 0; background: rgb(0 0 0 / 0.28); display: flex; align-items: flex-start; justify-content: center; padding-top: 10vh; z-index: 20; }
 .panel { background: var(--panel); border: 1px solid var(--line-strong); border-radius: 12px; box-shadow: 0 18px 50px rgb(0 0 0 / 0.25); width: min(520px, calc(100vw - 32px)); padding: 18px 20px 20px; display: flex; flex-direction: column; gap: 12px; max-height: 80vh; overflow-y: auto; }
-.panel header { display: flex; align-items: center; justify-content: space-between; }
+.panel header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.panel header h2 { flex: 1; }
+.panel .close { display: inline-flex; align-items: center; justify-content: center; }
 .panel h2 { margin: 0; font-size: 18px; }
 .panel h3 { margin: 6px 0 0; font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
 .panel p { margin: 0; color: var(--muted); line-height: 1.45; }
@@ -327,6 +332,7 @@ button, input, select { font: inherit; color: inherit; }
   .formula-bar input { min-width: 0; }
   .banner { padding-left: 52px; } /* clear the menu button */
   .empty { padding: 0 24px; }
+  .empty-actions { flex-direction: column; align-items: stretch; }
   .formula-bar .address { width: 48px; }
   .panel-backdrop { padding-top: 4vh; }
 }

@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react'
+import { X } from '@phosphor-icons/react'
 import { call, on } from './bridge.js'
 import { QrCode } from './Qr.jsx'
 import { MemberAvatar } from './Avatar.jsx'
@@ -62,7 +63,7 @@ export function SharePanel ({ sheetId, onClose, onError }) {
       <section className='panel' role='dialog' aria-label='Share this sheet'>
         <header>
           <h2>Share</h2>
-          <button className='close' aria-label='Close' onClick={onClose}>×</button>
+          <button className='close' aria-label='Close' onClick={onClose}><X size={18} /></button>
         </header>
 
         {!data && <p className='muted'>Loading...</p>}
