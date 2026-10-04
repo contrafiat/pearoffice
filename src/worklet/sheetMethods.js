@@ -20,10 +20,11 @@ function present (v, fmt) {
   const value = v.value
   if (value === null || value === undefined) return { display: '', kind: 'empty' }
   if (typeof value === 'number') {
+    // `num` is the value itself, for the selection totals.
     if (fmt && fmt.num) {
-      try { return { display: SSF.format(fmt.num, value), kind: 'number' } } catch {}
+      try { return { display: SSF.format(fmt.num, value), kind: 'number', num: value } } catch {}
     }
-    return { display: displayNumber(value), kind: 'number' }
+    return { display: displayNumber(value), kind: 'number', num: value }
   }
   if (typeof value === 'boolean') return { display: value ? 'TRUE' : 'FALSE', kind: 'bool' }
   return { display: String(value), kind: 'text' }

@@ -126,6 +126,35 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
     result.spill = true
     step('spilling formula')
 
+    // Quick wins: totals of the selection, Ctrl+Home and Ctrl+Down, more
+    // decimals, and "Paste values only" from the cell menu.
+    const cellNode = (r, c) => "[...document.querySelectorAll('.cell')].find((x) => x.dataset.r === '" + r + "' && x.dataset.c === '" + c + "')"
+    const sendMod = async (keyCode, modifiers) => { wc.sendInputEvent({ type: 'keyDown', keyCode, modifiers }); wc.sendInputEvent({ type: 'keyUp', keyCode, modifiers }); await sleep(60) }
+    await sendMod('Home', ['control'])
+    await waitFor('at A1', "document.querySelector('.formula-bar .address').textContent === 'A1'")
+    await sendMod('Down', ['control'])
+    await waitFor('Ctrl+Down to A3', "document.querySelector('.formula-bar .address').textContent === 'A3'")
+    await key('Right'); await key('Up'); await key('Up')
+    await sendMod('Down', ['shift']); await sendMod('Down', ['shift'])
+    await waitFor('totals', "!!document.querySelector('.totals') && document.querySelector('.totals').textContent.includes('Sum 3301') && document.querySelector('.totals').textContent.includes('Count 3')")
+    await key('Up'); await key('Down')
+    await js("document.querySelector('.tools [aria-label=\"More decimal places\"]').click()")
+    await waitFor('more decimals', cellNode(2, 2) + ".textContent === '450.50'")
+    await key('Down')
+    await js(`(() => { const el = ${cellNode(3, 2)}; el.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 300, clientY: 200 })) })()`)
+    await waitFor('cell menu', "[...document.querySelectorAll('.menu li')].some((l) => l.textContent === 'Copy')")
+    await js("[...document.querySelectorAll('.menu li')].find((l) => l.textContent === 'Copy').click()")
+    await key('Right'); await key('Right')
+    await js(`(() => { const el = ${cellNode(3, 4)}; el.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 400, clientY: 200 })) })()`)
+    await waitFor('cell menu again', "[...document.querySelectorAll('.menu li')].some((l) => l.textContent === 'Paste values only')")
+    await js("[...document.querySelectorAll('.menu li')].find((l) => l.textContent === 'Paste values only').click()")
+    await waitFor('pasted value', cellNode(3, 4) + ".textContent === '1650.5' && document.querySelector('.formula-bar input').value === '1650.5'")
+    await key('Delete')
+    await waitFor('cleared', cellNode(3, 4) + ".textContent === ''")
+    await key('Left'); await key('Left'); await key('Down')
+    result.quickWins = true
+    step('totals, shortcuts, decimals, paste values')
+
     // Ranges, copy and paste: select B1:B3, copy, paste into C1. The formula
     // moves with it, as in Excel.
     for (let i = 0; i < 3; i++) await key('Up')
@@ -345,7 +374,7 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
       fs.writeFileSync(shot, image.toPNG())
       step('screenshot', shot)
     }
-    result.ok = result.keepOnline && result.avatar && result.spill && result.suggested === 'SUBSTITUTE,SUBTOTAL,SUM' && result.argHelp === 'number1' && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.importedFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000 && result.pastedFormula === '=SUM(C1:C2)' && result.inviteLink === 'pearsheet://join?s=' + result.inviteLink.slice(19) && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
+    result.ok = result.keepOnline && result.avatar && result.spill && result.quickWins && result.suggested === 'SUBSTITUTE,SUBTOTAL,SUM' && result.argHelp === 'number1' && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.importedFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000 && result.pastedFormula === '=SUM(C1:C2)' && result.inviteLink === 'pearsheet://join?s=' + result.inviteLink.slice(19) && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
   } catch (err) {
     result.error = err.message
     // What the page showed, to tell a UI failure from a load failure.

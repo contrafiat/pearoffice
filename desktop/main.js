@@ -2,7 +2,7 @@
 // (the same bundle the phones will run), opens the window and relays calls and
 // events between the UI and the worklet. See proposal section 9.
 
-const { app, BrowserWindow, Tray, Menu, ipcMain, shell } = require('electron')
+const { app, BrowserWindow, Tray, Menu, ipcMain, shell, clipboard } = require('electron')
 const path = require('node:path')
 const fs = require('node:fs')
 const { Worklet } = require('./worklet')
@@ -141,6 +141,10 @@ function startWorklet () {
 ipcMain.handle('worklet:call', async (_e, method, args) => {
   // The UI asks for a link that arrived before it was listening.
   if (method === 'app:takeLink') { const url = pendingLink; pendingLink = null; return { url } }
+  // The cell menu's Cut, Copy and Paste.
+  // This Electron's clipboard calls return promises.
+  if (method === 'app:setClipboard') { await clipboard.writeText(String((args && args.text) || '')); return { ok: true } }
+  if (method === 'app:getClipboard') return { text: String((await clipboard.readText()) || '') }
   // About: web and email links open outside the app.
   if (method === 'app:openUrl') {
     const url = String((args && args.url) || '')

@@ -440,3 +440,9 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 .spill-outline { position: absolute; border: 1px dashed var(--pear); pointer-events: none; margin: -1px 0 0 -1px; z-index: 2; }
 .formula-bar input.spilled { color: var(--muted); }
 .spill-note { padding: 6px 14px; font-size: 13px; color: var(--danger); background: var(--panel); border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }
+
+/* Sum, average and count of the selection, at the right of the tab bar. */
+.tabbar .totals { margin-left: auto; display: flex; align-items: center; gap: 14px; font-size: 12px; color: var(--muted); white-space: nowrap; padding: 0 6px; }
+.tabbar .totals b { color: var(--ink); font-weight: 500; }
+@media (max-width: 720px) { .tabbar .totals .wide { display: none; } }
+.tools .decimals { font-size: 12px; font-variant-numeric: tabular-nums; gap: 1px; }
