@@ -219,6 +219,16 @@ function createSheetMethods (sheets, { getJoin, getMoves, getProfiles }) {
           const val = v.get(row + ',' + col) || { value: null }
           cells.push({ row, col, input: model.getInput(doc, id, row, col), value: val.error ? null : val.value, error: val.error, fmt: model.getFormat(doc, id, row, col), spill: val.spill })
         }
+        // Formatted cells with nothing in them, so their style goes out too.
+        const seen = new Set(cells.map((x) => x.row + ',' + x.col))
+        for (const key of t.get('fmt').keys()) {
+          const [rowId, colId] = key.split(':')
+          const row = rowIndex.get(rowId)
+          const col = colIndex.get(colId)
+          if (row === undefined || col === undefined || seen.has(row + ',' + col)) continue
+          seen.add(row + ',' + col)
+          cells.push({ row, col, input: '', value: null, fmt: model.getFormat(doc, id, row, col) })
+        }
         for (const [rc, val] of v) {
           if (!val.from) continue
           const [row, col] = rc.split(',').map(Number)
