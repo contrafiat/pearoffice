@@ -1,4 +1,5 @@
 import React from 'react'
+import { QrCode as QrIcon } from '@phosphor-icons/react'
 import { call } from './bridge.js'
 import { toSvg } from '../shared/qr.js'
 import { isMobile } from './xlsx.js'
@@ -25,7 +26,7 @@ export function ScanButton ({ prefix, what, onLink, onError }) {
         } catch (err) { onError(err.message) }
       }}
     >
-      Scan QR code
+      <QrIcon size={16} /> Scan QR code
     </button>
   )
 }

@@ -392,3 +392,46 @@ button, input, select { font: inherit; color: inherit; }
 .formula-help .args { color: var(--muted); font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-size: 12px; }
 .formula-help .args b { color: var(--ink); }
 .formula-help .about { color: var(--muted); font-size: 12px; margin-top: 2px; }
+
+/* ---------------------------------------------------------------------------
+   Suite UI rules, shared with PearList and PearPetal: Manrope, centered
+   titles and section headers, buttons side by side share the width equally,
+   a lone button spans the row, and phones open panels as bottom sheets.
+   --------------------------------------------------------------------------- */
+:root { font-family: 'Manrope', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
+/* Cells keep the system font: its figures line up in columns. */
+.grid, .formula-bar input, .formula-bar .address, .tab.rename { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; }
+/* Manrope ships 300, 400 and 500. */
+h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.active, .badge,
+.panel button.primary, .toolbar .share, .people-stack .more-people { font-weight: 500; }
+
+.panel header { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; }
+.panel header h2 { grid-column: 2; grid-row: 1; text-align: center; }
+.panel header .back { grid-column: 1; grid-row: 1; justify-self: start; }
+.panel header .close { grid-column: 3; grid-row: 1; justify-self: end; }
+.panel h3 { text-align: center; }
+
+.panel button:where(:not(.close):not(.link-button):not(.swatch):not(.me-picture)),
+.new-sheet, .join-sheet { display: inline-flex; align-items: center; justify-content: center; gap: 6px; text-align: center; }
+.panel .row:not(:has(input, select, textarea)) > button:not(.link-button) { flex: 1 1 0; min-width: 0; }
+.panel .row.end { justify-content: stretch; }
+.panel .scan-button { align-self: stretch; }
+.panel .about-row { justify-content: center; }
+
+.empty-actions { width: min(560px, 100%); margin: 0 auto; }
+.empty-actions > * { flex: 1 1 0; min-width: 0; margin: 0; }
+.join-sheet.import { display: inline-flex; }
+
+/* Phones: panels slide up from the bottom, with a drag handle. */
+@keyframes pearsheet-sheet-up { from { transform: translateY(100%); } to { transform: none; } }
+@keyframes pearsheet-fade-in { from { background: rgb(0 0 0 / 0); } }
+@media (max-width: 720px) {
+  .panel-backdrop { align-items: flex-end; padding: 0; animation: pearsheet-fade-in 0.24s ease; background: rgb(0 0 0 / 0.45); }
+  .panel {
+    width: 100%; max-height: 88vh; border-radius: 16px 16px 0 0; border-bottom: 0;
+    padding: 8px 18px calc(22px + env(safe-area-inset-bottom));
+    animation: pearsheet-sheet-up 0.26s cubic-bezier(0.32, 0.72, 0, 1);
+  }
+  .panel::before { content: ''; flex: none; width: 36px; height: 4px; border-radius: 2px; background: var(--line-strong); margin: 4px auto 2px; }
+  .empty-actions { flex-direction: column; align-items: stretch; }
+}

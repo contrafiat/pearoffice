@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { CaretLeft, X } from '@phosphor-icons/react'
+import { ArrowCounterClockwise, CaretLeft, DeviceMobile, Key, X } from '@phosphor-icons/react'
 import { QrCode, ScanButton } from './Qr.jsx'
 import { call, on } from './bridge.js'
 
@@ -40,14 +40,14 @@ export function DevicesPanel ({ initialLink = '', startWith = null, onBack = nul
           <>
             <p>Use PearSheet on another phone or computer as the same person, with all your sheets.</p>
             <div className='row'>
-              <button className='primary' onClick={async () => { setMode('show'); try { setLink(await call('link:start')) } catch (err) { onError(err.message) } }}>Link a new device</button>
+              <button className='primary' onClick={async () => { setMode('show'); try { setLink(await call('link:start')) } catch (err) { onError(err.message) } }}><DeviceMobile size={16} /> Link a new device</button>
               <button onClick={() => setMode('use')}>This is the new device</button>
             </div>
             <h3>Recovery phrase</h3>
             <p>24 words that bring back your identity if you lose every device. Anyone with them can act as you.</p>
             <div className='row'>
-              <button onClick={async () => { try { setPhrase((await call('link:phrase')).phrase); setMode('phrase'); call('app:phraseNudged').catch(() => {}) } catch (err) { onError(err.message) } }}>Show my phrase</button>
-              <button onClick={() => setMode('restore')}>Restore from a phrase</button>
+              <button onClick={async () => { try { setPhrase((await call('link:phrase')).phrase); setMode('phrase'); call('app:phraseNudged').catch(() => {}) } catch (err) { onError(err.message) } }}><Key size={16} /> Show my phrase</button>
+              <button onClick={() => setMode('restore')}><ArrowCounterClockwise size={16} /> Restore from a phrase</button>
             </div>
             <p className='muted small'>If you lose a linked device, it still holds your identity. To cut it off, the owner of each sheet removes you and invites you again under a new identity.</p>
           </>

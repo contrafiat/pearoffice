@@ -7,7 +7,7 @@ import { DevicesPanel } from './DevicesPanel.jsx'
 import { importFile, pickAndImport, isMobile } from './xlsx.js'
 import { Avatar, MemberAvatar } from './Avatar.jsx'
 import { SettingsPanel } from './SettingsPanel.jsx'
-import { List, GearSix } from '@phosphor-icons/react'
+import { FileArrowUp, GearSix, LinkSimple, List, Plus } from '@phosphor-icons/react'
 
 // Import .xlsx: a file input on desktop, the shell's file picker on phones.
 function ImportButton ({ className, onImported, onError }) {
@@ -22,13 +22,13 @@ function ImportButton ({ className, onImported, onError }) {
           } catch (err) { onError('Could not import: ' + err.message) }
         }}
       >
-        Import .xlsx
+        <FileArrowUp size={16} /> Import .xlsx
       </button>
     )
   }
   return (
     <label className={className + ' import'}>
-      Import .xlsx
+      <FileArrowUp size={16} /> Import .xlsx
       <input
         type='file'
         accept='.xlsx,.csv'
@@ -148,8 +148,8 @@ export function App () {
           <span className='brand-mark' aria-hidden='true' />
           PearSheet
         </div>
-        <button className='new-sheet' onClick={create}>New sheet</button>
-        <button className='join-sheet' onClick={() => setJoining('')}>Join with a link</button>
+        <button className='new-sheet' onClick={create}><Plus size={16} /> New sheet</button>
+        <button className='join-sheet' onClick={() => setJoining('')}><LinkSimple size={16} /> Join with a link</button>
         <ImportButton className='join-sheet' onImported={opened} onError={setError} />
         <nav className='sheet-list' aria-label='Your sheets'>
           {sheets === null && <p className='muted'>Starting...</p>}
@@ -236,8 +236,8 @@ export function App () {
               <h1>Shared spreadsheets, device to device.</h1>
               <p>No accounts and no servers. Create a sheet, join one with a link or import a file.</p>
               <div className='empty-actions'>
-                <button className='new-sheet big' onClick={create}>New sheet</button>
-                <button className='join-sheet big' onClick={() => setJoining('')}>Join with a link</button>
+                <button className='new-sheet big' onClick={create}><Plus size={18} /> New sheet</button>
+                <button className='join-sheet big' onClick={() => setJoining('')}><LinkSimple size={18} /> Join with a link</button>
                 <ImportButton className='join-sheet big' onImported={opened} onError={setError} />
               </div>
             </div>

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react'
-import { X } from '@phosphor-icons/react'
+import { Copy, Eye, PencilSimple, X } from '@phosphor-icons/react'
 import { call, on } from './bridge.js'
 import { QrCode } from './Qr.jsx'
 import { MemberAvatar } from './Avatar.jsx'
@@ -74,15 +74,15 @@ export function SharePanel ({ sheetId, onClose, onError }) {
               <div className='invite-actions'>
                 <p>Invite someone. Each link works once and expires after 24 hours.</p>
                 <div className='row'>
-                  <button className='primary' onClick={() => invite('editor')}>Invite to edit</button>
-                  <button onClick={() => invite('viewer')}>Invite to view</button>
+                  <button className='primary' onClick={() => invite('editor')}><PencilSimple size={16} /> Invite to edit</button>
+                  <button onClick={() => invite('viewer')}><Eye size={16} /> Invite to view</button>
                 </div>
                 {link && (
                   <div className='invite-link'>
                     <label>Send this link to one person ({link.role === 'editor' ? 'can edit' : 'can view'}):</label>
                     <div className='row'>
                       <input readOnly value={link.link} onFocus={(e) => e.target.select()} aria-label='Invite link' />
-                      <button className='primary' onClick={copy}>{copied ? 'Copied' : 'Copy'}</button>
+                      <button className='primary' onClick={copy}><Copy size={16} /> {copied ? 'Copied' : 'Copy'}</button>
                     </div>
                     <div className='pairing'>
                       <QrCode value={link.link} label='Invite QR code' />
