@@ -8,6 +8,7 @@ const fs = require('node:fs')
 const { Worklet } = require('./worklet')
 const { SeederProcess } = require('./seeder-process')
 const { resolvePaths } = require('./paths')
+const { createLoginItem } = require('./login')
 
 const SMOKE = !!process.env.PEARSHEET_SMOKE
 
@@ -37,10 +38,12 @@ let win = null
 let worklet = null
 let quitting = false
 let tray = null
+// A smoke run must not touch the real login items.
+const loginItem = createLoginItem({ app, autostartDir: SMOKE ? path.join(dataDir, 'autostart') : null, fake: SMOKE })
 
 // Desktop-only settings, kept next to the data (not in the sheets).
 const settingsFile = path.join(dataDir, 'desktop-settings.json')
-const DEFAULTS = { keepOnline: false, runSeeder: false }
+const DEFAULTS = { keepOnline: false, runSeeder: false, startAtLogin: false }
 function readSettings () {
   try { return { ...DEFAULTS, ...JSON.parse(fs.readFileSync(settingsFile, 'utf8')) } } catch { return { ...DEFAULTS } }
 }
@@ -49,6 +52,14 @@ const stayRunning = () => settings.keepOnline || settings.runSeeder
 let settings = readSettings()
 function writeSettings (patch) {
   settings = { ...settings, ...patch }
+  // Starting at login only makes sense while PearSheet stays running.
+  if (!stayRunning()) settings.startAtLogin = false
+  try {
+    if (loginItem.isEnabled() !== settings.startAtLogin) loginItem.setEnabled(settings.startAtLogin)
+  } catch (err) {
+    log('login item failed:', err.message)
+    settings.startAtLogin = loginItem.isEnabled()
+  }
   fs.mkdirSync(path.dirname(settingsFile), { recursive: true })
   fs.writeFileSync(settingsFile, JSON.stringify(settings, null, 2))
   if (stayRunning()) createTray()
@@ -126,7 +137,7 @@ ipcMain.handle('worklet:call', async (_e, method, args) => {
   if (method === 'app:takeLink') { const url = pendingLink; pendingLink = null; return { url } }
   // After a device link or a phrase restore the identity changed: start a
   // fresh worklet and reload the UI.
-  if (method === 'app:settings') return settings
+  if (method === 'app:settings') return { ...settings, startAtLogin: settings.startAtLogin && loginItem.isEnabled() }
   if (method === 'app:setSetting') {
     const patch = {}
     for (const k of Object.keys(DEFAULTS)) if (args && typeof args[k] === 'boolean') patch[k] = args[k]
@@ -166,7 +177,8 @@ function createWindow () {
     minWidth: 640,
     minHeight: 400,
     title: 'PearSheet',
-    show: !SMOKE,
+    // Started at login with the tray on: stay hidden until opened.
+    show: !SMOKE && !(stayRunning() && loginItem.launchedAtLogin()),
     backgroundColor: '#f7f7f4',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
@@ -201,6 +213,7 @@ app.whenReady().then(async () => {
   })
   createWindow()
   if (stayRunning()) createTray()
+  if (!SMOKE) log(win.isVisible() ? 'window shown' : 'started hidden in the tray')
   if (settings.runSeeder) startSeeder().catch((err) => log('seeder failed to start:', err.message))
   if (SMOKE) {
     // Downloads (Export) go straight to the smoke test's data folder.
