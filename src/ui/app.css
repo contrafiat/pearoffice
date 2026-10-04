@@ -228,7 +228,7 @@ button, input, select { font: inherit; color: inherit; }
 .people-stack .avatar + .avatar { margin-left: -8px; }
 .people-stack .more-people { background: var(--head); color: var(--ink); font-weight: 600; }
 .toolbar .export + .people-stack, .toolbar .people-stack + .share { margin-left: 0; }
-.sheet-link:disabled { color: var(--muted); font-style: italic; cursor: default; }
+.sheet-link.waiting { color: var(--muted); font-style: italic; }
 .badge { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); background: var(--head); border-radius: 999px; padding: 2px 8px; white-space: nowrap; }
 .badge.view-only { color: var(--pear-dark); background: var(--pear-soft); }
 .keep-online { margin-top: auto; display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); padding: 6px 8px; cursor: pointer; }

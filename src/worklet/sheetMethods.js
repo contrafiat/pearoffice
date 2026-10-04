@@ -187,7 +187,7 @@ function createSheetMethods (sheets, { getJoin, getMoves, getProfiles }) {
         joining.delete(value.groupId)
       }
       // Joins that have not been welcomed yet have no base.
-      for (const p of joining.values()) out.push({ sheetId: p.sheetId, title: '', joining: true, waiting: true })
+      for (const p of joining.values()) out.push({ sheetId: p.sheetId, title: '', joining: true, waiting: true, role: p.role, reason: p.reason, startedAt: p.startedAt })
       return out
     },
 

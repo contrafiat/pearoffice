@@ -40,6 +40,14 @@ function createSheetEngine (opts = {}) {
     'seeder:stopPreview': async ({ seederKey }) => seeding.stopPreview(seederKey),
     'seeder:stopUsing': async ({ seederKey }) => seeding.stopUsing(seederKey),
     'sheet:removeLocal': async ({ sheetId }) => deleting.removeLocal(sheetId),
+    // Stop a join that is still waiting; if its keys had arrived, also
+    // remove what was opened.
+    'sheet:cancelJoin': async ({ sheetId }) => {
+      await join.cancel(sheetId)
+      if (engine.bases.get(sheetId)) return deleting.removeLocal(sheetId, { reason: 'join cancelled' })
+      emit('sheet:gone', { sheetId, reason: 'join cancelled' })
+      return { ok: true }
+    },
     'sheet:deleteForEveryone': async ({ sheetId }) => deleting.deleteForEveryone(sheetId),
     'link:start': async () => linking.start(),
     'link:join': async ({ link }) => linking.join(link),
