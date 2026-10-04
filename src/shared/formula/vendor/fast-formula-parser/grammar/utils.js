@@ -5,6 +5,32 @@ const Collection = require('./type/collection');
 const MAX_ROW = 1048576, MAX_COLUMN = 16384;
 const {NotAllInputParsedException} = require('chevrotain');
 
+// PearSheet: element-wise operators over arrays (rows of values).
+function mapArray(arr, fn) {
+    return arr.map(row => row.map(fn));
+}
+
+// Excel's broadcasting: the result is as big as the larger operand in each
+// direction; a single row, column or value repeats; anything else that falls
+// outside an operand is #N/A.
+function broadcast(a, b, fn) {
+    const rows = Math.max(a.length, b.length);
+    const cols = Math.max(a[0].length, b[0].length);
+    const at = (m, r, c) => {
+        const rr = m.length === 1 ? 0 : r;
+        const cc = m[0].length === 1 ? 0 : c;
+        if (rr >= m.length || cc >= m[rr].length) return FormulaError.NA;
+        return m[rr][cc];
+    };
+    const out = [];
+    for (let r = 0; r < rows; r++) {
+        const line = [];
+        for (let c = 0; c < cols; c++) line.push(fn(at(a, r, c), at(b, r, c)));
+        out.push(line);
+    }
+    return out;
+}
+
 class Utils {
 
     constructor(context) {
@@ -92,6 +118,10 @@ class Utils {
     _applyPrefix(prefixes, val, isArray) {
         if (this.isFormulaError(val))
             return val;
+        // PearSheet: an array operand applies the operator to each value
+        // (Excel 365 dynamic arrays).
+        if (Array.isArray(val))
+            return mapArray(val, v => v instanceof FormulaError ? v : Prefix.unaryOp(prefixes, v, false));
         return Prefix.unaryOp(prefixes, val, isArray);
     }
 
@@ -119,6 +149,8 @@ class Utils {
     _applyPostfix(val, isArray, postfix) {
         if (this.isFormulaError(val))
             return val;
+        if (Array.isArray(val))
+            return mapArray(val, v => v instanceof FormulaError ? v : Postfix.percentOp(v, postfix, false));
         return Postfix.percentOp(val, postfix, isArray);
     }
 
@@ -144,6 +176,11 @@ class Utils {
             return val1;
         if (this.isFormulaError(val2))
             return val2;
+        // PearSheet: with an array on either side, apply the operator value by
+        // value, broadcasting a single row, column or value (Excel 365).
+        if (Array.isArray(val1) || Array.isArray(val2))
+            return broadcast(Array.isArray(val1) ? val1 : [[val1]], Array.isArray(val2) ? val2 : [[val2]],
+                (a, b) => this._applyInfix({val: a, isArray: false}, infix, {val: b, isArray: false}));
         if (Operators.compareOp.includes(infix))
             return Infix.compareOp(val1, infix, val2, isArray1, isArray2);
         else if (Operators.concatOp.includes(infix))

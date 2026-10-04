@@ -9,6 +9,19 @@
 const { MAX_ROWS, MAX_COLS } = require('./a1')
 
 const MAX_IMPORT_CELLS = 200000
+
+// In .xlsx files, functions newer than Excel 2007 carry an _xlfn. prefix and
+// the first dynamic-array functions also _xlws. (spilling formulas,
+// proposals/2026-10-04-spilling-formulas.md). PearSheet stores plain names.
+const XLWS = new Set(['FILTER', 'SORT'])
+const XLFN = new Set(['SORTBY', 'UNIQUE', 'SEQUENCE', 'TEXTSPLIT', 'TAKE', 'DROP', 'VSTACK', 'HSTACK', 'TOCOL', 'TOROW',
+  'CHOOSEROWS', 'CHOOSECOLS', 'WRAPROWS', 'WRAPCOLS', 'EXPAND', 'RANDARRAY', 'XLOOKUP', 'XMATCH', 'TEXTBEFORE', 'TEXTAFTER'])
+// Outside string literals only.
+function mapNames (f, fn) {
+  return String(f).split(/("(?:[^"]|"")*")/).map((part, i) => (i % 2 ? part : fn(part))).join('')
+}
+const toFile = (f) => mapNames(f, (p) => p.replace(/\b([A-Z][A-Z0-9.]*)\(/g, (m, name) => (XLWS.has(name) ? '_xlfn._xlws.' + name + '(' : XLFN.has(name) ? '_xlfn.' + name + '(' : m)))
+const fromFile = (f) => mapNames(f, (p) => p.replace(/_xl(fn|ws)\./gi, ''))
 // Excel's error codes. PearSheet's own #CIRCULAR! has none; Excel recomputes
 // formula cells on open anyway.
 const ERROR_CODES = { '#NULL!': 0x00, '#DIV/0!': 0x07, '#VALUE!': 0x0F, '#REF!': 0x17, '#NAME?': 0x1D, '#NUM!': 0x24, '#N/A': 0x2A }
@@ -39,6 +52,18 @@ function workbookToTabs (XLSX, wb) {
   for (const name of wb.SheetNames) {
     const ws = wb.Sheets[name]
     const cells = []
+    // Array formulas (dynamic or the older Ctrl+Shift+Enter kind): the
+    // formula sits in the top-left cell and spills; the rest of its range is
+    // the formula's answer, not input.
+    const covered = new Set()
+    for (const ref of Object.keys(ws)) {
+      const cell = ws[ref]
+      if (ref[0] === '!' || !cell.F || !cell.f) continue
+      const range = XLSX.utils.decode_range(cell.F)
+      for (let r = range.s.r; r <= range.e.r; r++) {
+        for (let c = range.s.c; c <= range.e.c; c++) if (r !== range.s.r || c !== range.s.c) covered.add(r + ',' + c)
+      }
+    }
     for (const ref of Object.keys(ws)) {
       if (ref[0] === '!') continue
       const cell = ws[ref]
@@ -46,8 +71,9 @@ function workbookToTabs (XLSX, wb) {
       const row = r + 1
       const col = c + 1
       if (row > MAX_ROWS || col > MAX_COLS) continue
+      if (covered.has(r + ',' + c)) continue
       let input
-      if (cell.f) input = '=' + cell.f
+      if (cell.f) input = '=' + fromFile(cell.f)
       else if (cell.t === 'n') input = String(cell.v)
       else if (cell.t === 'b') input = cell.v ? 'TRUE' : 'FALSE'
       else if (cell.t === 'e') input = cell.w || '#N/A'
@@ -82,7 +108,13 @@ function dumpToWorkbook (XLSX, dump) {
       const ref = XLSX.utils.encode_cell({ r: cell.row - 1, c: cell.col - 1 })
       const out = {}
       if (cell.error) { out.t = 'e'; out.v = ERROR_CODES[cell.error] ?? ERROR_CODES['#VALUE!']; out.w = cell.error in ERROR_CODES ? cell.error : '#VALUE!' } else if (typeof cell.value === 'number') { out.t = 'n'; out.v = cell.value } else if (typeof cell.value === 'boolean') { out.t = 'b'; out.v = cell.value } else if (cell.value === null || cell.value === undefined) { out.t = 's'; out.v = '' } else { out.t = 's'; out.v = String(cell.value) }
-      if (typeof cell.input === 'string' && cell.input[0] === '=') out.f = cell.input.slice(1)
+      if (typeof cell.input === 'string' && cell.input[0] === '=') out.f = toFile(cell.input.slice(1))
+      // A spilling formula is written as a dynamic array over its block; the
+      // cells it fills are written as plain values.
+      if (out.f && cell.spill) {
+        out.F = XLSX.utils.encode_range({ s: { r: cell.row - 1, c: cell.col - 1 }, e: { r: cell.row + cell.spill.rows - 2, c: cell.col + cell.spill.cols - 2 } })
+        out.D = true
+      }
       if (cell.fmt && cell.fmt.num) out.z = cell.fmt.num
       ws[ref] = out
       maxR = Math.max(maxR, cell.row)
@@ -101,4 +133,4 @@ function dumpToWorkbook (XLSX, dump) {
   return wb
 }
 
-module.exports = { workbookToTabs, dumpToWorkbook, textInput, READ_OPTIONS, MAX_IMPORT_CELLS }
+module.exports = { workbookToTabs, dumpToWorkbook, textInput, toFile, fromFile, READ_OPTIONS, MAX_IMPORT_CELLS }

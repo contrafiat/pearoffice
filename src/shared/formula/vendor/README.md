@@ -16,4 +16,10 @@ Changes from upstream:
   so PearSheet's OFFSET (in `src/shared/formula/newer.js`) gets the reference
   itself rather than its values.
 
+- Spilling formulas (proposals/2026-10-04-spilling-formulas.md):
+  `grammar/utils.js` applies operators value by value when either side is an
+  array, with Excel's broadcasting; `grammar/hooks.js` lets a reference to a
+  cell holding an error return that error when arrays are allowed;
+  `ROWS` and `COLUMNS` in `formulas/functions/reference.js` count arrays.
+
 `test/formula-vendor.test.js` fails if a `**` comes back.

@@ -1,0 +1,826 @@
+{
+ "source": "LibreOffice 26.2.6.3",
+ "expected": {
+  "M1": {
+   "formula": "=SORT(A2:C7)",
+   "libreoffice": [
+    [
+     "Apple",
+     "Blue",
+     90
+    ],
+    [
+     "apple",
+     "Green",
+     90
+    ],
+    [
+     "Date",
+     "Red",
+     75
+    ],
+    [
+     "fig",
+     "Red",
+     60
+    ],
+    [
+     "kiwi",
+     "Blue",
+     15
+    ],
+    [
+     "pear",
+     "Red",
+     30
+    ]
+   ]
+  },
+  "M11": {
+   "formula": "=SORT(A2:C7, 3, -1)",
+   "libreoffice": [
+    [
+     "Apple",
+     "Blue",
+     90
+    ],
+    [
+     "apple",
+     "Green",
+     90
+    ],
+    [
+     "Date",
+     "Red",
+     75
+    ],
+    [
+     "fig",
+     "Red",
+     60
+    ],
+    [
+     "pear",
+     "Red",
+     30
+    ],
+    [
+     "kiwi",
+     "Blue",
+     15
+    ]
+   ]
+  },
+  "M21": {
+   "formula": "=SORT(A2:C7, {2,3}, {1,-1})",
+   "libreoffice": [
+    [
+     "Apple",
+     "Blue",
+     90
+    ],
+    [
+     "kiwi",
+     "Blue",
+     15
+    ],
+    [
+     "apple",
+     "Green",
+     90
+    ],
+    [
+     "Date",
+     "Red",
+     75
+    ],
+    [
+     "fig",
+     "Red",
+     60
+    ],
+    [
+     "pear",
+     "Red",
+     30
+    ]
+   ]
+  },
+  "M31": {
+   "formula": "=SORT(F1:F7, 1, -1)",
+   "libreoffice": [
+    [
+     7
+    ],
+    [
+     6
+    ],
+    [
+     5
+    ],
+    [
+     4
+    ],
+    [
+     3
+    ],
+    [
+     2
+    ],
+    [
+     1
+    ]
+   ]
+  },
+  "M41": {
+   "formula": "=SORT(A1:D1, 1, 1, TRUE)",
+   "libreoffice": [
+    [
+     "Joined",
+     "Name",
+     "Score",
+     "Team"
+    ]
+   ]
+  },
+  "M51": {
+   "formula": "=SORTBY(A2:A7, C2:C7, -1)",
+   "libreoffice": [
+    [
+     "Apple"
+    ],
+    [
+     "apple"
+    ],
+    [
+     "Date"
+    ],
+    [
+     "fig"
+    ],
+    [
+     "pear"
+    ],
+    [
+     "kiwi"
+    ]
+   ]
+  },
+  "M61": {
+   "formula": "=SORTBY(A2:B7, B2:B7, 1, C2:C7, -1)",
+   "libreoffice": [
+    [
+     "Apple",
+     "Blue"
+    ],
+    [
+     "kiwi",
+     "Blue"
+    ],
+    [
+     "apple",
+     "Green"
+    ],
+    [
+     "Date",
+     "Red"
+    ],
+    [
+     "fig",
+     "Red"
+    ],
+    [
+     "pear",
+     "Red"
+    ]
+   ]
+  },
+  "M71": {
+   "formula": "=FILTER(A2:C7, C2:C7>50)",
+   "libreoffice": [
+    [
+     "Apple",
+     "Blue",
+     90
+    ],
+    [
+     "fig",
+     "Red",
+     60
+    ],
+    [
+     "apple",
+     "Green",
+     90
+    ],
+    [
+     "Date",
+     "Red",
+     75
+    ]
+   ]
+  },
+  "M81": {
+   "formula": "=FILTER(A2:A7, B2:B7=\"Red\")",
+   "libreoffice": [
+    [
+     "pear"
+    ],
+    [
+     "fig"
+    ],
+    [
+     "Date"
+    ]
+   ]
+  },
+  "M91": {
+   "formula": "=FILTER(A2:A7, C2:C7>100, \"none\")",
+   "libreoffice": [
+    [
+     "none"
+    ]
+   ]
+  },
+  "M101": {
+   "formula": "=FILTER(A2:C7, (B2:B7=\"Blue\")+(C2:C7<20))",
+   "libreoffice": [
+    [
+     "Apple",
+     "Blue",
+     90
+    ],
+    [
+     "kiwi",
+     "Blue",
+     15
+    ]
+   ]
+  },
+  "M111": {
+   "formula": "=UNIQUE(B2:B7)",
+   "libreoffice": [
+    [
+     "Red"
+    ],
+    [
+     "Blue"
+    ],
+    [
+     "Green"
+    ]
+   ]
+  },
+  "M121": {
+   "formula": "=UNIQUE(A2:A7)",
+   "libreoffice": [
+    [
+     "pear"
+    ],
+    [
+     "Apple"
+    ],
+    [
+     "fig"
+    ],
+    [
+     "kiwi"
+    ],
+    [
+     "Date"
+    ]
+   ]
+  },
+  "M131": {
+   "formula": "=UNIQUE(B2:B7, FALSE, TRUE)",
+   "libreoffice": [
+    [
+     "Green"
+    ]
+   ]
+  },
+  "M141": {
+   "formula": "=UNIQUE(C2:C7)",
+   "libreoffice": [
+    [
+     30
+    ],
+    [
+     90
+    ],
+    [
+     60
+    ],
+    [
+     15
+    ],
+    [
+     75
+    ]
+   ]
+  },
+  "M151": {
+   "formula": "=SEQUENCE(4)",
+   "libreoffice": [
+    [
+     1
+    ],
+    [
+     2
+    ],
+    [
+     3
+    ],
+    [
+     4
+    ]
+   ]
+  },
+  "M161": {
+   "formula": "=SEQUENCE(2, 3)",
+   "libreoffice": [
+    [
+     1,
+     2,
+     3
+    ],
+    [
+     4,
+     5,
+     6
+    ]
+   ]
+  },
+  "M171": {
+   "formula": "=SEQUENCE(3, 2, 10, -2)",
+   "libreoffice": [
+    [
+     10,
+     8
+    ],
+    [
+     6,
+     4
+    ],
+    [
+     2,
+     0
+    ]
+   ]
+  },
+  "M181": {
+   "formula": "=SEQUENCE(1, 5, 0, 0.5)",
+   "libreoffice": [
+    [
+     0,
+     0.5,
+     1,
+     1.5,
+     2
+    ]
+   ]
+  },
+  "M191": {
+   "formula": "=TEXTSPLIT(H1, \",\", \";\")",
+   "libreoffice": [
+    [
+     "a",
+     "b",
+     "c"
+    ],
+    [
+     "d",
+     "e",
+     {
+      "error": "#N/A"
+     }
+    ],
+    [
+     "f",
+     {
+      "error": "#N/A"
+     },
+     {
+      "error": "#N/A"
+     }
+    ]
+   ]
+  },
+  "M201": {
+   "formula": "=TEXTSPLIT(H2, \" \")",
+   "libreoffice": [
+    [
+     "one",
+     null,
+     "two",
+     "three"
+    ]
+   ]
+  },
+  "M211": {
+   "formula": "=TEXTSPLIT(H2, \" \", , TRUE)",
+   "libreoffice": [
+    [
+     "one",
+     "two",
+     "three"
+    ]
+   ]
+  },
+  "M221": {
+   "formula": "=TEXTSPLIT(H1, \",\", \";\", FALSE, 0, \"-\")",
+   "libreoffice": [
+    [
+     "a",
+     "b",
+     "c"
+    ],
+    [
+     "d",
+     "e",
+     "-"
+    ],
+    [
+     "f",
+     "-",
+     "-"
+    ]
+   ]
+  },
+  "M231": {
+   "formula": "=TEXTSPLIT(H3, \"-\")",
+   "libreoffice": [
+    [
+     "x",
+     "y",
+     "z"
+    ]
+   ]
+  },
+  "M241": {
+   "formula": "=TAKE(A2:C7, 2)",
+   "libreoffice": [
+    [
+     "pear",
+     "Red",
+     30
+    ],
+    [
+     "Apple",
+     "Blue",
+     90
+    ]
+   ]
+  },
+  "M251": {
+   "formula": "=TAKE(A2:C7, -2, 2)",
+   "libreoffice": [
+    [
+     "kiwi",
+     "Blue"
+    ],
+    [
+     "Date",
+     "Red"
+    ]
+   ]
+  },
+  "M261": {
+   "formula": "=DROP(A2:C7, 4)",
+   "libreoffice": [
+    [
+     "kiwi",
+     "Blue",
+     15
+    ],
+    [
+     "Date",
+     "Red",
+     75
+    ]
+   ]
+  },
+  "M271": {
+   "formula": "=DROP(A2:C7, -4, -1)",
+   "libreoffice": [
+    [
+     "pear",
+     "Red"
+    ],
+    [
+     "Apple",
+     "Blue"
+    ]
+   ]
+  },
+  "M281": {
+   "formula": "=VSTACK(A1:B2, F1:F2)",
+   "libreoffice": [
+    [
+     "Name",
+     "Team"
+    ],
+    [
+     "pear",
+     "Red"
+    ],
+    [
+     1,
+     {
+      "error": "#N/A"
+     }
+    ],
+    [
+     2,
+     {
+      "error": "#N/A"
+     }
+    ]
+   ]
+  },
+  "M291": {
+   "formula": "=HSTACK(A2:A4, F1:F2)",
+   "libreoffice": [
+    [
+     "pear",
+     1
+    ],
+    [
+     "Apple",
+     2
+    ],
+    [
+     "fig",
+     {
+      "error": "#N/A"
+     }
+    ]
+   ]
+  },
+  "M301": {
+   "formula": "=TOCOL(A2:B3)",
+   "libreoffice": [
+    [
+     "pear"
+    ],
+    [
+     "Red"
+    ],
+    [
+     "Apple"
+    ],
+    [
+     "Blue"
+    ]
+   ]
+  },
+  "M311": {
+   "formula": "=TOCOL(A2:B3, 0, TRUE)",
+   "libreoffice": [
+    [
+     "pear"
+    ],
+    [
+     "Apple"
+    ],
+    [
+     "Red"
+    ],
+    [
+     "Blue"
+    ]
+   ]
+  },
+  "M321": {
+   "formula": "=TOROW(F1:F4)",
+   "libreoffice": [
+    [
+     1,
+     2,
+     3,
+     4
+    ]
+   ]
+  },
+  "M331": {
+   "formula": "=CHOOSEROWS(A2:C7, 1, -1)",
+   "libreoffice": [
+    [
+     "pear",
+     "Red",
+     30
+    ],
+    [
+     "Date",
+     "Red",
+     75
+    ]
+   ]
+  },
+  "M341": {
+   "formula": "=CHOOSECOLS(A2:D7, 3, 1)",
+   "libreoffice": [
+    [
+     30,
+     "pear"
+    ],
+    [
+     90,
+     "Apple"
+    ],
+    [
+     60,
+     "fig"
+    ],
+    [
+     90,
+     "apple"
+    ],
+    [
+     15,
+     "kiwi"
+    ],
+    [
+     75,
+     "Date"
+    ]
+   ]
+  },
+  "M351": {
+   "formula": "=WRAPROWS(F1:F7, 3)",
+   "libreoffice": [
+    [
+     1,
+     2,
+     3
+    ],
+    [
+     4,
+     5,
+     6
+    ],
+    [
+     7,
+     {
+      "error": "#N/A"
+     },
+     {
+      "error": "#N/A"
+     }
+    ]
+   ]
+  },
+  "M361": {
+   "formula": "=WRAPROWS(F1:F7, 3, 0)",
+   "libreoffice": [
+    [
+     1,
+     2,
+     3
+    ],
+    [
+     4,
+     5,
+     6
+    ],
+    [
+     7,
+     0,
+     0
+    ]
+   ]
+  },
+  "M371": {
+   "formula": "=WRAPCOLS(F1:F7, 3, \"\")",
+   "libreoffice": [
+    [
+     1,
+     4,
+     7
+    ],
+    [
+     2,
+     5,
+     null
+    ],
+    [
+     3,
+     6,
+     null
+    ]
+   ]
+  },
+  "M381": {
+   "formula": "=EXPAND(F1:F2, 3, 2, 0)",
+   "libreoffice": [
+    [
+     1,
+     0
+    ],
+    [
+     2,
+     0
+    ],
+    [
+     0,
+     0
+    ]
+   ]
+  },
+  "M391": {
+   "formula": "=F1:F3*10",
+   "libreoffice": [
+    [
+     10
+    ],
+    [
+     20
+    ],
+    [
+     30
+    ]
+   ]
+  },
+  "M401": {
+   "formula": "=A2:A4&\"!\"",
+   "libreoffice": [
+    [
+     "pear!"
+    ],
+    [
+     "Apple!"
+    ],
+    [
+     "fig!"
+    ]
+   ]
+  },
+  "M411": {
+   "formula": "=C2:C7>50",
+   "libreoffice": [
+    [
+     0
+    ],
+    [
+     1
+    ],
+    [
+     1
+    ],
+    [
+     1
+    ],
+    [
+     0
+    ],
+    [
+     1
+    ]
+   ]
+  },
+  "M421": {
+   "formula": "=F1:F3+TRANSPOSE(F1:F3)",
+   "libreoffice": [
+    [
+     2,
+     3,
+     4
+    ],
+    [
+     3,
+     4,
+     5
+    ],
+    [
+     4,
+     5,
+     6
+    ]
+   ]
+  },
+  "M431": {
+   "formula": "=SUM(SEQUENCE(10))",
+   "libreoffice": [
+    [
+     55
+    ]
+   ]
+  },
+  "M441": {
+   "formula": "=ROWS(FILTER(A2:A7, C2:C7>50))",
+   "libreoffice": [
+    [
+     4
+    ]
+   ]
+  },
+  "M451": {
+   "formula": "=INDEX(SORT(C2:C7), 2)",
+   "libreoffice": [
+    [
+     30
+    ]
+   ]
+  }
+ }
+}

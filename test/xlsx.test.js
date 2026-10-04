@@ -18,7 +18,7 @@ function dump (doc) {
       const cells = []
       for (const [key, v] of values.get(id)) {
         const [row, col] = key.split(',').map(Number)
-        cells.push({ row, col, input: model.getInput(doc, id, row, col), value: v.error ? null : v.value, error: v.error, fmt: model.getFormat(doc, id, row, col) })
+        cells.push({ row, col, input: v.from ? undefined : model.getInput(doc, id, row, col), value: v.error ? null : v.value, error: v.error, fmt: model.getFormat(doc, id, row, col), spill: v.spill, from: v.from })
       }
       const widths = {}
       t.get('cols').toArray().forEach((colId, i) => { if (t.get('widths').has(colId)) widths[i + 1] = t.get('widths').get(colId) })
@@ -59,6 +59,40 @@ test('a sheet survives export to .xlsx and import back', () => {
   assert.equal(model.tabMap(doc2, o2).get('name'), 'Rates & fees')
   const colId = model.tabMap(doc2, m2).get('cols').get(0)
   assert.equal(model.tabMap(doc2, m2).get('widths').get(colId), 180)
+})
+
+test('a spilling formula goes out as a dynamic array and comes back as one formula', () => {
+  const doc = model.createDoc()
+  model.initSheet(doc, { title: 'Spills' })
+  const tab = model.tabIds(doc)[0]
+  model.setCells(doc, tab, 1, 1, [['pear'], ['apple'], ['fig']])
+  model.setCell(doc, tab, 1, 3, '=SORT(A1:A3)')
+  model.setCell(doc, tab, 1, 4, '=SEQUENCE(2,2)')
+
+  const wb = dumpToWorkbook(XLSX, dump(doc))
+  const ws = wb.Sheets[wb.SheetNames[0]]
+  assert.equal(ws.C1.f, '_xlfn._xlws.SORT(A1:A3)')
+  assert.equal(ws.C1.F, 'C1:C3')
+  assert.equal(ws.C1.D, true)
+  assert.equal(ws.C3.v, 'pear', 'filled cells are written as values')
+  assert.equal(ws.C3.f, undefined)
+  assert.equal(ws.D1.F, 'D1:E2')
+
+  const bytes = XLSX.write(wb, { type: 'array', bookType: 'xlsx' })
+  const sheetXml = XLSX.read(bytes, { type: 'array', bookFiles: true }).files['xl/worksheets/sheet1.xml']
+  const xml = Buffer.from(sheetXml.content).toString()
+  assert.match(xml, /<c r="C1"[^>]* cm="1"><f t="array" ref="C1:C3">/)
+
+  const back = XLSX.read(bytes, { type: 'array', cellFormula: true, cellNF: true, cellStyles: true })
+  const doc2 = model.createDoc()
+  model.initSheet(doc2)
+  model.importTabs(doc2, workbookToTabs(XLSX, back))
+  const t2 = model.tabIds(doc2)[0]
+  assert.equal(model.getInput(doc2, t2, 1, 3), '=SORT(A1:A3)')
+  assert.equal(model.getInput(doc2, t2, 2, 3), '', 'the values a spill filled are not imported as input')
+  const v = evaluateSheet(doc2).get(t2)
+  assert.deepEqual([1, 2, 3].map((r) => v.get(r + ',3').value), ['apple', 'fig', 'pear'])
+  assert.deepEqual(v.get('2,5').value, 4)
 })
 
 test('text that would read as a number or formula keeps an apostrophe', () => {

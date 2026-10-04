@@ -56,6 +56,8 @@ CHISQ.INV|probability, deg_freedom|Inverse of the chi-squared distribution
 CHISQ.INV.RT|probability, deg_freedom|Inverse of the right-tailed chi-squared distribution
 CHISQ.TEST|actual_range, expected_range|Chi-squared test of independence
 CHOOSE|index_num, value1, [value2, ...]|Pick a value from the list by position
+CHOOSECOLS|array, col_num1, [col_num2, ...]|Chosen columns of an array; negative numbers count from the end
+CHOOSEROWS|array, row_num1, [row_num2, ...]|Chosen rows of an array; negative numbers count from the end
 CLEAN|text|Text without unprintable characters
 CODE|text|Code of the first character
 COLUMN|[reference]|Column number of a reference
@@ -107,6 +109,7 @@ DMAX|database, field, criteria|Largest value of a field in matching database row
 DMIN|database, field, criteria|Smallest value of a field in matching database rows
 DOLLAR|number, [decimals]|Number as currency text
 DPRODUCT|database, field, criteria|Product of a field in matching database rows
+DROP|array, rows, [columns]|An array without its first rows or columns (negative: the last)
 DSTDEV|database, field, criteria|Sample standard deviation of a field in matching database rows
 DSTDEVP|database, field, criteria|Population standard deviation of a field in matching database rows
 DSUM|database, field, criteria|Sum of a field in matching database rows
@@ -122,6 +125,7 @@ ERROR.TYPE|error_val|Number for the kind of error
 EVEN|number|Round up to an even whole number
 EXACT|text1, text2|TRUE if two texts match exactly, case included
 EXP|number|e raised to a power
+EXPAND|array, rows, [columns], [pad_with]|An array grown to a size, filling new cells with pad_with
 EXPON.DIST|x, lambda, cumulative|Exponential distribution
 F.DIST|x, deg_freedom1, deg_freedom2, cumulative|F distribution
 F.DIST.RT|x, deg_freedom1, deg_freedom2|Right-tailed F distribution
@@ -131,6 +135,7 @@ F.TEST|array1, array2|F-test of two variances
 FACT|number|Factorial
 FACTDOUBLE|number|Double factorial
 FALSE||The value FALSE
+FILTER|array, include, [if_empty]|Rows or columns of an array where include is TRUE
 FIND|find_text, within_text, [start_num]|Position of text inside text, case sensitive
 FINDB|find_text, within_text, [start_num]|Position of text inside text, case sensitive
 FISHER|x|Fisher transformation
@@ -159,6 +164,7 @@ HEX2DEC|number|Hexadecimal to decimal
 HEX2OCT|number, [places]|Hexadecimal to octal
 HLOOKUP|lookup_value, table_array, row_index_num, [range_lookup]|Find a value in the top row and return one from below it
 HOUR|time|Hour of a time
+HSTACK|array1, [array2, ...]|Arrays side by side
 HYPGEOM.DIST|sample_s, number_sample, population_s, number_pop, cumulative|Hypergeometric distribution
 IF|logical_test, [value_if_true], [value_if_false]|One value if a test is TRUE, another if not
 IFERROR|value, value_if_error|A value, or another if it is an error
@@ -289,6 +295,7 @@ QUARTILE.INC|array, quart|Quartile, inclusive
 QUOTIENT|numerator, denominator|Whole-number part of a division
 RADIANS|angle|Degrees to radians
 RAND||Random number from 0 to 1 (changes on each device)
+RANDARRAY|[rows], [columns], [min], [max], [whole_number]|Block of random numbers, different on each device
 RANDBETWEEN|bottom, top|Random whole number in a range (changes on each device)
 RANK.AVG|number, ref, [order]|Rank of a number, ties sharing the average rank
 RANK.EQ|number, ref, [order]|Rank of a number, ties sharing the top rank
@@ -310,6 +317,7 @@ SEARCHB|find_text, within_text, [start_num]|Position of text inside text, ignori
 SEC|number|Secant of an angle in radians
 SECH|number|Hyperbolic secant
 SECOND|time|Second of a time
+SEQUENCE|rows, [columns], [start], [step]|Block of numbers counting up from start
 SERIESSUM|x, n, m, coefficients|Sum of a power series
 SIGN|number|1, 0 or -1 for the sign of a number
 SIN|number|Sine of an angle in radians
@@ -319,6 +327,8 @@ SKEW.P|number1, [number2, ...]|Skewness of a population
 SLN|cost, salvage, life|Straight-line depreciation
 SLOPE|known_ys, known_xs|Slope of the straight line through the data
 SMALL|array, k|The k-th smallest value
+SORT|array, [sort_index], [sort_order], [by_col]|An array sorted by one of its columns (or rows)
+SORTBY|array, by_array1, [sort_order1, ...]|An array sorted by other ranges
 SQRT|number|Square root
 SQRTPI|number|Square root of a number times pi
 STANDARDIZE|x, mean, standard_dev|How many standard deviations a value is from the mean
@@ -347,15 +357,19 @@ T.DIST.RT|x, deg_freedom|Right-tailed Student's t distribution
 T.INV|probability, deg_freedom|Inverse of Student's t distribution
 T.INV.2T|probability, deg_freedom|Two-tailed inverse of Student's t distribution
 T.TEST|array1, array2, tails, type|Student's t-test probability
+TAKE|array, rows, [columns]|The first rows or columns of an array (negative: the last)
 TAN|number|Tangent of an angle in radians
 TANH|number|Hyperbolic tangent
 TEXT|value, format_text|Number as text in a format, like "0.00"
 TEXTAFTER|text, delimiter, [instance_num], [match_mode], [match_end], [if_not_found]|Text after a delimiter
 TEXTBEFORE|text, delimiter, [instance_num], [match_mode], [match_end], [if_not_found]|Text before a delimiter
 TEXTJOIN|delimiter, ignore_empty, text1, [text2, ...]|Join text with a delimiter
+TEXTSPLIT|text, col_delimiter, [row_delimiter], [ignore_empty], [match_mode], [pad_with]|Text split into cells across and down
 TIME|hour, minute, second|Time from hour, minute and second
 TIMEVALUE|time_text|Time from text
+TOCOL|array, [ignore], [scan_by_column]|An array as one column
 TODAY||Today's date (changes on each device)
+TOROW|array, [ignore], [scan_by_column]|An array as one row
 TRANSPOSE|array|Rows and columns swapped (first value shown)
 TREND|known_ys, [known_xs], [new_xs], [const]|Value on the straight line through the data
 TRIM|text|Text without extra spaces
@@ -365,6 +379,7 @@ TRUNC|number, [num_digits]|Cut off decimals without rounding
 TYPE|value|Number for the kind of value
 UNICHAR|number|Character with this Unicode number
 UNICODE|text|Unicode number of the first character
+UNIQUE|array, [by_col], [exactly_once]|An array with repeated rows (or columns) left out
 UPPER|text|Text in upper case
 VALUE|text|Number from text
 VAR|number1, [number2, ...]|Variance of a sample
@@ -373,11 +388,14 @@ VAR.S|number1, [number2, ...]|Variance of a sample
 VARA|value1, [value2, ...]|Variance of a sample, counting TRUE as 1
 VARPA|value1, [value2, ...]|Variance of a population, counting TRUE as 1
 VLOOKUP|lookup_value, table_array, col_index_num, [range_lookup]|Find a value in the first column and return one from its row
+VSTACK|array1, [array2, ...]|Arrays one below another
 WEEKDAY|date, [return_type]|Day of the week as a number
 WEEKNUM|date, [return_type]|Week number of the year
 WEIBULL.DIST|x, alpha, beta, cumulative|Weibull distribution
 WORKDAY|start_date, days, [holidays]|Date some working days away
 WORKDAY.INTL|start_date, days, [weekend], [holidays]|Date some working days away, choosing the weekend
+WRAPCOLS|vector, wrap_count, [pad_with]|A row or column wrapped into columns of a given length
+WRAPROWS|vector, wrap_count, [pad_with]|A row or column wrapped into rows of a given length
 XIRR|values, dates, [guess]|Internal rate of return for cash flows on given dates
 XLOOKUP|lookup_value, lookup_array, return_array, [if_not_found], [match_mode], [search_mode]|Find a value and return the matching one from another range
 XMATCH|lookup_value, lookup_array, [match_mode], [search_mode]|Position of a value in a list, with more ways to match

@@ -339,4 +339,4 @@ function newerFunctions () {
   return { XLOOKUP, XMATCH, TEXTBEFORE, TEXTAFTER, OFFSET, INDIRECT, XNPV, XIRR, ...DB }
 }
 
-module.exports = { newerFunctions }
+module.exports = { newerFunctions, helpers: { val, left, num, text, grid, rank, compare } }

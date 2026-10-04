@@ -50,6 +50,16 @@ const NUMBER_FORMATS = [
   ['d mmm yyyy', '29 Feb 2024']
 ]
 
+// Why a formula shows #SPILL!, in words.
+function spillReason (b) {
+  const at = (rc) => colName(rc[1]) + rc[0]
+  if (b.kind === 'cells') return 'This answer needs cells that are not empty: ' + b.cells.map(at).join(', ') + (b.more ? ' and ' + b.more + ' more' : '') + '. Clear them to let it fill in.'
+  if (b.kind === 'overlap') return 'The answer of the formula in ' + at(b.anchor) + ' already fills some of the cells this answer needs.'
+  if (b.kind === 'edge') return 'The answer does not fit on this tab.'
+  if (b.kind === 'size') return 'The answer is larger than 100,000 cells.'
+  return 'The answer would cover a cell it depends on.'
+}
+
 export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
   const [view, setView] = useState(null)
   const [tabId, setTabId] = useState(null)
@@ -154,6 +164,13 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
   }, [view])
 
   const selected = cells.get(sel.row + ',' + sel.col)
+  // Spilling (proposals/2026-10-04-spilling-formulas.md): the formula a
+  // selected cell's value comes from, and the block it fills.
+  const anchor = selected && selected.from ? cells.get(selected.from[0] + ',' + selected.from[1]) : selected
+  const spillBox = anchor && anchor.spill
+    ? { r1: anchor.row, c1: anchor.col, r2: anchor.row + anchor.spill.rows - 1, c2: anchor.col + anchor.spill.cols - 1 }
+    : null
+  const spilled = !!(selected && selected.from)
 
   const run = useCallback(async (method, args = {}) => {
     try {
@@ -365,7 +382,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
     : 'This sheet moved to new keys. Opening the new copy...')
 
   const fmt = (selected && selected.fmt) || {}
-  const barValue = editing && editing.row === sel.row && editing.col === sel.col ? editing.value : (selected ? selected.input : '')
+  const barValue = editing && editing.row === sel.row && editing.col === sel.col ? editing.value : spilled ? (anchor ? anchor.input : '') : (selected ? selected.input : '')
 
   return (
     <div className='sheet' onClick={() => menu && setMenu(null)}>
@@ -456,15 +473,34 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
         <input
           aria-label='Cell contents'
           inputMode={numPad ? 'decimal' : undefined}
-          readOnly={!canEdit}
+          className={spilled && !editing ? 'spilled' : undefined}
+          title={spilled && !editing ? 'This value comes from the formula in ' + colName(anchor.col) + anchor.row : undefined}
+          readOnly={!canEdit || (spilled && !editing)}
           value={barValue}
-          onFocus={() => { if (canEdit && !editing) setEditing({ ...sel, value: selected ? selected.input : '', source: 'bar' }) }}
+          onFocus={() => { if (canEdit && !editing && !spilled) setEditing({ ...sel, value: selected ? selected.input : '', source: 'bar' }) }}
           onChange={(e) => { setEditing({ ...sel, value: e.target.value, source: 'bar' }); setCaret(e.target.selectionStart) }}
           onSelect={(e) => setCaret(e.target.selectionStart)}
           onKeyDown={onEditKey}
           onBlur={() => { if (editing) commit(null) }}
         />
       </div>
+      {selected && selected.blocked && (
+        <div className='spill-note' role='status'>
+          {spillReason(selected.blocked)}
+          {selected.blocked.kind === 'edge' && canEdit && (
+            <button
+              className='link-button'
+              onClick={async () => {
+                const b = selected.blocked
+                if (b.rows) await run('sheet:insertRows', { at: view.rows + 1, count: b.rows })
+                if (b.cols) await run('sheet:insertCols', { at: view.cols + 1, count: b.cols })
+              }}
+            >
+              Add {selected.blocked.rows ? selected.blocked.rows + (selected.blocked.rows === 1 ? ' row' : ' rows') : ''}{selected.blocked.rows && selected.blocked.cols ? ' and ' : ''}{selected.blocked.cols ? selected.blocked.cols + (selected.blocked.cols === 1 ? ' column' : ' columns') : ''}
+            </button>
+          )}
+        </div>
+      )}
 
       <Grid
         ref={gridRef}
@@ -476,6 +512,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
         onZoom={isMobile() ? setZoom : null}
         inputMode={numPad ? 'decimal' : undefined}
         range={range}
+        spillBox={spillBox}
         ext={ext}
         onSelect={(row, col, extend) => { if (editing) commit(null); select(row, col, extend) }}
         onCopy={onCopy}

@@ -200,12 +200,22 @@ filled in `src/shared/formula/fills.js`; newer Excel functions (XLOOKUP,
 XMATCH, TEXTBEFORE/AFTER, OFFSET, INDIRECT, XNPV, XIRR, DSUM and the other
 database functions) are in `src/shared/formula/newer.js`.
 
+Formulas spill (proposals/2026-10-04-spilling-formulas.md): any array result
+fills the cells below and to the right, computed on each device and never
+stored; `src/shared/formula/index.js` has the four blocking rules
+(`#SPILL!`) and evaluates in reading order. The array functions (FILTER,
+SORT, UNIQUE, SEQUENCE, TEXTSPLIT, TAKE, DROP, VSTACK and the rest) are in
+`src/shared/formula/arrays.js`. `test/spill.test.js` covers the rules;
+`test/spill-corpus.test.js` checks whole blocks
+(`test/fixtures/spill-corpus.js`) against LibreOffice: after adding cases,
+run `node scripts/spill-expectations.js`.
+
 Formula suggestions come from `src/shared/formula/catalog.js` (name, arguments
-and one line for each of the 380 working functions); `test/catalog.test.js`
+and one line for each of the 398 working functions); `test/catalog.test.js`
 fails if a function is added to the engine without an entry.
 
 After a deliberate formula change, regenerate the golden file with
-`UPDATE_GOLDEN=1 node --test test/formula.test.js test/functions.test.js` and say why in the commit.
+`UPDATE_GOLDEN=1 node --test test/formula.test.js test/functions.test.js test/spill-corpus.test.js` and say why in the commit.
 
 Formula code must never use `**`, and `Math.pow`, `Math.sin` and `Math.cos`
 are replaced at start-up (`src/shared/formula/detmath.js`). A test fails if a

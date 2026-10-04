@@ -9,6 +9,7 @@ const { FormulaHelpers: H, Criteria } = require('./vendor/fast-formula-parser/fo
 const { Infix } = require('./vendor/fast-formula-parser/formulas/operators')
 const engineering = require('./vendor/fast-formula-parser/formulas/functions/engineering')
 const { newerFunctions } = require('./newer')
+const { arrayFunctions } = require('./arrays')
 
 // formulajs returns lists flat; the parser wants rows of cells.
 function column (impl) {
@@ -374,7 +375,7 @@ function MATCH (lookup, array, type) {
 function fillFunctions () {
   const out = { MATCH, CHOOSE, AVERAGEIF, SEARCH, SEARCHB: SEARCH, LOGEST, 'T.TEST': TTEST, MDETERM, MINVERSE }
   for (const name of COMPLEX_RESULTS) out[name] = complexOut(engineering[name])
-  Object.assign(out, newerFunctions())
+  Object.assign(out, newerFunctions(), arrayFunctions())
   for (const [name, impl] of Object.entries(FILLS)) {
     if (typeof impl !== 'function') throw new Error('formulajs has no ' + name)
     out[name] = wrap(name, impl)
