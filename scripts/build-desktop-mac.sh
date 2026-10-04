@@ -9,8 +9,10 @@
 #
 # Usage: scripts/build-desktop-mac.sh [arm64|x64]     (default arm64)
 #
-# Unsigned unless SIGN=1. Signing and notarizing need the Mac's login keychain
-# unlocked, which cannot be done from here.
+# Unsigned unless SIGN=1. With SIGN=1 it signs with the Developer ID
+# Application certificate and notarizes with a notarytool profile, both kept
+# in the Mac's build keychain (empty password, so it works over SSH; the same
+# keychain PearCircle's seeder build uses). NOTARY_PROFILE picks the profile.
 set -euo pipefail
 
 ARCH="${1:-arm64}"
@@ -27,17 +29,8 @@ ssh -o BatchMode=yes "$MAC" "mkdir -p ~/$REMOTE/pearsheet ~/$REMOTE/peerloom-cor
 rsync -a --delete --rsync-path="$RSYNC_PATH" "${EXCLUDES[@]}" "$ROOT/" "$MAC:$REMOTE/pearsheet/"
 rsync -a --delete --rsync-path="$RSYNC_PATH" --exclude node_modules --exclude .git "$ROOT/../peerloom-core/" "$MAC:$REMOTE/peerloom-core/"
 
-SIGN_ENV="CSC_IDENTITY_AUTO_DISCOVERY=false"
-[ "${SIGN:-0}" = "1" ] && SIGN_ENV=""
-
-echo "==> install, stage, build on the Mac ($ARCH)"
-ssh -o BatchMode=yes "$MAC" "zsh -lc 'set -e
-  cd ~/$REMOTE/peerloom-core && npm install --no-audit --no-fund --silent
-  cd ~/$REMOTE/pearsheet && npm install --no-audit --no-fund --silent
-  npm install --prefix desktop --no-audit --no-fund --silent
-  node scripts/stage-desktop.js --platform darwin --arch $ARCH
-  cd desktop && rm -rf dist && $SIGN_ENV npx electron-builder --mac --$ARCH --publish never
-'"
+echo "==> install, stage, build on the Mac ($ARCH, SIGN=${SIGN:-0})"
+ssh -o BatchMode=yes "$MAC" "zsh -lc 'cd ~/$REMOTE/pearsheet && ARCH=$ARCH SIGN=${SIGN:-0} NOTARY_PROFILE=${NOTARY_PROFILE:-pearcircle-seeder-notary} ./scripts/mac-build-desktop.sh'"
 
 echo "==> packaged smoke on the Mac"
 APP_DIR=$([ "$ARCH" = "arm64" ] && echo mac-arm64 || echo mac)

@@ -15,7 +15,7 @@
     "build:seeder": "node scripts/build-seeder.js",
     "seeder": "node scripts/run-seeder.js",
     "dist:linux": "node scripts/dist-linux.js",
-    "dist:mac": "scripts/build-desktop-mac.sh arm64",
+    "dist:mac": "SIGN=1 scripts/build-desktop-mac.sh arm64",
     "dist:windows": "scripts/build-desktop-windows.sh",
     "build:bare:mobile": "bare-pack --linked --defer fs --defer path --defer bare-process --imports scripts/bare-imports.js -o assets/bare-universal.bundle src/worklet/bare.js",
     "build:ui:mobile": "node scripts/build-ui.mjs --minify --mobile",
@@ -23,7 +23,8 @@
     "ios": "expo run:ios",
     "build:android": "scripts/build-android.sh",
     "dist:seeder": "node scripts/dist-seeder.js",
-    "build:bare:ios": "bare-pack --preset ios --defer fs --defer path --defer bare-process --imports scripts/bare-imports.js -o assets/bare-ios.bundle src/worklet/bare.js"
+    "build:bare:ios": "bare-pack --preset ios --defer fs --defer path --defer bare-process --imports scripts/bare-imports.js -o assets/bare-ios.bundle src/worklet/bare.js",
+    "dist:mac:intel": "SIGN=1 scripts/build-desktop-mac.sh x64"
   },
   "dependencies": {
     "@formulajs/formulajs": "^4.6.1",
