@@ -161,6 +161,9 @@ function createSheetMethods (sheets, { getJoin, getMoves }) {
         if (moved && moved.to) continue
         // Prefer the live title: the stored name is what it was called at join.
         const e = sheets.peek(value.groupId)
+        // Not loaded yet: load it in the background, so its title (and any
+        // later change) reaches the list live through sheet:changed.
+        if (!e && !(moved && moved.removed)) sheets.load(value.groupId).then(() => sheets.changed(value.groupId)).catch(() => {})
         out.push({ sheetId: value.groupId, title: (e && model.title(e.guarded.doc)) || value.name || '', joining: joining.has(value.groupId) || undefined, removed: (moved && moved.removed) || undefined })
         joining.delete(value.groupId)
       }

@@ -161,6 +161,8 @@ function Backups ({ sheetId, members, onError }) {
     try { setInfo(await call('seeder:sheet', { sheetId })) } catch (err) { onError(err.message) }
   }, [sheetId, onError])
   useEffect(() => { load() }, [load])
+  // Seeder listings are membership ops: follow them live.
+  useEffect(() => on('sheet:members', (d) => { if (d.sheetId === sheetId) load() }), [sheetId, load])
 
   async function change (method, seederKey) {
     setBusy(seederKey)
