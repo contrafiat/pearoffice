@@ -228,6 +228,57 @@ function setFormat (doc, tabId, row, col, patch) {
   })
 }
 
+// Put the rows of a range in a new order, as one change: `order` lists the
+// source row for each row from r1 down. Only the range's columns move.
+// Formulas move like a paste, so their relative references shift with
+// their row, as in Excel; formatting moves with the cell.
+function sortRows (doc, tabId, r1, c1, r2, c2, order) {
+  if (order.length !== r2 - r1 + 1) throw new Error('sort order does not match the range')
+  return capture(doc, () => {
+    const ctx = makeCtx(doc, tabId)
+    const t = tabMap(doc, tabId)
+    const fmt = t.get('fmt')
+    const prebuilt = refs.indexTabs(ctx.tabs)
+    const take = []
+    for (let r = r1; r <= r2; r++) {
+      const line = []
+      for (let c = c1; c <= c2; c++) {
+        const { rowId, colId } = idsAt(doc, tabId, r, c)
+        const f = {}
+        for (const attr of FORMAT_ATTRS) {
+          const v = rowId && colId ? fmt.get(cellKey(rowId, colId) + ':' + attr) : undefined
+          if (v !== undefined) f[attr] = v
+        }
+        line.push({ input: getInput(doc, tabId, r, c, prebuilt), fmt: f })
+      }
+      take.push(line)
+    }
+    order.forEach((from, i) => {
+      const to = r1 + i
+      take[from - r1].forEach((cell, j) => {
+        const c = c1 + j
+        let input = cell.input
+        if (typeof input === 'string' && input[0] === '=' && to !== from) input = '=' + refs.shiftA1(input.slice(1), to - from, 0)
+        writeCell(doc, ctx, tabId, to, c, input)
+        const { rowId, colId } = idsAt(doc, tabId, to, c)
+        for (const attr of FORMAT_ATTRS) {
+          const key = cellKey(rowId, colId) + ':' + attr
+          if (cell.fmt[attr] === undefined) { if (fmt.has(key)) fmt.delete(key) } else if (fmt.get(key) !== cell.fmt[attr]) fmt.set(key, cell.fmt[attr])
+        }
+      })
+    })
+  })
+}
+
+// Replace text in what people typed (formulas in their A1 form), as one
+// change. `cells` lists [row, col, newInput].
+function replaceInputs (doc, tabId, cells) {
+  return capture(doc, () => {
+    const ctx = makeCtx(doc, tabId)
+    for (const [row, col, input] of cells) writeCell(doc, ctx, tabId, row, col, input)
+  })
+}
+
 function getFormat (doc, tabId, row, col) {
   const { t, rowId, colId } = idsAt(doc, tabId, row, col)
   const fmt = t.get('fmt')
@@ -396,6 +447,8 @@ module.exports = {
   deleteCols,
   setWidth,
   importTabs,
+  sortRows,
+  replaceInputs,
   addTab,
   renameTab
 }

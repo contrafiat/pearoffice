@@ -155,6 +155,26 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
     result.quickWins = true
     step('totals, shortcuts, decimals, paste values')
 
+    // Find (Ctrl+F) jumps to a match; "Sort Z to A" from the cell menu sorts
+    // the block around the cell; one undo puts it back.
+    await sendMod('F', ['control'])
+    await waitFor('find panel', "!!document.querySelector('.find-panel input')")
+    await type('Food')
+    await key('Enter')
+    await waitFor('found', "document.querySelector('.formula-bar .address').textContent === 'A2'")
+    await js("document.querySelector('.find-panel .close').click()")
+    await js(`(() => { const el = ${cellNode(1, 1)}; el.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 200, clientY: 150 })) })()`)
+    await waitFor('sort in menu', "[...document.querySelectorAll('.menu li')].some((l) => l.textContent === 'Sort Z to A')")
+    await js("[...document.querySelectorAll('.menu li')].find((l) => l.textContent === 'Sort Z to A').click()")
+    await waitFor('sorted', cellNode(1, 1) + ".textContent === 'Total' && " + cellNode(3, 1) + ".textContent === 'Food'")
+    await js("document.querySelector('.grid .body').focus()")
+    await sendMod('Z', ['control'])
+    await waitFor('sort undone', cellNode(1, 1) + ".textContent === 'Rent' && " + cellNode(3, 2) + ".textContent === '1650.5'")
+    for (let i = 0; i < 3; i++) await key('Down')
+    await key('Right')
+    result.findSort = true
+    step('find and sort')
+
     // Ranges, copy and paste: select B1:B3, copy, paste into C1. The formula
     // moves with it, as in Excel.
     for (let i = 0; i < 3; i++) await key('Up')
@@ -374,7 +394,7 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
       fs.writeFileSync(shot, image.toPNG())
       step('screenshot', shot)
     }
-    result.ok = result.keepOnline && result.avatar && result.spill && result.quickWins && result.suggested === 'SUBSTITUTE,SUBTOTAL,SUM' && result.argHelp === 'number1' && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.importedFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000 && result.pastedFormula === '=SUM(C1:C2)' && result.inviteLink === 'pearsheet://join?s=' + result.inviteLink.slice(19) && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
+    result.ok = result.keepOnline && result.avatar && result.spill && result.quickWins && result.findSort && result.suggested === 'SUBSTITUTE,SUBTOTAL,SUM' && result.argHelp === 'number1' && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.importedFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000 && result.pastedFormula === '=SUM(C1:C2)' && result.inviteLink === 'pearsheet://join?s=' + result.inviteLink.slice(19) && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
   } catch (err) {
     result.error = err.message
     // What the page showed, to tell a UI failure from a load failure.

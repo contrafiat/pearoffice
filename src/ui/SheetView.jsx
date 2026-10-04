@@ -6,8 +6,10 @@ import { changeDecimals, jumpTarget, todaySerial } from './cellTools.js'
 import { shiftA1 } from '../shared/refs.js'
 import { SharePanel } from './SharePanel.jsx'
 import { PeopleStack } from './Avatar.jsx'
+import { FindPanel } from './FindPanel.jsx'
+import { SortPanel } from './SortPanel.jsx'
 import { readPref, writePref } from './prefs.js'
-import { ArrowCounterClockwise, ArrowClockwise, TextB, TextItalic, TextAUnderline, PaintBucket, Copy, Scissors, ClipboardText, Eraser, Numpad, FileXls, DotsThree, Plus } from '@phosphor-icons/react'
+import { ArrowCounterClockwise, ArrowClockwise, TextB, TextItalic, TextAUnderline, PaintBucket, Copy, Scissors, ClipboardText, Eraser, Numpad, FileXls, DotsThree, Plus, MagnifyingGlass } from '@phosphor-icons/react'
 import { DeletePanel } from './DeletePanel.jsx'
 import { FormulaHelp, helpFor, insertFunction } from './FormulaHelp.jsx'
 import { exportSheet, isMobile } from './xlsx.js'
@@ -125,6 +127,8 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
     return () => window.removeEventListener('pearsheet:pref', onPref)
   }, [])
   const [deleting, setDeleting] = useState(null) // 'local' | 'everyone' | null
+  const [finding, setFinding] = useState(null) // { replace } while Find is open
+  const [sorting, setSorting] = useState(null) // what the Sort panel sorts
   const gridRef = useRef(null)
 
   // Everyone in the sheet, for the pictures next to Share.
@@ -183,6 +187,12 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
   }, [sheetId, tabId, onError])
 
   const focusGrid = () => gridRef.current && gridRef.current.focus()
+  // After a panel closes: back to the grid on desktop; on phones drop focus
+  // instead, so the keyboard the panel opened goes away.
+  const afterPanel = () => {
+    if (!phone) { focusGrid(); return }
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur()
+  }
 
   async function commit (move) {
     const current = editingRef.current
@@ -319,6 +329,54 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
     setExt({ row: range.r1 + h - 1, col: range.c1 + w - 1 })
   }
 
+  // The block of data around a cell, as Excel's current region: grows while
+  // a neighbouring row or column has something in it.
+  function dataRegion (r) {
+    const filled = (row, col) => { const x = cells.get(row + ',' + col); return !!(x && x.display !== '') }
+    const box = { ...r }
+    for (let grew = true; grew;) {
+      grew = false
+      const any = (r1, c1, r2, c2) => { for (let a = r1; a <= r2; a++) for (let b = c1; b <= c2; b++) if (filled(a, b)) return true; return false }
+      if (box.r1 > 1 && any(box.r1 - 1, Math.max(1, box.c1 - 1), box.r1 - 1, Math.min(view.cols, box.c2 + 1))) { box.r1--; grew = true }
+      if (box.r2 < view.rows && any(box.r2 + 1, Math.max(1, box.c1 - 1), box.r2 + 1, Math.min(view.cols, box.c2 + 1))) { box.r2++; grew = true }
+      if (box.c1 > 1 && any(box.r1, box.c1 - 1, box.r2, box.c1 - 1)) { box.c1--; grew = true }
+      if (box.c2 < view.cols && any(box.r1, box.c2 + 1, box.r2, box.c2 + 1)) { box.c2++; grew = true }
+    }
+    return box
+  }
+
+  // A first row that is all text above a column that is not is a header.
+  function headerGuess (box) {
+    const top = []
+    for (let c = box.c1; c <= box.c2; c++) top.push(cells.get(box.r1 + ',' + c))
+    if (!top.every((x) => x && x.kind === 'text')) return false
+    for (let r = box.r1 + 1; r <= box.r2; r++) for (let c = box.c1; c <= box.c2; c++) { const x = cells.get(r + ',' + c); if (x && x.kind !== 'text' && x.display !== '') return true }
+    return top.some((x) => x.fmt && x.fmt.b)
+  }
+
+  // What a sort works on: the selection, or the data around a single cell.
+  function sortBox () {
+    return range.r1 === range.r2 && range.c1 === range.c2 ? dataRegion(range) : { ...range }
+  }
+
+  async function sortBy (box, keys, header) {
+    await run('sheet:sortRange', { ...box, keys, header })
+    setSel({ row: box.r1, col: box.c1 })
+    setExt({ row: box.r2, col: box.c2 })
+  }
+
+  function quickSort (desc) {
+    const box = sortBox()
+    sortBy(box, [{ col: Math.min(Math.max(sel.col, box.c1), box.c2), desc }], headerGuess(box))
+  }
+
+  function openSort () {
+    const box = sortBox()
+    const names = {}
+    for (let c = box.c1; c <= box.c2; c++) { const x = cells.get(box.r1 + ',' + c); if (x) names[c] = x.display }
+    setSorting({ box, header: headerGuess(box), names, firstKey: Math.min(Math.max(sel.col, box.c1), box.c2) })
+  }
+
   // Keys that move or select without editing, for every role: Ctrl+arrows
   // to the edge of the data, Ctrl+Home/End, Ctrl+A, Shift+Space (row) and
   // Ctrl+Space (column). True if it handled the key.
@@ -361,6 +419,11 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
         const ch = e.key
         setEditing((ed) => ({ ...ed, value: ed.value + ch }))
       }
+      return
+    }
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F' || e.key === 'h' || e.key === 'H')) {
+      e.preventDefault()
+      setFinding({ replace: canEdit && (e.key === 'h' || e.key === 'H') })
       return
     }
     if (!canEdit) {
@@ -545,12 +608,15 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
         {window.pearsheet && (
           <button className='export icon-button' title='Save a copy as an Excel file' aria-label='Export' onClick={() => exportSheet(sheetId).catch((err) => onError(err.message))}><FileXls size={ICON} /></button>
         )}
+        <button className='find-button icon-button' title='Find and replace (Ctrl+F)' aria-label='Find' onClick={() => setFinding({ replace: false })}><MagnifyingGlass size={ICON} /></button>
         {members.length > 1 && <PeopleStack sheetId={sheetId} members={members} max={phone ? 2 : 3} size={phone ? 24 : 26} onClick={() => setSharing(true)} />}
         <button className='share' onClick={() => setSharing(true)}>Share</button>
         <span className='more'>
           <button className='more-button icon-button' aria-label='More' title='More' onClick={() => setMore(!more)}><DotsThree size={ICON} weight='bold' /></button>
           {more && (
             <ul className='menu more-menu' role='menu' onClick={() => setMore(false)}>
+              <li role='menuitem' onClick={() => setFinding({ replace: canEdit })}>Find and replace</li>
+              {canEdit && <li role='menuitem' onClick={openSort}>Sort...</li>}
               <li role='menuitem' onClick={() => setDeleting('local')}>Remove from this device</li>
               {view.myRole === 'owner' && <li role='menuitem' className='danger' onClick={() => setDeleting('everyone')}>Delete for everyone</li>}
             </ul>
@@ -623,6 +689,28 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
         onResize={(col, px) => { if (canEdit) run('sheet:setWidth', { col, px }) }}
       />
 
+      {finding && (
+        <FindPanel
+          sheetId={sheetId}
+          tabId={view.tabId}
+          tabs={view.tabs}
+          canEdit={canEdit}
+          startWithReplace={finding.replace}
+          onGo={(m) => { if (m.tabId !== view.tabId) setTabId(m.tabId); setSel({ row: m.row, col: m.col }); setExt({ row: m.row, col: m.col }) }}
+          onClose={() => { setFinding(null); afterPanel() }}
+          onError={onError}
+        />
+      )}
+      {sorting && (
+        <SortPanel
+          range={sorting.box}
+          headerGuess={sorting.header}
+          headerNames={sorting.names}
+          firstKey={sorting.firstKey}
+          onSort={({ keys, header }) => { setSorting(null); sortBy(sorting.box, keys, header); afterPanel() }}
+          onClose={() => { setSorting(null); afterPanel() }}
+        />
+      )}
       {sharing && <SharePanel sheetId={sheetId} onClose={() => setSharing(false)} onError={onError} />}
       {shownHelp && <FormulaHelp help={shownHelp} selected={helpSel} onPick={pickFunction} anchor={document.activeElement && document.activeElement.tagName === 'INPUT' ? document.activeElement : null} />}
       {deleting && <DeletePanel sheetId={sheetId} title={view.title} kind={deleting} onClose={() => setDeleting(null)} onError={onError} onDone={() => { setDeleting(null); onGone() }} />}
@@ -636,6 +724,9 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
               {canEdit && <li role='menuitem' onClick={() => { setMenu(null); menuPaste(null).catch((err) => onError(err.message)) }}>Paste</li>}
               {canEdit && <li role='menuitem' onClick={() => { setMenu(null); menuPaste('values').catch((err) => onError(err.message)) }}>Paste values only</li>}
               {canEdit && <li role='menuitem' onClick={() => { setMenu(null); menuPaste('transpose').catch((err) => onError(err.message)) }}>Paste transposed</li>}
+              {canEdit && <li role='menuitem' onClick={() => { setMenu(null); quickSort(false) }}>Sort A to Z</li>}
+              {canEdit && <li role='menuitem' onClick={() => { setMenu(null); quickSort(true) }}>Sort Z to A</li>}
+              {canEdit && <li role='menuitem' onClick={() => { setMenu(null); openSort() }}>Sort...</li>}
               {canEdit && <li role='menuitem' className='danger' onClick={() => { setMenu(null); run('sheet:clearRange', range) }}>Clear contents</li>}
             </>
           )}
