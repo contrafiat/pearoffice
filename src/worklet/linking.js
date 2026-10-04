@@ -16,7 +16,7 @@ const sodium = require('sodium-universal')
 const { signValue, verifyValueWithSigner } = require('@peerloom/core/records')
 const { identityFromSeed, seedToPhrase, phraseToSeed } = require('../shared/phrase')
 const { defaultEncodeInvite } = require('@peerloom/core/engine')
-const { inviteKeyPair } = require('./membership')
+const { inviteKeyPair, cleanName, checkAvatar } = require('./membership')
 
 const PROTOCOL = 'pearsheet/link/1'
 const NAMESPACE = 'pearsheet/link/v1'
@@ -115,7 +115,7 @@ function createLinking ({ engine, log = () => {}, now = () => Date.now() }) {
         const seeders = []
         for await (const { value } of engine.localDb.createReadStream({ gt: 'seeders:', lt: 'seeders:~' })) seeders.push(value.seederKey)
         log('linking a device ' + hex(conn.remotePublicKey).slice(0, 8))
-        msg.send({ t: 'welcome', seed: hex(seed), name: profile ? profile.name : '', sheets: await memberships(), seeders })
+        msg.send({ t: 'welcome', seed: hex(seed), name: profile ? profile.name : '', profile: profile || null, sheets: await memberships(), seeders })
         engine.emit('link:done', { deviceKey: hex(conn.remotePublicKey) })
         const used = active
         setTimeout(() => close(used), 2000)
@@ -188,7 +188,16 @@ function createLinking ({ engine, log = () => {}, now = () => Date.now() }) {
     const seed = b4a.from(String(welcome.seed), 'hex')
     if (seed.length !== 32) throw new Error('The other device sent a damaged identity')
     await replaceIdentity(seed)
-    if (welcome.name) await engine.localDb.put('profile', { name: String(welcome.name).slice(0, 60) })
+    const profile = { name: cleanName(welcome.name), nameAt: 0, avatar: null, avatarAt: 0 }
+    const p = welcome.profile
+    if (p && typeof p === 'object') {
+      if (typeof p.nameAt === 'number') profile.nameAt = p.nameAt
+      if (p.avatar && checkAvatar(p.avatar)) {
+        profile.avatar = { data: p.avatar.data, mime: p.avatar.mime, hash: p.avatar.hash }
+        profile.avatarAt = typeof p.avatarAt === 'number' ? p.avatarAt : 0
+      }
+    }
+    if (profile.name || profile.avatar) await engine.localDb.put('profile', profile)
     for (const key of welcome.seeders || []) {
       if (/^[0-9a-f]{64}$/.test(key)) await engine.localDb.put('seeders:' + key, { seederKey: key, pairedAt: Date.now() })
     }

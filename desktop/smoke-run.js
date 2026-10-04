@@ -239,6 +239,24 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
     result.keepOnline = !win.isDestroyed() && !!getTray()
     step('keep online: window hidden, tray up')
 
+    // Profile picture: a picked image is shrunk, saved and shown, here and
+    // in the share panel.
+    await js(`(async () => {
+      const c = document.createElement('canvas')
+      c.width = 300; c.height = 200
+      const g = c.getContext('2d')
+      g.fillStyle = '#5b8c3a'; g.fillRect(0, 0, 300, 200)
+      const blob = await new Promise((resolve) => c.toBlob(resolve, 'image/png'))
+      const dt = new DataTransfer()
+      dt.items.add(new File([blob], 'me.png', { type: 'image/png' }))
+      const input = document.querySelector('.me input[type=file]')
+      input.files = dt.files
+      input.dispatchEvent(new Event('change', { bubbles: true }))
+    })()`)
+    await waitFor('own picture shown', "!!document.querySelector('.me-picture img.avatar')")
+    result.avatar = await js("document.querySelector('.me-picture img.avatar').src.startsWith('data:image/jpeg;base64,')")
+    step('profile picture')
+
     // Share: the owner gets a single-use invite link.
     await js("document.querySelector('.toolbar .share').click()")
     await waitFor('share panel', "!!document.querySelector('.panel .invite-actions')")
@@ -246,6 +264,7 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
     await waitFor('invite link', "(document.querySelector('.invite-link input') || {}).value?.startsWith('pearsheet://join?')")
     await waitFor('invite QR', "!!document.querySelector('.invite-link .qr svg')")
     result.inviteLink = (await js("document.querySelector('.invite-link input').value")).slice(0, 24)
+    await waitFor('picture in the share panel', "!!document.querySelector('.people img.avatar')")
     step('invite link')
 
     // Stop backing up this sheet to the local seeder, then add it back.
@@ -276,7 +295,7 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
       fs.writeFileSync(shot, image.toPNG())
       step('screenshot', shot)
     }
-    result.ok = result.keepOnline && result.suggested === 'SUBSTITUTE,SUBTOTAL,SUM' && result.argHelp === 'number1' && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.importedFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000 && result.pastedFormula === '=SUM(C1:C2)' && result.inviteLink === 'pearsheet://join?s=' + result.inviteLink.slice(19) && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
+    result.ok = result.keepOnline && result.avatar && result.suggested === 'SUBSTITUTE,SUBTOTAL,SUM' && result.argHelp === 'number1' && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.importedFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000 && result.pastedFormula === '=SUM(C1:C2)' && result.inviteLink === 'pearsheet://join?s=' + result.inviteLink.slice(19) && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
   } catch (err) {
     result.error = err.message
     // What the page showed, to tell a UI failure from a load failure.

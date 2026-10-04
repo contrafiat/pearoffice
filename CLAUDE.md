@@ -41,7 +41,8 @@ the iPhone SE. Mac builds are signed and notarized. Anyone can remove a sheet
 from their device and the owner can delete it for everyone, seeder included
 (proposals/2026-10-04-deleting-sheets.md). A seeder can be taken off a sheet,
 a device can stop using one and a seeder can forget a device
-(proposals/2026-10-04-stop-backing-up.md).
+(proposals/2026-10-04-stop-backing-up.md). People have profile pictures,
+stored inside each sheet (proposals/2026-10-04-profiles-with-avatars.md).
 On desktop, PearSheet can start hidden in the tray at login
 (`desktop/login.js`; XDG autostart on Linux, a LaunchAgent on macOS, login
 items on Windows). `PEARSHEET_DEBUG=1` turns on logging in an installed copy.
@@ -58,6 +59,7 @@ See `TODO.md`.
   ops, built and checked), `join.js` (the `pearsheet/join/1` handshake),
   `moves.js` (removal by moving to fresh keys), `seeding.js` (seeder client),
   `linking.js` (linking a person's devices, recovery phrase),
+  `profiles.js` (your name and picture in every sheet),
   `sheetMethods.js` (IPC), `sheets.js` (live documents).
 - `src/ui/` - the React spreadsheet UI. Talks only to `window.pearsheet`
   (`call`, `on`), which the desktop preload provides and the mobile WebView
