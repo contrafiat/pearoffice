@@ -400,7 +400,7 @@ button, input, select { font: inherit; color: inherit; }
    --------------------------------------------------------------------------- */
 :root { font-family: 'Manrope', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
 /* Cells keep the system font: its figures line up in columns. */
-.grid, .formula-bar input, .formula-bar .address, .tab.rename { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; }
+.grid, .formula-bar .address, .tab.rename { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; }
 /* Manrope ships 300, 400 and 500. */
 h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.active, .badge,
 .panel button.primary, .toolbar .share, .people-stack .more-people { font-weight: 500; }
