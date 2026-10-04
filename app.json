@@ -19,22 +19,46 @@
         {
           "action": "VIEW",
           "data": [
-            { "scheme": "pearsheet", "host": "join" },
-            { "scheme": "pearsheet", "host": "seeder" }
+            {
+              "scheme": "pearsheet",
+              "host": "join"
+            },
+            {
+              "scheme": "pearsheet",
+              "host": "seeder"
+            }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     },
     "ios": {
-      "bundleIdentifier": "com.pearsheet"
+      "bundleIdentifier": "com.pearsheet",
+      "buildNumber": "1",
+      "supportsTablet": true
     },
     "plugins": [
-      ["expo-build-properties", { "android": { "minSdkVersion": 29 } }],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 29
+          }
+        }
+      ],
       "./plugins/with-android-debug-standalone",
       "./plugins/with-android-abis",
-      "./plugins/with-gradle-jvmargs"
+      "./plugins/with-gradle-jvmargs",
+      "./plugins/with-ios-pod-deployment-target",
+      "./plugins/with-ios-scene-lifecycle"
     ],
-    "assets": ["./assets/bare-universal.bundle", "./assets/app-ui.bundle"]
+    "assets": [
+      "./assets/bare-universal.bundle",
+      "./assets/bare-ios.bundle",
+      "./assets/app-ui.bundle"
+    ]
   }
 }
