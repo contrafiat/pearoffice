@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useSta
 import { call, on } from './bridge.js'
 import { Grid } from './Grid.jsx'
 import { colName } from './a1.js'
+import { changeDecimals, jumpTarget, todaySerial } from './cellTools.js'
 import { shiftA1 } from '../shared/refs.js'
 import { SharePanel } from './SharePanel.jsx'
 import { PeopleStack } from './Avatar.jsx'
@@ -68,6 +69,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
   // dragging move this corner while the active cell stays where it was.
   const [ext, setExt] = useState({ row: 1, col: 1 })
   const clip = useRef(null) // what we last copied: { text, row, col, inputs }
+  const pasteMode = useRef(null) // 'values' for the next paste (Ctrl+Shift+V)
   const [palette, setPalette] = useState(null) // 'color' | 'fill' | null
   // On phones the tools row scrolls sideways, which would clip a palette
   // placed inside it, so the palette is placed on the screen instead.
@@ -246,7 +248,14 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
   // into PearSheet keeps formulas.
   function copyText (cut) {
     const text = toTsv(rangeGrid((cell) => (cell ? cell.display : '')))
-    clip.current = { text, row: range.r1, col: range.c1, inputs: rangeGrid((cell) => (cell ? cell.input : '')) }
+    clip.current = {
+      text,
+      row: range.r1,
+      col: range.c1,
+      inputs: rangeGrid((cell) => (cell ? cell.input : '')),
+      // What the cells show, for "paste values": numbers exactly, the rest as shown.
+      values: rangeGrid((cell) => (!cell ? '' : cell.num !== undefined ? String(cell.num) : cell.kind === 'error' ? '' : cell.display))
+    }
     if (cut && canEdit) run('sheet:clearRange', range)
     return text
   }
@@ -261,7 +270,16 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
     const text = e.clipboardData.getData('text/plain')
     if (!text) return
     e.preventDefault()
-    pasteText(text)
+    pasteText(text, pasteMode.current)
+    pasteMode.current = null
+  }
+
+  // The cell menu's clipboard: the system clipboard through the shell.
+  async function menuCopy (cut) { await call('app:setClipboard', { text: copyText(cut) }) }
+  async function menuPaste (mode) {
+    if (!canEdit) return
+    const { text } = await call('app:getClipboard')
+    if (text) pasteText(text, mode)
   }
 
   // Phones: the shell's clipboard, from the toolbar buttons.
@@ -272,11 +290,15 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
     if (text) pasteText(text)
   }
 
-  function pasteText (text) {
+  // mode: 'values' pastes what cells show (no formulas); 'transpose' turns
+  // rows into columns.
+  function pasteText (text, mode = null) {
     const ours = clip.current && clip.current.text === text ? clip.current : null
     // From inside PearSheet: paste what was typed, moving relative references
     // as Excel does. From elsewhere: paste the text.
-    let source = ours ? ours.inputs : fromTsv(text)
+    let source = ours ? (mode === 'values' ? ours.values : ours.inputs) : fromTsv(text)
+    if (mode === 'values') source = source.map((line) => line.map((v) => (typeof v === 'string' && /^[='"]/.test(v) ? "'" + v : v)))
+    if (mode === 'transpose') source = source[0].map((_, c) => source.map((line) => line[c]))
     // One copied cell fills a larger selection.
     const single = source.length === 1 && source[0].length === 1
     const h = single ? range.r2 - range.r1 + 1 : source.length
@@ -285,15 +307,46 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
     // A pasted block moves as a whole; a single cell tiled over a range moves
     // to each target cell in turn.
     const at = (r, c, input) => {
-      if (!ours || typeof input !== 'string' || input[0] !== '=') return input
-      const dr = range.r1 - ours.row + (single ? r : 0)
-      const dc = range.c1 - ours.col + (single ? c : 0)
+      if (!ours || mode === 'values' || typeof input !== 'string' || input[0] !== '=') return input
+      // Transposed, the cell at (r, c) came from (c, r).
+      const dr = range.r1 - ours.row + (single ? r : 0) + (mode === 'transpose' ? r - c : 0)
+      const dc = range.c1 - ours.col + (single ? c : 0) + (mode === 'transpose' ? c - r : 0)
       return '=' + shiftA1(input.slice(1), dr, dc)
     }
     const grid = source.map((line, r) => line.map((input, c) => at(r, c, input)))
     run('sheet:setCells', { row: range.r1, col: range.c1, grid })
     setSel({ row: range.r1, col: range.c1 })
     setExt({ row: range.r1 + h - 1, col: range.c1 + w - 1 })
+  }
+
+  // Keys that move or select without editing, for every role: Ctrl+arrows
+  // to the edge of the data, Ctrl+Home/End, Ctrl+A, Shift+Space (row) and
+  // Ctrl+Space (column). True if it handled the key.
+  function navKey (e) {
+    const mod = e.ctrlKey || e.metaKey
+    const k = e.key
+    const arrows = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] }
+    const filled = (r, c) => { const x = cells.get(r + ',' + c); return !!(x && x.display !== '') }
+    let to = null
+    let extend = e.shiftKey
+    if (mod && arrows[k]) to = jumpTarget(filled, view.rows, view.cols, extend ? ext : sel, ...arrows[k])
+    else if (mod && k === 'Home') to = { row: 1, col: 1 }
+    else if (mod && k === 'End') {
+      let row = 1
+      let col = 1
+      for (const x of view.cells) if (x.display !== '') { row = Math.max(row, x.row); col = Math.max(col, x.col) }
+      to = { row, col }
+    } else if (mod && (k === 'a' || k === 'A') && !e.shiftKey) {
+      e.preventDefault(); setSel({ row: 1, col: 1 }); setExt({ row: view.rows, col: view.cols }); return true
+    } else if (k === ' ' && e.shiftKey && !mod) {
+      e.preventDefault(); setSel({ row: sel.row, col: 1 }); setExt({ row: ext.row, col: view.cols }); return true
+    } else if (k === ' ' && mod) {
+      e.preventDefault(); setSel({ row: 1, col: sel.col }); setExt({ row: view.rows, col: ext.col }); return true
+    } else return false
+    e.preventDefault()
+    if (k === 'Home' || k === 'End') extend = e.shiftKey
+    select(to.row, to.col, extend)
+    return true
   }
 
   function onKeyDown (e) {
@@ -311,12 +364,22 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
       return
     }
     if (!canEdit) {
+      if (navKey(e)) return
       const moves = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1], Tab: [0, e.shiftKey ? -1 : 1] }
       if (moves[e.key]) { e.preventDefault(); moveBy(...moves[e.key]) }
       return
     }
     const mod = e.ctrlKey || e.metaKey
     const k = e.key
+    if (navKey(e)) return
+    // Ctrl+Shift+V: the next paste is values only.
+    if (mod && e.shiftKey && (k === 'v' || k === 'V')) { pasteMode.current = 'values'; return }
+    if (mod && k === ';') {
+      e.preventDefault()
+      run('sheet:setCell', { row: sel.row, col: sel.col, input: String(todaySerial()) })
+      if (!(selected && selected.fmt && selected.fmt.num)) run('sheet:setFormat', { row: sel.row, col: sel.col, patch: { num: 'yyyy-mm-dd' } })
+      return
+    }
     if (mod && (k === 'z' || k === 'Z')) { e.preventDefault(); run(e.shiftKey ? 'sheet:redo' : 'sheet:undo'); return }
     if (mod && (k === 'y' || k === 'Y')) { e.preventDefault(); run('sheet:redo'); return }
     if (mod && (k === 'b' || k === 'B')) { e.preventDefault(); toggle('b'); return }
@@ -329,6 +392,21 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
     if (k === 'Delete' || k === 'Backspace') { e.preventDefault(); run('sheet:clearRange', range); return }
     if (k.length === 1) { e.preventDefault(); setEditing({ ...sel, value: k, source: 'grid' }) }
   }
+
+  // Sum, average and count of the selection, as Calc and Excel show them.
+  const totals = useMemo(() => {
+    if (range.r1 === range.r2 && range.c1 === range.c2) return null
+    let sum = 0
+    let numbers = 0
+    let count = 0
+    for (const x of cells.values()) {
+      if (x.row < range.r1 || x.row > range.r2 || x.col < range.c1 || x.col > range.c2 || x.display === '') continue
+      count++
+      if (x.num !== undefined) { sum += x.num; numbers++ }
+    }
+    return { sum, average: numbers ? sum / numbers : null, count }
+  }, [cells, range.r1, range.r2, range.c1, range.c2])
+  const shortNumber = (n) => String(Number(n.toPrecision(12)))
 
   const editValue = editing ? editing.value : null
   const caretAt = caret === null || editValue === null ? (editValue || '').length : Math.min(caret, editValue.length)
@@ -427,6 +505,20 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
           >
             {NUMBER_FORMATS.map(([code, label]) => <option key={code} value={code}>{label}</option>)}
           </select>
+          <button
+            className='decimals'
+            title='Fewer decimal places'
+            aria-label='Fewer decimal places'
+            onClick={() => formatRange({ num: changeDecimals(fmt.num, -1, selected && selected.display) })}
+          >.0<span aria-hidden='true'>←</span>
+          </button>
+          <button
+            className='decimals'
+            title='More decimal places'
+            aria-label='More decimal places'
+            onClick={() => formatRange({ num: changeDecimals(fmt.num, 1, selected && selected.display) })}
+          >.00<span aria-hidden='true'>→</span>
+          </button>
           {phone && (
             <>
               <span className='sep' />
@@ -524,6 +616,10 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
         onEditBlur={() => commit(null)}
         onKeyDown={onKeyDown}
         onHeaderMenu={(kind, index, x, y) => { if (canEdit) setMenu({ kind, index, x, y }) }}
+        onCellMenu={(row, col, x, y) => {
+          if (row < range.r1 || row > range.r2 || col < range.c1 || col > range.c2) select(row, col)
+          setMenu({ kind: 'cell', x, y })
+        }}
         onResize={(col, px) => { if (canEdit) run('sheet:setWidth', { col, px }) }}
       />
 
@@ -533,9 +629,19 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
 
       {menu && (
         <ul className='menu' style={{ left: menu.x, top: menu.y }} role='menu'>
-          <li role='menuitem' onClick={() => lineAction('before')}>Insert {menu.kind === 'row' ? 'row above' : 'column left'}</li>
-          <li role='menuitem' onClick={() => lineAction('after')}>Insert {menu.kind === 'row' ? 'row below' : 'column right'}</li>
-          <li role='menuitem' className='danger' onClick={() => lineAction('delete')}>Delete {menu.kind === 'row' ? 'row ' + menu.index : 'column ' + colName(menu.index)}</li>
+          {menu.kind === 'cell' && (
+            <>
+              {canEdit && <li role='menuitem' onClick={() => { setMenu(null); menuCopy(true).catch((err) => onError(err.message)) }}>Cut</li>}
+              <li role='menuitem' onClick={() => { setMenu(null); menuCopy(false).catch((err) => onError(err.message)) }}>Copy</li>
+              {canEdit && <li role='menuitem' onClick={() => { setMenu(null); menuPaste(null).catch((err) => onError(err.message)) }}>Paste</li>}
+              {canEdit && <li role='menuitem' onClick={() => { setMenu(null); menuPaste('values').catch((err) => onError(err.message)) }}>Paste values only</li>}
+              {canEdit && <li role='menuitem' onClick={() => { setMenu(null); menuPaste('transpose').catch((err) => onError(err.message)) }}>Paste transposed</li>}
+              {canEdit && <li role='menuitem' className='danger' onClick={() => { setMenu(null); run('sheet:clearRange', range) }}>Clear contents</li>}
+            </>
+          )}
+          {menu.kind !== 'cell' && <li role='menuitem' onClick={() => lineAction('before')}>Insert {menu.kind === 'row' ? 'row above' : 'column left'}</li>}
+          {menu.kind !== 'cell' && <li role='menuitem' onClick={() => lineAction('after')}>Insert {menu.kind === 'row' ? 'row below' : 'column right'}</li>}
+          {menu.kind !== 'cell' && <li role='menuitem' className='danger' onClick={() => lineAction('delete')}>Delete {menu.kind === 'row' ? 'row ' + menu.index : 'column ' + colName(menu.index)}</li>}
         </ul>
       )}
 
@@ -569,6 +675,13 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
             </button>
             ))}
         {canEdit && <button className='tab add' title='Add tab' aria-label='Add tab' onClick={async () => { const r = await run('sheet:addTab', {}); if (r) setTabId(r.tabId) }}><Plus size={16} /></button>}
+              {totals && (
+          <span className='totals' aria-live='polite'>
+            {totals.average !== null && <span>Sum <b>{shortNumber(totals.sum)}</b></span>}
+            {totals.average !== null && <span className='wide'>Average <b>{shortNumber(totals.average)}</b></span>}
+            <span>Count <b>{totals.count}</b></span>
+          </span>
+        )}
       </footer>
     </div>
   )

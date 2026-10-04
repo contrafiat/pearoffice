@@ -13,7 +13,7 @@ export const MAX_ZOOM = 2.5
 // sheets stay fast. Headers are drawn outside the scroll area and moved with
 // the scroll position.
 export const Grid = forwardRef(function Grid (props, ref) {
-  const { view, cells, sel, ext = sel, range, spillBox, editing, onSelect, onEdit, onEditChange, onEditKey, onEditBlur, onEditCaret = () => {}, onKeyDown, onHeaderMenu, onResize, onCopy, onPaste, zoom = 1, onZoom, inputMode } = props
+  const { view, cells, sel, ext = sel, range, spillBox, editing, onSelect, onEdit, onEditChange, onEditKey, onEditBlur, onEditCaret = () => {}, onKeyDown, onHeaderMenu, onCellMenu = () => {}, onResize, onCopy, onPaste, zoom = 1, onZoom, inputMode } = props
   // Row height and column widths scale with the zoom (pinch on a phone);
   // stored widths stay unzoomed.
   const ROW_H = Math.round(BASE_ROW_H * zoom)
@@ -211,6 +211,7 @@ export const Grid = forwardRef(function Grid (props, ref) {
                 onMouseDown={(e) => { dragging.current = true; onSelect(r, c, e.shiftKey) }}
                 onMouseEnter={() => { if (dragging.current) onSelect(r, c, true) }}
                 onDoubleClick={() => onEdit(r, c)}
+                onContextMenu={(e) => { e.preventDefault(); onCellMenu(r, c, e.clientX, e.clientY) }}
                 // Touch screens: tapping the cell that is already selected edits it.
                 onTouchEnd={(e) => { if (!pinched.current && e.touches.length === 0 && sel.row === r && sel.col === c) { e.preventDefault(); onEdit(r, c) } }}
                 title={cell && cell.volatile ? 'Changes on each device (time or random)' : cell && cell.blocked ? 'This answer cannot fill in. Select the cell to see why.' : undefined}
