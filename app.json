@@ -60,7 +60,15 @@
       "./plugins/with-android-abis",
       "./plugins/with-gradle-jvmargs",
       "./plugins/with-ios-pod-deployment-target",
-      "./plugins/with-ios-scene-lifecycle"
+      "./plugins/with-ios-scene-lifecycle",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "PearSheet uses the camera to scan invite, device and seeder QR codes.",
+          "microphonePermission": false,
+          "recordAudioAndroid": false
+        }
+      ]
     ],
     "assets": [
       "./assets/bare-universal.bundle",

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { QrCode, ScanButton } from './Qr.jsx'
 import { call, on } from './bridge.js'
 
 // Linking a person's devices and the recovery phrase
@@ -59,6 +60,12 @@ export function DevicesPanel ({ initialLink = '', startWith = null, onClose, onE
                 <button className='primary' onClick={async () => { try { await navigator.clipboard.writeText(link.link); setCopied(true) } catch { if (window.pearsheet.platform === 'mobile') { await call('app:setClipboard', { text: link.link }); setCopied(true) } } }}>{copied ? 'Copied' : 'Copy'}</button>
               </div>
             )}
+            {link && (
+              <div className='pairing'>
+                <QrCode value={link.link} label='Device link QR code' />
+                <p className='muted small'>Or scan this with PearSheet on the new phone.</p>
+              </div>
+            )}
             {linked && <p className='ok'>Linked. Your sheets are opening on the new device.</p>}
           </>
         )}
@@ -67,6 +74,7 @@ export function DevicesPanel ({ initialLink = '', startWith = null, onClose, onE
           <form onSubmit={(e) => { e.preventDefault(); restartAfter('link:join', { link: input.trim() }) }}>
             <p>Paste the link from your other device. This device must not have any sheets yet; it takes on your identity.</p>
             <input aria-label='Device link' placeholder='pearsheet://link?...' value={input} onChange={(e) => setInput(e.target.value)} autoFocus />
+            <ScanButton prefix='pearsheet://link?' what='a PearSheet device link' onError={onError} onLink={(l) => { setInput(l); restartAfter('link:join', { link: l }) }} />
             <div className='row end'>
               <button type='button' onClick={() => setMode('menu')}>Back</button>
               <button className='primary' type='submit' disabled={busy || !input.trim()}>{busy ? 'Linking...' : 'Link'}</button>

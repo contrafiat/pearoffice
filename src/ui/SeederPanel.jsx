@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { call } from './bridge.js'
 import { toSvg } from '../shared/qr.js'
+import { ScanButton } from './Qr.jsx'
 
 // "Run a seeder on this computer" (desktop): a separate blind process the
 // desktop app starts and stops. Shows its pairing QR and what it holds.
@@ -152,12 +153,12 @@ export function SeederPanel ({ initialLink = '', onClose, onError }) {
   }
   useEffect(() => { load() }, [])
 
-  async function pair (e) {
-    e.preventDefault()
+  async function pair (e, scanned) {
+    if (e) e.preventDefault()
     setBusy(true)
     setDone(false)
     try {
-      await call('seeder:pair', { link: link.trim() })
+      await call('seeder:pair', { link: (scanned || link).trim() })
       setLink('')
       setDone(true)
       load()
@@ -185,6 +186,7 @@ export function SeederPanel ({ initialLink = '', onClose, onError }) {
           value={link}
           onChange={(e) => setLink(e.target.value)}
         />
+        <ScanButton prefix='pearsheet://seeder?' what='a PearSheet seeder code' onError={onError} onLink={(l) => { setLink(l); pair(null, l) }} />
         <div className='row end'>
           {done && <span className='muted'>Paired. Your sheets are backing up.</span>}
           <button className='primary' type='submit' disabled={busy || !link.trim()}>{busy ? 'Pairing...' : 'Pair'}</button>
