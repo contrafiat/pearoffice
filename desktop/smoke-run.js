@@ -254,6 +254,44 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
     result.charts = png.length > 2000 && png.slice(1, 4).toString() === 'PNG' && result.chartInXlsx
     step('charts')
 
+    // Cell formats (proposals/2026-10-04-cell-formats.md), in M30 out of the
+    // way: underline and strikethrough, wrap a long text and see its row
+    // grow, a larger size, borders, and a row resized by dragging its edge.
+    const rowHead = (r) => "[...document.querySelectorAll('.row-head')].find((h) => h.firstChild && h.firstChild.textContent === '" + r + "')"
+    await sendMod('Home', ['control'])
+    for (let i = 0; i < 12; i++) await key('Right')
+    for (let i = 0; i < 29; i++) await key('Down')
+    await enter('A long note that will not fit on one line of this cell', 'Enter')
+    await key('Up')
+    await sendMod('U', ['control'])
+    await sendMod('5', ['control'])
+    await waitFor('underline and strike', cellNode(30, 13) + ".querySelector('.cell-text').style.textDecoration === 'underline line-through'")
+    const before = await js(rowHead(30) + '.getBoundingClientRect().height')
+    await js("document.querySelector('.tools [aria-label=\"Alignment\"]').click()")
+    await waitFor('align menu', "!!document.querySelector('.align-menu')")
+    await js("document.querySelector('.align-menu [aria-label=\"Wrap text\"]').click()")
+    await waitFor('row grows for wrapped text', rowHead(30) + '.getBoundingClientRect().height > ' + (before + 10))
+    await js("document.querySelector('.grid .body').focus()")
+    await key('Down')
+    await enter('Big', 'Enter', 'Big')
+    await key('Up')
+    await js(`(() => { const s = document.querySelector('.tools [aria-label="Font size"]'); const set = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set; set.call(s, '24'); s.dispatchEvent(new Event('change', { bubbles: true })) })()`)
+    await waitFor('bigger text', cellNode(31, 13) + ".querySelector('.cell-text').style.fontSize === '32px' && " + rowHead(31) + '.getBoundingClientRect().height > 35')
+    await js("document.querySelector('.tools [aria-label=\"Borders\"]').click()")
+    await waitFor('borders menu', "!!document.querySelector('.borders-menu')")
+    await js("[...document.querySelectorAll('.borders-menu .border-preset')].find((b) => b.textContent === 'All').click()")
+    await waitFor('borders', "!!" + cellNode(31, 13) + ".querySelector('.cell-borders')")
+    const [rx, ry] = await js(`(() => { const r = ${rowHead(29)}.querySelector('.row-resize').getBoundingClientRect(); return [Math.round(r.left + r.width / 2), Math.round(r.top + r.height / 2)] })()`)
+    wc.sendInputEvent({ type: 'mouseDown', x: rx, y: ry, button: 'left', clickCount: 1 })
+    for (let i = 1; i <= 5; i++) { wc.sendInputEvent({ type: 'mouseMove', x: rx, y: ry + i * 6, button: 'left' }); await sleep(40) }
+    wc.sendInputEvent({ type: 'mouseUp', x: rx, y: ry + 30, button: 'left', clickCount: 1 })
+    await waitFor('row resized', rowHead(29) + '.getBoundingClientRect().height > 45')
+    await js("document.querySelector('.grid .body').focus()")
+    await sendMod('Home', ['control'])
+    await key('Right'); for (let i = 0; i < 3; i++) await key('Down')
+    result.formats = true
+    step('cell formats and row heights')
+
     // Ranges, copy and paste: select B1:B3, copy, paste into C1. The formula
     // moves with it, as in Excel.
     for (let i = 0; i < 3; i++) await key('Up')
@@ -504,7 +542,7 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
       fs.writeFileSync(shot, image.toPNG())
       step('screenshot', shot)
     }
-    result.ok = result.keepOnline && result.avatar && result.spill && result.quickWins && result.findSort && result.fill && result.charts && result.csvPdf && result.tabs && result.suggested === 'SUBSTITUTE,SUBTOTAL,SUM' && result.argHelp === 'number1' && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.importedFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000 && result.pastedFormula === '=SUM(C1:C2)' && result.inviteLink === 'pearsheet://join?s=' + result.inviteLink.slice(19) && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
+    result.ok = result.keepOnline && result.avatar && result.spill && result.quickWins && result.findSort && result.fill && result.charts && result.formats && result.csvPdf && result.tabs && result.suggested === 'SUBSTITUTE,SUBTOTAL,SUM' && result.argHelp === 'number1' && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.importedFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000 && result.pastedFormula === '=SUM(C1:C2)' && result.inviteLink === 'pearsheet://join?s=' + result.inviteLink.slice(19) && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
   } catch (err) {
     result.error = err.message
     // What the page showed, to tell a UI failure from a load failure.

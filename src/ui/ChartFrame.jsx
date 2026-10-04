@@ -9,10 +9,10 @@ import { ChartView } from './Chart.jsx'
 
 const touch = () => typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(pointer: coarse)').matches
 
-export function ChartFrame ({ chart, zoom, rowH, baseRowH, colX, cols, rows, selected, actions }) {
+export function ChartFrame ({ chart, zoom, rowY, rowAt, colX, cols, rows, selected, actions }) {
   const [drag, setDrag] = useState(null) // { mode, x0, y0, dx, dy }
   const moved = useRef(false)
-  const top = (Math.min(chart.anchor.row, rows) - 1) * rowH + chart.anchor.dy * zoom
+  const top = rowY[Math.min(chart.anchor.row, rows)] + chart.anchor.dy * zoom
   const left = colX[Math.min(chart.anchor.col, cols)] + chart.anchor.dx * zoom
   const w = Math.round(chart.size.w * zoom)
   const h = Math.round(chart.size.h * zoom)
@@ -20,12 +20,12 @@ export function ChartFrame ({ chart, zoom, rowH, baseRowH, colX, cols, rows, sel
 
   // Where a drag ends, as an anchor cell and offset in unzoomed pixels.
   function anchorAt (pxTop, pxLeft) {
-    const t = Math.max(0, pxTop / zoom)
-    const l = Math.max(0, pxLeft / zoom)
-    const row = Math.min(rows, Math.floor(t / baseRowH) + 1)
+    const t = Math.max(0, pxTop)
+    const l = Math.max(0, pxLeft)
+    const row = rowAt(t)
     let col = 1
-    while (col < cols && colX[col + 1] / zoom <= l) col++
-    return { row, col, dx: l - colX[col] / zoom, dy: t - (row - 1) * baseRowH }
+    while (col < cols && colX[col + 1] <= l) col++
+    return { row, col, dx: (l - colX[col]) / zoom, dy: (t - rowY[row]) / zoom }
   }
 
   function start (mode, e) {

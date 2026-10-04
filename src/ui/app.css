@@ -156,17 +156,27 @@ button, input, select { font: inherit; color: inherit; }
   height: var(--row-h);
   border-right: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
-  padding: 0 6px;
-  line-height: calc(var(--row-h) - 1px);
-  white-space: nowrap;
+  padding: 0 6px 3px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
   overflow: hidden;
-  text-overflow: ellipsis;
   cursor: cell;
   font-size: var(--cell-font, 14px);
 }
-.cell.k-number { text-align: right; font-variant-numeric: tabular-nums; }
-.cell.k-bool { text-align: center; }
-.cell.k-error { color: var(--error); text-align: center; }
+/* The text inside a cell: one line unless the cell wraps. Bottom-aligned
+   by default, as in Excel; a default-height row looks centred. */
+.cell-text { display: block; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.3; }
+.cell.wrap .cell-text { white-space: pre-wrap; overflow-wrap: anywhere; text-overflow: clip; }
+.cell.v-top { justify-content: flex-start; padding-top: 3px; }
+.cell.v-middle { justify-content: center; padding-bottom: 0; }
+.cell-borders { position: absolute; inset: -1px; pointer-events: none; }
+.row-head { position: absolute; }
+.row-head .row-resize { position: absolute; left: 0; right: 0; bottom: -3px; height: 6px; cursor: row-resize; z-index: 1; }
+.cell.k-number .cell-text { text-align: right; font-variant-numeric: tabular-nums; }
+.cell.k-bool .cell-text { text-align: center; }
+.cell.k-error { color: var(--error); }
+.cell.k-error .cell-text { text-align: center; }
 .cell.b { font-weight: 700; }
 .cell.i { font-style: italic; }
 .selection { position: absolute; border: 2px solid var(--pear); pointer-events: none; margin: -1px 0 0 -1px; }
@@ -497,3 +507,21 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
   .chart-backdrop { background: transparent; justify-content: flex-end; padding: 60px 24px 0 0; pointer-events: none; }
   .chart-backdrop .chart-panel { pointer-events: auto; width: 400px; max-height: calc(100vh - 90px); }
 }
+
+/* Borders menu (proposals/2026-10-04-cell-formats.md). */
+.palette.borders-menu { grid-template-columns: repeat(4, auto); width: max-content; align-items: center; }
+.tools .palette .border-preset { min-width: 0; padding: 4px 8px; font-size: 12px; height: auto; }
+.palette.borders-menu select { grid-column: 1 / -1; height: 30px; }
+.border-colours { grid-column: 1 / -1; display: flex; gap: 6px; }
+.tools .palette .border-colours .swatch.on { outline: 2px solid var(--pear); }
+.tools .size-select { width: 64px; }
+/* Desktop: the formatting tools get their own row under the title, wrapping
+   in a narrow window, so Share and the menu stay in view. */
+@media (min-width: 721px) {
+  .toolbar { flex-wrap: wrap; row-gap: 6px; }
+  .toolbar .tools:not(.phone-row) { order: 3; flex-basis: 100%; flex-wrap: wrap; row-gap: 4px; }
+}
+.palette.align-menu { grid-template-columns: repeat(3, 34px); width: max-content; }
+.tools .palette.align-menu button { min-width: 0; height: 32px; padding: 0; }
+.tools .palette.align-menu button.on { background: var(--pear-soft); border-color: var(--pear); color: var(--pear-dark); }
+.tools .palette .wrap-toggle { grid-column: 1 / -1; gap: 6px; font-size: 12px; padding: 0 8px; }
