@@ -8,8 +8,11 @@ import { SharePanel } from './SharePanel.jsx'
 import { PeopleStack } from './Avatar.jsx'
 import { FindPanel } from './FindPanel.jsx'
 import { SortPanel } from './SortPanel.jsx'
+import { ChartPanel } from './ChartPanel.jsx'
+import { ChartView, downloadChart } from './Chart.jsx'
+import { guessChart } from '../shared/charts.js'
 import { readPref, writePref } from './prefs.js'
-import { ArrowCounterClockwise, ArrowClockwise, TextB, TextItalic, TextAUnderline, PaintBucket, Copy, Scissors, ClipboardText, Eraser, Numpad, FileXls, DotsThree, Plus, MagnifyingGlass, X } from '@phosphor-icons/react'
+import { ArrowCounterClockwise, ArrowClockwise, TextB, TextItalic, TextAUnderline, PaintBucket, Copy, Scissors, ClipboardText, Eraser, Numpad, FileXls, DotsThree, Plus, MagnifyingGlass, X, ChartBar, PencilSimple, DownloadSimple, Trash } from '@phosphor-icons/react'
 import { DeletePanel } from './DeletePanel.jsx'
 import { FormulaHelp, helpFor, insertFunction } from './FormulaHelp.jsx'
 import { exportSheet, exportCsv, printTab, isMobile } from './xlsx.js'
@@ -130,6 +133,9 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
   const [finding, setFinding] = useState(null) // { replace } while Find is open
   const [sorting, setSorting] = useState(null) // what the Sort panel sorts
   const [droppingTab, setDroppingTab] = useState(null) // a tab waiting for "Delete"
+  const [selectedChart, setSelectedChart] = useState(null) // chart id (desktop)
+  const [editingChart, setEditingChart] = useState(null) // chart id in the editor
+  const [viewingChart, setViewingChart] = useState(null) // chart id full screen (phones)
   const gridRef = useRef(null)
 
   // Everyone in the sheet, for the pictures next to Share.
@@ -357,6 +363,38 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
     }
   }
 
+  // --- charts (proposals/2026-10-04-charts.md) ---------------------------
+  const chartById = (id) => (view.charts || []).find((c) => c.id === id)
+  const rangeText = (box) => colName(box.c1) + box.r1 + (box.r1 === box.r2 && box.c1 === box.c2 ? '' : ':' + colName(box.c2) + box.r2)
+
+  // A chart of the selection (or the data around the cell), to the right of it.
+  async function insertChart () {
+    const box = sortBox()
+    const block = []
+    for (let r = box.r1; r <= box.r2; r++) {
+      const line = []
+      for (let c = box.c1; c <= box.c2; c++) { const x = cells.get(r + ',' + c); line.push({ num: x && x.num !== undefined ? x.num : null, text: x ? x.display : '' }) }
+      block.push(line)
+    }
+    const guess = guessChart(block)
+    // Desktop: beside the data. Phones: below it, as wide as the screen.
+    const place = phone
+      ? { anchor: { row: Math.min(view.rows, box.r2 + 2), col: 1 }, size: { w: Math.max(240, Math.min(480, window.innerWidth / zoom - 70)), h: 260 } }
+      : { anchor: { row: box.r1, col: Math.min(view.cols, box.c2 + 2) } }
+    const r = await run('sheet:addChart', { spec: { ...guess, data: rangeText(box), ...place } })
+    if (r) { setSelectedChart(r.chartId); setEditingChart(r.chartId) }
+  }
+
+  const chartActions = {
+    canEdit,
+    select: (id) => setSelectedChart(id),
+    open: (id) => setViewingChart(id),
+    edit: (id) => { setViewingChart(null); setEditingChart(id) },
+    change: (id, patch) => run('sheet:setChart', { chartId: id, patch }),
+    download: (id, kind) => { const c = chartById(id); if (c) downloadChart(c, kind).catch((err) => onError(err.message)) },
+    remove: (id) => { setSelectedChart(null); setEditingChart(null); setViewingChart(null); run('sheet:deleteChart', { chartId: id }) }
+  }
+
   // The block of data around a cell, as Excel's current region: grows while
   // a neighbouring row or column has something in it.
   function dataRegion (r) {
@@ -448,6 +486,10 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
         setEditing((ed) => ({ ...ed, value: ed.value + ch }))
       }
       return
+    }
+    if (selectedChart && chartById(selectedChart)) {
+      if (e.key === 'Escape') { e.preventDefault(); setSelectedChart(null); return }
+      if ((e.key === 'Delete' || e.key === 'Backspace') && canEdit) { e.preventDefault(); chartActions.remove(selectedChart); return }
     }
     if ((e.ctrlKey || e.metaKey) && (e.key === 'f' || e.key === 'F' || e.key === 'h' || e.key === 'H')) {
       e.preventDefault()
@@ -613,6 +655,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
             onClick={() => formatRange({ num: changeDecimals(fmt.num, 1, selected && selected.display) })}
           >.00<span aria-hidden='true'>→</span>
           </button>
+          <button title='Insert a chart of the selection' aria-label='Insert chart' className='insert-chart' onClick={() => insertChart().catch((err) => onError(err.message))}><ChartBar size={ICON} /></button>
           {phone && (
             <>
               <span className='sep' />
@@ -708,7 +751,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
         range={range}
         spillBox={spillBox}
         ext={ext}
-        onSelect={(row, col, extend) => { if (editing) commit(null); select(row, col, extend) }}
+        onSelect={(row, col, extend) => { if (editing) commit(null); setSelectedChart(null); select(row, col, extend) }}
         onCopy={onCopy}
         onPaste={onPaste}
         onEdit={(row, col) => { select(row, col); if (canEdit) setEditing({ row, col, value: (cells.get(row + ',' + col) || {}).input || '' }) }}
@@ -719,6 +762,9 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
         onKeyDown={onKeyDown}
         onHeaderMenu={(kind, index, x, y) => { if (canEdit) setMenu({ kind, index, x, y }) }}
         onFill={canEdit && !phone ? fillFrom : null}
+        charts={view.charts || []}
+        selectedChart={selectedChart}
+        chartActions={chartActions}
         onCellMenu={(row, col, x, y) => {
           if (row < range.r1 || row > range.r2 || col < range.c1 || col > range.c2) select(row, col)
           setMenu({ kind: 'cell', x, y })
@@ -750,6 +796,38 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
           </section>
         </div>
       )}
+      {editingChart && chartById(editingChart) && (
+        <ChartPanel
+          key={editingChart}
+          chart={chartById(editingChart)}
+          selection={rangeText(range)}
+          onChange={(patch) => chartActions.change(editingChart, patch)}
+          onDelete={() => chartActions.remove(editingChart)}
+          onClose={() => { setEditingChart(null); afterPanel() }}
+        />
+      )}
+      {viewingChart && chartById(viewingChart) && (() => {
+        const c = chartById(viewingChart)
+        const w = Math.min(window.innerWidth - 24, 900)
+        const h = Math.min(Math.round(w * 0.75), window.innerHeight - 220)
+        return (
+          <div className='panel-backdrop' onMouseDown={(e) => { if (e.target === e.currentTarget) setViewingChart(null) }}>
+            <section className='panel chart-full' role='dialog' aria-label='Chart'>
+              <header>
+                <h2>{c.title || 'Chart'}</h2>
+                <button className='close' aria-label='Close' onClick={() => setViewingChart(null)}><X size={18} /></button>
+              </header>
+              <ChartView chart={{ ...c, title: undefined }} width={w - 36} height={h} />
+              <div className='row'>
+                {canEdit && <button onClick={() => chartActions.edit(c.id)}><PencilSimple size={16} /> Edit</button>}
+                <button onClick={() => chartActions.download(c.id, 'png')}><DownloadSimple size={16} /> PNG</button>
+                <button onClick={() => chartActions.download(c.id, 'svg')}><DownloadSimple size={16} /> SVG</button>
+                {canEdit && <button className='danger' onClick={() => chartActions.remove(c.id)}><Trash size={16} /></button>}
+              </div>
+            </section>
+          </div>
+        )
+      })()}
       {finding && (
         <FindPanel
           sheetId={sheetId}

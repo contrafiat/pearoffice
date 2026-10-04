@@ -211,6 +211,40 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
     result.fill = true
     step('fill handle and Ctrl+D')
 
+    // Charts: insert one from A1:B2, show values, switch to a line chart,
+    // change a cell and see the chart follow, download a PNG, delete it.
+    await sendMod('Home', ['control'])
+    await sendMod('Down', ['shift']); await sendMod('Right', ['shift'])
+    await js("document.querySelector('.insert-chart').click()")
+    await waitFor('chart inserted', "!!document.querySelector('.chart-frame svg') && !!document.querySelector('.chart-panel')")
+    await js("[...document.querySelectorAll('.chart-panel label')].find((l) => l.textContent.includes('Show values')).querySelector('input').click()")
+    await waitFor('values shown', "[...document.querySelectorAll('.chart-frame svg text')].some((t) => t.textContent === '1200')")
+    await js("document.querySelector('.chart-types [title=\"Line\"]').click()")
+    await waitFor('line chart', "document.querySelector('.chart-types [title=\"Line\"]').getAttribute('aria-checked') === 'true'")
+    await js("document.querySelector('.chart-panel .close').click()")
+    await js("document.querySelector('.grid .body').focus()")
+    await sendMod('Home', ['control'])
+    await key('Right')
+    await enter('1300', 'Enter')
+    await waitFor('chart follows the cell', "[...document.querySelectorAll('.chart-frame svg text')].some((t) => t.textContent === '1300')")
+    await js("document.querySelector('.chart-frame').click()")
+    await waitFor('chart tools', "!!document.querySelector('.chart-tools')")
+    await js("document.querySelector('.chart-tools [aria-label=\"Download as PNG\"]').click()")
+    const pngFile = require('node:path').join(dataDir, 'downloads', 'Chart.png')
+    for (const t0 = Date.now(); !fs.existsSync(pngFile) && Date.now() - t0 < 10000;) await sleep(200)
+    await sleep(300)
+    const png = fs.existsSync(pngFile) ? fs.readFileSync(pngFile) : Buffer.alloc(0)
+    await js("document.querySelector('.chart-tools [aria-label=\"Delete chart\"]').click()")
+    await waitFor('chart deleted', "!document.querySelector('.chart-frame')")
+    await js("document.querySelector('.grid .body').focus()")
+    await sendMod('Home', ['control'])
+    await key('Right')
+    await enter('1200', 'Enter', '1650.5')
+    await sendMod('Home', ['control'])
+    await key('Right'); for (let i = 0; i < 3; i++) await key('Down')
+    result.charts = png.length > 2000 && png.slice(1, 4).toString() === 'PNG'
+    step('charts')
+
     // Ranges, copy and paste: select B1:B3, copy, paste into C1. The formula
     // moves with it, as in Excel.
     for (let i = 0; i < 3; i++) await key('Up')
@@ -461,7 +495,7 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
       fs.writeFileSync(shot, image.toPNG())
       step('screenshot', shot)
     }
-    result.ok = result.keepOnline && result.avatar && result.spill && result.quickWins && result.findSort && result.fill && result.csvPdf && result.tabs && result.suggested === 'SUBSTITUTE,SUBTOTAL,SUM' && result.argHelp === 'number1' && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.importedFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000 && result.pastedFormula === '=SUM(C1:C2)' && result.inviteLink === 'pearsheet://join?s=' + result.inviteLink.slice(19) && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
+    result.ok = result.keepOnline && result.avatar && result.spill && result.quickWins && result.findSort && result.fill && result.charts && result.csvPdf && result.tabs && result.suggested === 'SUBSTITUTE,SUBTOTAL,SUM' && result.argHelp === 'number1' && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.importedFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000 && result.pastedFormula === '=SUM(C1:C2)' && result.inviteLink === 'pearsheet://join?s=' + result.inviteLink.slice(19) && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
   } catch (err) {
     result.error = err.message
     // What the page showed, to tell a UI failure from a load failure.

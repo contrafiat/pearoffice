@@ -332,6 +332,79 @@ function fillRange (doc, tabId, src, dir, n, mode = 'series') {
   })
 }
 
+// --- charts (proposals/2026-10-04-charts.md) -----------------------------
+// A tab's charts live in the root map `charts:<tabId>` (root maps never
+// clash between devices): chart id -> a map with one key per setting, the
+// data range stored like a formula reference (cell ids) and the anchor cell
+// as ids.
+
+const { SETTINGS: CHART_SETTINGS } = require('./charts')
+
+function chartsMap (doc, tabId) {
+  return doc.getMap('charts:' + tabId)
+}
+
+function writeChart (doc, tabId, chart, patch) {
+  const ctx = makeCtx(doc, tabId)
+  for (const [key, value] of Object.entries(patch)) {
+    if (key === 'data') chart.set('data', value ? refs.toStored(String(value).replace(/^=/, ''), ctx) : '')
+    else if (key === 'anchor') {
+      const { rowId, colId } = idsAt(doc, tabId, Math.max(1, value.row), Math.max(1, value.col))
+      chart.set('anchorRow', rowId)
+      chart.set('anchorCol', colId)
+      chart.set('dx', Math.round(value.dx || 0))
+      chart.set('dy', Math.round(value.dy || 0))
+    } else if (key === 'size') {
+      chart.set('w', Math.max(160, Math.min(2000, Math.round(value.w))))
+      chart.set('h', Math.max(120, Math.min(2000, Math.round(value.h))))
+    } else if (CHART_SETTINGS.includes(key)) {
+      if (value === null || value === undefined) chart.delete(key)
+      else chart.set(key, value)
+    } else throw new Error('unknown chart setting: ' + key)
+  }
+}
+
+function addChart (doc, tabId, spec) {
+  const id = newId()
+  const update = capture(doc, () => {
+    const chart = new Y.Map()
+    chartsMap(doc, tabId).set(id, chart)
+    writeChart(doc, tabId, chart, { size: { w: 480, h: 300 }, ...spec })
+  })
+  return { id, update }
+}
+
+function setChart (doc, tabId, id, patch) {
+  const chart = chartsMap(doc, tabId).get(id)
+  if (!chart) throw new Error('That chart was deleted')
+  return capture(doc, () => writeChart(doc, tabId, chart, patch))
+}
+
+function deleteChart (doc, tabId, id) {
+  return capture(doc, () => chartsMap(doc, tabId).delete(id))
+}
+
+// Every chart on a tab, with its data range back in A1 form and its anchor
+// as a row and column number (row 1, column 1 if those were deleted).
+function getCharts (doc, tabId) {
+  const t = tabMap(doc, tabId)
+  const rows = t.get('rows').toArray()
+  const cols = t.get('cols').toArray()
+  const out = []
+  for (const [id, chart] of chartsMap(doc, tabId).entries()) {
+    const c = { id }
+    for (const key of CHART_SETTINGS) if (chart.has(key)) c[key] = chart.get(key)
+    const stored = chart.get('data') || ''
+    c.data = stored ? refs.toDisplay(stored, { tabId, tabs: tabsContext(doc) }) : ''
+    const row = rows.indexOf(chart.get('anchorRow')) + 1
+    const col = cols.indexOf(chart.get('anchorCol')) + 1
+    c.anchor = { row: row || 1, col: col || 1, dx: chart.get('dx') || 0, dy: chart.get('dy') || 0 }
+    c.size = { w: chart.get('w') || 480, h: chart.get('h') || 300 }
+    out.push(c)
+  }
+  return out.sort((a, b) => (a.id < b.id ? -1 : 1))
+}
+
 // Replace text in what people typed (formulas in their A1 form), as one
 // change. `cells` lists [row, col, newInput].
 function replaceInputs (doc, tabId, cells) {
@@ -577,6 +650,10 @@ module.exports = {
   setWidth,
   importTabs,
   sortRows,
+  addChart,
+  setChart,
+  deleteChart,
+  getCharts,
   fillRange,
   replaceInputs,
   addTab,

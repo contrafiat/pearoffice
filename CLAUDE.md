@@ -61,6 +61,10 @@ See `TODO.md`.
   `linking.js` (linking a person's devices, recovery phrase),
   `profiles.js` (your name and picture in every sheet),
   `sheetMethods.js` (IPC), `sheets.js` (live documents).
+- Charts (proposals/2026-10-04-charts.md): `src/shared/charts.js` (data
+  ranges, series, first guess), stored per tab in the root map
+  `charts:<tabId>` (`sheetModel.js`), drawn with ECharts as SVG
+  (`src/ui/Chart.jsx`, `chartOption.js`, `ChartFrame.jsx`, `ChartPanel.jsx`).
 - `src/ui/` - the React spreadsheet UI. Talks only to `window.pearsheet`
   (`call`, `on`), which the desktop preload provides and the mobile WebView
   will provide later. Built to `dist/ui` by `scripts/build-ui.mjs`.

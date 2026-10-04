@@ -9,6 +9,7 @@ const model = require('../shared/sheetModel')
 const { displayNumber } = require('../shared/formula')
 const SSF = require('../shared/formula/vendor/fast-formula-parser/ssf/ssf')
 const m = require('./membership')
+const charts = require('../shared/charts')
 
 const hex = (buf) => b4a.toString(buf, 'hex')
 const INVITE_HOURS = 24
@@ -28,6 +29,29 @@ function present (v, fmt) {
   }
   if (typeof value === 'boolean') return { display: value ? 'TRUE' : 'FALSE', kind: 'bool' }
   return { display: String(value), kind: 'text' }
+}
+
+// A chart's data, ready to draw: { categories, series } or { error }.
+function resolveChart (doc, tabId, chart, allValues) {
+  const range = charts.parseRange(chart.data)
+  if (!range) return { error: chart.data && chart.data.includes('#REF!') ? 'The data for this chart was deleted' : 'This chart has no data range' }
+  let tab = tabId
+  if (range.sheet) {
+    tab = model.tabIds(doc).find((id) => String(model.tabMap(doc, id).get('name')).toUpperCase() === range.sheet.toUpperCase())
+    if (!tab) return { error: 'The tab "' + range.sheet + '" is gone' }
+  }
+  const values = allValues.get(tab) || new Map()
+  const cellAt = (r, c) => {
+    const v = values.get(r + ',' + c)
+    if (!v) return null
+    const fmt = v.from ? model.getFormat(doc, tab, v.from[0], v.from[1]) : model.getFormat(doc, tab, r, c)
+    return { ...v, display: present(v, fmt).display }
+  }
+  const block = charts.rangeBlock(range, cellAt)
+  if (!block) return { error: 'The formula in ' + chart.data.replace(/#$/, '') + ' does not spill' }
+  const out = charts.chartData(block, chart)
+  if (!out.series.length) return { error: 'There are no numbers to chart in ' + chart.data }
+  return out
 }
 
 function createSheetMethods (sheets, { getJoin, getMoves, getProfiles }) {
@@ -278,7 +302,8 @@ function createSheetMethods (sheets, { getJoin, getMoves, getProfiles }) {
         // joining or a move, until a writer has added it.
         writable: !!(ctx.bases.get(sheetId) && ctx.bases.get(sheetId).writable),
         canUndo: !!(e.undo && e.undo.canUndo()),
-        canRedo: !!(e.undo && e.undo.canRedo())
+        canRedo: !!(e.undo && e.undo.canRedo()),
+        charts: model.getCharts(doc, tab).map((c) => ({ ...c, resolved: resolveChart(doc, tab, c, sheets.values(e)) }))
       }
     },
 
@@ -403,6 +428,25 @@ function createSheetMethods (sheets, { getJoin, getMoves, getProfiles }) {
       const n = Math.min(100000, Math.max(0, Math.trunc(Number(a.n) || 0)))
       return model.fillRange(doc, tab, { r1: a.r1, c1: a.c1, r2: a.r2, c2: a.c2 }, a.dir, n, a.mode === 'copy' ? 'copy' : 'series')
     }),
+
+    // Charts (proposals/2026-10-04-charts.md).
+    'sheet:addChart': async ({ sheetId, tabId, spec }, ctx) => {
+      await requireEdit(ctx, sheetId)
+      const { doc } = await docFor(sheetId)
+      const { id, update } = model.addChart(doc, firstTab(doc, tabId), spec || {})
+      await commit(ctx, sheetId, update)
+      return { chartId: id }
+    },
+    'sheet:setChart': async ({ sheetId, tabId, chartId, patch }, ctx) => {
+      await requireEdit(ctx, sheetId)
+      const { doc } = await docFor(sheetId)
+      return commit(ctx, sheetId, model.setChart(doc, firstTab(doc, tabId), chartId, patch || {}))
+    },
+    'sheet:deleteChart': async ({ sheetId, tabId, chartId }, ctx) => {
+      await requireEdit(ctx, sheetId)
+      const { doc } = await docFor(sheetId)
+      return commit(ctx, sheetId, model.deleteChart(doc, firstTab(doc, tabId), chartId))
+    },
 
     'sheet:deleteTab': async ({ sheetId, tabId }, ctx) => {
       await requireEdit(ctx, sheetId)

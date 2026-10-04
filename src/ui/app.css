@@ -470,3 +470,30 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 .fill-handle { position: absolute; width: 8px; height: 8px; background: var(--pear); border: 1px solid var(--panel); cursor: crosshair; z-index: 5; }
 @media (pointer: coarse) { .fill-handle { display: none; } }
 .fill-preview { position: absolute; border: 1px dashed var(--pear-dark); pointer-events: none; margin: -1px 0 0 -1px; z-index: 4; }
+
+/* Charts (proposals/2026-10-04-charts.md). */
+.chart-frame { position: absolute; z-index: 6; background: var(--panel); border: 1px solid var(--line-strong); border-radius: 8px; box-shadow: 0 2px 10px rgb(0 0 0 / 0.08); overflow: visible; cursor: default; }
+.chart-frame.selected { border-color: var(--pear); box-shadow: 0 0 0 2px var(--pear-soft), 0 4px 16px rgb(0 0 0 / 0.12); cursor: move; }
+.chart-view, .chart-empty { border-radius: 8px; overflow: hidden; }
+.chart-empty { display: flex; align-items: center; justify-content: center; text-align: center; padding: 16px; color: var(--muted); font-size: 13px; }
+.chart-tools { position: absolute; top: 6px; right: 6px; z-index: 2; display: flex; gap: 4px; background: var(--panel); border: 1px solid var(--line-strong); border-radius: 8px; padding: 3px; box-shadow: 0 4px 14px rgb(0 0 0 / 0.12); }
+.chart-tools button { display: inline-flex; align-items: center; gap: 4px; border: 0; background: none; color: var(--ink); padding: 4px 8px; border-radius: 6px; cursor: pointer; font-size: 12px; }
+.chart-tools button:hover { background: var(--head); }
+.chart-tools button.danger { color: var(--danger); }
+.chart-resize { position: absolute; right: -6px; bottom: -6px; width: 12px; height: 12px; background: var(--pear); border: 2px solid var(--panel); border-radius: 3px; cursor: nwse-resize; }
+.chart-panel { width: min(560px, calc(100vw - 32px)); }
+.chart-types { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.panel .chart-types button { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 4px; font-size: 12px; }
+.panel .chart-types button.on { border-color: var(--pear); background: var(--pear-soft); color: var(--pear-dark); }
+.chart-field { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--muted); flex: 1; min-width: 0; }
+.chart-field select { border: 1px solid var(--line-strong); border-radius: 8px; padding: 7px 8px; background: var(--paper); color: var(--ink); }
+.chart-checks { display: flex; flex-wrap: wrap; gap: 6px 16px; }
+.chart-checks .check, .chart-series .check { font-size: 13px; align-items: center; }
+.chart-series { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.chart-series li { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; font-size: 13px; }
+.chart-series li > span { flex: 1 1 100%; color: var(--ink); font-weight: 500; }
+.chart-full .row { flex-wrap: wrap; }
+@media (min-width: 721px) {
+  .chart-backdrop { background: transparent; justify-content: flex-end; padding: 60px 24px 0 0; pointer-events: none; }
+  .chart-backdrop .chart-panel { pointer-events: auto; width: 400px; max-height: calc(100vh - 90px); }
+}

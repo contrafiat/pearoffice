@@ -1,3 +1,4 @@
+import { ChartFrame } from './ChartFrame.jsx'
 import React, { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { colName } from './a1.js'
 
@@ -13,7 +14,7 @@ export const MAX_ZOOM = 2.5
 // sheets stay fast. Headers are drawn outside the scroll area and moved with
 // the scroll position.
 export const Grid = forwardRef(function Grid (props, ref) {
-  const { view, cells, sel, ext = sel, range, spillBox, editing, onSelect, onEdit, onEditChange, onEditKey, onEditBlur, onEditCaret = () => {}, onKeyDown, onHeaderMenu, onCellMenu = () => {}, onFill = null, onResize, onCopy, onPaste, zoom = 1, onZoom, inputMode } = props
+  const { view, cells, sel, ext = sel, range, spillBox, editing, onSelect, onEdit, onEditChange, onEditKey, onEditBlur, onEditCaret = () => {}, onKeyDown, onHeaderMenu, onCellMenu = () => {}, onFill = null, charts = [], selectedChart = null, chartActions = null, onResize, onCopy, onPaste, zoom = 1, onZoom, inputMode } = props
   // Row height and column widths scale with the zoom (pinch on a phone);
   // stored widths stay unzoomed.
   const ROW_H = Math.round(BASE_ROW_H * zoom)
@@ -263,6 +264,20 @@ export const Grid = forwardRef(function Grid (props, ref) {
             className='selection'
             style={{ top: (sel.row - 1) * ROW_H, left: colX[sel.col], width: widths[sel.col], height: ROW_H }}
           />
+          {charts.map((ch) => (
+            <ChartFrame
+              key={ch.id}
+              chart={ch}
+              zoom={zoom}
+              rowH={ROW_H}
+              baseRowH={BASE_ROW_H}
+              colX={colX}
+              cols={view.cols}
+              rows={view.rows}
+              selected={selectedChart === ch.id}
+              actions={chartActions}
+            />
+          ))}
           {/* Mouse: drag this square to fill (series or copies). */}
           {onFill && (
             <div
