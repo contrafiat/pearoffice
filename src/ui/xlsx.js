@@ -5,6 +5,7 @@ import * as XLSX from 'xlsx/dist/xlsx.mini.min.js'
 import * as fflate from 'fflate'
 import { workbookToTabs, workbookBytes, READ_OPTIONS } from '../shared/xlsxMap.js'
 import { call } from './bridge.js'
+import { borderCss, fontPx, FONTS } from './cellStyle.js'
 
 const MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 export const isMobile = () => !!(window.pearsheet && window.pearsheet.platform === 'mobile')
@@ -102,16 +103,26 @@ export function tabHtml (view, chartSvgs = []) {
   const width = (c) => (view.widths && view.widths[c]) || 100
   let body = ''
   for (let r = 1; r <= rows; r++) {
-    body += '<tr>'
+    const rh = view.heights && view.heights[r]
+    body += rh ? '<tr style="height:' + Math.round(rh * 11 / 14) + 'px">' : '<tr>'
     for (let c = 1; c <= cols; c++) {
       const x = at.get(r + ',' + c)
       const f = (x && x.fmt) || {}
       const style = [
-        x && (x.kind === 'number' || x.kind === 'bool') ? 'text-align:right' : '',
+        f.align ? 'text-align:' + f.align : x && (x.kind === 'number' || x.kind === 'bool') ? 'text-align:right' : '',
+        'vertical-align:' + (f.valign || 'bottom'),
+        f.wrap ? 'white-space:pre-wrap' : '',
+        f.size ? 'font-size:' + Math.round(fontPx(f) * 11 / 14 * 10) / 10 + 'px' : '',
+        f.font ? 'font-family:' + FONTS[f.font].replace(/"/g, "'") : '',
+        f.u || f.s ? 'text-decoration:' + [f.u && 'underline', f.s && 'line-through'].filter(Boolean).join(' ') : '',
         f.b ? 'font-weight:bold' : '',
         f.i ? 'font-style:italic' : '',
         f.color ? 'color:' + f.color : '',
-        f.fill ? 'background:' + f.fill : ''
+        f.fill ? 'background:' + f.fill : '',
+        f.bt ? 'border-top:' + borderCss(f.bt) : '',
+        f.br ? 'border-right:' + borderCss(f.br) : '',
+        f.bb ? 'border-bottom:' + borderCss(f.bb) : '',
+        f.bl ? 'border-left:' + borderCss(f.bl) : ''
       ].filter(Boolean).join(';')
       body += '<td' + (style ? ' style="' + style + '"' : '') + '>' + esc(x ? x.display : '') + '</td>'
     }

@@ -2,6 +2,22 @@
 
 Append-only, newest on top. Per Constitution §4.
 
+## 2026-10-04 - More cell formats, merged cells, row heights
+Tier: T2
+Context: the everyday formatting gaps against Calc
+(proposals/2026-10-04-cell-formats.md).
+Choice: new per-attribute keys in `fmt` (align, valign, wrap, size, u, s,
+font, four borders); merges in a root map `merges:<tabId>` keyed by the
+top-left cell's ids, the earliest in reading order winning an overlap; row
+heights in `heights:<tabId>`, with rows that hold wrapped or larger text
+growing on each device without storing it. Styles go into .xlsx exports,
+written after SheetJS like charts.
+Alternatives: one style object per cell (rejected - concurrent changes to
+different attributes would clash); stored auto heights (rejected - devices
+measure text differently).
+Consequences: older builds show plain, unmerged cells; a spill is blocked by
+a merge.
+
 ## 2026-10-04 - Charts: shared descriptions drawn with ECharts
 Tier: T2
 Context: charts were the biggest gap against Calc

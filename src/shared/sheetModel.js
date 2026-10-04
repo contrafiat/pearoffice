@@ -23,7 +23,29 @@ const { fillLine } = require('./fill')
 const VERSION = 1
 const DEFAULT_ROWS = 100
 const DEFAULT_COLS = 26
-const FORMAT_ATTRS = ['b', 'i', 'color', 'fill', 'num']
+const FORMAT_ATTRS = ['b', 'i', 'color', 'fill', 'num', 'align', 'valign', 'wrap', 'size', 'u', 's', 'font', 'bt', 'br', 'bb', 'bl']
+
+// Allowed values for the formats added in proposals/2026-10-04-cell-formats.md.
+// A value outside these is refused, so every device draws the same thing.
+const BORDER = /^(thin|medium|thick|dashed|double)(:#[0-9a-f]{6})?$/i
+const FORMAT_VALUES = {
+  align: (v) => ['left', 'center', 'right'].includes(v),
+  valign: (v) => ['top', 'middle', 'bottom'].includes(v),
+  wrap: (v) => v === true,
+  u: (v) => v === true,
+  s: (v) => v === true,
+  size: (v) => Number.isInteger(v) && v >= 6 && v <= 72,
+  font: (v) => ['serif', 'mono'].includes(v),
+  bt: (v) => BORDER.test(v),
+  br: (v) => BORDER.test(v),
+  bb: (v) => BORDER.test(v),
+  bl: (v) => BORDER.test(v)
+}
+function checkFormat (attr, value) {
+  if (!FORMAT_ATTRS.includes(attr)) throw new Error('unknown format attribute: ' + attr)
+  if (value === null || value === undefined || value === false) return
+  if (FORMAT_VALUES[attr] && !FORMAT_VALUES[attr](value)) throw new Error('bad value for ' + attr)
+}
 
 function createDoc () {
   return new Y.Doc()
@@ -198,7 +220,7 @@ function setFormatRange (doc, tabId, r1, c1, r2, c2, patch) {
     const rows = t.get('rows')
     const cols = t.get('cols')
     const fmt = t.get('fmt')
-    for (const attr of Object.keys(patch)) if (!FORMAT_ATTRS.includes(attr)) throw new Error('unknown format attribute: ' + attr)
+    for (const [attr, value] of Object.entries(patch)) checkFormat(attr, value)
     for (let r = r1; r <= Math.min(r2, rows.length); r++) {
       for (let c = c1; c <= Math.min(c2, cols.length); c++) {
         for (const [attr, value] of Object.entries(patch)) {
@@ -225,7 +247,7 @@ function setFormat (doc, tabId, row, col, patch) {
     const { t, rowId, colId } = idsAt(doc, tabId, row, col)
     const fmt = t.get('fmt')
     for (const [attr, value] of Object.entries(patch)) {
-      if (!FORMAT_ATTRS.includes(attr)) throw new Error('unknown format attribute: ' + attr)
+      checkFormat(attr, value)
       const key = cellKey(rowId, colId) + ':' + attr
       if (value === null || value === undefined || value === false) fmt.delete(key)
       else fmt.set(key, value)
@@ -503,6 +525,58 @@ function setWidth (doc, tabId, col, px) {
   })
 }
 
+// Borders over a range, as one change. preset: all, outside, inside, top,
+// bottom, left, right or none; line: 'thin', 'medium:#cc0000' and so on.
+function setBorders (doc, tabId, r1, c1, r2, c2, preset, line = 'thin') {
+  if (preset !== 'none' && !BORDER.test(line)) throw new Error('bad border')
+  const PRESETS = ['all', 'outside', 'inside', 'top', 'bottom', 'left', 'right', 'none']
+  if (!PRESETS.includes(preset)) throw new Error('unknown border preset')
+  return capture(doc, () => {
+    const t = tabMap(doc, tabId)
+    const rows = t.get('rows')
+    const cols = t.get('cols')
+    const fmt = t.get('fmt')
+    for (let r = r1; r <= Math.min(r2, rows.length); r++) {
+      for (let c = c1; c <= Math.min(c2, cols.length); c++) {
+        const sides = preset === 'none' ? { bt: null, br: null, bb: null, bl: null }
+          : preset === 'all' ? { bt: line, br: line, bb: line, bl: line }
+            : preset === 'outside' ? { ...(r === r1 && { bt: line }), ...(r === r2 && { bb: line }), ...(c === c1 && { bl: line }), ...(c === c2 && { br: line }) }
+              : preset === 'inside' ? { ...(r < r2 && { bb: line }), ...(c < c2 && { br: line }) }
+                : preset === 'top' ? (r === r1 ? { bt: line } : {})
+                  : preset === 'bottom' ? (r === r2 ? { bb: line } : {})
+                    : preset === 'left' ? (c === c1 ? { bl: line } : {})
+                      : (c === c2 ? { br: line } : {})
+        for (const [attr, value] of Object.entries(sides)) {
+          const key = cellKey(rows.get(r - 1), cols.get(c - 1)) + ':' + attr
+          if (value === null) { if (fmt.has(key)) fmt.delete(key) } else if (fmt.get(key) !== value) fmt.set(key, value)
+        }
+      }
+    }
+  })
+}
+
+// Row heights (pixels at 100%), in the root map heights:<tabId> by row id.
+// A row without one is the default height, or taller to fit wrapped or
+// larger text on each device.
+function setHeight (doc, tabId, row, px) {
+  return capture(doc, () => {
+    const rowId = tabMap(doc, tabId).get('rows').get(row - 1)
+    if (!rowId) return
+    const heights = doc.getMap('heights:' + tabId)
+    if (px === null || px === undefined) { if (heights.has(rowId)) heights.delete(rowId); return }
+    const h = Math.max(12, Math.min(600, Math.round(Number(px) || 0)))
+    if (heights.get(rowId) !== h) heights.set(rowId, h)
+  })
+}
+
+function getHeights (doc, tabId) {
+  const rows = tabMap(doc, tabId).get('rows').toArray()
+  const at = new Map(rows.map((id, i) => [id, i + 1]))
+  const out = {}
+  for (const [rowId, h] of doc.getMap('heights:' + tabId).entries()) if (at.has(rowId)) out[at.get(rowId)] = h
+  return out
+}
+
 // Fill an empty, just-created sheet from an import payload
 // ({ tabs: [{ name, cells: [[row, col, input, numFmt?]], widths }] }) in one
 // change. Every tab exists before any cell is written, so formulas that point
@@ -648,6 +722,9 @@ module.exports = {
   deleteRows,
   deleteCols,
   setWidth,
+  setBorders,
+  setHeight,
+  getHeights,
   importTabs,
   sortRows,
   addChart,

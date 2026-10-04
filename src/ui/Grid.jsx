@@ -1,6 +1,7 @@
 import { ChartFrame } from './ChartFrame.jsx'
 import React, { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { colName } from './a1.js'
+import { textStyle, borderCss, hasBorder, neededHeight } from './cellStyle.js'
 
 const BASE_ROW_H = 24
 const HEAD_H = 26
@@ -14,13 +15,14 @@ export const MAX_ZOOM = 2.5
 // sheets stay fast. Headers are drawn outside the scroll area and moved with
 // the scroll position.
 export const Grid = forwardRef(function Grid (props, ref) {
-  const { view, cells, sel, ext = sel, range, spillBox, editing, onSelect, onEdit, onEditChange, onEditKey, onEditBlur, onEditCaret = () => {}, onKeyDown, onHeaderMenu, onCellMenu = () => {}, onFill = null, charts = [], selectedChart = null, chartActions = null, onResize, onCopy, onPaste, zoom = 1, onZoom, inputMode } = props
+  const { view, cells, sel, ext = sel, range, spillBox, editing, onSelect, onEdit, onEditChange, onEditKey, onEditBlur, onEditCaret = () => {}, onKeyDown, onHeaderMenu, onCellMenu = () => {}, onFill = null, charts = [], selectedChart = null, chartActions = null, onResize, onRowResize = () => {}, onCopy, onPaste, zoom = 1, onZoom, inputMode } = props
   // Row height and column widths scale with the zoom (pinch on a phone);
   // stored widths stay unzoomed.
   const ROW_H = Math.round(BASE_ROW_H * zoom)
   const bodyRef = useRef(null)
   const [scroll, setScroll] = useState({ top: 0, left: 0, width: 800, height: 600 })
   const [drag, setDrag] = useState(null) // { col, startX, startW, w }
+  const [rowDrag, setRowDrag] = useState(null) // { row, h } while a row is resized
 
   useImperativeHandle(ref, () => ({ focus: () => bodyRef.current && bodyRef.current.focus() }))
 
@@ -90,8 +92,37 @@ export const Grid = forwardRef(function Grid (props, ref) {
     return x
   }, [widths, view.cols])
 
+  // Row heights (proposals/2026-10-04-cell-formats.md): a stored height, or
+  // tall enough for wrapped or larger text (measured here, never stored), or
+  // the default. rowY[r] is the top of row r; rowY[rows + 1] the total.
+  const rowH = useMemo(() => {
+    const need = new Map()
+    for (const cell of cells.values()) {
+      const n = neededHeight(cell, view.widths[cell.col] || DEFAULT_W, BASE_ROW_H)
+      if (n > (need.get(cell.row) || 0)) need.set(cell.row, n)
+    }
+    const h = new Array(view.rows + 2)
+    for (let r = 1; r <= view.rows; r++) h[r] = Math.round(((view.heights && view.heights[r]) || need.get(r) || BASE_ROW_H) * zoom)
+    if (rowDrag) h[rowDrag.row] = rowDrag.h
+    return h
+  }, [cells, view.rows, view.heights, view.widths, zoom, rowDrag])
+  const rowY = useMemo(() => {
+    const y = new Array(view.rows + 2)
+    y[1] = 0
+    for (let r = 1; r <= view.rows; r++) y[r + 1] = y[r] + rowH[r]
+    return y
+  }, [rowH, view.rows])
+  // The row at a vertical position (zoomed pixels).
+  const rowAt = (py) => {
+    let lo = 1
+    let hi = view.rows
+    while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (rowY[mid] <= py) lo = mid; else hi = mid - 1 }
+    return lo
+  }
+  const span = (r1, r2) => rowY[Math.min(r2, view.rows) + 1] - rowY[r1]
+
   const totalW = colX[view.cols + 1]
-  const totalH = view.rows * ROW_H
+  const totalH = rowY[view.rows + 1]
 
   useLayoutEffect(() => {
     const el = bodyRef.current
@@ -145,19 +176,19 @@ export const Grid = forwardRef(function Grid (props, ref) {
   useEffect(() => {
     const el = bodyRef.current
     if (!el) return
-    const y = (ext.row - 1) * ROW_H
+    const y = rowY[ext.row]
     const x = colX[ext.col]
     const w = widths[ext.col]
     if (y < el.scrollTop) el.scrollTop = y
-    else if (y + ROW_H > el.scrollTop + el.clientHeight) el.scrollTop = y + ROW_H - el.clientHeight
+    else if (y + rowH[ext.row] > el.scrollTop + el.clientHeight) el.scrollTop = y + rowH[ext.row] - el.clientHeight
     if (x < el.scrollLeft) el.scrollLeft = x
     else if (x + w > el.scrollLeft + el.clientWidth) el.scrollLeft = x + w - el.clientWidth
     // Only when the selection moves: a pinch zoom must not snap back to it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ext.row, ext.col])
 
-  const firstRow = Math.max(1, Math.floor(scroll.top / ROW_H) + 1 - OVERSCAN)
-  const lastRow = Math.min(view.rows, Math.ceil((scroll.top + scroll.height) / ROW_H) + OVERSCAN)
+  const firstRow = Math.max(1, rowAt(scroll.top) - OVERSCAN)
+  const lastRow = Math.min(view.rows, rowAt(scroll.top + scroll.height) + OVERSCAN)
   let firstCol = 1
   while (firstCol < view.cols && colX[firstCol + 1] < scroll.left) firstCol++
   let lastCol = firstCol
@@ -181,6 +212,24 @@ export const Grid = forwardRef(function Grid (props, ref) {
       const w = Math.max(24, startW + ev.clientX - startX)
       setDrag(null)
       if (w !== startW) onResize(col, Math.round(w / zoom))
+    }
+    window.addEventListener('mousemove', move)
+    window.addEventListener('mouseup', up)
+  }
+
+  function startRowResize (e, row) {
+    e.preventDefault()
+    e.stopPropagation()
+    const startY = e.clientY
+    const startH = rowH[row]
+    setRowDrag({ row, h: startH })
+    const move = (ev) => setRowDrag({ row, h: Math.max(12, startH + ev.clientY - startY) })
+    const up = (ev) => {
+      window.removeEventListener('mousemove', move)
+      window.removeEventListener('mouseup', up)
+      const h = Math.max(12, startH + ev.clientY - startY)
+      setRowDrag(null)
+      if (h !== startH) onRowResize(row, Math.round(h / zoom))
     }
     window.addEventListener('mousemove', move)
     window.addEventListener('mouseup', up)
@@ -214,11 +263,12 @@ export const Grid = forwardRef(function Grid (props, ref) {
             <div
               key={r}
               className={'row-head' + (r >= range.r1 && r <= range.r2 ? ' on' : '')}
-              style={{ top: (r - 1) * ROW_H }}
+              style={{ top: rowY[r], height: rowH[r] }}
               onClick={(e) => { if (e.shiftKey) onSelect(r, view.cols, true); else { onSelect(r, 1); onSelect(r, view.cols, true) } }}
               onContextMenu={(e) => { e.preventDefault(); onHeaderMenu('row', r, e.clientX, e.clientY) }}
             >
               {r}
+              <span className='row-resize' title='Drag to resize; double-click to fit' onMouseDown={(e) => startRowResize(e, r)} onDoubleClick={(e) => { e.stopPropagation(); onRowResize(r, null) }} onClick={(e) => e.stopPropagation()} />
             </div>
           ))}
         </div>
@@ -228,12 +278,12 @@ export const Grid = forwardRef(function Grid (props, ref) {
           {rows.map((r) => cols.map((c) => {
             const cell = cells.get(r + ',' + c)
             const fmt = (cell && cell.fmt) || {}
-            const cls = 'cell' + (cell ? ' k-' + cell.kind : '') + (fmt.b ? ' b' : '') + (fmt.i ? ' i' : '')
+            const cls = 'cell' + (cell ? ' k-' + cell.kind : '') + (fmt.b ? ' b' : '') + (fmt.i ? ' i' : '') + (fmt.wrap ? ' wrap' : '') + (fmt.valign ? ' v-' + fmt.valign : '')
             return (
               <div
                 key={r + ',' + c}
                 className={cls}
-                style={{ top: (r - 1) * ROW_H, left: colX[c], width: widths[c], color: fmt.color, background: fmt.fill }}
+                style={{ top: rowY[r], height: rowH[r], left: colX[c], width: widths[c], color: fmt.color, background: fmt.fill }}
                 data-r={r}
                 data-c={c}
                 onMouseDown={(e) => { dragging.current = true; onSelect(r, c, e.shiftKey) }}
@@ -244,33 +294,34 @@ export const Grid = forwardRef(function Grid (props, ref) {
                 onTouchEnd={(e) => { if (!pinched.current && e.touches.length === 0 && sel.row === r && sel.col === c) { e.preventDefault(); onEdit(r, c) } }}
                 title={cell && cell.volatile ? 'Changes on each device (time or random)' : cell && cell.blocked ? 'This answer cannot fill in. Select the cell to see why.' : undefined}
               >
-                {cell ? cell.display : ''}
+                <span className='cell-text' style={textStyle(fmt, zoom)}>{cell ? cell.display : ''}</span>
+                {hasBorder(fmt) && <span className='cell-borders' style={{ borderTop: borderCss(fmt.bt), borderRight: borderCss(fmt.br), borderBottom: borderCss(fmt.bb), borderLeft: borderCss(fmt.bl) }} />}
               </div>
             )
           }))}
           {(range.r1 !== range.r2 || range.c1 !== range.c2) && (
             <div
               className='range'
-              style={{ top: (range.r1 - 1) * ROW_H, left: colX[range.c1], width: colX[Math.min(range.c2, view.cols) + 1] - colX[range.c1], height: (range.r2 - range.r1 + 1) * ROW_H }}
+              style={{ top: rowY[range.r1], left: colX[range.c1], width: colX[Math.min(range.c2, view.cols) + 1] - colX[range.c1], height: span(range.r1, range.r2) }}
             />
           )}
           {spillBox && (
             <div
               className='spill-outline'
-              style={{ top: (spillBox.r1 - 1) * ROW_H, left: colX[spillBox.c1], width: colX[Math.min(spillBox.c2, view.cols) + 1] - colX[spillBox.c1], height: (spillBox.r2 - spillBox.r1 + 1) * ROW_H }}
+              style={{ top: rowY[spillBox.r1], left: colX[spillBox.c1], width: colX[Math.min(spillBox.c2, view.cols) + 1] - colX[spillBox.c1], height: span(spillBox.r1, spillBox.r2) }}
             />
           )}
           <div
             className='selection'
-            style={{ top: (sel.row - 1) * ROW_H, left: colX[sel.col], width: widths[sel.col], height: ROW_H }}
+            style={{ top: rowY[sel.row], left: colX[sel.col], width: widths[sel.col], height: rowH[sel.row] }}
           />
           {charts.map((ch) => (
             <ChartFrame
               key={ch.id}
               chart={ch}
               zoom={zoom}
-              rowH={ROW_H}
-              baseRowH={BASE_ROW_H}
+              rowY={rowY}
+              rowAt={rowAt}
               colX={colX}
               cols={view.cols}
               rows={view.rows}
@@ -283,7 +334,7 @@ export const Grid = forwardRef(function Grid (props, ref) {
             <div
               className='fill-handle'
               title='Drag to fill'
-              style={{ top: range.r2 * ROW_H - 4, left: colX[Math.min(range.c2, view.cols) + 1] - 4 }}
+              style={{ top: rowY[Math.min(range.r2, view.rows) + 1] - 4, left: colX[Math.min(range.c2, view.cols) + 1] - 4 }}
               onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); filling.current = true; setFillTo(null) }}
             />
           )}
@@ -298,7 +349,7 @@ export const Grid = forwardRef(function Grid (props, ref) {
             return (
               <div
                 className='fill-preview'
-                style={{ top: (box.r1 - 1) * ROW_H, left: colX[box.c1], width: colX[Math.min(box.c2, view.cols) + 1] - colX[box.c1], height: (box.r2 - box.r1 + 1) * ROW_H }}
+                style={{ top: rowY[Math.max(1, box.r1)], left: colX[Math.max(1, box.c1)], width: colX[Math.min(box.c2, view.cols) + 1] - colX[Math.max(1, box.c1)], height: span(Math.max(1, box.r1), box.r2) }}
               />
             )
           })()}
@@ -306,7 +357,7 @@ export const Grid = forwardRef(function Grid (props, ref) {
               finger dragging across the grid scrolls it. */}
           <div
             className='range-handle'
-            style={{ top: range.r2 * ROW_H - 9, left: colX[Math.min(range.c2, view.cols) + 1] - 9 }}
+            style={{ top: rowY[Math.min(range.r2, view.rows) + 1] - 9, left: colX[Math.min(range.c2, view.cols) + 1] - 9 }}
             onTouchStart={(e) => { e.stopPropagation() }}
             // touch-action: none (in the CSS) stops the page scrolling while
             // the handle is dragged.
@@ -323,7 +374,7 @@ export const Grid = forwardRef(function Grid (props, ref) {
               autoFocus
               aria-label='Edit cell'
               inputMode={inputMode}
-              style={{ top: (editing.row - 1) * ROW_H, left: colX[editing.col], minWidth: widths[editing.col], height: ROW_H }}
+              style={{ top: rowY[editing.row], left: colX[editing.col], minWidth: widths[editing.col], height: rowH[editing.row], ...textStyle((cells.get(editing.row + ',' + editing.col) || {}).fmt, zoom), textAlign: undefined }}
               value={editing.value}
               onChange={(e) => { onEditChange(e.target.value); onEditCaret(e.target.selectionStart) }}
               onSelect={(e) => onEditCaret(e.target.selectionStart)}

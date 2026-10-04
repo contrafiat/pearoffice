@@ -3,6 +3,7 @@ import { call, on } from './bridge.js'
 import { Grid } from './Grid.jsx'
 import { colName } from './a1.js'
 import { changeDecimals, jumpTarget, todaySerial } from './cellTools.js'
+import { SIZES, borderCss } from './cellStyle.js'
 import { shiftA1 } from '../shared/refs.js'
 import { SharePanel } from './SharePanel.jsx'
 import { PeopleStack } from './Avatar.jsx'
@@ -12,7 +13,7 @@ import { ChartPanel } from './ChartPanel.jsx'
 import { ChartView, downloadChart, chartSvg } from './Chart.jsx'
 import { guessChart } from '../shared/charts.js'
 import { readPref, writePref } from './prefs.js'
-import { ArrowCounterClockwise, ArrowClockwise, TextB, TextItalic, TextAUnderline, PaintBucket, Copy, Scissors, ClipboardText, Eraser, Numpad, FileXls, DotsThree, Plus, MagnifyingGlass, X, ChartBar, PencilSimple, DownloadSimple, Trash } from '@phosphor-icons/react'
+import { ArrowCounterClockwise, ArrowClockwise, TextB, TextItalic, TextAUnderline, PaintBucket, Copy, Scissors, ClipboardText, Eraser, Numpad, FileXls, DotsThree, Plus, MagnifyingGlass, X, ChartBar, PencilSimple, DownloadSimple, Trash, TextUnderline, TextStrikethrough, TextAlignLeft, TextAlignCenter, TextAlignRight, ArrowUDownLeft, FrameCorners, AlignTop, AlignCenterVertical, AlignBottom } from '@phosphor-icons/react'
 import { DeletePanel } from './DeletePanel.jsx'
 import { FormulaHelp, helpFor, insertFunction } from './FormulaHelp.jsx'
 import { exportSheet, exportCsv, printTab, isMobile } from './xlsx.js'
@@ -79,6 +80,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
   // On phones the tools row scrolls sideways, which would clip a palette
   // placed inside it, so the palette is placed on the screen instead.
   const [paletteAt, setPaletteAt] = useState(null)
+  const [borderLine, setBorderLine] = useState('thin') // style[:#colour] for the next borders
   const phone = isMobile()
   const ICON = phone ? 20 : 18 // toolbar icon size
   function openPalette (kind, button) {
@@ -524,6 +526,8 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
     if (mod && (k === 'y' || k === 'Y')) { e.preventDefault(); run('sheet:redo'); return }
     if (mod && (k === 'b' || k === 'B')) { e.preventDefault(); toggle('b'); return }
     if (mod && (k === 'i' || k === 'I')) { e.preventDefault(); toggle('i'); return }
+    if (mod && (k === 'u' || k === 'U')) { e.preventDefault(); toggle('u'); return }
+    if (mod && k === '5') { e.preventDefault(); toggle('s'); return }
     if (mod) return
     const moves = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] }
     if (moves[k]) { e.preventDefault(); moveBy(...moves[k], e.shiftKey); return }
@@ -621,6 +625,8 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
           <span className='sep' />
           <button title='Bold (Ctrl+B)' aria-label='Bold' className={'fmt-b' + (fmt.b ? ' on' : '')} onClick={() => toggle('b')}><TextB size={ICON} weight='bold' /></button>
           <button title='Italic (Ctrl+I)' aria-label='Italic' className={'fmt-i' + (fmt.i ? ' on' : '')} onClick={() => toggle('i')}><TextItalic size={ICON} /></button>
+          <button title='Underline (Ctrl+U)' aria-label='Underline' className={fmt.u ? 'on' : ''} onClick={() => toggle('u')}><TextUnderline size={ICON} /></button>
+          <button title='Strikethrough (Ctrl+5)' aria-label='Strikethrough' className={fmt.s ? 'on' : ''} onClick={() => toggle('s')}><TextStrikethrough size={ICON} /></button>
           <span className='picker'>
             <button title='Text colour' aria-label='Text colour' className='swatch-button' onClick={(e) => openPalette('color', e.currentTarget)}>
               <span className='icon-swatch'><TextAUnderline size={ICON} /><span className='swatch-bar' style={{ background: fmt.color || 'currentColor' }} /></span>
@@ -637,6 +643,15 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
               </span>
             )}
           </span>
+          <select title='Font size' aria-label='Font size' className='size-select' value={fmt.size || ''} onChange={(e) => formatRange({ size: e.target.value ? Number(e.target.value) : null })}>
+            <option value=''>Size</option>
+            {SIZES.map((n) => <option key={n} value={n}>{n}</option>)}
+          </select>
+          <select title='Font' aria-label='Font' value={fmt.font || ''} onChange={(e) => formatRange({ font: e.target.value || null })}>
+            <option value=''>Sans</option>
+            <option value='serif'>Serif</option>
+            <option value='mono'>Mono</option>
+          </select>
           <select
             title='Number format'
             aria-label='Number format'
@@ -659,6 +674,41 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
             onClick={() => formatRange({ num: changeDecimals(fmt.num, 1, selected && selected.display) })}
           >.00<span aria-hidden='true'>→</span>
           </button>
+          <span className='sep' />
+          <span className='picker'>
+            <button title='Alignment and wrap' aria-label='Alignment' className={fmt.align || fmt.valign || fmt.wrap ? 'on' : ''} onClick={(e) => openPalette('align', e.currentTarget)}>
+              {fmt.align === 'center' ? <TextAlignCenter size={ICON} /> : fmt.align === 'right' ? <TextAlignRight size={ICON} /> : <TextAlignLeft size={ICON} />}
+            </button>
+            {palette === 'align' && (
+              <span className='palette align-menu' role='menu' style={paletteAt || undefined}>
+                {[['left', TextAlignLeft, 'Align left'], ['center', TextAlignCenter, 'Centre'], ['right', TextAlignRight, 'Align right']].map(([v, Icon, label]) => (
+                  <button key={v} title={label} aria-label={label} className={fmt.align === v ? 'on' : ''} onClick={() => formatRange({ align: fmt.align === v ? null : v })}><Icon size={18} /></button>
+                ))}
+                {[['top', AlignTop, 'Top'], ['middle', AlignCenterVertical, 'Middle'], ['bottom', AlignBottom, 'Bottom']].map(([v, Icon, label]) => (
+                  <button key={v} title={label} aria-label={'Align ' + label.toLowerCase()} className={(fmt.valign || 'bottom') === v ? 'on' : ''} onClick={() => formatRange({ valign: v === 'bottom' ? null : v })}><Icon size={18} /></button>
+                ))}
+                <button className={'wrap-toggle' + (fmt.wrap ? ' on' : '')} aria-label='Wrap text' onClick={() => toggle('wrap')}><ArrowUDownLeft size={18} /> Wrap text</button>
+              </span>
+            )}
+          </span>
+          <span className='picker'>
+            <button title='Borders' aria-label='Borders' onClick={(e) => openPalette('borders', e.currentTarget)}><FrameCorners size={ICON} /></button>
+            {palette === 'borders' && (
+              <span className='palette borders-menu' role='menu' style={paletteAt || undefined}>
+                {[['all', 'All'], ['outside', 'Outside'], ['inside', 'Inside'], ['top', 'Top'], ['bottom', 'Bottom'], ['left', 'Left'], ['right', 'Right'], ['none', 'None']].map(([preset, label]) => (
+                  <button key={preset} className='border-preset' onClick={() => { run('sheet:setBorders', { ...range, preset, line: borderLine }); setPalette(null) }}>{label}</button>
+                ))}
+                <select aria-label='Border line' value={borderLine.split(':')[0]} onChange={(e) => setBorderLine(e.target.value + (borderLine.includes(':') ? ':' + borderLine.split(':')[1] : ''))}>
+                  {['thin', 'medium', 'thick', 'dashed', 'double'].map((k) => <option key={k} value={k}>{k[0].toUpperCase() + k.slice(1)}</option>)}
+                </select>
+                <span className='border-colours'>
+                  {['', '#1f2420', '#b3261e', '#5b8c3a', '#2f7d8c', '#6b716b'].map((c) => (
+                    <button key={c || 'auto'} className={'swatch' + ((borderLine.split(':')[1] || '') === c ? ' on' : '')} title={c || 'Text colour'} aria-label={'Border colour ' + (c || 'automatic')} style={{ background: c || 'transparent', borderTop: borderCss('thin') }} onClick={() => setBorderLine(borderLine.split(':')[0] + (c ? ':' + c : ''))} />
+                  ))}
+                </span>
+              </span>
+            )}
+          </span>
           <button title='Insert a chart of the selection' aria-label='Insert chart' className='insert-chart' onClick={() => insertChart().catch((err) => onError(err.message))}><ChartBar size={ICON} /></button>
           {phone && (
             <>
@@ -774,6 +824,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
           setMenu({ kind: 'cell', x, y })
         }}
         onResize={(col, px) => { if (canEdit) run('sheet:setWidth', { col, px }) }}
+        onRowResize={(row, px) => { if (canEdit) run('sheet:setHeight', { row, px }) }}
       />
 
       {droppingTab && (
