@@ -74,9 +74,8 @@ test (`scripts/smoke-packaged.js`) run against the installed-layout app.
 
 - `npm run dist:linux` - AppImage and deb, built here.
 - `npm run dist:mac` - dmg and zip for Apple silicon, built on the Mac Mini
-  over SSH in `~/peerloomllc/pearsheet-build` (`scripts/build-desktop-mac.sh`,
-  `x64` for Intel; the Mac has no Rosetta, so the Intel build cannot be
-  smoke-tested there).
+  over SSH in `~/peerloomllc/pearsheet-build` (`scripts/build-desktop-mac.sh`;
+  pass `x64` for Intel, smoke-tested under Rosetta).
 - `npm run dist:windows` - NSIS installer, built on the local libvirt VM
   `win11-pearguard` (start it with `virsh -c qemu:///system start
   win11-pearguard`, shut it down after).

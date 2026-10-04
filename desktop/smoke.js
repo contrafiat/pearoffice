@@ -36,5 +36,5 @@ child.on('exit', () => {
     console.error('not ok - desktop smoke', JSON.stringify(result))
     process.exit(1)
   }
-  console.log('ok - desktop smoke: create, type, formula, bold, undo, rename, invite link')
+  console.log('ok - desktop smoke: create, type, fast typing, formula, bold, undo, rename, invite link')
 })
