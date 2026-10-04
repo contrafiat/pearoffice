@@ -436,7 +436,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
         {window.pearsheet && (
           <button className='export icon-button' title='Save a copy as an Excel file' aria-label='Export' onClick={() => exportSheet(sheetId).catch((err) => onError(err.message))}><FileXls size={ICON} /></button>
         )}
-        {members.length > 1 && <PeopleStack sheetId={sheetId} members={members} onClick={() => setSharing(true)} />}
+        {members.length > 1 && <PeopleStack sheetId={sheetId} members={members} max={phone ? 2 : 3} size={phone ? 24 : 26} onClick={() => setSharing(true)} />}
         <button className='share' onClick={() => setSharing(true)}>Share</button>
         <span className='more'>
           <button className='more-button icon-button' aria-label='More' title='More' onClick={() => setMore(!more)}><DotsThree size={ICON} weight='bold' /></button>
