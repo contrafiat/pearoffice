@@ -9,7 +9,7 @@ longer needs after the 7-day grace period.
 them).
 
 Tim settled the choices on 2026-10-04: wipe after 7 days, the owner or
-whoever added a seeder can take it off, and the seeder side can forget a
+whoever added a seeder can take it off and the seeder side can forget a
 device.
 
 ## Scope
@@ -34,7 +34,7 @@ Pairing, the `seeder` op's checks, drop requests and the drop sweep
     { type: 'seederOff', seederOff: signValue({ purpose: 'pearsheet/seeder-off/v1', sheetId, seederKey, identity }, identity) }
 
 `apply` accepts it when the appending device belongs to `identity`, the
-seeder is listed, and `identity` is the owner or the person in the listing's
+seeder is listed and `identity` is the owner or the person in the listing's
 `addedBy`. It deletes `seeder/<key>` and puts `seederOff/<key> { by }`.
 
 The `seeder` op works as before and also deletes `seederOff/<key>`, so a
@@ -97,7 +97,7 @@ a sheet that is in use.
 ## UI
 
 - **Share panel:** a "Backed up to" list of the sheet's seeders, each with
-  "Stop" for the owner and the person who added it, and "Back up to my
+  "Stop" for the owner and the person who added it plus "Back up to my
   seeder" when this device is paired with a seeder the sheet does not list.
 - **Seeder panel (device):** "Stop using this seeder", with a confirm that
   says which sheets will stop backing up and which stay backed up by others.
