@@ -5,6 +5,7 @@ import { colName } from './a1.js'
 import { shiftA1 } from '../shared/refs.js'
 import { SharePanel } from './SharePanel.jsx'
 import { PeopleStack } from './Avatar.jsx'
+import { readPref, writePref } from './prefs.js'
 import { DeletePanel } from './DeletePanel.jsx'
 import { FormulaHelp, helpFor, insertFunction } from './FormulaHelp.jsx'
 import { exportSheet, isMobile } from './xlsx.js'
@@ -47,13 +48,6 @@ const NUMBER_FORMATS = [
   ['yyyy-mm-dd', '2024-02-29'],
   ['d mmm yyyy', '29 Feb 2024']
 ]
-
-function readPref (key) {
-  try { return window.localStorage.getItem(key) } catch { return null }
-}
-function writePref (key, value) {
-  try { window.localStorage.setItem(key, value) } catch {}
-}
 
 export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
   const [view, setView] = useState(null)
@@ -98,6 +92,12 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
   const [numPad, setNumPadState] = useState(() => readPref('pearsheet:numpad') === '1')
   const setZoom = (z) => { setZoomState(z); writePref('pearsheet:zoom', String(Math.round(z * 100) / 100)) }
   const setNumPad = (on) => { setNumPadState(on); writePref('pearsheet:numpad', on ? '1' : '0') }
+  // Changed in Settings while this sheet is open.
+  useEffect(() => {
+    const onPref = (e) => { if (e.detail && e.detail.key === 'pearsheet:numpad') setNumPadState(e.detail.value === '1') }
+    window.addEventListener('pearsheet:pref', onPref)
+    return () => window.removeEventListener('pearsheet:pref', onPref)
+  }, [])
   const [deleting, setDeleting] = useState(null) // 'local' | 'everyone' | null
   const gridRef = useRef(null)
 
