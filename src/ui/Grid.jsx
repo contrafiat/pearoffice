@@ -11,12 +11,36 @@ const OVERSCAN = 6
 // sheets stay fast. Headers are drawn outside the scroll area and moved with
 // the scroll position.
 export const Grid = forwardRef(function Grid (props, ref) {
-  const { view, cells, sel, editing, onSelect, onEdit, onEditChange, onEditKey, onEditBlur, onKeyDown, onHeaderMenu, onResize } = props
+  const { view, cells, sel, ext = sel, range, editing, onSelect, onEdit, onEditChange, onEditKey, onEditBlur, onKeyDown, onHeaderMenu, onResize, onCopy, onPaste } = props
   const bodyRef = useRef(null)
   const [scroll, setScroll] = useState({ top: 0, left: 0, width: 800, height: 600 })
   const [drag, setDrag] = useState(null) // { col, startX, startW, w }
 
   useImperativeHandle(ref, () => ({ focus: () => bodyRef.current && bodyRef.current.focus() }))
+
+  // Drag to select a range.
+  const dragging = useRef(false)
+  useEffect(() => {
+    const up = () => { dragging.current = false }
+    window.addEventListener('mouseup', up)
+    return () => window.removeEventListener('mouseup', up)
+  }, [])
+
+  // Copy, cut and paste while the grid (not an input) has focus.
+  useEffect(() => {
+    const mine = () => document.activeElement === bodyRef.current
+    const copy = (e) => { if (mine()) onCopy(e, false) }
+    const cut = (e) => { if (mine()) onCopy(e, true) }
+    const paste = (e) => { if (mine()) onPaste(e) }
+    document.addEventListener('copy', copy)
+    document.addEventListener('cut', cut)
+    document.addEventListener('paste', paste)
+    return () => {
+      document.removeEventListener('copy', copy)
+      document.removeEventListener('cut', cut)
+      document.removeEventListener('paste', paste)
+    }
+  }, [onCopy, onPaste])
 
   const widths = useMemo(() => {
     const w = new Array(view.cols + 1)
@@ -50,18 +74,18 @@ export const Grid = forwardRef(function Grid (props, ref) {
     setScroll((s) => ({ ...s, top: el.scrollTop, left: el.scrollLeft }))
   }
 
-  // Keep the selected cell in view.
+  // Keep the moving corner of the selection in view.
   useEffect(() => {
     const el = bodyRef.current
     if (!el) return
-    const y = (sel.row - 1) * ROW_H
-    const x = colX[sel.col]
-    const w = widths[sel.col]
+    const y = (ext.row - 1) * ROW_H
+    const x = colX[ext.col]
+    const w = widths[ext.col]
     if (y < el.scrollTop) el.scrollTop = y
     else if (y + ROW_H > el.scrollTop + el.clientHeight) el.scrollTop = y + ROW_H - el.clientHeight
     if (x < el.scrollLeft) el.scrollLeft = x
     else if (x + w > el.scrollLeft + el.clientWidth) el.scrollLeft = x + w - el.clientWidth
-  }, [sel.row, sel.col, colX, widths])
+  }, [ext.row, ext.col, colX, widths])
 
   const firstRow = Math.max(1, Math.floor(scroll.top / ROW_H) + 1 - OVERSCAN)
   const lastRow = Math.min(view.rows, Math.ceil((scroll.top + scroll.height) / ROW_H) + OVERSCAN)
@@ -104,9 +128,9 @@ export const Grid = forwardRef(function Grid (props, ref) {
           {cols.map((c) => (
             <div
               key={c}
-              className={'col-head' + (c === sel.col ? ' on' : '')}
+              className={'col-head' + (c >= range.c1 && c <= range.c2 ? ' on' : '')}
               style={{ left: colX[c], width: widths[c] }}
-              onClick={() => onSelect(sel.row, c)}
+              onClick={(e) => { if (e.shiftKey) onSelect(view.rows, c, true); else { onSelect(1, c); onSelect(view.rows, c, true) } }}
               onContextMenu={(e) => { e.preventDefault(); onHeaderMenu('col', c, e.clientX, e.clientY) }}
             >
               {colName(c)}
@@ -120,9 +144,9 @@ export const Grid = forwardRef(function Grid (props, ref) {
           {rows.map((r) => (
             <div
               key={r}
-              className={'row-head' + (r === sel.row ? ' on' : '')}
+              className={'row-head' + (r >= range.r1 && r <= range.r2 ? ' on' : '')}
               style={{ top: (r - 1) * ROW_H }}
-              onClick={() => onSelect(r, sel.col)}
+              onClick={(e) => { if (e.shiftKey) onSelect(r, view.cols, true); else { onSelect(r, 1); onSelect(r, view.cols, true) } }}
               onContextMenu={(e) => { e.preventDefault(); onHeaderMenu('row', r, e.clientX, e.clientY) }}
             >
               {r}
@@ -140,8 +164,9 @@ export const Grid = forwardRef(function Grid (props, ref) {
               <div
                 key={r + ',' + c}
                 className={cls}
-                style={{ top: (r - 1) * ROW_H, left: colX[c], width: widths[c] }}
-                onMouseDown={() => onSelect(r, c)}
+                style={{ top: (r - 1) * ROW_H, left: colX[c], width: widths[c], color: fmt.color, background: fmt.fill }}
+                onMouseDown={(e) => { dragging.current = true; onSelect(r, c, e.shiftKey) }}
+                onMouseEnter={() => { if (dragging.current) onSelect(r, c, true) }}
                 onDoubleClick={() => onEdit(r, c)}
                 // Touch screens: tapping the cell that is already selected edits it.
                 onTouchEnd={(e) => { if (sel.row === r && sel.col === c) { e.preventDefault(); onEdit(r, c) } }}
@@ -151,6 +176,12 @@ export const Grid = forwardRef(function Grid (props, ref) {
               </div>
             )
           }))}
+          {(range.r1 !== range.r2 || range.c1 !== range.c2) && (
+            <div
+              className='range'
+              style={{ top: (range.r1 - 1) * ROW_H, left: colX[range.c1], width: colX[Math.min(range.c2, view.cols) + 1] - colX[range.c1], height: (range.r2 - range.r1 + 1) * ROW_H }}
+            />
+          )}
           <div
             className='selection'
             style={{ top: (sel.row - 1) * ROW_H, left: colX[sel.col], width: widths[sel.col], height: ROW_H }}

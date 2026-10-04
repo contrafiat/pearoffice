@@ -205,4 +205,48 @@ function toDisplay (stored, ctx, prebuilt) {
   })
 }
 
-module.exports = { toStored, toDisplay, indexTabs, REF_ERROR, TOKEN_RE }
+// Move the relative parts of every A1 reference by dr rows and dc columns, as
+// when a formula is pasted somewhere else. $-fixed parts stay. A reference
+// pushed off the top or left edge becomes #REF!.
+function shiftA1 (formula, dr, dc) {
+  if (!dr && !dc) return formula
+  // Each returns the part as written ($ kept), or null if it falls off the grid.
+  const col = (abs, letters) => {
+    if (abs) return '$' + letters.toUpperCase()
+    const n = colToNum(letters) + dc
+    return n < 1 || n > MAX_COLS ? null : numToCol(n)
+  }
+  const row = (abs, digits) => {
+    if (abs) return '$' + digits
+    const n = Number(digits) + dr
+    return n < 1 || n > MAX_ROWS ? null : String(n)
+  }
+  const join = (...parts) => (parts.includes(null) ? null : parts.join(''))
+  return mapOutsideStrings(formula, (code) => {
+    let out = ''
+    let i = 0
+    while (i < code.length) {
+      const prev = i === 0 ? ' ' : code[i - 1]
+      A1_RE.lastIndex = i
+      const m = BEFORE_OK.test(prev) ? A1_RE.exec(code) : null
+      const next = m ? code[i + m[0].length] : undefined
+      if (!m || (next !== undefined && AFTER_BAD.test(next))) { out += code[i++]; continue }
+      const prefix = m[1] !== undefined ? "'" + m[1] + "'!" : m[2] !== undefined ? m[2] + '!' : ''
+      let ref
+      if (m[4] !== undefined) {
+        ref = m[8] === undefined
+          ? join(col(m[3], m[4]), row(m[5], m[6]))
+          : join(col(m[3], m[4]), row(m[5], m[6]), ':', col(m[7], m[8]), row(m[9], m[10]))
+      } else if (m[12] !== undefined) {
+        ref = join(col(m[11], m[12]), ':', col(m[13], m[14]))
+      } else {
+        ref = join(row(m[15], m[16]), ':', row(m[17], m[18]))
+      }
+      out += ref === null ? REF_ERROR : prefix + ref
+      i += m[0].length
+    }
+    return out
+  })
+}
+
+module.exports = { toStored, toDisplay, shiftA1, indexTabs, REF_ERROR, TOKEN_RE }

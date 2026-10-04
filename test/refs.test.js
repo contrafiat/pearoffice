@@ -90,3 +90,29 @@ test('cross-tab references follow renames', () => {
   assert.equal(model.getInput(doc, tab, 1, 1), "='Monthly costs'!A1*2")
   assert.equal(evaluateSheet(doc).get(tab).get('1,1').value, 14)
 })
+
+test('pasting shifts relative references and keeps $-fixed ones', () => {
+  const { shiftA1 } = require('../src/shared/refs')
+  assert.equal(shiftA1('A1+B2', 1, 1), 'B2+C3')
+  assert.equal(shiftA1('$A$1+A$1+$A1', 2, 3), '$A$1+D$1+$A3')
+  assert.equal(shiftA1("'My Tab'!A1:B2", 1, 0), "'My Tab'!A2:B3")
+  assert.equal(shiftA1('"A1"&A1', 1, 0), '"A1"&A2')
+  assert.equal(shiftA1('A1', -1, 0), '#REF!')
+})
+
+test('block writes, range clears and range formats are single changes', () => {
+  const { doc, tab } = setup()
+  let updates = 0
+  doc.on('update', () => updates++)
+  model.setCells(doc, tab, 2, 2, [['1', '2'], ['3', '=B2+C2']])
+  assert.equal(updates, 1)
+  assert.equal(evaluateSheet(doc).get(tab).get('3,3').value, 3)
+  model.setFormatRange(doc, tab, 2, 2, 3, 3, { b: true, fill: '#fde68a' })
+  assert.equal(updates, 2)
+  assert.deepEqual(model.getFormat(doc, tab, 3, 3), { b: true, fill: '#fde68a' })
+  model.clearRange(doc, tab, 2, 2, 2, 3)
+  assert.equal(updates, 3)
+  assert.equal(model.getInput(doc, tab, 2, 2), '')
+  assert.equal(model.getInput(doc, tab, 3, 2), '3')
+  assert.deepEqual(model.getFormat(doc, tab, 2, 2), { b: true, fill: '#fde68a' }, 'formatting stays after clearing')
+})

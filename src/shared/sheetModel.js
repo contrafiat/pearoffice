@@ -142,20 +142,66 @@ function idsAt (doc, tabId, row, col) {
 
 // Set what a person typed into a cell. Formulas are translated from A1 to ids.
 // Typing past the edge of the grid grows it.
+function writeCell (doc, ctx, tabId, row, col, input) {
+  const t = tabMap(doc, tabId)
+  if (row > t.get('rows').length || col > t.get('cols').length) ctx.extend(tabId, row, col)
+  const { rowId, colId } = idsAt(doc, tabId, row, col)
+  const cells = t.get('cells')
+  const key = cellKey(rowId, colId)
+  if (input === '' || input === null || input === undefined) {
+    if (cells.has(key)) cells.delete(key)
+    return
+  }
+  const raw = typeof input === 'string' && input[0] === '=' ? '=' + refs.toStored(input.slice(1), ctx) : String(input)
+  if (cells.get(key) !== raw) cells.set(key, raw)
+}
+
 function setCell (doc, tabId, row, col, input) {
+  return capture(doc, () => writeCell(doc, makeCtx(doc, tabId), tabId, row, col, input))
+}
+
+// Write a block of inputs (rows of strings) with its top-left at row, col, as
+// one change. Used by paste and by .xlsx import.
+function setCells (doc, tabId, row, col, grid) {
   return capture(doc, () => {
     const ctx = makeCtx(doc, tabId)
+    grid.forEach((line, r) => line.forEach((input, c) => {
+      if (input !== undefined) writeCell(doc, ctx, tabId, row + r, col + c, input)
+    }))
+  })
+}
+
+// Clear the contents of a range (formatting stays, as with Excel's Delete).
+function clearRange (doc, tabId, r1, c1, r2, c2) {
+  return capture(doc, () => {
     const t = tabMap(doc, tabId)
-    if (row > t.get('rows').length || col > t.get('cols').length) ctx.extend(tabId, row, col)
-    const { rowId, colId } = idsAt(doc, tabId, row, col)
+    const rows = t.get('rows')
+    const cols = t.get('cols')
     const cells = t.get('cells')
-    const key = cellKey(rowId, colId)
-    if (input === '' || input === null || input === undefined) {
-      if (cells.has(key)) cells.delete(key)
-      return
+    for (let r = r1; r <= Math.min(r2, rows.length); r++) {
+      for (let c = c1; c <= Math.min(c2, cols.length); c++) {
+        const key = cellKey(rows.get(r - 1), cols.get(c - 1))
+        if (cells.has(key)) cells.delete(key)
+      }
     }
-    const raw = typeof input === 'string' && input[0] === '=' ? '=' + refs.toStored(input.slice(1), ctx) : String(input)
-    if (cells.get(key) !== raw) cells.set(key, raw)
+  })
+}
+
+function setFormatRange (doc, tabId, r1, c1, r2, c2, patch) {
+  return capture(doc, () => {
+    const t = tabMap(doc, tabId)
+    const rows = t.get('rows')
+    const cols = t.get('cols')
+    const fmt = t.get('fmt')
+    for (const attr of Object.keys(patch)) if (!FORMAT_ATTRS.includes(attr)) throw new Error('unknown format attribute: ' + attr)
+    for (let r = r1; r <= Math.min(r2, rows.length); r++) {
+      for (let c = c1; c <= Math.min(c2, cols.length); c++) {
+        for (const [attr, value] of Object.entries(patch)) {
+          const key = cellKey(rows.get(r - 1), cols.get(c - 1)) + ':' + attr
+          if (value === null || value === undefined || value === false) { if (fmt.has(key)) fmt.delete(key) } else if (fmt.get(key) !== value) fmt.set(key, value)
+        }
+      }
+    }
   })
 }
 
@@ -303,6 +349,9 @@ module.exports = {
   tabMap,
   cellKey,
   setCell,
+  setCells,
+  clearRange,
+  setFormatRange,
   getInput,
   setFormat,
   getFormat,

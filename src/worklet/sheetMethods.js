@@ -177,6 +177,12 @@ function createSheetMethods (sheets, { getJoin, getMoves }) {
 
     'sheet:setCell': mutate((doc, tab, a) => model.setCell(doc, tab, a.row, a.col, a.input)),
     'sheet:setFormat': mutate((doc, tab, a) => model.setFormat(doc, tab, a.row, a.col, a.patch || {})),
+    'sheet:setCells': mutate((doc, tab, a) => {
+      if (!Array.isArray(a.grid) || a.grid.reduce((n, line) => n + (Array.isArray(line) ? line.length : 0), 0) > 100000) throw new Error('Too many cells in one paste')
+      return model.setCells(doc, tab, a.row, a.col, a.grid.map((line) => line.map((v) => (v === null || v === undefined ? undefined : String(v)))))
+    }),
+    'sheet:clearRange': mutate((doc, tab, a) => model.clearRange(doc, tab, a.r1, a.c1, a.r2, a.c2)),
+    'sheet:setFormatRange': mutate((doc, tab, a) => model.setFormatRange(doc, tab, a.r1, a.c1, a.r2, a.c2, a.patch || {})),
     'sheet:insertRows': mutate((doc, tab, a) => model.insertRows(doc, tab, a.at, a.count || 1)),
     'sheet:deleteRows': mutate((doc, tab, a) => model.deleteRows(doc, tab, a.at, a.count || 1)),
     'sheet:insertCols': mutate((doc, tab, a) => model.insertCols(doc, tab, a.at, a.count || 1)),
