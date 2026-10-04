@@ -3,7 +3,7 @@ import { call, on } from './bridge.js'
 import { SheetView } from './SheetView.jsx'
 import { JoinPanel } from './JoinPanel.jsx'
 import { SeederPanel } from './SeederPanel.jsx'
-import { importFile } from './xlsx.js'
+import { importFile, pickAndImport, isMobile } from './xlsx.js'
 
 export function App () {
   const [sheets, setSheets] = useState(null)
@@ -70,7 +70,20 @@ export function App () {
         </div>
         <button className='new-sheet' onClick={create}>New sheet</button>
         <button className='join-sheet' onClick={() => setJoining('')}>Join with a link</button>
-        <label className='join-sheet import'>
+        {isMobile() && (
+          <button
+            className='join-sheet'
+            onClick={async () => {
+              try {
+                const r = await pickAndImport()
+                if (r) { await refresh(); setCurrent(r.sheetId) }
+              } catch (err) { setError('Could not import: ' + err.message) }
+            }}
+          >
+            Import .xlsx
+          </button>
+        )}
+        <label className='join-sheet import' hidden={isMobile()}>
           Import .xlsx
           <input
             type='file'

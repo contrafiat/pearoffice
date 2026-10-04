@@ -165,6 +165,8 @@ export const Grid = forwardRef(function Grid (props, ref) {
                 key={r + ',' + c}
                 className={cls}
                 style={{ top: (r - 1) * ROW_H, left: colX[c], width: widths[c], color: fmt.color, background: fmt.fill }}
+                data-r={r}
+                data-c={c}
                 onMouseDown={(e) => { dragging.current = true; onSelect(r, c, e.shiftKey) }}
                 onMouseEnter={() => { if (dragging.current) onSelect(r, c, true) }}
                 onDoubleClick={() => onEdit(r, c)}
@@ -185,6 +187,21 @@ export const Grid = forwardRef(function Grid (props, ref) {
           <div
             className='selection'
             style={{ top: (sel.row - 1) * ROW_H, left: colX[sel.col], width: widths[sel.col], height: ROW_H }}
+          />
+          {/* Touch screens: drag this handle to grow the selection, since a
+              finger dragging across the grid scrolls it. */}
+          <div
+            className='range-handle'
+            style={{ top: range.r2 * ROW_H - 9, left: colX[Math.min(range.c2, view.cols) + 1] - 9 }}
+            onTouchStart={(e) => { e.stopPropagation() }}
+            // touch-action: none (in the CSS) stops the page scrolling while
+            // the handle is dragged.
+            onTouchMove={(e) => {
+              const t = e.touches[0]
+              const el = document.elementFromPoint(t.clientX, t.clientY)
+              const cell = el && el.closest && el.closest('.cell')
+              if (cell) onSelect(Number(cell.dataset.r), Number(cell.dataset.c), true)
+            }}
           />
           {isEditingHere && (
             <input

@@ -85,7 +85,8 @@ rule 15): the dedicated AVD `PearSheet_Pixel_9` has a 12 GB data partition
 (the shared `Pixel_9` AVD ran out of space). Boot it with
 `../pearlist/scripts/emu.sh PearSheet_Pixel_9 5572`, then
 `adb -s emulator-5572 install -r android/app/build/outputs/apk/debug/app-debug.apk`.
-`scripts/adb-ui.sh <serial> texts|tap|bounds` reads and taps the UI by text.
+`scripts/adb-ui.sh <serial> texts|tap|bounds|all` reads and taps the UI by text
+(`all` lists every node with a text, to pick one by position).
 On this emulator `adb shell input text` knocks adb offline; send
 `input keyevent` codes instead.
 
