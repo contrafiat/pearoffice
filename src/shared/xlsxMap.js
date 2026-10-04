@@ -109,6 +109,9 @@ function dumpToWorkbook (XLSX, dump) {
     let maxR = 0
     let maxC = 0
     for (const cell of tab.cells) {
+      // A formatted cell with nothing in it: its style is added as a blank
+      // cell (src/shared/xlsxStyles.js), not as empty text.
+      if (!cell.input && !cell.error && (cell.value === null || cell.value === undefined)) continue
       const ref = XLSX.utils.encode_cell({ r: cell.row - 1, c: cell.col - 1 })
       const out = {}
       if (cell.error) { out.t = 'e'; out.v = ERROR_CODES[cell.error] ?? ERROR_CODES['#VALUE!']; out.w = cell.error in ERROR_CODES ? cell.error : '#VALUE!' } else if (typeof cell.value === 'number') { out.t = 'n'; out.v = cell.value } else if (typeof cell.value === 'boolean') { out.t = 'b'; out.v = cell.value } else if (cell.value === null || cell.value === undefined) { out.t = 's'; out.v = '' } else { out.t = 's'; out.v = String(cell.value) }
@@ -146,7 +149,10 @@ function workbookBytes (XLSX, fflate, dump) {
   const names = new Map(dump.tabs.map((t, i) => [String(t.name).toUpperCase(), wb.SheetNames[i]]))
   const rename = (data) => String(data || '').replace(/^'((?:[^']|'')+)'!|^([A-Za-z_][\w.]*)!/, (m, q, b) => { const n = names.get((q !== undefined ? q.replace(/''/g, "'") : b).toUpperCase()); return n ? "'" + n.replace(/'/g, "''") + "'!" : m })
   const tabs = dump.tabs.map((t, i) => ({ name: wb.SheetNames[i], charts: (t.charts || []).map((c) => ({ ...c, data: rename(c.data) })) }))
-  return require('./xlsxCharts').addChartsToXlsx(bytes, tabs, fflate)
+  // Styles first (src/shared/xlsxStyles.js), then charts.
+  const files = fflate.unzipSync(bytes)
+  require('./xlsxStyles').addStyles(files, dump.tabs, fflate)
+  return require('./xlsxCharts').addChartsToXlsx(fflate.zipSync(files), tabs, fflate)
 }
 
 module.exports = { workbookBytes, workbookToTabs, dumpToWorkbook, textInput, toFile, fromFile, READ_OPTIONS, MAX_IMPORT_CELLS }
