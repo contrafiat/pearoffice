@@ -13,7 +13,10 @@
     "smoke:desktop": "node scripts/smoke-desktop.js",
     "verify": "npm test && npm run test:bare && npm run smoke:desktop",
     "build:seeder": "node scripts/build-seeder.js",
-    "seeder": "node scripts/run-seeder.js"
+    "seeder": "node scripts/run-seeder.js",
+    "dist:linux": "node scripts/dist-linux.js",
+    "dist:mac": "scripts/build-desktop-mac.sh arm64",
+    "dist:windows": "scripts/build-desktop-windows.sh"
   },
   "dependencies": {
     "@formulajs/formulajs": "^4.6.1",

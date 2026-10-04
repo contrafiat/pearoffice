@@ -7,9 +7,79 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "smoke": "node smoke.js"
+    "smoke": "node smoke.js",
+    "dist": "electron-builder --publish never"
   },
   "devDependencies": {
-    "electron": "^44.5.1"
+    "electron": "^44.5.1",
+    "electron-builder": "^26.15.3"
+  },
+  "author": {
+    "name": "PeerLoom LLC",
+    "email": "support@peerloomllc.com"
+  },
+  "homepage": "https://github.com/peerloomllc/pearsheet",
+  "build": {
+    "appId": "com.peerloomllc.pearsheet",
+    "productName": "PearSheet",
+    "copyright": "Copyright 2026 PeerLoom LLC",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "worklet.js",
+      "paths.js",
+      "smoke-run.js",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "build/resources",
+        "to": "."
+      }
+    ],
+    "protocols": [
+      {
+        "name": "PearSheet invite",
+        "schemes": [
+          "pearsheet"
+        ]
+      }
+    ],
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.productivity",
+      "icon": "build/icon.png",
+      "artifactName": "PearSheet-${version}-mac-${arch}.${ext}"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Office",
+      "icon": "build/icon.png",
+      "artifactName": "pearsheet-${version}-linux-${arch}.${ext}",
+      "synopsis": "Peer-to-peer shared spreadsheets",
+      "description": "Shared spreadsheets that sync device to device. No accounts, no servers."
+    },
+    "deb": {
+      "packageName": "pearsheet"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.png",
+      "artifactName": "PearSheet-Setup-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false
+    }
   }
 }

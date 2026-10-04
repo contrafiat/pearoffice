@@ -47,7 +47,8 @@ async function run ({ app, win, ready, log }) {
     await ready
     step('worklet ready')
     await new Promise((resolve) => wc.isLoading() ? wc.once('did-finish-load', resolve) : resolve())
-    await waitFor('sheet list', "!!document.querySelector('.new-sheet') && !document.querySelector('.sheet-list .muted')?.textContent.includes('Starting')")
+    // Generous: a first launch on macOS includes the system's check of the new app.
+    await waitFor('sheet list', "!!document.querySelector('.new-sheet') && !document.querySelector('.sheet-list .muted')?.textContent.includes('Starting')", 60000)
     step('ui loaded')
 
     await js("document.querySelector('.new-sheet').click()")
@@ -118,6 +119,8 @@ async function run ({ app, win, ready, log }) {
     result.ok = result.inviteLink === 'pearsheet://join?s=' + result.inviteLink.slice(19) && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
   } catch (err) {
     result.error = err.message
+    // What the page showed, to tell a UI failure from a load failure.
+    result.page = await js("(document.body && document.body.innerText || '').slice(0, 300) + ' | url=' + location.href").catch((e) => 'unreadable: ' + e.message)
   }
   console.log('SMOKE_RESULT ' + JSON.stringify(result))
   app.quit()

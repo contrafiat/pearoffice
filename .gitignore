@@ -11,3 +11,7 @@ corestore/
 # Local-only working notes
 TODO.md
 DONE.md
+# Desktop packaging: keep the icon, never the staged resources or installers
+!desktop/build/
+desktop/build/resources/
+desktop/dist/
