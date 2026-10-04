@@ -77,6 +77,22 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
     await enter('=SUM(B1:B2)', 'Enter', '1650.5')
     step('typed and computed')
 
+    // Formula suggestions: =su lists SUM; Down, Down, Tab inserts it; inside
+    // the brackets the argument help shows; Escape leaves the cell as it was.
+    await type('=su')
+    await waitFor('suggestions', "!!document.querySelector('.formula-help') && document.querySelector('.formula-help').textContent.includes('SUM(')")
+    if (process.env.PEARSHEET_SMOKE_HELP_SHOT) fs.writeFileSync(process.env.PEARSHEET_SMOKE_HELP_SHOT, (await wc.capturePage()).toPNG())
+    result.suggested = await js("[...document.querySelectorAll('.formula-help .fname')].map((e) => e.textContent).slice(0, 3).join(',')")
+    await key('Down'); await key('Down'); await key('Tab')
+    await waitFor('function inserted', "(document.querySelector('.grid .editor') || {}).value === '=SUM('")
+    await type('B1')
+    await waitFor('argument help', "!!document.querySelector('.formula-help .sig b')")
+    result.argHelp = await js("document.querySelector('.formula-help .sig b').textContent")
+    await key('Escape')
+    await waitFor('edit cancelled', "!document.querySelector('.grid .editor') && !document.querySelector('.formula-help')")
+    await js("document.querySelector('.grid .body').focus()")
+    step('formula suggestions')
+
     // Ranges, copy and paste: select B1:B3, copy, paste into C1. The formula
     // moves with it, as in Excel.
     for (let i = 0; i < 3; i++) await key('Up')
@@ -260,7 +276,7 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
       fs.writeFileSync(shot, image.toPNG())
       step('screenshot', shot)
     }
-    result.ok = result.keepOnline && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.importedFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000 && result.pastedFormula === '=SUM(C1:C2)' && result.inviteLink === 'pearsheet://join?s=' + result.inviteLink.slice(19) && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
+    result.ok = result.keepOnline && result.suggested === 'SUBSTITUTE,SUBTOTAL,SUM' && result.argHelp === 'number1' && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.importedFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000 && result.pastedFormula === '=SUM(C1:C2)' && result.inviteLink === 'pearsheet://join?s=' + result.inviteLink.slice(19) && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
   } catch (err) {
     result.error = err.message
     // What the page showed, to tell a UI failure from a load failure.

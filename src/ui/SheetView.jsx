@@ -1,10 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { call, on } from './bridge.js'
 import { Grid } from './Grid.jsx'
 import { colName } from './a1.js'
 import { shiftA1 } from '../shared/refs.js'
 import { SharePanel } from './SharePanel.jsx'
 import { DeletePanel } from './DeletePanel.jsx'
+import { FormulaHelp, helpFor, insertFunction } from './FormulaHelp.jsx'
 import { exportSheet, isMobile } from './xlsx.js'
 
 const COLOURS = ['#1f2420', '#b3261e', '#c2410c', '#a16207', '#15803d', '#0e7490', '#1d4ed8', '#7e22ce']
@@ -76,6 +77,12 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
   const [renaming, setRenaming] = useState(null) // { id, value } | null
   const [sharing, setSharing] = useState(false)
   const [more, setMore] = useState(false) // the ⋯ menu
+  // Formula help: where the caret is in the text being edited, the
+  // highlighted suggestion, and whether Escape hid the list.
+  const [caret, setCaret] = useState(null)
+  const [helpSel, setHelpSel] = useState(0)
+  const [helpOff, setHelpOff] = useState(null) // the partial name Escape hid
+  const nextCaret = useRef(null)
   // Refresh the sidebar when the title changes from anywhere: a rename on
   // another device, or the name arriving after this device joined.
   const title = view ? view.title : null
@@ -283,7 +290,36 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
     if (k.length === 1) { e.preventDefault(); setEditing({ ...sel, value: k, source: 'grid' }) }
   }
 
+  const editValue = editing ? editing.value : null
+  const caretAt = caret === null || editValue === null ? (editValue || '').length : Math.min(caret, editValue.length)
+  const help = editing && canEdit ? helpFor(editValue, caretAt) : null
+  const shownHelp = help && help.list && helpOff === help.partial ? null : help
+  useEffect(() => { setHelpSel(0) }, [help && help.partial])
+  useEffect(() => { if (!editing) { setCaret(null); setHelpOff(null) } }, [!!editing])
+  // Put the caret where an inserted function name ended.
+  useLayoutEffect(() => {
+    if (nextCaret.current === null) return
+    const el = document.activeElement
+    if (el && el.tagName === 'INPUT') el.setSelectionRange(nextCaret.current, nextCaret.current)
+    setCaret(nextCaret.current)
+    nextCaret.current = null
+  })
+
+  function pickFunction (name) {
+    if (!help || !help.list) return
+    const r = insertFunction(editValue, caretAt, help.partial, name)
+    nextCaret.current = r.caret
+    setEditing((ed) => ({ ...ed, value: r.value }))
+  }
+
   function onEditKey (e) {
+    if (shownHelp && shownHelp.list) {
+      const n = shownHelp.list.length
+      if (e.key === 'ArrowDown') { e.preventDefault(); setHelpSel((i) => (i + 1) % n); return }
+      if (e.key === 'ArrowUp') { e.preventDefault(); setHelpSel((i) => (i - 1 + n) % n); return }
+      if (e.key === 'Tab' || e.key === 'Enter') { e.preventDefault(); pickFunction(shownHelp.list[Math.min(helpSel, n - 1)].name); return }
+      if (e.key === 'Escape') { e.preventDefault(); setHelpOff(shownHelp.partial); return }
+    }
     if (e.key === 'Enter') { e.preventDefault(); commit([e.shiftKey ? -1 : 1, 0]) }
     else if (e.key === 'Tab') { e.preventDefault(); commit([0, e.shiftKey ? -1 : 1]) }
     else if (e.key === 'Escape') { e.preventDefault(); setEditing(null); focusGrid() }
@@ -397,7 +433,8 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
           readOnly={!canEdit}
           value={barValue}
           onFocus={() => { if (canEdit && !editing) setEditing({ ...sel, value: selected ? selected.input : '', source: 'bar' }) }}
-          onChange={(e) => setEditing({ ...sel, value: e.target.value, source: 'bar' })}
+          onChange={(e) => { setEditing({ ...sel, value: e.target.value, source: 'bar' }); setCaret(e.target.selectionStart) }}
+          onSelect={(e) => setCaret(e.target.selectionStart)}
           onKeyDown={onEditKey}
           onBlur={() => { if (editing) commit(null) }}
         />
@@ -419,6 +456,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
         onPaste={onPaste}
         onEdit={(row, col) => { select(row, col); if (canEdit) setEditing({ row, col, value: (cells.get(row + ',' + col) || {}).input || '' }) }}
         onEditChange={(value) => setEditing((ed) => ({ ...ed, value }))}
+        onEditCaret={setCaret}
         onEditKey={onEditKey}
         onEditBlur={() => commit(null)}
         onKeyDown={onKeyDown}
@@ -427,6 +465,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
       />
 
       {sharing && <SharePanel sheetId={sheetId} onClose={() => setSharing(false)} onError={onError} />}
+      {shownHelp && <FormulaHelp help={shownHelp} selected={helpSel} onPick={pickFunction} anchor={document.activeElement && document.activeElement.tagName === 'INPUT' ? document.activeElement : null} />}
       {deleting && <DeletePanel sheetId={sheetId} title={view.title} kind={deleting} onClose={() => setDeleting(null)} onError={onError} onDone={() => { setDeleting(null); onGone() }} />}
 
       {menu && (

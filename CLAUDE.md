@@ -198,6 +198,10 @@ filled in `src/shared/formula/fills.js`; newer Excel functions (XLOOKUP,
 XMATCH, TEXTBEFORE/AFTER, OFFSET, INDIRECT, XNPV, XIRR, DSUM and the other
 database functions) are in `src/shared/formula/newer.js`.
 
+Formula suggestions come from `src/shared/formula/catalog.js` (name, arguments
+and one line for each of the 380 working functions); `test/catalog.test.js`
+fails if a function is added to the engine without an entry.
+
 After a deliberate formula change, regenerate the golden file with
 `UPDATE_GOLDEN=1 node --test test/formula.test.js test/functions.test.js` and say why in the commit.
 

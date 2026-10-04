@@ -13,7 +13,7 @@ export const MAX_ZOOM = 2.5
 // sheets stay fast. Headers are drawn outside the scroll area and moved with
 // the scroll position.
 export const Grid = forwardRef(function Grid (props, ref) {
-  const { view, cells, sel, ext = sel, range, editing, onSelect, onEdit, onEditChange, onEditKey, onEditBlur, onKeyDown, onHeaderMenu, onResize, onCopy, onPaste, zoom = 1, onZoom, inputMode } = props
+  const { view, cells, sel, ext = sel, range, editing, onSelect, onEdit, onEditChange, onEditKey, onEditBlur, onEditCaret = () => {}, onKeyDown, onHeaderMenu, onResize, onCopy, onPaste, zoom = 1, onZoom, inputMode } = props
   // Row height and column widths scale with the zoom (pinch on a phone);
   // stored widths stay unzoomed.
   const ROW_H = Math.round(BASE_ROW_H * zoom)
@@ -252,7 +252,8 @@ export const Grid = forwardRef(function Grid (props, ref) {
               inputMode={inputMode}
               style={{ top: (editing.row - 1) * ROW_H, left: colX[editing.col], minWidth: widths[editing.col], height: ROW_H }}
               value={editing.value}
-              onChange={(e) => onEditChange(e.target.value)}
+              onChange={(e) => { onEditChange(e.target.value); onEditCaret(e.target.selectionStart) }}
+              onSelect={(e) => onEditCaret(e.target.selectionStart)}
               onKeyDown={onEditKey}
               onBlur={onEditBlur}
             />
