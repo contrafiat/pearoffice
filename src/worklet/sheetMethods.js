@@ -396,6 +396,14 @@ function createSheetMethods (sheets, { getJoin, getMoves, getProfiles }) {
       return { count }
     },
 
+    // Fill n cells past a range: dir 'down' | 'up' | 'right' | 'left',
+    // mode 'series' (the fill handle) or 'copy' (Ctrl+D, Ctrl+R).
+    'sheet:fill': mutate((doc, tab, a) => {
+      if (!['down', 'up', 'right', 'left'].includes(a.dir)) throw new Error('bad fill direction')
+      const n = Math.min(100000, Math.max(0, Math.trunc(Number(a.n) || 0)))
+      return model.fillRange(doc, tab, { r1: a.r1, c1: a.c1, r2: a.r2, c2: a.c2 }, a.dir, n, a.mode === 'copy' ? 'copy' : 'series')
+    }),
+
     'sheet:deleteTab': async ({ sheetId, tabId }, ctx) => {
       await requireEdit(ctx, sheetId)
       const { doc } = await docFor(sheetId)

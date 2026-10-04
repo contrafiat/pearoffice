@@ -18,6 +18,7 @@
 const Y = require('yjs')
 const { newId } = require('./ids')
 const refs = require('./refs')
+const { fillLine } = require('./fill')
 
 const VERSION = 1
 const DEFAULT_ROWS = 100
@@ -274,6 +275,63 @@ function sortRows (doc, tabId, r1, c1, r2, c2, order) {
   })
 }
 
+// Fill n cells past a source range in one direction ('down', 'up', 'right',
+// 'left'), as one change: series or copies (src/shared/fill.js). Copied
+// formulas shift their references to the new cell; formats come along.
+function fillRange (doc, tabId, src, dir, n, mode = 'series') {
+  if (!(n > 0)) return null
+  const vertical = dir === 'down' || dir === 'up'
+  const backward = dir === 'up' || dir === 'left'
+  return capture(doc, () => {
+    const ctx = makeCtx(doc, tabId)
+    const t = tabMap(doc, tabId)
+    const fmt = t.get('fmt')
+    const prebuilt = refs.indexTabs(ctx.tabs)
+    const formatOf = (r, c) => {
+      const { rowId, colId } = idsAt(doc, tabId, r, c)
+      const f = {}
+      if (!rowId || !colId) return f
+      for (const attr of FORMAT_ATTRS) { const v = fmt.get(cellKey(rowId, colId) + ':' + attr); if (v !== undefined) f[attr] = v }
+      return f
+    }
+    const lines = vertical ? [src.c1, src.c2] : [src.r1, src.r2]
+    for (let line = lines[0]; line <= lines[1]; line++) {
+      const cellsOf = []
+      const k = vertical ? src.r2 - src.r1 + 1 : src.c2 - src.c1 + 1
+      for (let i = 0; i < k; i++) {
+        const r = vertical ? src.r1 + i : line
+        const c = vertical ? line : src.c1 + i
+        const f = formatOf(r, c)
+        cellsOf.push({ r, c, input: getInput(doc, tabId, r, c, prebuilt), fmt: f, num: f.num })
+      }
+      const plan = fillLine(cellsOf, n, { backward, mode })
+      plan.forEach((p, t) => {
+        const step = t + 1
+        const r = vertical ? (backward ? src.r1 - step : src.r2 + step) : line
+        const c = vertical ? line : (backward ? src.c1 - step : src.c2 + step)
+        if (r < 1 || c < 1) return
+        let input
+        let f
+        if (p.from !== undefined) {
+          const from = cellsOf[p.from]
+          input = from.input
+          if (typeof input === 'string' && input[0] === '=') input = '=' + refs.shiftA1(input.slice(1), r - from.r, c - from.c)
+          f = from.fmt
+        } else {
+          input = p.input
+          f = cellsOf[p.like || 0].fmt
+        }
+        writeCell(doc, ctx, tabId, r, c, input)
+        const { rowId, colId } = idsAt(doc, tabId, r, c)
+        for (const attr of FORMAT_ATTRS) {
+          const key = cellKey(rowId, colId) + ':' + attr
+          if (f[attr] === undefined) { if (fmt.has(key)) fmt.delete(key) } else if (fmt.get(key) !== f[attr]) fmt.set(key, f[attr])
+        }
+      })
+    }
+  })
+}
+
 // Replace text in what people typed (formulas in their A1 form), as one
 // change. `cells` lists [row, col, newInput].
 function replaceInputs (doc, tabId, cells) {
@@ -519,6 +577,7 @@ module.exports = {
   setWidth,
   importTabs,
   sortRows,
+  fillRange,
   replaceInputs,
   addTab,
   renameTab,

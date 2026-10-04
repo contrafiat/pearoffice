@@ -330,6 +330,33 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
     setExt({ row: range.r1 + h - 1, col: range.c1 + w - 1 })
   }
 
+  // Fill n cells past the selection (the fill handle), then select it all.
+  async function fillFrom (dir, n, src = range, mode = 'series') {
+    await run('sheet:fill', { ...src, dir, n, mode })
+    const box = { ...src }
+    if (dir === 'down') box.r2 += n
+    if (dir === 'up') box.r1 -= n
+    if (dir === 'right') box.c2 += n
+    if (dir === 'left') box.c1 -= n
+    setSel({ row: box.r1, col: box.c1 })
+    setExt({ row: box.r2, col: box.c2 })
+  }
+
+  // Phones (More menu): continue what is at the top (or left) of the
+  // selection into the empty rest of it.
+  function fillSelection (dir) {
+    const has = (r, c) => { const x = cells.get(r + ',' + c); return !!(x && x.input) }
+    if (dir === 'down') {
+      let end = range.r1
+      while (end < range.r2 && [...Array(range.c2 - range.c1 + 1)].some((_, i) => has(end + 1, range.c1 + i))) end++
+      if (end < range.r2) fillFrom('down', range.r2 - end, { r1: range.r1, c1: range.c1, r2: end, c2: range.c2 })
+    } else {
+      let end = range.c1
+      while (end < range.c2 && [...Array(range.r2 - range.r1 + 1)].some((_, i) => has(range.r1 + i, end + 1))) end++
+      if (end < range.c2) fillFrom('right', range.c2 - end, { r1: range.r1, c1: range.c1, r2: range.r2, c2: end })
+    }
+  }
+
   // The block of data around a cell, as Excel's current region: grows while
   // a neighbouring row or column has something in it.
   function dataRegion (r) {
@@ -444,6 +471,9 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
       if (!(selected && selected.fmt && selected.fmt.num)) run('sheet:setFormat', { row: sel.row, col: sel.col, patch: { num: 'yyyy-mm-dd' } })
       return
     }
+    // Ctrl+D / Ctrl+R: copy the top row down / the left column right.
+    if (mod && (k === 'd' || k === 'D') && range.r2 > range.r1) { e.preventDefault(); fillFrom('down', range.r2 - range.r1, { ...range, r2: range.r1 }, 'copy'); return }
+    if (mod && (k === 'r' || k === 'R') && range.c2 > range.c1) { e.preventDefault(); fillFrom('right', range.c2 - range.c1, { ...range, c2: range.c1 }, 'copy'); return }
     if (mod && (k === 'z' || k === 'Z')) { e.preventDefault(); run(e.shiftKey ? 'sheet:redo' : 'sheet:undo'); return }
     if (mod && (k === 'y' || k === 'Y')) { e.preventDefault(); run('sheet:redo'); return }
     if (mod && (k === 'b' || k === 'B')) { e.preventDefault(); toggle('b'); return }
@@ -621,6 +651,8 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
               {!phone && <li role='menuitem' onClick={() => printTab(view, 'pdf').catch((err) => onError(err.message))}>Save this tab as PDF</li>}
               {!phone && <li role='menuitem' onClick={() => printTab(view, 'print').catch((err) => onError(err.message))}>Print this tab...</li>}
               {canEdit && <li role='menuitem' onClick={openSort}>Sort...</li>}
+              {canEdit && phone && <li role='menuitem' onClick={() => fillSelection('down')}>Fill down</li>}
+              {canEdit && phone && <li role='menuitem' onClick={() => fillSelection('right')}>Fill right</li>}
               <li role='menuitem' onClick={() => setDeleting('local')}>Remove from this device</li>
               {view.myRole === 'owner' && <li role='menuitem' className='danger' onClick={() => setDeleting('everyone')}>Delete for everyone</li>}
             </ul>
@@ -686,6 +718,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
         onEditBlur={() => commit(null)}
         onKeyDown={onKeyDown}
         onHeaderMenu={(kind, index, x, y) => { if (canEdit) setMenu({ kind, index, x, y }) }}
+        onFill={canEdit && !phone ? fillFrom : null}
         onCellMenu={(row, col, x, y) => {
           if (row < range.r1 || row > range.r2 || col < range.c1 || col > range.c2) select(row, col)
           setMenu({ kind: 'cell', x, y })
