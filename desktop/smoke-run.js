@@ -22,13 +22,13 @@ async function run ({ app, win, ready, log }) {
     throw new Error('timed out waiting for ' + label)
   }
 
-  async function type (text) {
+  async function type (text, gap = 40) {
     for (const ch of text) {
       const modifiers = /[A-Z]/.test(ch) ? ['shift'] : []
       wc.sendInputEvent({ type: 'keyDown', keyCode: ch, modifiers })
       wc.sendInputEvent({ type: 'char', keyCode: ch, modifiers })
       wc.sendInputEvent({ type: 'keyUp', keyCode: ch, modifiers })
-      await sleep(40)
+      if (gap) await sleep(gap)
     }
   }
 
@@ -52,20 +52,28 @@ async function run ({ app, win, ready, log }) {
     step('ui loaded')
 
     await js("document.querySelector('.new-sheet').click()")
-    await waitFor('grid', "!!document.querySelector('.grid .body')")
+    await waitFor('grid', "!!document.querySelector('.grid .body') && !!document.querySelector('.selection')")
+    // Let the new sheet settle, then make sure the grid has focus.
+    await sleep(500)
     await js("document.querySelector('.grid .body').focus()")
+    await waitFor('grid focus', "document.activeElement === document.querySelector('.grid .body')")
     step('sheet created')
 
-    await type('Rent'); await key('Tab')
-    await type('1200'); await key('Enter')
-    await js("document.querySelector('.grid .body').focus()")
+    const hasCell = (text) => `[...document.querySelectorAll('.cell')].some((c) => c.textContent === ${JSON.stringify(text)})`
+    async function enter (text, then, shows = text) {
+      await type(text)
+      await key(then)
+      await waitFor('cell ' + text, hasCell(shows))
+      await waitFor('grid focus', "document.activeElement === document.querySelector('.grid .body')")
+    }
+    await enter('Rent', 'Tab')
+    await enter('1200', 'Enter')
     await key('Left')
-    await type('Food'); await key('Tab')
-    await type('450.5'); await key('Enter')
+    await enter('Food', 'Tab')
+    await enter('450.5', 'Enter')
     await key('Left')
-    await type('Total'); await key('Tab')
-    await type('=SUM(B1:B2)'); await key('Enter')
-    await waitFor('formula result', "[...document.querySelectorAll('.cell')].some((c) => c.textContent === '1650.5')")
+    await enter('Total', 'Tab')
+    await enter('=SUM(B1:B2)', 'Enter', '1650.5')
     step('typed and computed')
 
     result.grid = {
@@ -101,6 +109,15 @@ async function run ({ app, win, ready, log }) {
     await waitFor('title in list', "[...document.querySelectorAll('.sheet-link')].some((b) => b.textContent === 'Household budget')")
     step('renamed')
 
+    // Type with no gap between keys: keys that arrive before the cell editor
+    // is drawn must still land in it, in order.
+    await js("document.querySelector('.grid .body').focus()")
+    for (let i = 0; i < 4; i++) await key('Down')
+    await type('Typed fast 123', 0)
+    await key('Enter')
+    await waitFor('fast typing kept', "[...document.querySelectorAll('.cell')].some((c) => c.textContent === 'Typed fast 123')", 10000)
+    step('fast typing')
+
     // Share: the owner gets a single-use invite link.
     await js("document.querySelector('.toolbar .share').click()")
     await waitFor('share panel', "!!document.querySelector('.panel .invite-actions')")
@@ -120,7 +137,8 @@ async function run ({ app, win, ready, log }) {
   } catch (err) {
     result.error = err.message
     // What the page showed, to tell a UI failure from a load failure.
-    result.page = await js("(document.body && document.body.innerText || '').slice(0, 300) + ' | url=' + location.href").catch((e) => 'unreadable: ' + e.message)
+    result.page = await js("(document.body && document.body.innerText || '').slice(0, 120) + ' | url=' + location.href").catch((e) => 'unreadable: ' + e.message)
+    result.cells = await js("[...document.querySelectorAll('.cell')].filter((c) => c.textContent).map((c) => c.style.top + '/' + c.style.left + '=' + c.textContent)").catch(() => null)
   }
   console.log('SMOKE_RESULT ' + JSON.stringify(result))
   app.quit()

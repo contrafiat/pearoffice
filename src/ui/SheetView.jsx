@@ -19,7 +19,16 @@ export function SheetView ({ sheetId, onTitleChange, onError }) {
   const [view, setView] = useState(null)
   const [tabId, setTabId] = useState(null)
   const [sel, setSel] = useState({ row: 1, col: 1 })
-  const [editing, setEditing] = useState(null) // { row, col, value } | null
+  const [editing, setEditingState] = useState(null) // { row, col, value, source } | null
+  // Keys can arrive before React has drawn the cell editor (slow machines,
+  // fast typists). A ref holds the latest edit so those keys add to it
+  // instead of replacing each other, and commit never reads a stale copy.
+  const editingRef = useRef(null)
+  const setEditing = useCallback((next) => {
+    const value = typeof next === 'function' ? next(editingRef.current) : next
+    editingRef.current = value
+    setEditingState(value)
+  }, [])
   const [menu, setMenu] = useState(null) // { kind, index, x, y } | null
   const [renaming, setRenaming] = useState(null) // { id, value } | null
   const [sharing, setSharing] = useState(false)
@@ -66,8 +75,9 @@ export function SheetView ({ sheetId, onTitleChange, onError }) {
   const focusGrid = () => gridRef.current && gridRef.current.focus()
 
   async function commit (move) {
-    if (!editing) return
-    const { row, col, value } = editing
+    const current = editingRef.current
+    if (!current) return
+    const { row, col, value } = current
     setEditing(null)
     const before = cells.get(row + ',' + col)
     if ((before ? before.input : '') !== value) {
@@ -96,7 +106,19 @@ export function SheetView ({ sheetId, onTitleChange, onError }) {
   }
 
   function onKeyDown (e) {
-    if (editing) return
+    // The cell editor lives inside the grid, so its keys bubble up here. It
+    // handles its own; only keys aimed at the grid itself count.
+    if (e.target !== e.currentTarget) return
+    // An edit has started but its input is not focused yet: keep typing into it.
+    if (editingRef.current) {
+      if (e.key === 'Enter' || e.key === 'Tab' || e.key === 'Escape') { onEditKey(e); return }
+      if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault()
+        const ch = e.key
+        setEditing((ed) => ({ ...ed, value: ed.value + ch }))
+      }
+      return
+    }
     if (!canEdit) {
       const moves = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1], Tab: [0, e.shiftKey ? -1 : 1] }
       if (moves[e.key]) { e.preventDefault(); moveBy(...moves[e.key]) }
@@ -113,7 +135,7 @@ export function SheetView ({ sheetId, onTitleChange, onError }) {
     if (moves[k]) { e.preventDefault(); moveBy(...moves[k]); return }
     if (k === 'Enter' || k === 'F2') { e.preventDefault(); setEditing({ ...sel, value: selected ? selected.input : '' }); return }
     if (k === 'Delete' || k === 'Backspace') { e.preventDefault(); if (selected) run('sheet:setCell', { row: sel.row, col: sel.col, input: '' }); return }
-    if (k.length === 1) { e.preventDefault(); setEditing({ ...sel, value: k }) }
+    if (k.length === 1) { e.preventDefault(); setEditing({ ...sel, value: k, source: 'grid' }) }
   }
 
   function onEditKey (e) {
