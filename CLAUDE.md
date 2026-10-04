@@ -188,13 +188,15 @@ builds are signed and notarized; Linux and Windows builds are unsigned
   events and checks formula, bold, undo and rename. About 15 s. Skipped (with
   a message) when there is no display.
 
-`test/functions.test.js` checks 371 cases covering 339 of the engine's 355
+`test/functions.test.js` checks 408 cases covering 373 of the engine's 389
 functions (`test/fixtures/function-corpus.js`) against LibreOffice's answers in
 `test/fixtures/function-expected.json`, with Excel's value recorded by hand
 where the two differ. After adding cases, run `node scripts/function-expectations.js`
 (needs `soffice`): it recalculates them in LibreOffice and lists where PearSheet
 differs. Many upstream fast-formula-parser functions are empty stubs; they are
-filled in `src/shared/formula/fills.js`.
+filled in `src/shared/formula/fills.js`; newer Excel functions (XLOOKUP,
+XMATCH, TEXTBEFORE/AFTER, OFFSET, INDIRECT, XNPV, XIRR, DSUM and the other
+database functions) are in `src/shared/formula/newer.js`.
 
 After a deliberate formula change, regenerate the golden file with
 `UPDATE_GOLDEN=1 node --test test/formula.test.js test/functions.test.js` and say why in the commit.

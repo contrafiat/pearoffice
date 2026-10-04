@@ -12,5 +12,8 @@ Changes from upstream:
   `src/shared/formula/detmath.js`). Integer powers of constants became
   literals, squares became `x * x`, the rest became `Math.pow`.
 - `grammar/diagram.js` removed (dev-only).
+- `OFFSET` added to `funsNeedContextAndNoDataRetrieve` in `grammar/hooks.js`,
+  so PearSheet's OFFSET (in `src/shared/formula/newer.js`) gets the reference
+  itself rather than its values.
 
 `test/formula-vendor.test.js` fails if a `**` comes back.

@@ -37,7 +37,7 @@ const XLFN = new Set(('ACOT ACOTH AGGREGATE ARABIC BASE BETA.DIST BETA.INV BINOM
   'NEGBINOM.DIST NORM.DIST NORM.INV NORM.S.DIST NORM.S.INV NUMBERVALUE PERCENTILE.EXC ' +
   'PERCENTILE.INC PERCENTRANK.EXC PERCENTRANK.INC PERMUTATIONA PHI POISSON.DIST QUARTILE.EXC QUARTILE.INC RANK.AVG ' +
   'RANK.EQ SEC SECH SKEW.P STDEV.P STDEV.S SWITCH T.DIST T.DIST.2T T.DIST.RT T.INV T.INV.2T T.TEST TEXTJOIN UNICHAR ' +
-  'UNICODE VAR.P VAR.S WEIBULL.DIST WORKDAY.INTL XOR Z.TEST NETWORKDAYS.INTL').split(' '))
+  'UNICODE VAR.P VAR.S WEIBULL.DIST WORKDAY.INTL XOR Z.TEST XLOOKUP XMATCH TEXTBEFORE TEXTAFTER NETWORKDAYS.INTL').split(' '))
 const xlfn = (f) => f.replace(/([A-Z][A-Z0-9.]*)\(/g, (m, name) => (XLFN.has(name) ? '_xlfn.' + name + '(' : m))
 // Functions that return an array need an array formula in LibreOffice.
 const ARRAY = /MINVERSE|MMULT|MUNIT|FREQUENCY|GROWTH|LINEST|LOGEST|MODE\.MULT|TREND|TRANSPOSE|SERIESSUM|SUMPRODUCT/
@@ -45,7 +45,7 @@ for (const [a1, f] of cases) {
   ws[a1] = { t: 'n', f: xlfn(f.slice(1)) }
   if (ARRAY.test(f)) ws[a1].F = a1 + ':' + a1
 }
-ws['!ref'] = 'A1:T' + cases.length
+ws['!ref'] = 'A1:AF' + cases.length
 const wb = XLSX.utils.book_new()
 XLSX.utils.book_append_sheet(wb, ws, 'Sheet1')
 XLSX.writeFile(wb, src)
