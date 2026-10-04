@@ -23,6 +23,8 @@ async function main () {
   const spillGolden = JSON.parse(fs.readFileSync(path.join(root, 'test', 'fixtures', 'spill-golden.json'), 'utf8'))
   assert.deepEqual(got.spills, spillGolden)
   console.log('ok - spill corpus under Bare matches the golden file')
+  assert.deepEqual(got.lifts, JSON.parse(fs.readFileSync(path.join(root, 'test', 'fixtures', 'lift-golden.json'), 'utf8')))
+  console.log('ok - lift corpus under Bare matches the golden file')
 
   require('./build-worklet')
   const bundle = path.join(root, 'dist', 'worklet', 'worklet.bundle')

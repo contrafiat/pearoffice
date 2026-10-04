@@ -185,3 +185,25 @@ test('A2# works across tabs', () => {
   model.setCell(doc, tab, 1, 1, "=SUM('Data sheet'!A1#)")
   assert.equal(shown(at(doc, tab, 1, 1)), 10)
 })
+
+// Single-value functions over a range (proposals/2026-10-04-functions-over-ranges.md).
+test('a single-value function given a range runs once per value', () => {
+  const { doc, tab } = sheet()
+  model.setCells(doc, tab, 1, 1, [['apple', '5'], ['Pear', '120'], ['fig', '0']])
+  model.setCell(doc, tab, 1, 4, '=UPPER(A1:A3)')
+  model.setCell(doc, tab, 1, 5, '=IF(B1:B3>100, "big", 1/B1:B3)')
+  model.setCell(doc, tab, 1, 6, '=SUM(B1:B3)')
+  const v = evaluateSheet(doc).get(tab)
+  assert.deepEqual([1, 2, 3].map((r) => shown(v.get(r + ',4'))), ['APPLE', 'PEAR', 'FIG'])
+  // Each position picks its branch; the #DIV/0! stays in its own cell.
+  assert.deepEqual([1, 2, 3].map((r) => shown(v.get(r + ',5'))), [0.2, 'big', '#DIV/0!'])
+  assert.equal(shown(v.get('1,6')), 125, 'functions that total a range do not change')
+})
+
+test('a row and a column given to one function fill a grid', () => {
+  const { doc, tab } = sheet()
+  model.setCell(doc, tab, 1, 1, '=POWER({1;2;3}, {1,2})')
+  const v = evaluateSheet(doc).get(tab)
+  assert.deepEqual(v.get('1,1').spill, { rows: 3, cols: 2 })
+  assert.deepEqual([[1, 1], [1, 2], [3, 1], [3, 2]].map(([r, c]) => shown(v.get(r + ',' + c))), [1, 1, 3, 9])
+})
