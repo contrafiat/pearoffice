@@ -336,3 +336,11 @@ button, input, select { font: inherit; color: inherit; }
 .phone-tools .on { background: var(--pear-soft); border-color: var(--pear); color: var(--pear-dark); }
 .panel .scan-button { align-self: flex-start; }
 .invite-link .pairing { margin-top: 10px; }
+.formula-help { position: fixed; z-index: 40; max-width: min(440px, calc(100vw - 8px)); max-height: 320px; overflow-y: auto; background: var(--panel); border: 1px solid var(--line-strong); border-radius: 8px; box-shadow: 0 8px 28px rgb(0 0 0 / 0.18); padding: 4px; font-size: 13px; }
+.formula-help .fh-item { padding: 6px 8px; border-radius: 6px; cursor: pointer; }
+.formula-help .fh-item.on { background: var(--pear-soft); }
+.formula-help .fh-item.sig { cursor: default; }
+.formula-help .fname { font-weight: 650; font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; }
+.formula-help .args { color: var(--muted); font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-size: 12px; }
+.formula-help .args b { color: var(--ink); }
+.formula-help .about { color: var(--muted); font-size: 12px; margin-top: 2px; }

@@ -37,5 +37,5 @@ child.on('exit', () => {
     console.error('not ok - desktop smoke', JSON.stringify(result))
     process.exit(1)
   }
-  console.log('ok - desktop smoke: create, type, fast typing, formula, copy/paste, fill, clear range, bold, undo, rename, export, import, seeder and devices panels, local seeder, keep online, start at login, invite link and QR, stop and restart a backup, remove from this device')
+  console.log('ok - desktop smoke: create, type, fast typing, formula, formula suggestions, copy/paste, fill, clear range, bold, undo, rename, export, import, seeder and devices panels, local seeder, keep online, start at login, invite link and QR, stop and restart a backup, remove from this device')
 })
