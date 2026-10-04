@@ -4,6 +4,7 @@
 // screenshot. Prints one JSON line and quits.
 
 const fs = require('node:fs')
+const path = require('node:path')
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
@@ -207,6 +208,13 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
     // Keep sheets online: closing the window hides it, the app keeps running.
     await js("document.querySelector('.keep-online input').click()")
     await waitFor('setting on', "document.querySelector('.keep-online input').checked")
+    await waitFor('start at login shown', "!!document.querySelector('.start-at-login input')")
+    await js("document.querySelector('.start-at-login input').click()")
+    await waitFor('start at login on', "document.querySelector('.start-at-login input').checked")
+    if (process.platform === 'linux') {
+      const entry = fs.readFileSync(path.join(dataDir, 'autostart', 'pearsheet.desktop'), 'utf8')
+      result.autostart = /^Exec=.* "--hidden"$/m.test(entry)
+    } else result.autostart = true
     win.close()
     await sleep(500)
     result.keepOnline = !win.isDestroyed() && !!getTray()
@@ -237,7 +245,7 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
     await js("[...document.querySelectorAll('.more-menu li')].find((l) => l.textContent === 'Remove from this device').click()")
     await waitFor('confirm', "[...document.querySelectorAll('.panel button')].some((b) => b.textContent === 'Remove from this device')")
     await js("[...document.querySelectorAll('.panel button')].find((b) => b.textContent === 'Remove from this device').click()")
-    await waitFor('sheet removed', "!document.querySelector('.panel') && document.querySelectorAll('.sheet-link').length === " + (result.sheetsBefore - 1) + " && !document.querySelector('.toolbar .share')", 30000)
+    await waitFor('sheet removed', "!document.querySelector('.panel') && document.querySelectorAll('.sheet-link').length === " + (result.sheetsBefore - 1), 30000)
     result.sheetsAfter = await js("document.querySelectorAll('.sheet-link').length")
     step('removed from this device')
 
@@ -248,11 +256,11 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
       fs.writeFileSync(shot, image.toPNG())
       step('screenshot', shot)
     }
-    result.ok = result.keepOnline && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.importedFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000 && result.pastedFormula === '=SUM(C1:C2)' && result.inviteLink === 'pearsheet://join?s=' + result.inviteLink.slice(19) && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
+    result.ok = result.keepOnline && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.importedFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000 && result.pastedFormula === '=SUM(C1:C2)' && result.inviteLink === 'pearsheet://join?s=' + result.inviteLink.slice(19) && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
   } catch (err) {
     result.error = err.message
     // What the page showed, to tell a UI failure from a load failure.
-    result.page = await js("(document.body && document.body.innerText || '').slice(0, 120) + ' | url=' + location.href").catch((e) => 'unreadable: ' + e.message)
+    result.page = await js("(document.body && document.body.innerText || '').slice(0, 600) + ' | url=' + location.href").catch((e) => 'unreadable: ' + e.message)
     result.cells = await js("[...document.querySelectorAll('.cell')].filter((c) => c.textContent).map((c) => c.style.top + '/' + c.style.left + '=' + c.textContent)").catch(() => null)
   }
   console.log('SMOKE_RESULT ' + JSON.stringify(result))

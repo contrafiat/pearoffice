@@ -19,6 +19,7 @@ export function App () {
   const [notice, setNotice] = useState(null)
   const desktop = !!(window.pearsheet && window.pearsheet.platform === 'desktop')
   const [keepOnline, setKeepOnline] = useState(null)
+  const [startAtLogin, setStartAtLogin] = useState(false)
 
   const refresh = useCallback(async () => {
     try {
@@ -32,7 +33,7 @@ export function App () {
   useEffect(() => {
     refresh()
     call('app:me').then((me) => { setName(me.name); setNudge(!!me.phraseNudge) }).catch(() => {})
-    if (desktop) call('app:settings').then((s) => setKeepOnline(!!s.keepOnline)).catch(() => {})
+    if (desktop) call('app:settings').then((s) => { setKeepOnline(!!s.keepOnline); setStartAtLogin(!!s.startAtLogin) }).catch(() => {})
     const offs = [
       on('worklet:exit', () => setError('The sync engine stopped. Restart PearSheet.')),
       on('join:progress', refresh),
@@ -139,10 +140,23 @@ export function App () {
               checked={keepOnline}
               onChange={async (e) => {
                 const r = await call('app:setSetting', { keepOnline: e.target.checked }).catch((err) => { setError(err.message); return null })
-                if (r) setKeepOnline(!!r.keepOnline)
+                if (r) { setKeepOnline(!!r.keepOnline); setStartAtLogin(!!r.startAtLogin) }
               }}
             />
             Keep sheets online when closed
+          </label>
+        )}
+        {desktop && keepOnline && (
+          <label className='keep-online start-at-login' title='Opens PearSheet hidden in the tray when you log in, so your sheets stay reachable after a restart'>
+            <input
+              type='checkbox'
+              checked={startAtLogin}
+              onChange={async (e) => {
+                const r = await call('app:setSetting', { startAtLogin: e.target.checked }).catch((err) => { setError(err.message); return null })
+                if (r) setStartAtLogin(!!r.startAtLogin)
+              }}
+            />
+            Start when the computer starts
           </label>
         )}
         <button className={'seeder-button' + (desktop ? ' second' : '')} onClick={() => setDevices({})}>Devices</button>

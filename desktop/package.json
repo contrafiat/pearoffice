@@ -33,6 +33,7 @@
       "worklet.js",
       "seeder-process.js",
       "paths.js",
+      "login.js",
       "smoke-run.js",
       "package.json",
       "build/icon.png"
