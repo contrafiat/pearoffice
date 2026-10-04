@@ -130,9 +130,11 @@ export function App () {
     }
   }
 
-  // Open the most recent sheet on start.
+  // Open the most recent sheet on start. Not a join still waiting for its
+  // keys: there is nothing to open yet.
   useEffect(() => {
-    if (sheets && sheets.length && !current) setCurrent(sheets[sheets.length - 1].sheetId)
+    const ready = (sheets || []).filter((s) => !s.waiting)
+    if (ready.length && !current) setCurrent(ready[ready.length - 1].sheetId)
   }, [sheets, current])
 
   return (
