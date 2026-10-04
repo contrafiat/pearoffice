@@ -234,6 +234,15 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
     for (const t0 = Date.now(); !fs.existsSync(pngFile) && Date.now() - t0 < 10000;) await sleep(200)
     await sleep(300)
     const png = fs.existsSync(pngFile) ? fs.readFileSync(pngFile) : Buffer.alloc(0)
+    // The .xlsx export carries the chart (src/shared/xlsxCharts.js).
+    await js("document.querySelector('.toolbar .export').click()")
+    const chartXlsx = require('node:path').join(dataDir, 'downloads', 'Untitled sheet.xlsx')
+    for (const t0 = Date.now(); !fs.existsSync(chartXlsx) && Date.now() - t0 < 10000;) await sleep(200)
+    await sleep(500)
+    const zipped = fs.existsSync(chartXlsx) ? require('fflate').unzipSync(fs.readFileSync(chartXlsx)) : {}
+    result.chartInXlsx = !!zipped['xl/charts/chart1.xml'] && require('fflate').strFromU8(zipped['xl/worksheets/sheet1.xml']).includes('<drawing r:id=')
+    await js("document.querySelector('.chart-frame').click()")
+    await waitFor('chart tools again', "!!document.querySelector('.chart-tools')")
     await js("document.querySelector('.chart-tools [aria-label=\"Delete chart\"]').click()")
     await waitFor('chart deleted', "!document.querySelector('.chart-frame')")
     await js("document.querySelector('.grid .body').focus()")
@@ -242,7 +251,7 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
     await enter('1200', 'Enter', '1650.5')
     await sendMod('Home', ['control'])
     await key('Right'); for (let i = 0; i < 3; i++) await key('Down')
-    result.charts = png.length > 2000 && png.slice(1, 4).toString() === 'PNG'
+    result.charts = png.length > 2000 && png.slice(1, 4).toString() === 'PNG' && result.chartInXlsx
     step('charts')
 
     // Ranges, copy and paste: select B1:B3, copy, paste into C1. The formula

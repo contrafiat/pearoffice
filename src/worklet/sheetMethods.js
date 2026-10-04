@@ -226,7 +226,8 @@ function createSheetMethods (sheets, { getJoin, getMoves, getProfiles }) {
         }
         const widths = {}
         for (const [colId, px] of t.get('widths').entries()) if (colIndex.has(colId)) widths[colIndex.get(colId)] = px
-        return { name: t.get('name'), cells, widths }
+        const tabCharts = model.getCharts(doc, id).map((c) => ({ ...c, resolved: resolveChart(doc, id, c, values) }))
+        return { name: t.get('name'), cells, widths, charts: tabCharts }
       })
       return { title: model.title(doc), tabs }
     },

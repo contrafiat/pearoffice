@@ -65,6 +65,9 @@ See `TODO.md`.
   ranges, series, first guess), stored per tab in the root map
   `charts:<tabId>` (`sheetModel.js`), drawn with ECharts as SVG
   (`src/ui/Chart.jsx`, `chartOption.js`, `ChartFrame.jsx`, `ChartPanel.jsx`).
+  .xlsx exports get DrawingML charts from `src/shared/xlsxCharts.js`;
+  `node scripts/check-chart-export.js [dir]` has LibreOffice open one with
+  every chart type (needs `soffice`).
 - `src/ui/` - the React spreadsheet UI. Talks only to `window.pearsheet`
   (`call`, `on`), which the desktop preload provides and the mobile WebView
   will provide later. Built to `dist/ui` by `scripts/build-ui.mjs`.

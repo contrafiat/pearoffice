@@ -136,4 +136,15 @@ function dumpToWorkbook (XLSX, dump) {
   return wb
 }
 
-module.exports = { workbookToTabs, dumpToWorkbook, textInput, toFile, fromFile, READ_OPTIONS, MAX_IMPORT_CELLS }
+// The workbook with the dump's charts added (src/shared/xlsxCharts.js), as
+// .xlsx bytes. Charts name tabs as the workbook does (Excel shortens some).
+function workbookBytes (XLSX, fflate, dump) {
+  const wb = dumpToWorkbook(XLSX, dump)
+  const bytes = new Uint8Array(XLSX.write(wb, { type: 'array', bookType: 'xlsx' }))
+  const names = new Map(dump.tabs.map((t, i) => [String(t.name).toUpperCase(), wb.SheetNames[i]]))
+  const rename = (data) => String(data || '').replace(/^'((?:[^']|'')+)'!|^([A-Za-z_][\w.]*)!/, (m, q, b) => { const n = names.get((q !== undefined ? q.replace(/''/g, "'") : b).toUpperCase()); return n ? "'" + n.replace(/'/g, "''") + "'!" : m })
+  const tabs = dump.tabs.map((t, i) => ({ name: wb.SheetNames[i], charts: (t.charts || []).map((c) => ({ ...c, data: rename(c.data) })) }))
+  return require('./xlsxCharts').addChartsToXlsx(bytes, tabs, fflate)
+}
+
+module.exports = { workbookBytes, workbookToTabs, dumpToWorkbook, textInput, toFile, fromFile, READ_OPTIONS, MAX_IMPORT_CELLS }
