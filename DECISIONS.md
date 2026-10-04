@@ -2,6 +2,21 @@
 
 Append-only, newest on top. Per Constitution §4.
 
+## 2026-10-04 - Single-value functions run per value over a range
+Tier: T2
+Context: =UPPER(A1:A3) and =IF(A1:A3>1, ...) should fill three cells as in
+Excel 365 (proposals/2026-10-04-functions-over-ranges.md).
+Choice: `src/shared/formula/lift.js` lists each function's single-value
+argument positions, built from the catalog's argument names with hand
+corrections; the parser's function call runs the function once per
+position when a block arrives there. Checked against LibreOffice for every
+function in the corpus.
+Alternatives: per-function wrappers (rejected - 280 functions); lifting
+every argument (rejected - SUM and lookups would break).
+Consequences: formulas giving a range where one value goes now spill.
+Database functions are left out. Excel's `@` (implicit intersection) is not
+supported.
+
 ## 2026-10-04 - A2# is ANCHORARRAY, rewritten before parsing
 Tier: T2
 Context: "the whole spill from A2" (proposals/2026-10-04-spill-reference.md).

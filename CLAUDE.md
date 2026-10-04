@@ -206,7 +206,11 @@ stored; `src/shared/formula/index.js` has the four blocking rules
 (`#SPILL!`) and evaluates in reading order. The array functions (FILTER,
 SORT, UNIQUE, SEQUENCE, TEXTSPLIT, TAKE, DROP, VSTACK and the rest) are in
 `src/shared/formula/arrays.js`. `A2#` (the whole spill from A2) is rewritten
-to ANCHORARRAY(A2) before parsing (proposals/2026-10-04-spill-reference.md). `test/spill.test.js` covers the rules;
+to ANCHORARRAY(A2) before parsing (proposals/2026-10-04-spill-reference.md).
+A single-value function given a range runs once per value
+(`src/shared/formula/lift.js`, proposals/2026-10-04-functions-over-ranges.md);
+`test/lift-corpus.test.js` checks each one against LibreOffice: run
+`node scripts/spill-expectations.js lift` after changing the table. `test/spill.test.js` covers the rules;
 `test/spill-corpus.test.js` checks whole blocks
 (`test/fixtures/spill-corpus.js`) against LibreOffice: after adding cases,
 run `node scripts/spill-expectations.js`.
@@ -216,7 +220,7 @@ and one line for each of the 399 working functions); `test/catalog.test.js`
 fails if a function is added to the engine without an entry.
 
 After a deliberate formula change, regenerate the golden file with
-`UPDATE_GOLDEN=1 node --test test/formula.test.js test/functions.test.js test/spill-corpus.test.js` and say why in the commit.
+`UPDATE_GOLDEN=1 node --test test/formula.test.js test/functions.test.js test/spill-corpus.test.js test/lift-corpus.test.js` and say why in the commit.
 
 Formula code must never use `**`, and `Math.pow`, `Math.sin` and `Math.cos`
 are replaced at start-up (`src/shared/formula/detmath.js`). A test fails if a

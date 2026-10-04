@@ -2,4 +2,4 @@
 const { runCorpus } = require('./formula-run')
 const { runFunctionCorpus } = require('./function-run')
 const { runSpillCorpus } = require('./spill-run')
-console.log(JSON.stringify({ corpus: runCorpus(), functions: runFunctionCorpus(), spills: runSpillCorpus() }))
+console.log(JSON.stringify({ corpus: runCorpus(), functions: runFunctionCorpus(), spills: runSpillCorpus(), lifts: runSpillCorpus('lift') }))

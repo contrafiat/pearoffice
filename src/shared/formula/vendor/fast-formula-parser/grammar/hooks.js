@@ -131,12 +131,66 @@ class FormulaParser {
      * @param args - Arguments that pass to the function.
      * @return {*}
      */
+    // PearSheet: run `name` once per position of the blocks given at its
+    // single-value argument positions. A single row, column or value repeats
+    // across the others; outside a block is #N/A. Undefined if no argument
+    // there is a block.
+    _liftCall(name, args, positions, nullValue) {
+        const blocks = new Map();
+        for (const p of positions) {
+            const arg = args[p];
+            if (arg == null) continue;
+            let v = arg;
+            if (arg.ref) {
+                if (!FormulaHelpers.isRangeRef(arg)) continue;
+                v = this.utils.extractRefValue(arg).val;
+            }
+            if (Array.isArray(v) && Array.isArray(v[0]) && (v.length > 1 || v[0].length > 1)) blocks.set(p, v);
+        }
+        if (!blocks.size) return undefined;
+        let rows = 1, cols = 1;
+        for (const b of blocks.values()) {
+            rows = Math.max(rows, b.length);
+            cols = Math.max(cols, b[0].length);
+        }
+        const pick = (b, r, c) => {
+            const rr = b.length === 1 ? 0 : r;
+            const cc = b[0].length === 1 ? 0 : c;
+            if (rr >= b.length || cc >= b[rr].length) return FormulaError.NA;
+            const v = b[rr][cc];
+            return v === null || v === undefined ? nullValue : v;
+        };
+        const out = [];
+        for (let r = 0; r < rows; r++) {
+            const line = [];
+            for (let c = 0; c < cols; c++) {
+                const one = args.slice();
+                for (const [p, b] of blocks) one[p] = pick(b, r, c);
+                let res = this._callFunction(name, one);
+                if (res && res.ref) res = this.retrieveRef(res);
+                if (Array.isArray(res)) res = Array.isArray(res[0]) ? res[0][0] : res[0];
+                line.push(res === undefined ? null : res);
+            }
+            out.push(line);
+        }
+        return out;
+    }
+
     _callFunction(name, args) {
         if (name.indexOf('_xlfn.') === 0)
             name = name.slice(6);
         name = name.toUpperCase();
         // if one arg is null, it means 0 or "" depends on the function it calls
         const nullValue = this.funsNullAs0.includes(name) ? 0 : '';
+
+        // PearSheet: a block given where the function takes a single value
+        // runs it once per value (Excel 365). See src/shared/formula/lift.js.
+        const lift = this.liftArgs && this.liftArgs[name];
+        if (lift) {
+            const lifted = this._liftCall(name, args, lift, nullValue);
+            if (lifted !== undefined)
+                return lifted;
+        }
 
         if (!this.funsNeedContextAndNoDataRetrieve.includes(name)) {
             // retrieve reference

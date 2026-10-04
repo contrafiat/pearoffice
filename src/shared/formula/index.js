@@ -11,6 +11,7 @@ const FormulaError = require('./vendor/fast-formula-parser/formulas/error')
 const { installDeterministicMath } = require('./detmath')
 const { fillFunctions } = require('./fills')
 const { makeRef } = require('./newer')
+const { LIFT } = require('./lift')
 const refs = require('../refs')
 const model = require('../sheetModel')
 
@@ -318,6 +319,7 @@ function evaluateSheet (doc) {
     // ANCHORARRAY gets its reference unresolved, as OFFSET does, and returns
     // a reference to the block that cell's formula spills.
     p.funsNeedContextAndNoDataRetrieve.push('ANCHORARRAY')
+    p.liftArgs = LIFT
     p.functions.ANCHORARRAY = (context, reference) => {
       if (!reference || !reference.ref || reference.ref.from || !reference.ref.row) throw FormulaError.REF
       const t = reference.ref.sheet ? tabByName(reference.ref.sheet) : tab

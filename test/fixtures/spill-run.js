@@ -3,18 +3,22 @@
 const { colToNum } = require('../../src/shared/a1')
 const model = require('../../src/shared/sheetModel')
 const { evaluateSheet } = require('../../src/shared/formula')
-const { inputs, cases, SPACING } = require('./spill-corpus')
 
 function pos (a1) {
   const m = /^([A-Z]+)(\d+)$/.exec(a1)
   return { row: Number(m[2]), col: colToNum(m[1]) }
 }
 
-function runSpillCorpus () {
+// Plain requires, so the Bare bundler can follow them.
+const CORPORA = { spill: require('./spill-corpus'), lift: require('./lift-corpus') }
+
+function runSpillCorpus (corpus = 'spill') {
+  const { inputs, cases, SPACING } = CORPORA[corpus]
   const doc = model.createDoc()
   model.initSheet(doc)
   const tab = model.tabIds(doc)[0]
   model.insertRows(doc, tab, 101, cases.length * SPACING)
+  if (corpus === 'lift') model.insertCols(doc, tab, 27, 10)
   for (const [a1, v] of Object.entries(inputs)) { const p = pos(a1); model.setCell(doc, tab, p.row, p.col, v) }
   for (const [a1, f] of cases) { const p = pos(a1); model.setCell(doc, tab, p.row, p.col, f) }
   const values = evaluateSheet(doc).get(tab)
