@@ -263,3 +263,26 @@ button, input, select { font: inherit; color: inherit; }
 .panel button.danger { border-color: var(--danger); color: var(--danger); }
 .panel .warn { color: var(--danger); font-size: 13px; }
 .sheet-link.removed { color: var(--muted); text-decoration: line-through; }
+
+.nav-toggle, .nav-scrim { display: none; }
+
+/* Phone layout */
+@media (max-width: 720px) {
+  .app { grid-template-columns: 1fr; }
+  .sidebar {
+    position: fixed; z-index: 30; top: 0; bottom: 0; left: 0; width: min(280px, 82vw);
+    transform: translateX(-105%); transition: transform 0.18s ease; box-shadow: 0 0 30px rgb(0 0 0 / 0.25);
+  }
+  .app.nav-open .sidebar { transform: none; }
+  .nav-scrim { display: block; position: fixed; inset: 0; z-index: 25; background: rgb(0 0 0 / 0.3); }
+  .nav-toggle {
+    display: block; position: fixed; z-index: 15; top: 8px; left: 8px; width: 36px; height: 36px;
+    border: 1px solid var(--line); border-radius: 8px; background: var(--panel); font-size: 18px; cursor: pointer;
+  }
+  .toolbar { flex-wrap: wrap; gap: 8px; padding-left: 52px; }
+  .title { min-width: 0; flex: 1; font-size: 16px; }
+  .tools { order: 3; width: 100%; overflow-x: auto; }
+  .empty { padding: 0 24px; }
+  .formula-bar .address { width: 48px; }
+  .panel-backdrop { padding-top: 4vh; }
+}

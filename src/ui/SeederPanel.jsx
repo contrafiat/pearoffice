@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react'
 import { call } from './bridge.js'
 
-export function SeederPanel ({ onClose, onError }) {
-  const [link, setLink] = useState('')
+export function SeederPanel ({ initialLink = '', onClose, onError }) {
+  const [link, setLink] = useState(initialLink)
   const [busy, setBusy] = useState(false)
   const [seeders, setSeeders] = useState(null)
   const [done, setDone] = useState(false)

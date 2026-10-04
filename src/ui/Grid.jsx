@@ -143,6 +143,8 @@ export const Grid = forwardRef(function Grid (props, ref) {
                 style={{ top: (r - 1) * ROW_H, left: colX[c], width: widths[c] }}
                 onMouseDown={() => onSelect(r, c)}
                 onDoubleClick={() => onEdit(r, c)}
+                // Touch screens: tapping the cell that is already selected edits it.
+                onTouchEnd={(e) => { if (sel.row === r && sel.col === c) { e.preventDefault(); onEdit(r, c) } }}
                 title={cell && cell.volatile ? 'Changes on each device (time or random)' : undefined}
               >
                 {cell ? cell.display : ''}

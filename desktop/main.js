@@ -24,8 +24,8 @@ function linkIn (argv) {
 
 function sendLink (url) {
   if (!url) return
+  pendingLink = url
   if (win && !win.isDestroyed() && !win.webContents.isLoading()) win.webContents.send('worklet:event', { name: 'app:deeplink', data: { url } })
-  else pendingLink = url
 }
 
 const paths = resolvePaths({ packaged: app.isPackaged, resourcesPath: process.resourcesPath })
@@ -59,6 +59,8 @@ function startWorklet () {
 }
 
 ipcMain.handle('worklet:call', async (_e, method, args) => {
+  // The UI asks for a link that arrived before it was listening.
+  if (method === 'app:takeLink') { const url = pendingLink; pendingLink = null; return { url } }
   if (typeof method !== 'string' || !/^(sheet|app):[A-Za-z]+$/.test(method)) throw new Error('bad method')
   return worklet.call(method, args || {})
 })
@@ -88,8 +90,6 @@ function createWindow () {
   })
   win.webContents.on('will-navigate', (e) => e.preventDefault())
   win.loadFile(paths.ui)
-  // Give React a moment to subscribe before replaying a link from start-up.
-  win.webContents.on('did-finish-load', () => setTimeout(() => { if (pendingLink) { const url = pendingLink; pendingLink = null; sendLink(url) } }, 800))
   return win
 }
 

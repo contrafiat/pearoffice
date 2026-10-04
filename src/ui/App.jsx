@@ -11,6 +11,7 @@ export function App () {
   const [joining, setJoining] = useState(null) // initial link text, or '' for an empty panel
   const [name, setName] = useState(null)
   const [seeder, setSeeder] = useState(false)
+  const [navOpen, setNavOpen] = useState(false) // phone layout: the sheet list slides in
 
   const refresh = useCallback(async () => {
     try {
@@ -30,10 +31,17 @@ export function App () {
       // A sheet moved to fresh keys: follow it if it is the one on screen.
       on('sheet:moved', async ({ from, to }) => { await refresh(); setCurrent((c) => (c === from ? to : c)) }),
       on('sheet:removed', refresh),
-      on('app:deeplink', ({ url }) => { if (/^pearsheet:\/\/join\?/.test(url)) setJoining(url) })
+      on('app:deeplink', ({ url }) => { call('app:takeLink').catch(() => {}); openLink(url) })
     ]
+    // A link that opened the app before this page was listening.
+    call('app:takeLink').then((r) => { if (r && r.url) openLink(r.url) }).catch(() => {})
     return () => offs.forEach((off) => off())
   }, [refresh])
+
+  function openLink (url) {
+    if (/^pearsheet:\/\/join\?/.test(url)) setJoining(url)
+    else if (/^pearsheet:\/\/seeder\?/.test(url)) setSeeder(url)
+  }
 
   async function create () {
     try {
@@ -51,8 +59,10 @@ export function App () {
   }, [sheets, current])
 
   return (
-    <div className='app'>
-      <aside className='sidebar'>
+    <div className={'app' + (navOpen ? ' nav-open' : '')}>
+      <button className='nav-toggle' aria-label='Your sheets' onClick={() => setNavOpen(true)}>☰</button>
+      {navOpen && <div className='nav-scrim' onClick={() => setNavOpen(false)} />}
+      <aside className='sidebar' onClick={(e) => { if (e.target.closest('.sheet-link')) setNavOpen(false) }}>
         <div className='brand'>
           <span className='brand-mark' aria-hidden='true' />
           PearSheet
@@ -95,7 +105,7 @@ export function App () {
           onJoined={async () => { setJoining(null); await refresh() }}
         />
       )}
-      {seeder && <SeederPanel onClose={() => setSeeder(false)} onError={setError} />}
+      {seeder && <SeederPanel initialLink={typeof seeder === 'string' ? seeder : ''} onClose={() => setSeeder(false)} onError={setError} />}
       <main className='main'>
         {error && <div className='banner' role='alert'>{error} <button className='link-button' onClick={() => setError(null)}>Dismiss</button></div>}
         {current
