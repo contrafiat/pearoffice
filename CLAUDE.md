@@ -36,7 +36,8 @@ alone. Removing someone moves the sheet to fresh keys. Desktop installers build 
 Linux, macOS and Windows. The Android app runs on the emulator and the TCL.
 A person can link their devices (one-time link) and keep a 24-word recovery
 phrase (proposals/2026-10-03-device-linking.md). The seeder ships inside the
-desktop app and as a Linux server download. Signing and iOS are next.
+desktop app and as a Linux server download. iOS runs on the Simulator.
+Signing and the iPhone SE are next.
 See `TODO.md`.
 
 ## Layout
@@ -110,6 +111,20 @@ Two traps, both hit on 2026-10-03:
   `node_modules/react-native-bare-kit/android/src/main/addons/`.
 - The mobile bundle defers `bare-process` (core's desktop-only IPC fallback),
   which would otherwise pull in `bare-posix`, an addon BareKit never links.
+
+## iOS
+
+Simulator first (suite rule 7). `scripts/build-ios-sim.sh` syncs to the Mac
+Mini (`~/peerloomllc/pearsheet-build`), builds the iOS worklet bundle
+(`npm run build:bare:ios`, `--preset ios`: one bundle for devices and the
+Simulator) and the WebView UI, runs `expo prebuild` and CocoaPods, builds an
+unsigned Release Simulator app and launches it on the `PearSheetBench`
+simulator. Drive it with
+`SIM_NAME=PearSheetBench BUNDLE_ID=com.pearsheet ../pearlist/scripts/sim-drive.sh dump|tap|type|enter|shot`.
+The `dump` output does not show what a text field contains: screenshot to
+check, and do not type twice. `plugins/with-ios-pod-deployment-target` and
+`plugins/with-ios-scene-lifecycle` come from PearPetal; the second keeps apps
+built with the iOS 27 SDK from being killed at launch.
 
 ## Packaging
 

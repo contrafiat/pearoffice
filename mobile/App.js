@@ -4,7 +4,7 @@
 // src/ui/mobile-entry.js on top of the WebView bridge.
 
 import React, { useEffect, useRef, useState } from 'react'
-import { ActivityIndicator, Linking, StatusBar, StyleSheet, Text, View, useColorScheme } from 'react-native'
+import { ActivityIndicator, Linking, Platform, StatusBar, StyleSheet, Text, View, useColorScheme } from 'react-native'
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
 import { WebView } from 'react-native-webview'
 import { Worklet } from 'react-native-bare-kit'
@@ -56,7 +56,9 @@ let nextId = 1
 function startWorklet () {
   if (started) return started
   started = (async () => {
-    const asset = Asset.fromModule(require('../assets/bare-universal.bundle'))
+    // iOS links its addons per framework, so it has its own bundle (covers
+    // devices and the Simulator).
+    const asset = Asset.fromModule(Platform.OS === 'ios' ? require('../assets/bare-ios.bundle') : require('../assets/bare-universal.bundle'))
     await asset.downloadAsync()
     const bundle = await FileSystem.readAsStringAsync(asset.localUri, { encoding: FileSystem.EncodingType.Base64 })
     worklet = new Worklet()
