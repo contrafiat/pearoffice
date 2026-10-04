@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { X } from '@phosphor-icons/react'
 import { call } from './bridge.js'
 import { ScanButton } from './Qr.jsx'
 
@@ -23,7 +24,7 @@ export function JoinPanel ({ initialLink = '', onJoined, onClose, onError }) {
       <form className='panel' role='dialog' aria-label='Join a sheet' onSubmit={join}>
         <header>
           <h2>Join a sheet</h2>
-          <button type='button' className='close' aria-label='Close' onClick={onClose}>×</button>
+          <button type='button' className='close' aria-label='Close' onClick={onClose}><X size={18} /></button>
         </header>
         <p>Paste the invite link someone sent you. It connects straight to their device, so one of the people already in the sheet needs to be online.</p>
         <input

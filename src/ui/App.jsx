@@ -7,6 +7,47 @@ import { DevicesPanel } from './DevicesPanel.jsx'
 import { importFile, pickAndImport, isMobile } from './xlsx.js'
 import { Avatar, MemberAvatar } from './Avatar.jsx'
 import { SettingsPanel } from './SettingsPanel.jsx'
+import { List, GearSix } from '@phosphor-icons/react'
+
+// Import .xlsx: a file input on desktop, the shell's file picker on phones.
+function ImportButton ({ className, onImported, onError }) {
+  if (isMobile()) {
+    return (
+      <button
+        className={className}
+        onClick={async () => {
+          try {
+            const r = await pickAndImport()
+            if (r) await onImported(r.sheetId)
+          } catch (err) { onError('Could not import: ' + err.message) }
+        }}
+      >
+        Import .xlsx
+      </button>
+    )
+  }
+  return (
+    <label className={className + ' import'}>
+      Import .xlsx
+      <input
+        type='file'
+        accept='.xlsx,.csv'
+        hidden
+        onChange={async (e) => {
+          const file = e.target.files && e.target.files[0]
+          e.target.value = ''
+          if (!file) return
+          try {
+            const { sheetId } = await importFile(file)
+            await onImported(sheetId)
+          } catch (err) {
+            onError('Could not import ' + file.name + ': ' + err.message)
+          }
+        }}
+      />
+    </label>
+  )
+}
 
 export function App () {
   const [sheets, setSheets] = useState(null)
@@ -36,6 +77,8 @@ export function App () {
   }, [])
 
   const loadMe = useCallback(() => call('app:me').then((me) => { setName(me.name); setAvatar(me.avatar || null); setMyId(me.identity); setNudge(!!me.phraseNudge) }).catch(() => {}), [])
+
+  const opened = useCallback(async (sheetId) => { await refresh(); setCurrent(sheetId) }, [refresh])
 
   const soon = useRef(null)
   const refreshSoon = useCallback(() => {
@@ -94,7 +137,7 @@ export function App () {
 
   return (
     <div className={'app' + (navOpen ? ' nav-open' : '')}>
-      <button className='nav-toggle' aria-label='Your sheets' aria-expanded={navOpen} onClick={() => setNavOpen(true)}><span aria-hidden='true'>☰</span></button>
+      <button className='nav-toggle' aria-label='Your sheets' aria-expanded={navOpen} onClick={() => setNavOpen(true)}><List size={20} aria-hidden='true' /></button>
       {navOpen && <div className='nav-scrim' onClick={() => setNavOpen(false)} />}
       <aside className='sidebar' onClick={(e) => { if (e.target.closest('button')) setNavOpen(false) }}>
         <div className='brand'>
@@ -103,39 +146,7 @@ export function App () {
         </div>
         <button className='new-sheet' onClick={create}>New sheet</button>
         <button className='join-sheet' onClick={() => setJoining('')}>Join with a link</button>
-        {isMobile() && (
-          <button
-            className='join-sheet'
-            onClick={async () => {
-              try {
-                const r = await pickAndImport()
-                if (r) { await refresh(); setCurrent(r.sheetId) }
-              } catch (err) { setError('Could not import: ' + err.message) }
-            }}
-          >
-            Import .xlsx
-          </button>
-        )}
-        <label className='join-sheet import' hidden={isMobile()}>
-          Import .xlsx
-          <input
-            type='file'
-            accept='.xlsx,.csv'
-            hidden
-            onChange={async (e) => {
-              const file = e.target.files && e.target.files[0]
-              e.target.value = ''
-              if (!file) return
-              try {
-                const { sheetId } = await importFile(file)
-                await refresh()
-                setCurrent(sheetId)
-              } catch (err) {
-                setError('Could not import ' + file.name + ': ' + err.message)
-              }
-            }}
-          />
-        </label>
+        <ImportButton className='join-sheet' onImported={opened} onError={setError} />
         <nav className='sheet-list' aria-label='Your sheets'>
           {sheets === null && <p className='muted'>Starting...</p>}
           {sheets && sheets.length === 0 && <p className='muted'>No sheets yet.</p>}
@@ -147,11 +158,13 @@ export function App () {
               title={s.waiting ? 'Waiting for someone in this sheet to come online' : s.removed ? 'You were removed from this sheet' : undefined}
               onClick={() => setCurrent(s.sheetId)}
             >
-              {s.owner && (
-                <span className='sheet-owner' title={s.owner.isMe ? 'Yours' : 'Owned by ' + (s.owner.name || 'someone')}>
-                  <MemberAvatar sheetId={s.sheetId} member={s.owner} size={20} />
-                </span>
-              )}
+              {s.owner
+                ? (
+                  <span className='sheet-owner' title={s.owner.isMe ? 'Yours' : 'Owned by ' + (s.owner.name || 'someone')}>
+                    <MemberAvatar sheetId={s.sheetId} member={s.owner} size={20} />
+                  </span>
+                  )
+                : <span className='sheet-owner placeholder' aria-hidden='true' />}
               <span className='sheet-title'>{s.waiting ? 'Joining...' : (s.title || 'Untitled sheet')}</span>
               {s.joining && !s.waiting && <span className='badge'>joining</span>}
               {!s.joining && s.people > 1 && (
@@ -166,7 +179,7 @@ export function App () {
         <button className='me-row' onClick={() => setSettings(true)} aria-label='Settings'>
           <Avatar name={name} src={avatar ? 'data:' + avatar.mime + ';base64,' + avatar.data : null} seed={myId} size={32} />
           <span className='me-name'>{name || 'Set your name'}</span>
-          <svg className='gear' viewBox='0 0 24 24' width='18' height='18' aria-hidden='true'><path fill='currentColor' d='M19.4 13a7.6 7.6 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.4 7.4 0 0 0-1.7-1L15 3.3h-4l-.4 2.6a7.4 7.4 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.6 7.6 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.4 7.4 0 0 0 1.7 1l.4 2.6h4l.4-2.6a7.4 7.4 0 0 0 1.7-1l2.5 1 2-3.5zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z' transform='translate(-1 0)' /></svg>
+          <GearSix className='gear' size={20} aria-hidden='true' />
         </button>
       </aside>
       {joining !== null && (
@@ -188,14 +201,14 @@ export function App () {
             const r = await call('app:setSetting', patch).catch((err) => { setError(err.message); return null })
             if (r) { setKeepOnline(!!r.keepOnline); setStartAtLogin(!!r.startAtLogin) }
           }}
-          onDevices={() => { setSettings(false); setDevices({}) }}
-          onSeeder={() => { setSettings(false); setSeeder(true) }}
+          onDevices={() => { setSettings(false); setDevices({ fromSettings: true }) }}
+          onSeeder={() => { setSettings(false); setSeeder('fromSettings') }}
           onClose={() => setSettings(false)}
           onError={setError}
         />
       )}
-      {devices && <DevicesPanel initialLink={devices.link || ''} startWith={devices.startWith || null} onClose={() => setDevices(null)} onError={setError} />}
-      {seeder && <SeederPanel initialLink={typeof seeder === 'string' ? seeder : ''} onClose={() => setSeeder(false)} onError={setError} />}
+      {devices && <DevicesPanel initialLink={devices.link || ''} startWith={devices.startWith || null} onBack={devices.fromSettings ? () => { setDevices(null); setSettings(true) } : null} onClose={() => setDevices(null)} onError={setError} />}
+      {seeder && <SeederPanel initialLink={typeof seeder === 'string' && seeder !== 'fromSettings' ? seeder : ''} onBack={seeder === 'fromSettings' ? () => { setSeeder(false); setSettings(true) } : null} onClose={() => setSeeder(false)} onError={setError} />}
       <main className='main'>
         {notice && <div className='banner info'>{notice} <button className='link-button' onClick={() => setNotice(null)}>OK</button></div>}
         {nudge && (
@@ -211,8 +224,12 @@ export function App () {
           : (
             <div className='empty'>
               <h1>Shared spreadsheets, device to device.</h1>
-              <p>No accounts and no servers. Create a sheet to start.</p>
-              <button className='new-sheet big' onClick={create}>New sheet</button>
+              <p>No accounts and no servers. Create a sheet, join one with a link or import a file.</p>
+              <div className='empty-actions'>
+                <button className='new-sheet big' onClick={create}>New sheet</button>
+                <button className='join-sheet big' onClick={() => setJoining('')}>Join with a link</button>
+                <ImportButton className='join-sheet big' onImported={opened} onError={setError} />
+              </div>
             </div>
             )}
       </main>

@@ -206,6 +206,11 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
     await openSettings()
     await js("document.querySelector('.panel .settings-devices').click()")
     await waitFor('devices panel', "[...document.querySelectorAll('.panel button')].some((b) => b.textContent === 'Link a new device')")
+    // Back returns to Settings.
+    await js("document.querySelector('.panel .back').click()")
+    await waitFor('back in settings', "!!document.querySelector('.panel.settings')")
+    await js("document.querySelector('.panel .settings-devices').click()")
+    await waitFor('devices panel again', "[...document.querySelectorAll('.panel button')].some((b) => b.textContent === 'Link a new device')")
     await js("[...document.querySelectorAll('.panel button')].find((b) => b.textContent === 'Link a new device').click()")
     await waitFor('device link', "(document.querySelector('.panel input') || {}).value?.startsWith('pearsheet://link?')")
     await js("document.querySelector('.panel .close').click()")

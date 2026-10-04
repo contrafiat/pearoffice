@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react'
+import { CaretLeft, X } from '@phosphor-icons/react'
 import { QrCode, ScanButton } from './Qr.jsx'
 import { call, on } from './bridge.js'
 
 // Linking a person's devices and the recovery phrase
 // (proposals/2026-10-03-device-linking.md).
-export function DevicesPanel ({ initialLink = '', startWith = null, onClose, onError }) {
+export function DevicesPanel ({ initialLink = '', startWith = null, onBack = null, onClose, onError }) {
   const [mode, setMode] = useState(startWith || (initialLink ? 'use' : 'menu'))
   const [link, setLink] = useState(null) // the link this device shows
   const [linked, setLinked] = useState(false)
@@ -30,8 +31,9 @@ export function DevicesPanel ({ initialLink = '', startWith = null, onClose, onE
     <div className='panel-backdrop' onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
       <section className='panel' role='dialog' aria-label='Devices'>
         <header>
+          {onBack && <button className='link-button back' onClick={onBack}><CaretLeft size={14} /> Settings</button>}
           <h2>Your devices</h2>
-          <button className='close' aria-label='Close' onClick={onClose}>×</button>
+          <button className='close' aria-label='Close' onClick={onClose}><X size={18} /></button>
         </header>
 
         {mode === 'menu' && (

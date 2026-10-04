@@ -6,7 +6,7 @@ import { shiftA1 } from '../shared/refs.js'
 import { SharePanel } from './SharePanel.jsx'
 import { PeopleStack } from './Avatar.jsx'
 import { readPref, writePref } from './prefs.js'
-import { ArrowCounterClockwise, ArrowClockwise, TextB, TextItalic, TextAUnderline, PaintBucket, Copy, Scissors, ClipboardText, Eraser, Numpad, FileXls, DotsThree } from '@phosphor-icons/react'
+import { ArrowCounterClockwise, ArrowClockwise, TextB, TextItalic, TextAUnderline, PaintBucket, Copy, Scissors, ClipboardText, Eraser, Numpad, FileXls, DotsThree, Plus } from '@phosphor-icons/react'
 import { DeletePanel } from './DeletePanel.jsx'
 import { FormulaHelp, helpFor, insertFunction } from './FormulaHelp.jsx'
 import { exportSheet, isMobile } from './xlsx.js'
@@ -50,9 +50,6 @@ const NUMBER_FORMATS = [
   ['d mmm yyyy', '29 Feb 2024']
 ]
 
-// Toolbar icon size on phones.
-const ICON = 20
-
 export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
   const [view, setView] = useState(null)
   const [tabId, setTabId] = useState(null)
@@ -66,6 +63,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
   // placed inside it, so the palette is placed on the screen instead.
   const [paletteAt, setPaletteAt] = useState(null)
   const phone = isMobile()
+  const ICON = phone ? 20 : 18 // toolbar icon size
   function openPalette (kind, button) {
     if (palette === kind) { setPalette(null); return }
     if (phone) {
@@ -383,21 +381,17 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
         />
         {!canEdit && <span className='badge view-only'>{hasEditRole ? 'Getting edit access...' : 'View only'}</span>}
         <div className={'tools' + (phone ? ' phone-row' : '')} role='toolbar' aria-label='Formatting' hidden={!canEdit}>
-          <button title='Undo (Ctrl+Z)' aria-label='Undo' disabled={!view.canUndo} onClick={() => run('sheet:undo')}>{phone ? <ArrowCounterClockwise size={ICON} /> : 'Undo'}</button>
-          <button title='Redo (Ctrl+Y)' aria-label='Redo' disabled={!view.canRedo} onClick={() => run('sheet:redo')}>{phone ? <ArrowClockwise size={ICON} /> : 'Redo'}</button>
+          <button title='Undo (Ctrl+Z)' aria-label='Undo' disabled={!view.canUndo} onClick={() => run('sheet:undo')}><ArrowCounterClockwise size={ICON} /></button>
+          <button title='Redo (Ctrl+Y)' aria-label='Redo' disabled={!view.canRedo} onClick={() => run('sheet:redo')}><ArrowClockwise size={ICON} /></button>
           <span className='sep' />
-          <button title='Bold (Ctrl+B)' aria-label='Bold' className={'fmt-b' + (fmt.b ? ' on' : '')} onClick={() => toggle('b')}>{phone ? <TextB size={ICON} weight='bold' /> : 'B'}</button>
-          <button title='Italic (Ctrl+I)' aria-label='Italic' className={'fmt-i' + (fmt.i ? ' on' : '')} onClick={() => toggle('i')}>{phone ? <TextItalic size={ICON} /> : 'I'}</button>
+          <button title='Bold (Ctrl+B)' aria-label='Bold' className={'fmt-b' + (fmt.b ? ' on' : '')} onClick={() => toggle('b')}><TextB size={ICON} weight='bold' /></button>
+          <button title='Italic (Ctrl+I)' aria-label='Italic' className={'fmt-i' + (fmt.i ? ' on' : '')} onClick={() => toggle('i')}><TextItalic size={ICON} /></button>
           <span className='picker'>
             <button title='Text colour' aria-label='Text colour' className='swatch-button' onClick={(e) => openPalette('color', e.currentTarget)}>
-              {phone
-                ? <span className='icon-swatch'><TextAUnderline size={ICON} /><span className='swatch-bar' style={{ background: fmt.color || 'currentColor' }} /></span>
-                : <span className='letter' style={{ borderBottomColor: fmt.color || 'currentColor' }}>A</span>}
+              <span className='icon-swatch'><TextAUnderline size={ICON} /><span className='swatch-bar' style={{ background: fmt.color || 'currentColor' }} /></span>
             </button>
             <button title='Fill colour' aria-label='Fill colour' className='swatch-button' onClick={(e) => openPalette('fill', e.currentTarget)}>
-              {phone
-                ? <span className='icon-swatch'><PaintBucket size={ICON} /><span className='swatch-bar' style={{ background: fmt.fill || 'transparent' }} /></span>
-                : <span className='fill-chip' style={{ background: fmt.fill || 'transparent' }} />}
+              <span className='icon-swatch'><PaintBucket size={ICON} /><span className='swatch-bar' style={{ background: fmt.fill || 'transparent' }} /></span>
             </button>
             {palette && (
               <span className='palette' role='menu' style={paletteAt || undefined}>
@@ -440,12 +434,12 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
           )}
         </div>
         {window.pearsheet && (
-          <button className={'export' + (phone ? ' icon-button' : '')} title='Save a copy as an Excel file' aria-label='Export' onClick={() => exportSheet(sheetId).catch((err) => onError(err.message))}>{phone ? <FileXls size={ICON} /> : 'Export'}</button>
+          <button className='export icon-button' title='Save a copy as an Excel file' aria-label='Export' onClick={() => exportSheet(sheetId).catch((err) => onError(err.message))}><FileXls size={ICON} /></button>
         )}
         {members.length > 1 && <PeopleStack sheetId={sheetId} members={members} onClick={() => setSharing(true)} />}
         <button className='share' onClick={() => setSharing(true)}>Share</button>
         <span className='more'>
-          <button className={'more-button' + (phone ? ' icon-button' : '')} aria-label='More' title='More' onClick={() => setMore(!more)}>{phone ? <DotsThree size={ICON} weight='bold' /> : '⋯'}</button>
+          <button className='more-button icon-button' aria-label='More' title='More' onClick={() => setMore(!more)}><DotsThree size={ICON} weight='bold' /></button>
           {more && (
             <ul className='menu more-menu' role='menu' onClick={() => setMore(false)}>
               <li role='menuitem' onClick={() => setDeleting('local')}>Remove from this device</li>
@@ -537,7 +531,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
               {t.name}
             </button>
             ))}
-        {canEdit && <button className='tab add' title='Add tab' onClick={async () => { const r = await run('sheet:addTab', {}); if (r) setTabId(r.tabId) }}>+</button>}
+        {canEdit && <button className='tab add' title='Add tab' aria-label='Add tab' onClick={async () => { const r = await run('sheet:addTab', {}); if (r) setTabId(r.tabId) }}><Plus size={16} /></button>}
       </footer>
     </div>
   )

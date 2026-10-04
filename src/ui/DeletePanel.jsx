@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { X } from '@phosphor-icons/react'
 import { call } from './bridge.js'
 
 // Confirmations for the two kinds of deleting
@@ -23,7 +24,7 @@ export function DeletePanel ({ sheetId, title, kind, onDone, onClose, onError })
       <section className='panel' role='dialog' aria-label={everyone ? 'Delete for everyone' : 'Remove from this device'}>
         <header>
           <h2>{everyone ? 'Delete for everyone?' : 'Remove from this device?'}</h2>
-          <button className='close' aria-label='Close' onClick={onClose}>×</button>
+          <button className='close' aria-label='Close' onClick={onClose}><X size={18} /></button>
         </header>
         {everyone
           ? (

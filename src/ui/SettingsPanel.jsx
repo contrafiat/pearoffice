@@ -1,4 +1,5 @@
 import React, { useRef, useState } from 'react'
+import { CaretLeft, X } from '@phosphor-icons/react'
 import { call } from './bridge.js'
 import { Avatar, shrinkPicture } from './Avatar.jsx'
 import { readPref, writePref } from './prefs.js'
@@ -41,9 +42,9 @@ export function SettingsPanel ({ me, onMe, desktop, keepOnline, startAtLogin, on
     <div className='panel-backdrop' onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
       <section className='panel settings' role='dialog' aria-label={mode === 'about' ? 'About PearSheet' : 'Settings'}>
         <header>
-          {mode === 'about' && <button className='link-button back' onClick={() => setMode('settings')}>‹ Settings</button>}
+          {mode === 'about' && <button className='link-button back' onClick={() => setMode('settings')}><CaretLeft size={14} /> Settings</button>}
           <h2>{mode === 'about' ? 'About PearSheet' : 'Settings'}</h2>
-          <button className='close' aria-label='Close' onClick={onClose}>×</button>
+          <button className='close' aria-label='Close' onClick={onClose}><X size={18} /></button>
         </header>
 
         {mode === 'settings' && (
@@ -122,7 +123,7 @@ export function SettingsPanel ({ me, onMe, desktop, keepOnline, startAtLogin, on
                 <h3>Typing</h3>
                 <label className='check num-pad'>
                   <input type='checkbox' checked={numPad} onChange={(e) => { setNumPad(e.target.checked); writePref('pearsheet:numpad', e.target.checked ? '1' : '0') }} />
-                  <span>Number keypad for cells<br /><span className='small muted'>Also switches with the 123 button above the sheet.</span></span>
+                  <span>Number keypad for cells<br /><span className='small muted'>Also switches with the keypad button in the toolbar.</span></span>
                 </label>
               </>
             )}

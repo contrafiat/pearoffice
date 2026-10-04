@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { CaretLeft, X } from '@phosphor-icons/react'
 import { call } from './bridge.js'
 import { toSvg } from '../shared/qr.js'
 import { ScanButton } from './Qr.jsx'
@@ -142,7 +143,7 @@ function StopUsing ({ seederKey, onDone, onError }) {
   )
 }
 
-export function SeederPanel ({ initialLink = '', onClose, onError }) {
+export function SeederPanel ({ initialLink = '', onBack = null, onClose, onError }) {
   const [link, setLink] = useState(initialLink)
   const [busy, setBusy] = useState(false)
   const [seeders, setSeeders] = useState(null)
@@ -172,8 +173,9 @@ export function SeederPanel ({ initialLink = '', onClose, onError }) {
     <div className='panel-backdrop' onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
       <form className='panel' role='dialog' aria-label='Seeder' onSubmit={pair}>
         <header>
+          {onBack && <button type='button' className='link-button back' onClick={onBack}><CaretLeft size={14} /> Settings</button>}
           <h2>Seeder</h2>
-          <button type='button' className='close' aria-label='Close' onClick={onClose}>×</button>
+          <button type='button' className='close' aria-label='Close' onClick={onClose}><X size={18} /></button>
         </header>
         <p>
           A seeder is an always-on computer that keeps an encrypted copy of your sheets, so people can catch up
