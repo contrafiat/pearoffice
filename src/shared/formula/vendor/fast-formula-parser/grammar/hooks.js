@@ -253,6 +253,10 @@ class FormulaParser {
                 if (result.ref) {
                     result = this.retrieveRef(result);
                 }
+                // PearSheet: a reference to a cell holding an error passes the
+                // error on.
+                if (result instanceof FormulaError)
+                    return result;
                 // Disallow union, and other unknown data types.
                 // e.g. `=(A1:C1, A2:E9)` -> #VALUE!
                 if (typeof result === 'object' && !Array.isArray(result) && result != null) {

@@ -2,6 +2,20 @@
 
 Append-only, newest on top. Per Constitution §4.
 
+## 2026-10-04 - Formulas spill, computed on every device
+Tier: T2
+Context: FILTER, SORT, UNIQUE and SEQUENCE fill a block of cells; the v1
+wire protocol said no spill (proposals/2026-10-04-spilling-formulas.md).
+Choice: every array result spills, as in Excel 365. Spilled values are
+computed from the merged cells, never stored. A spill is blocked (`#SPILL!`)
+by typed cells, by an earlier anchor's spill in reading order, by the tab's
+edge or past 100,000 cells. Evaluation starts in reading order so cycles
+resolve the same on every device.
+Alternatives: store spilled values (rejected - two devices could store
+different ones); spill only the new functions (rejected - unlike Excel).
+Consequences: old builds show the first value and see spilled cells as
+empty. The `A2#` operator is a follow-up.
+
 ## 2026-10-04 - Profile pictures live inside each sheet's encrypted log
 Tier: T2
 Context: profiles with avatars, as in the other suite apps

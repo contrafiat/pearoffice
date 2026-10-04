@@ -161,7 +161,12 @@ function createSheetMethods (sheets, { getJoin, getMoves, getProfiles }) {
           const col = colIndex.get(colId)
           if (row === undefined || col === undefined) continue
           const val = v.get(row + ',' + col) || { value: null }
-          cells.push({ row, col, input: model.getInput(doc, id, row, col), value: val.error ? null : val.value, error: val.error, fmt: model.getFormat(doc, id, row, col) })
+          cells.push({ row, col, input: model.getInput(doc, id, row, col), value: val.error ? null : val.value, error: val.error, fmt: model.getFormat(doc, id, row, col), spill: val.spill })
+        }
+        for (const [rc, val] of v) {
+          if (!val.from) continue
+          const [row, col] = rc.split(',').map(Number)
+          cells.push({ row, col, value: val.error ? null : val.value, error: val.error, fmt: model.getFormat(doc, id, row, col), from: val.from })
         }
         const widths = {}
         for (const [colId, px] of t.get('widths').entries()) if (colIndex.has(colId)) widths[colIndex.get(colId)] = px
@@ -213,7 +218,16 @@ function createSheetMethods (sheets, { getJoin, getMoves, getProfiles }) {
         if (row === undefined || col === undefined) continue
         const v = values.get(row + ',' + col) || { value: null }
         const fmt = model.getFormat(doc, tab, row, col)
-        cells.push({ row, col, input: model.getInput(doc, tab, row, col), ...present(v, fmt), volatile: v.volatile, fmt })
+        cells.push({ row, col, input: model.getInput(doc, tab, row, col), ...present(v, fmt), volatile: v.volatile, fmt, spill: v.spill, blocked: v.blocked })
+      }
+      // Cells a spilling formula fills (proposals/2026-10-04-spilling-formulas.md).
+      // They take the anchor's number format unless they have their own.
+      for (const [rc, v] of values) {
+        if (!v.from) continue
+        const [row, col] = rc.split(',').map(Number)
+        const own = model.getFormat(doc, tab, row, col)
+        const fmt = own.num ? own : { ...own, num: model.getFormat(doc, tab, v.from[0], v.from[1]).num }
+        cells.push({ row, col, input: '', ...present(v, fmt), fmt: own, from: v.from })
       }
       const widths = {}
       for (const [colId, px] of t.get('widths').entries()) if (colIndex.has(colId)) widths[colIndex.get(colId)] = px

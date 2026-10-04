@@ -430,6 +430,9 @@ are affected.
   Signed by their identity, appended only by their own devices, with a version
   counter so an old rename cannot be replayed. Viewers cannot append, so they
   keep the name they joined with.
+- 2026-10-04, formulas: array results now spill into neighbouring cells,
+  computed on every device and never stored. See
+  proposals/2026-10-04-spilling-formulas.md.
 - 2026-10-04, profiles: new `avatar` op, and any writer may append a
   member's signed `name` or `avatar` op on their behalf. See
   proposals/2026-10-04-profiles-with-avatars.md.

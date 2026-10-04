@@ -98,6 +98,29 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
     await js("document.querySelector('.grid .body').focus()")
     step('formula suggestions')
 
+    // Spilling: =SEQUENCE(3) in H1 fills H1:H3 and outlines the block; a
+    // value typed in H3 blocks it (#SPILL!) with a note saying why.
+    for (let i = 0; i < 6; i++) await key('Right')
+    for (let i = 0; i < 3; i++) await key('Up')
+    await enter('=SEQUENCE(3)', 'Enter', '1')
+    const cellAt = (a1) => "[...document.querySelectorAll('.cell')].find((c) => c.dataset.r === '" + a1[1] + "' && c.dataset.c === '8')"
+    await waitFor('spilled', cellAt('H3') + ".textContent === '3' && " + cellAt('H2') + ".textContent === '2'")
+    await waitFor('spill outline', "!!document.querySelector('.spill-outline') && document.querySelector('.formula-bar input').value === '=SEQUENCE(3)' && document.querySelector('.formula-bar input').classList.contains('spilled')")
+    await key('Down')
+    await enter('x', 'Enter')
+    for (let i = 0; i < 3; i++) await key('Up')
+    await waitFor('spill blocked', cellAt('H1') + ".textContent === '#SPILL!' && !!document.querySelector('.spill-note') && document.querySelector('.spill-note').textContent.includes('H3')")
+    await key('Down'); await key('Down')
+    await key('Delete')
+    await waitFor('spill back', cellAt('H3') + ".textContent === '3'")
+    await key('Up'); await key('Up')
+    await key('Delete')
+    await waitFor('spill cleared', cellAt('H1') + ".textContent === '' && !document.querySelector('.spill-outline')")
+    for (let i = 0; i < 6; i++) await key('Left')
+    for (let i = 0; i < 3; i++) await key('Down')
+    result.spill = true
+    step('spilling formula')
+
     // Ranges, copy and paste: select B1:B3, copy, paste into C1. The formula
     // moves with it, as in Excel.
     for (let i = 0; i < 3; i++) await key('Up')
@@ -317,7 +340,7 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
       fs.writeFileSync(shot, image.toPNG())
       step('screenshot', shot)
     }
-    result.ok = result.keepOnline && result.avatar && result.suggested === 'SUBSTITUTE,SUBTOTAL,SUM' && result.argHelp === 'number1' && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.importedFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000 && result.pastedFormula === '=SUM(C1:C2)' && result.inviteLink === 'pearsheet://join?s=' + result.inviteLink.slice(19) && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
+    result.ok = result.keepOnline && result.avatar && result.spill && result.suggested === 'SUBSTITUTE,SUBTOTAL,SUM' && result.argHelp === 'number1' && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.importedFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000 && result.pastedFormula === '=SUM(C1:C2)' && result.inviteLink === 'pearsheet://join?s=' + result.inviteLink.slice(19) && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
   } catch (err) {
     result.error = err.message
     // What the page showed, to tell a UI failure from a load failure.

@@ -13,7 +13,7 @@ export const MAX_ZOOM = 2.5
 // sheets stay fast. Headers are drawn outside the scroll area and moved with
 // the scroll position.
 export const Grid = forwardRef(function Grid (props, ref) {
-  const { view, cells, sel, ext = sel, range, editing, onSelect, onEdit, onEditChange, onEditKey, onEditBlur, onEditCaret = () => {}, onKeyDown, onHeaderMenu, onResize, onCopy, onPaste, zoom = 1, onZoom, inputMode } = props
+  const { view, cells, sel, ext = sel, range, spillBox, editing, onSelect, onEdit, onEditChange, onEditKey, onEditBlur, onEditCaret = () => {}, onKeyDown, onHeaderMenu, onResize, onCopy, onPaste, zoom = 1, onZoom, inputMode } = props
   // Row height and column widths scale with the zoom (pinch on a phone);
   // stored widths stay unzoomed.
   const ROW_H = Math.round(BASE_ROW_H * zoom)
@@ -213,7 +213,7 @@ export const Grid = forwardRef(function Grid (props, ref) {
                 onDoubleClick={() => onEdit(r, c)}
                 // Touch screens: tapping the cell that is already selected edits it.
                 onTouchEnd={(e) => { if (!pinched.current && e.touches.length === 0 && sel.row === r && sel.col === c) { e.preventDefault(); onEdit(r, c) } }}
-                title={cell && cell.volatile ? 'Changes on each device (time or random)' : undefined}
+                title={cell && cell.volatile ? 'Changes on each device (time or random)' : cell && cell.blocked ? 'This answer cannot fill in. Select the cell to see why.' : undefined}
               >
                 {cell ? cell.display : ''}
               </div>
@@ -223,6 +223,12 @@ export const Grid = forwardRef(function Grid (props, ref) {
             <div
               className='range'
               style={{ top: (range.r1 - 1) * ROW_H, left: colX[range.c1], width: colX[Math.min(range.c2, view.cols) + 1] - colX[range.c1], height: (range.r2 - range.r1 + 1) * ROW_H }}
+            />
+          )}
+          {spillBox && (
+            <div
+              className='spill-outline'
+              style={{ top: (spillBox.r1 - 1) * ROW_H, left: colX[spillBox.c1], width: colX[Math.min(spillBox.c2, view.cols) + 1] - colX[spillBox.c1], height: (spillBox.r2 - spillBox.r1 + 1) * ROW_H }}
             />
           )}
           <div

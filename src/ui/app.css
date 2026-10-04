@@ -435,3 +435,8 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
   .panel::before { content: ''; flex: none; width: 36px; height: 4px; border-radius: 2px; background: var(--line-strong); margin: 4px auto 2px; }
   .empty-actions { flex-direction: column; align-items: stretch; }
 }
+
+/* Spilling formulas: the block an answer fills, and why it cannot. */
+.spill-outline { position: absolute; border: 1px dashed var(--pear); pointer-events: none; margin: -1px 0 0 -1px; z-index: 2; }
+.formula-bar input.spilled { color: var(--muted); }
+.spill-note { padding: 6px 14px; font-size: 13px; color: var(--danger); background: var(--panel); border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: center; }
