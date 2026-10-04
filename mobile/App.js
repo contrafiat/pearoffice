@@ -114,7 +114,7 @@ async function loadHtml (dark) {
   await asset.downloadAsync()
   const js = await FileSystem.readAsStringAsync(asset.localUri, { encoding: FileSystem.EncodingType.UTF8 })
   const bg = dark ? '#171a17' : '#f7f7f4'
-  return '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">' +
+  return '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">' +
     '<style>html,body,#root{height:100%;margin:0;background:' + bg + '}</style></head>' +
     '<body><div id="root"></div><script>' + js + '</script></body></html>'
 }
