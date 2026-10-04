@@ -45,6 +45,25 @@ function createSheetMethods (sheets, { getJoin, getMoves, getProfiles }) {
     return node ? node.value : null
   }
 
+  // Who owns a sheet and how many people are in it, for the sheet list.
+  async function peopleOf (ctx, sheetId) {
+    const base = ctx.bases.get(sheetId)
+    if (!base) return {}
+    try {
+      await base.ready()
+      const sheet = (await base.view.get('sheet'))?.value
+      let people = 0
+      let owner = null
+      for await (const { value } of base.view.createReadStream({ gt: 'member/', lt: 'member/~' })) {
+        people++
+        if (sheet && value.identity === sheet.owner) owner = value
+      }
+      if (!owner) return { people }
+      const me = hex(ctx.identity.publicKey)
+      return { people, owner: { identity: owner.identity, name: owner.name || '', avatarHash: owner.avatarHash || null, isMe: owner.identity === me } }
+    } catch { return {} }
+  }
+
   async function myRole (ctx, sheetId) {
     const me = await viewGet(ctx, sheetId, 'member/' + hex(ctx.identity.publicKey))
     return me ? me.role : null
@@ -164,7 +183,7 @@ function createSheetMethods (sheets, { getJoin, getMoves, getProfiles }) {
         // Not loaded yet: load it in the background, so its title (and any
         // later change) reaches the list live through sheet:changed.
         if (!e && !(moved && moved.removed)) sheets.load(value.groupId).then(() => sheets.changed(value.groupId)).catch(() => {})
-        out.push({ sheetId: value.groupId, title: (e && model.title(e.guarded.doc)) || value.name || '', joining: joining.has(value.groupId) || undefined, removed: (moved && moved.removed) || undefined })
+        out.push({ sheetId: value.groupId, title: (e && model.title(e.guarded.doc)) || value.name || '', joining: joining.has(value.groupId) || undefined, removed: (moved && moved.removed) || undefined, ...(await peopleOf(ctx, value.groupId)) })
         joining.delete(value.groupId)
       }
       // Joins that have not been welcomed yet have no base.

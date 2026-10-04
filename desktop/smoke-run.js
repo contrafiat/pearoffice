@@ -155,7 +155,7 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
       el.focus(); set.call(el, 'Household budget'); el.dispatchEvent(new Event('input', { bubbles: true }))
       el.dispatchEvent(new FocusEvent('focusout', { bubbles: true }))
     })()`)
-    await waitFor('title in list', "[...document.querySelectorAll('.sheet-link')].some((b) => b.textContent === 'Household budget')")
+    await waitFor('title in list', "[...document.querySelectorAll('.sheet-link .sheet-title')].some((b) => b.textContent === 'Household budget')")
     step('renamed')
 
     // Type with no gap between keys: keys that arrive before the cell editor
@@ -185,7 +185,7 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
       input.files = dt.files
       input.dispatchEvent(new Event('change', { bubbles: true }))
     })()`)
-    await waitFor('imported sheet open', "[...document.querySelectorAll('.sheet-link')].some((b) => b.textContent === 'Imported budget') && document.querySelector('.title').value === 'Imported budget'")
+    await waitFor('imported sheet open', "[...document.querySelectorAll('.sheet-link .sheet-title')].some((b) => b.textContent === 'Imported budget') && document.querySelector('.title').value === 'Imported budget'")
     await waitFor('imported values', "[...document.querySelectorAll('.cell')].some((c) => c.textContent === '1650.5') && [...document.querySelectorAll('.cell')].some((c) => c.textContent === 'Rent')")
     await js("document.querySelector('.grid .body').focus()")
     for (let i = 0; i < 2; i++) await key('Down')
@@ -255,6 +255,7 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
     })()`)
     await waitFor('own picture shown', "!!document.querySelector('.me-picture img.avatar')")
     result.avatar = await js("document.querySelector('.me-picture img.avatar').src.startsWith('data:image/jpeg;base64,')")
+    await waitFor('owner picture in the sheet list', "!!document.querySelector('.sheet-link .sheet-owner img.avatar')")
     step('profile picture')
 
     // Share: the owner gets a single-use invite link.

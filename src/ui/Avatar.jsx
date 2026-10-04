@@ -85,3 +85,17 @@ export async function shrinkPicture (file) {
   }
   throw new Error('That picture is too detailed to shrink. Try another one.')
 }
+
+// The people in a sheet as overlapping pictures, the first few and a count
+// of the rest.
+export function PeopleStack ({ sheetId, members, max = 3, size = 26, onClick }) {
+  const shown = members.slice(0, max)
+  const rest = members.length - shown.length
+  const names = members.map((p) => (p.isMe ? 'You' : p.name || 'Unnamed')).join(', ')
+  return (
+    <button className='people-stack' title={names} aria-label={'People in this sheet: ' + names} onClick={onClick}>
+      {shown.map((p) => <MemberAvatar key={p.identity} sheetId={sheetId} member={p} size={size} />)}
+      {rest > 0 && <span className='avatar more-people' style={{ width: size, height: size, fontSize: Math.round(size * 0.4) }}>+{rest}</span>}
+    </button>
+  )
+}
