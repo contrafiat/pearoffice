@@ -65,7 +65,32 @@ async function main () {
   }
 }
 
-main().catch((err) => {
+async function seederCheck (bare) {
+  require('./build-seeder')
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pearsheet-seeder-'))
+  const proc = spawn(bare, [path.join(root, 'dist', 'seeder', 'seeder.bundle'), '--data', dataDir], { stdio: ['pipe', 'pipe', 'inherit'] })
+  let out = ''
+  try {
+    await new Promise((resolve, reject) => {
+      const t = setTimeout(() => reject(new Error('seeder did not print a pairing link')), 30000)
+      proc.stdout.on('data', (d) => {
+        out += d
+        if (/pearsheet:\/\/seeder\?rv=/.test(out) && !out.includes('status-asked')) {
+          out += 'status-asked'
+          proc.stdin.write('status\n')
+        }
+        if (/"pairedDevices":0/.test(out)) { clearTimeout(t); resolve() }
+      })
+      proc.on('exit', (code) => reject(new Error('seeder exited with ' + code)))
+    })
+    console.log('ok - seeder bundle under Bare: starts, prints a pairing link, answers status')
+  } finally {
+    proc.kill()
+    fs.rmSync(dataDir, { recursive: true, force: true })
+  }
+}
+
+main().then(() => seederCheck(barePath())).catch((err) => {
   console.error('not ok -', err.message)
   process.exit(1)
 })

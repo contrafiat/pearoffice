@@ -30,8 +30,9 @@ v1 wire protocol approved: `proposals/2026-10-03-wire-protocol.md`. Desktop
 first (Electron), then mobile (Android first). The engine is scaffolded: the
 Bare worklet, the Yjs sheet model, the vendored formula engine and sync over
 `@peerloom/core`. The Electron shell and grid UI work on Linux. Sharing works: single-use
-invites, owner, editor and viewer roles, renames. The seeder and removal by
-key move are next.
+invites, owner, editor and viewer roles, renames. The blind seeder works:
+pair by link, every member backs up to it, a member can catch up from it
+alone. Removal by key move, packaging and the mobile app are next.
 See `TODO.md`.
 
 ## Layout
@@ -51,12 +52,20 @@ See `TODO.md`.
   the bare-runtime binary and relays IPC, `preload.js` is the bridge,
   `smoke.js` + `smoke-run.js` are the offscreen smoke test. Has its own
   `package.json` (Electron): `npm install --prefix desktop`.
+- `src/seeder/` - the blind seeder: `seeder.js` (blind-peer plus the rule
+  that it stores only sheets a paired device registered), `protocol.js`
+  (pairing link and topic, shared with the app), `bare.js` (CLI entry).
+  The app side is `src/worklet/seeding.js`.
 - `spikes/` - the 2026-10-03 research spikes and their `RESULTS.md`.
 
 ## Running
 
 `npm run desktop` builds the UI and worklet and opens the app, using
 `~/.pearsheet-dev` for data (override with `PEARSHEET_DATA`).
+
+`npm run seeder` builds and runs the seeder with data in `~/.pearsheet-seeder`
+(override with `PEARSHEET_SEEDER_DATA`). It prints a pairing link; type `pair`
+for a new one and `status` for counts.
 
 ## Verify
 
@@ -66,10 +75,13 @@ See `TODO.md`.
   golden file, the same corpus in four timezones, formula reference
   translation, Yjs merging, bad-update handling, a two-engine sync test and
   the invite and role rules (single use, expiry, viewers cannot write, forged
-  and replayed ops skipped), all over a local DHT testnet.
+  and replayed ops skipped) and the seeder (pairing, sync from the seeder
+  alone, no readable data on it, strangers refused), all over a local DHT
+  testnet.
 - `npm run test:bare`: bundles for this machine and runs the real Bare binary.
   The formula corpus must match the golden file bit for bit, and the worklet
-  bundle must create, edit and read a sheet over stdin/stdout.
+  bundle must create, edit and read a sheet over stdin/stdout, and the seeder
+  bundle must start and print a pairing link.
 - `npm run smoke:desktop`: launches Electron with an offscreen window and a
   throwaway data folder, creates a sheet through the UI, types with real key
   events and checks formula, bold, undo and rename. About 15 s. Skipped (with

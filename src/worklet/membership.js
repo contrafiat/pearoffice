@@ -24,7 +24,8 @@ const P = {
   cancel: 'pearsheet/invite-cancel/v1',
   join: 'pearsheet/join/v1',
   role: 'pearsheet/role/v1',
-  name: 'pearsheet/name/v1'
+  name: 'pearsheet/name/v1',
+  seeder: 'pearsheet/seeder/v1'
 }
 
 const hex = (buf) => b4a.toString(buf, 'hex')
@@ -92,6 +93,11 @@ function roleOp ({ sheetId, owner, identity, role, v }) {
 // signed rename cannot be appended again to bring back an old name.
 function nameOp ({ sheetId, identity, name, n }) {
   return { type: 'name', name: signValue({ purpose: P.name, sheetId, identity: hex(identity.publicKey), name: cleanName(name), n }, identity.secretKey) }
+}
+
+// "Back this sheet up to that seeder". Any owner or editor can add one.
+function seederOp ({ sheetId, identity, seederKey }) {
+  return { type: 'seeder', seeder: signValue({ purpose: P.seeder, sheetId, seederKey, identity: hex(identity.publicKey) }, identity.secretKey) }
 }
 
 // The joiner's half of an inviteUse: proof of the invite secret, and proof that
@@ -242,6 +248,16 @@ async function applyMembershipOp (op, { view, base, groupId, node, log }) {
     return true
   }
 
+  if (op.type === 'seeder') {
+    const r = op.seeder
+    if (!signedBy(r, 'identity', P.seeder, sheetId) || !HEX64.test(r.seederKey || '')) return skip('bad seeder record')
+    const actor = await actorOf(view, node)
+    if (!actor || actor.identity !== r.identity || (actor.role !== 'owner' && actor.role !== 'editor')) return skip('not an owner or editor')
+    if (await get(view, 'seeder/' + r.seederKey)) return skip('already listed')
+    await view.put('seeder/' + r.seederKey, { seederKey: r.seederKey, addedBy: r.identity })
+    return true
+  }
+
   if (op.type === 'role') {
     const sheet = await get(view, 'sheet')
     const r = op.role
@@ -280,6 +296,7 @@ module.exports = {
   cancelOp,
   roleOp,
   nameOp,
+  seederOp,
   claimFor,
   inviteKeyPair,
   inviteLink,

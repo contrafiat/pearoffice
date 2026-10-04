@@ -435,3 +435,14 @@ are affected.
 - 2026-10-03, joining: the joiner looks the topic up again every few seconds
   while a join is pending. Hyperswarm otherwise waits minutes before a second
   lookup, so a joiner who looked before any member announced sat idle.
+- 2026-10-03, seeder: blind-peering dials with `peering.keyPair`, which it
+  never sets, so connections used a random key per process and the seeder
+  could not recognise paired devices. The app sets it to the device's swarm
+  key, the one sent at pairing.
+- 2026-10-03, seeder: blind-peering sends an Autobase in two batches, writer
+  cores with the bootstrap key as referrer and then view cores with no
+  referrer. The seeder accepts a referrer-less batch only on a connection that
+  has already shown an allowed referrer. Otherwise the other members of a
+  paired person's sheets were refused and disconnected.
+- 2026-10-03, seeder: deleting old cores a week after a move is not built yet.
+  It arrives with removal (section 7), since moves do not exist before that.
