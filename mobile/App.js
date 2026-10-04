@@ -4,7 +4,8 @@
 // src/ui/mobile-entry.js on top of the WebView bridge.
 
 import React, { useEffect, useRef, useState } from 'react'
-import { ActivityIndicator, Linking, Platform, StatusBar, StyleSheet, Text, View, useColorScheme } from 'react-native'
+import { ActivityIndicator, Linking, Modal, Platform, StatusBar, StyleSheet, Text, TouchableOpacity, View, useColorScheme } from 'react-native'
+import { CameraView, useCameraPermissions } from 'expo-camera'
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
 import { WebView } from 'react-native-webview'
 import { Worklet } from 'react-native-bare-kit'
@@ -118,6 +119,8 @@ export default function App () {
   const [html, setHtml] = useState(null)
   const [error, setError] = useState(null)
   const web = useRef(null)
+  const [scanning, setScanning] = useState(false)
+  const scanDone = useRef(null) // resolves the pending app:scanQr call
   const loaded = useRef(false)
   const queued = useRef([])
 
@@ -154,6 +157,12 @@ export default function App () {
     const { id, method, args } = msg
     const reply = (body) => inject('window.__psResponse(' + JSON.stringify({ id, ...body }) + ')')
     if (method === 'app:takeLink') { const url = pendingLink; pendingLink = null; return reply({ result: { url } }) }
+    if (method === 'app:scanQr') {
+      // Open the camera and answer with the first QR code read, or null if
+      // the person cancels or refuses the camera.
+      const text = await new Promise((resolve) => { scanDone.current = resolve; setScanning(true) })
+      return reply({ result: { text } })
+    }
     if (method === 'app:restart') {
       try { await restartWorklet() } catch (err) { return reply({ error: String(err && err.message ? err.message : err) }) }
       reply({ result: { ok: true } })
@@ -204,8 +213,45 @@ export default function App () {
           style={{ flex: 1, backgroundColor: bg }}
         />
       </SafeAreaView>
+      {scanning && <Scanner onDone={(text) => { setScanning(false); const done = scanDone.current; scanDone.current = null; if (done) done(text) }} />}
     </SafeAreaProvider>
   )
 }
 
-const styles = StyleSheet.create({ center: { flex: 1, alignItems: 'center', justifyContent: 'center' } })
+// Full-screen QR scanner (the pattern PearCircle uses).
+function Scanner ({ onDone }) {
+  const [permission, requestPermission] = useCameraPermissions()
+  const read = useRef(false)
+  useEffect(() => {
+    if (!permission) return
+    if (!permission.granted && permission.canAskAgain) requestPermission()
+    else if (!permission.granted) onDone(null)
+  }, [permission])
+  return (
+    <Modal visible animationType='slide' onRequestClose={() => onDone(null)}>
+      {permission && permission.granted
+        ? (
+          <View style={{ flex: 1, backgroundColor: '#000' }}>
+            <CameraView
+              style={StyleSheet.absoluteFillObject}
+              facing='back'
+              barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
+              onBarcodeScanned={({ data }) => { if (!read.current && data) { read.current = true; onDone(String(data)) } }}
+            />
+            <View style={styles.scanHint}><Text style={styles.scanText}>Point at a PearSheet QR code</Text></View>
+            <TouchableOpacity accessibilityRole='button' style={styles.scanCancel} onPress={() => onDone(null)}>
+              <Text style={styles.scanText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+          )
+        : <View style={[styles.center, { backgroundColor: '#000' }]}><Text style={styles.scanText}>Waiting for camera permission...</Text></View>}
+    </Modal>
+  )
+}
+
+const styles = StyleSheet.create({
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  scanHint: { position: 'absolute', top: 70, alignSelf: 'center', backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10 },
+  scanCancel: { position: 'absolute', bottom: 60, alignSelf: 'center', backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 10, paddingHorizontal: 28, paddingVertical: 14 },
+  scanText: { color: '#fff', fontSize: 16 }
+})

@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { call, on } from './bridge.js'
+import { QrCode } from './Qr.jsx'
 
 const ROLE_LABEL = { owner: 'Owner', editor: 'Can edit', viewer: 'Can view' }
 
@@ -80,6 +81,10 @@ export function SharePanel ({ sheetId, onClose, onError }) {
                     <div className='row'>
                       <input readOnly value={link.link} onFocus={(e) => e.target.select()} aria-label='Invite link' />
                       <button className='primary' onClick={copy}>{copied ? 'Copied' : 'Copy'}</button>
+                    </div>
+                    <div className='pairing'>
+                      <QrCode value={link.link} label='Invite QR code' />
+                      <p className='muted small'>Or scan this with PearSheet on their phone.</p>
                     </div>
                   </div>
                 )}

@@ -1,15 +1,16 @@
 import React, { useState } from 'react'
 import { call } from './bridge.js'
+import { ScanButton } from './Qr.jsx'
 
 export function JoinPanel ({ initialLink = '', onJoined, onClose, onError }) {
   const [link, setLink] = useState(initialLink)
   const [busy, setBusy] = useState(false)
 
-  async function join (e) {
-    e.preventDefault()
+  async function join (e, scanned) {
+    if (e) e.preventDefault()
     setBusy(true)
     try {
-      const { sheetId } = await call('sheet:join', { link: link.trim() })
+      const { sheetId } = await call('sheet:join', { link: (scanned || link).trim() })
       onJoined(sheetId)
     } catch (err) {
       onError(err.message)
@@ -32,6 +33,7 @@ export function JoinPanel ({ initialLink = '', onJoined, onClose, onError }) {
           value={link}
           onChange={(e) => setLink(e.target.value)}
         />
+        <ScanButton prefix='pearsheet://join?' what='a PearSheet invite' onError={onError} onLink={(l) => { setLink(l); join(null, l) }} />
         <div className='row end'>
           <button type='button' onClick={onClose}>Cancel</button>
           <button className='primary' type='submit' disabled={busy || !link.trim()}>{busy ? 'Joining...' : 'Join'}</button>

@@ -228,6 +228,7 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
     await waitFor('share panel', "!!document.querySelector('.panel .invite-actions')")
     await js("[...document.querySelectorAll('.panel button')].find((b) => b.textContent === 'Invite to edit').click()")
     await waitFor('invite link', "(document.querySelector('.invite-link input') || {}).value?.startsWith('pearsheet://join?')")
+    await waitFor('invite QR', "!!document.querySelector('.invite-link .qr svg')")
     result.inviteLink = (await js("document.querySelector('.invite-link input').value")).slice(0, 24)
     step('invite link')
 

@@ -1,0 +1,31 @@
+import React from 'react'
+import { call } from './bridge.js'
+import { toSvg } from '../shared/qr.js'
+import { isMobile } from './xlsx.js'
+
+// A link as a QR code, for another device's camera.
+export function QrCode ({ value, size = 220, label = 'QR code' }) {
+  return <div className='qr' role='img' aria-label={label} dangerouslySetInnerHTML={{ __html: toSvg(value, size) }} />
+}
+
+// "Scan QR code" on phones: opens the camera in the shell and hands back a
+// link that starts with `prefix`. Renders nothing elsewhere.
+export function ScanButton ({ prefix, what, onLink, onError }) {
+  if (!isMobile()) return null
+  return (
+    <button
+      type='button'
+      className='scan-button'
+      onClick={async () => {
+        try {
+          const { text } = await call('app:scanQr')
+          if (!text) return
+          if (!String(text).startsWith(prefix)) return onError('That QR code is not ' + what + '.')
+          onLink(String(text))
+        } catch (err) { onError(err.message) }
+      }}
+    >
+      Scan QR code
+    </button>
+  )
+}

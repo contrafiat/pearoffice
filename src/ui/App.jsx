@@ -77,7 +77,7 @@ export function App () {
     <div className={'app' + (navOpen ? ' nav-open' : '')}>
       <button className='nav-toggle' aria-label='Your sheets' aria-expanded={navOpen} onClick={() => setNavOpen(true)}><span aria-hidden='true'>☰</span></button>
       {navOpen && <div className='nav-scrim' onClick={() => setNavOpen(false)} />}
-      <aside className='sidebar' onClick={(e) => { if (e.target.closest('.sheet-link')) setNavOpen(false) }}>
+      <aside className='sidebar' onClick={(e) => { if (e.target.closest('button')) setNavOpen(false) }}>
         <div className='brand'>
           <span className='brand-mark' aria-hidden='true' />
           PearSheet
