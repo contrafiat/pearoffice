@@ -110,7 +110,7 @@ function createTray () {
 }
 
 function log (...args) {
-  if (!app.isPackaged || SMOKE) console.log('[pearsheet]', ...args)
+  if (!app.isPackaged || SMOKE || process.env.PEARSHEET_DEBUG) console.log('[pearsheet]', ...args)
 }
 
 function startWorklet () {
@@ -206,7 +206,7 @@ function createWindow () {
 }
 
 app.whenReady().then(async () => {
-  log('data', dataDir)
+  log('data', dataDir, 'argv', process.argv.slice(1).join(' '), 'stayRunning', stayRunning())
   const ready = startWorklet().catch((err) => {
     log('worklet failed to start:', err.message)
     throw err

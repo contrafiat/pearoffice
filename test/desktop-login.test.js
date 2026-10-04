@@ -4,7 +4,7 @@ const test = require('node:test')
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const path = require('node:path')
-const { desktopEntry, launchCommand, createLoginItem } = require('../desktop/login')
+const { desktopEntry, launchCommand, launchAgent, createLoginItem } = require('../desktop/login')
 const { tmpDir, cleanup } = require('./helpers')
 
 test('the autostart entry starts this copy hidden', () => {
@@ -29,4 +29,17 @@ test('turning it on and off writes and removes the entry', (t) => {
   assert.equal(item.isEnabled(), false)
   assert.equal(item.launchedAtLogin(['electron', '--hidden']), true)
   assert.equal(item.launchedAtLogin(['electron']), false)
+})
+
+test('the macOS launch agent opens the app bundle hidden', (t) => {
+  t.after(cleanup)
+  const plist = launchAgent({ packaged: true, execPath: '/Applications/PearSheet.app/Contents/MacOS/PearSheet' })
+  assert.match(plist, /<string>\/usr\/bin\/open<\/string>\n    <string>-g<\/string>\n    <string>-a<\/string>\n    <string>\/Applications\/PearSheet.app<\/string>\n    <string>--args<\/string>\n    <string>--hidden<\/string>/)
+  assert.match(plist, /<key>RunAtLoad<\/key>\n  <true\/>/)
+  const dir = tmpDir()
+  const item = createLoginItem({ app: { isPackaged: true, getAppPath: () => '/app' }, platform: 'darwin', autostartDir: dir })
+  item.setEnabled(true)
+  assert.ok(fs.existsSync(path.join(dir, 'com.peerloom.pearsheet.login.plist')))
+  item.setEnabled(false)
+  assert.equal(item.isEnabled(), false)
 })

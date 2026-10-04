@@ -214,6 +214,9 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
     if (process.platform === 'linux') {
       const entry = fs.readFileSync(path.join(dataDir, 'autostart', 'pearsheet.desktop'), 'utf8')
       result.autostart = /^Exec=.* "--hidden"$/m.test(entry)
+    } else if (process.platform === 'darwin') {
+      const agent = fs.readFileSync(path.join(dataDir, 'autostart', 'com.peerloom.pearsheet.login.plist'), 'utf8')
+      result.autostart = agent.includes('<string>--hidden</string>')
     } else result.autostart = true
     win.close()
     await sleep(500)

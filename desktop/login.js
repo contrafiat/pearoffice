@@ -1,7 +1,10 @@
 // "Start when the computer starts": opens PearSheet hidden in the tray at
-// login, so sheets stay reachable after a reboot. macOS and Windows use
-// Electron's login items; Linux uses an XDG autostart entry, which Electron
-// does not manage.
+// login, so sheets stay reachable after a reboot.
+//
+// - Linux: an XDG autostart entry, which Electron does not manage.
+// - macOS: a LaunchAgent. Electron's login items cannot pass arguments there
+//   and cannot tell a login launch apart on macOS 13 and later.
+// - Windows: Electron's login items, with `--hidden` as an argument.
 
 const fs = require('node:fs')
 const os = require('node:os')
@@ -35,40 +38,70 @@ function desktopEntry (command) {
   ].join('\n')
 }
 
+function xmlEscape (s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+const AGENT_LABEL = 'com.peerloom.pearsheet.login'
+
+// macOS: open the app bundle through Launch Services, in the background, with
+// the hidden flag. A dev checkout runs Electron directly.
+function launchAgent ({ packaged, execPath, appPath }) {
+  const args = packaged
+    ? ['/usr/bin/open', '-g', '-a', path.resolve(execPath, '..', '..', '..'), '--args', HIDDEN_FLAG]
+    : [execPath, appPath, HIDDEN_FLAG]
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">',
+    '<plist version="1.0">',
+    '<dict>',
+    '  <key>Label</key>',
+    '  <string>' + AGENT_LABEL + '</string>',
+    '  <key>ProgramArguments</key>',
+    '  <array>',
+    ...args.map((a) => '    <string>' + xmlEscape(a) + '</string>'),
+    '  </array>',
+    '  <key>RunAtLoad</key>',
+    '  <true/>',
+    '</dict>',
+    '</plist>',
+    ''
+  ].join('\n')
+}
+
 function createLoginItem ({ app, platform = process.platform, autostartDir, fake = false }) {
-  const linuxFile = path.join(autostartDir || path.join(process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config'), 'autostart'), 'pearsheet.desktop')
+  const home = os.homedir()
+  const file = platform === 'linux'
+    ? path.join(autostartDir || path.join(process.env.XDG_CONFIG_HOME || path.join(home, '.config'), 'autostart'), 'pearsheet.desktop')
+    : platform === 'darwin'
+      ? path.join(autostartDir || path.join(home, 'Library', 'LaunchAgents'), AGENT_LABEL + '.plist')
+      : null
   let fakeOn = false
 
   function isEnabled () {
-    if (platform === 'linux') return fs.existsSync(linuxFile)
+    if (file) return fs.existsSync(file)
     if (fake) return fakeOn
-    return app.getLoginItemSettings().openAtLogin
+    return app.getLoginItemSettings({ args: [HIDDEN_FLAG] }).openAtLogin
   }
 
   function setEnabled (on) {
-    if (platform === 'linux') {
-      if (on) {
-        const command = launchCommand({ packaged: app.isPackaged, execPath: process.execPath, appPath: app.getAppPath(), appImage: process.env.APPIMAGE })
-        fs.mkdirSync(path.dirname(linuxFile), { recursive: true })
-        fs.writeFileSync(linuxFile, desktopEntry(command))
-      } else {
-        fs.rmSync(linuxFile, { force: true })
-      }
+    if (file) {
+      if (!on) return fs.rmSync(file, { force: true })
+      const where = { packaged: app.isPackaged, execPath: process.execPath, appPath: app.getAppPath(), appImage: process.env.APPIMAGE }
+      fs.mkdirSync(path.dirname(file), { recursive: true })
+      fs.writeFileSync(file, platform === 'linux' ? desktopEntry(launchCommand(where)) : launchAgent(where))
       return
     }
     if (fake) { fakeOn = on; return }
-    // `args` is used on Windows; macOS reports wasOpenedAtLogin instead.
     app.setLoginItemSettings({ openAtLogin: on, args: [HIDDEN_FLAG] })
   }
 
   // Whether this launch came from the login item.
   function launchedAtLogin (argv = process.argv) {
-    if (argv.includes(HIDDEN_FLAG)) return true
-    if (platform === 'darwin' && !fake) return !!app.getLoginItemSettings().wasOpenedAtLogin
-    return false
+    return argv.includes(HIDDEN_FLAG)
   }
 
-  return { isEnabled, setEnabled, launchedAtLogin, linuxFile }
+  return { isEnabled, setEnabled, launchedAtLogin, file }
 }
 
-module.exports = { createLoginItem, desktopEntry, launchCommand, HIDDEN_FLAG }
+module.exports = { createLoginItem, desktopEntry, launchCommand, launchAgent, HIDDEN_FLAG }
