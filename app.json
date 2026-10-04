@@ -38,7 +38,14 @@
     "ios": {
       "bundleIdentifier": "com.pearsheet",
       "buildNumber": "1",
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocalNetworkUsageDescription": "PearSheet connects directly to the people you share sheets with, and to your own devices, on your Wi-Fi.",
+        "NSBonjourServices": [
+          "_hyperswarm._udp",
+          "_pearsheetlan._tcp"
+        ]
+      }
     },
     "plugins": [
       [

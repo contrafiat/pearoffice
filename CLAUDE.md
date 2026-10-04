@@ -36,8 +36,8 @@ alone. Removing someone moves the sheet to fresh keys. Desktop installers build 
 Linux, macOS and Windows. The Android app runs on the emulator and the TCL.
 A person can link their devices (one-time link) and keep a 24-word recovery
 phrase (proposals/2026-10-03-device-linking.md). The seeder ships inside the
-desktop app and as a Linux server download. iOS runs on the Simulator.
-Signing and the iPhone SE are next.
+desktop app and as a Linux server download. iOS runs on the Simulator and
+the iPhone SE. Signing for distribution is next.
 See `TODO.md`.
 
 ## Layout
@@ -125,6 +125,13 @@ The `dump` output does not show what a text field contains: screenshot to
 check, and do not type twice. `plugins/with-ios-pod-deployment-target` and
 `plugins/with-ios-scene-lifecycle` come from PearPetal; the second keeps apps
 built with the iOS 27 SDK from being killed at launch.
+
+The iPhone SE: `scripts/ios-dev-install.sh` builds and signs on the Mac (build
+keychain, development signing) and installs over USB from this machine. The
+Mac must be logged in. `modules/local-network` (from PearPetal) plus the
+`NSLocalNetworkUsageDescription` and `NSBonjourServices` entries in `app.json`
+make iOS show the Local Network prompt; without them iOS never asks and can
+block connections to devices on the same Wi-Fi.
 
 ## Packaging
 
