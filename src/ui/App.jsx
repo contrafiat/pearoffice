@@ -5,7 +5,7 @@ import { JoinPanel } from './JoinPanel.jsx'
 import { SeederPanel } from './SeederPanel.jsx'
 import { DevicesPanel } from './DevicesPanel.jsx'
 import { importFile, pickAndImport, isMobile } from './xlsx.js'
-import { Avatar, shrinkPicture } from './Avatar.jsx'
+import { Avatar, MemberAvatar, shrinkPicture } from './Avatar.jsx'
 
 export function App () {
   const [sheets, setSheets] = useState(null)
@@ -145,8 +145,19 @@ export function App () {
               title={s.waiting ? 'Waiting for someone in this sheet to come online' : s.removed ? 'You were removed from this sheet' : undefined}
               onClick={() => setCurrent(s.sheetId)}
             >
-              {s.waiting ? 'Joining...' : (s.title || 'Untitled sheet')}
+              {s.owner && (
+                <span className='sheet-owner' title={s.owner.isMe ? 'Yours' : 'Owned by ' + (s.owner.name || 'someone')}>
+                  <MemberAvatar sheetId={s.sheetId} member={s.owner} size={20} />
+                </span>
+              )}
+              <span className='sheet-title'>{s.waiting ? 'Joining...' : (s.title || 'Untitled sheet')}</span>
               {s.joining && !s.waiting && <span className='badge'>joining</span>}
+              {!s.joining && s.people > 1 && (
+                <span className='people-count' title={s.people + ' people'} aria-label={s.people + ' people'}>
+                  <svg viewBox='0 0 16 16' width='12' height='12' aria-hidden='true'><circle cx='8' cy='5' r='3' fill='currentColor' /><path d='M2 15c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5z' fill='currentColor' /></svg>
+                  {s.people}
+                </span>
+              )}
             </button>
           ))}
         </nav>

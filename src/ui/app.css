@@ -213,7 +213,16 @@ button, input, select { font: inherit; color: inherit; }
   margin-top: -4px;
 }
 .join-sheet:hover { border-color: var(--pear); color: var(--pear-dark); }
-.sheet-link { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.sheet-link { display: flex; align-items: center; gap: 8px; }
+.sheet-link .sheet-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.sheet-owner { display: inline-flex; flex: none; }
+.sheet-owner .avatar { font-size: 9px !important; }
+.people-count { display: inline-flex; align-items: center; gap: 3px; flex: none; color: var(--muted); font-size: 12px; font-weight: 400; }
+.people-stack { display: inline-flex; align-items: center; margin-left: auto; background: none; border: 0; padding: 0 4px; cursor: pointer; }
+.people-stack .avatar { box-shadow: 0 0 0 2px var(--panel); }
+.people-stack .avatar + .avatar { margin-left: -8px; }
+.people-stack .more-people { background: var(--head); color: var(--ink); font-weight: 600; }
+.toolbar .export + .people-stack, .toolbar .people-stack + .share { margin-left: 0; }
 .sheet-link:disabled { color: var(--muted); font-style: italic; cursor: default; }
 .badge { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); background: var(--head); border-radius: 999px; padding: 2px 8px; white-space: nowrap; }
 .badge.view-only { color: var(--pear-dark); background: var(--pear-soft); }

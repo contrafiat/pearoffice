@@ -4,6 +4,7 @@ import { Grid } from './Grid.jsx'
 import { colName } from './a1.js'
 import { shiftA1 } from '../shared/refs.js'
 import { SharePanel } from './SharePanel.jsx'
+import { PeopleStack } from './Avatar.jsx'
 import { DeletePanel } from './DeletePanel.jsx'
 import { FormulaHelp, helpFor, insertFunction } from './FormulaHelp.jsx'
 import { exportSheet, isMobile } from './xlsx.js'
@@ -99,6 +100,14 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
   const setNumPad = (on) => { setNumPadState(on); writePref('pearsheet:numpad', on ? '1' : '0') }
   const [deleting, setDeleting] = useState(null) // 'local' | 'everyone' | null
   const gridRef = useRef(null)
+
+  // Everyone in the sheet, for the pictures next to Share.
+  const [members, setMembers] = useState([])
+  const loadMembers = useCallback(() => {
+    call('sheet:members', { sheetId }).then((d) => setMembers(d.members)).catch(() => {})
+  }, [sheetId])
+  useEffect(() => { loadMembers() }, [loadMembers])
+  useEffect(() => on('sheet:members', (d) => { if (d.sheetId === sheetId) loadMembers() }), [sheetId, loadMembers])
 
   const load = useCallback(async () => {
     try {
@@ -411,6 +420,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
         {window.pearsheet && (
           <button className='export' title='Save a copy as an Excel file' onClick={() => exportSheet(sheetId).catch((err) => onError(err.message))}>Export</button>
         )}
+        {members.length > 1 && <PeopleStack sheetId={sheetId} members={members} onClick={() => setSharing(true)} />}
         <button className='share' onClick={() => setSharing(true)}>Share</button>
         <span className='more'>
           <button className='more-button' aria-label='More' title='More' onClick={() => setMore(!more)}>⋯</button>

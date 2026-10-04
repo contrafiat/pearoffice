@@ -78,6 +78,16 @@ test('profiles with avatars', async (t) => {
     assert.equal((await call(owner, 'sheet:avatar', { sheetId, identity: V })).data, viPic.data)
   })
 
+  await t.test('the sheet list shows the owner and how many people', async () => {
+    const mine = (await call(owner, 'sheet:list')).find((x) => x.sheetId === sheetId)
+    assert.equal(mine.people, 3)
+    assert.equal(mine.owner.isMe, true)
+    const theirs = (await call(viewer, 'sheet:list')).find((x) => x.sheetId === sheetId)
+    assert.equal(theirs.owner.isMe, false)
+    assert.equal(theirs.owner.name, 'Olive')
+    assert.equal(theirs.owner.avatarHash, olivePic.hash)
+  })
+
   await t.test('removing a picture', async () => {
     await call(viewer, 'app:setAvatar', { data: '' })
     await waitFor('gone on the owner', async () => (await memberOf(owner, sheetId, V)).avatarHash === null)
