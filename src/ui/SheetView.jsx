@@ -4,6 +4,7 @@ import { Grid } from './Grid.jsx'
 import { colName } from './a1.js'
 import { shiftA1 } from '../shared/refs.js'
 import { SharePanel } from './SharePanel.jsx'
+import { DeletePanel } from './DeletePanel.jsx'
 import { exportSheet, isMobile } from './xlsx.js'
 
 const COLOURS = ['#1f2420', '#b3261e', '#c2410c', '#a16207', '#15803d', '#0e7490', '#1d4ed8', '#7e22ce']
@@ -45,7 +46,7 @@ const NUMBER_FORMATS = [
   ['d mmm yyyy', '29 Feb 2024']
 ]
 
-export function SheetView ({ sheetId, onTitleChange, onError }) {
+export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
   const [view, setView] = useState(null)
   const [tabId, setTabId] = useState(null)
   const [sel, setSel] = useState({ row: 1, col: 1 }) // the active cell
@@ -67,6 +68,8 @@ export function SheetView ({ sheetId, onTitleChange, onError }) {
   const [menu, setMenu] = useState(null) // { kind, index, x, y } | null
   const [renaming, setRenaming] = useState(null) // { id, value } | null
   const [sharing, setSharing] = useState(false)
+  const [more, setMore] = useState(false) // the ⋯ menu
+  const [deleting, setDeleting] = useState(null) // 'local' | 'everyone' | null
   const gridRef = useRef(null)
 
   const load = useCallback(async () => {
@@ -339,6 +342,15 @@ export function SheetView ({ sheetId, onTitleChange, onError }) {
           <button className='export' title='Save a copy as an Excel file' onClick={() => exportSheet(sheetId).catch((err) => onError(err.message))}>Export</button>
         )}
         <button className='share' onClick={() => setSharing(true)}>Share</button>
+        <span className='more'>
+          <button className='more-button' aria-label='More' title='More' onClick={() => setMore(!more)}>⋯</button>
+          {more && (
+            <ul className='menu more-menu' role='menu' onClick={() => setMore(false)}>
+              <li role='menuitem' onClick={() => setDeleting('local')}>Remove from this device</li>
+              {view.myRole === 'owner' && <li role='menuitem' className='danger' onClick={() => setDeleting('everyone')}>Delete for everyone</li>}
+            </ul>
+          )}
+        </span>
       </header>
 
       {frozenNote && <div className='banner info'>{frozenNote}</div>}
@@ -377,6 +389,7 @@ export function SheetView ({ sheetId, onTitleChange, onError }) {
       />
 
       {sharing && <SharePanel sheetId={sheetId} onClose={() => setSharing(false)} onError={onError} />}
+      {deleting && <DeletePanel sheetId={sheetId} title={view.title} kind={deleting} onClose={() => setDeleting(null)} onError={onError} onDone={() => { setDeleting(null); onGone() }} />}
 
       {menu && (
         <ul className='menu' style={{ left: menu.x, top: menu.y }} role='menu'>

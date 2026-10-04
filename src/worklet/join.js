@@ -197,6 +197,8 @@ function createJoinService ({ engine, emit, log = () => {}, now = () => Date.now
       throw new Error('You already have this sheet')
     }
     if (joins.has(sheetId)) return { sheetId }
+    // Invited back after removing the sheet from this device: allow it.
+    await engine.localDb.del('removed:' + sheetId)
     const j = { raw: rawLink, link, name: m.cleanName(name), welcome: null, channels: new Set(), timer: null, done: false, claimMsg: null }
     joins.set(sheetId, j)
     await persist(sheetId, j)

@@ -26,7 +26,8 @@ const P = {
   role: 'pearsheet/role/v1',
   name: 'pearsheet/name/v1',
   seeder: 'pearsheet/seeder/v1',
-  move: 'pearsheet/move/v1'
+  move: 'pearsheet/move/v1',
+  delete: 'pearsheet/delete/v1'
 }
 
 const hex = (buf) => b4a.toString(buf, 'hex')
@@ -145,6 +146,11 @@ function moveOp ({ sheetId, owner, target, recipients }) {
   const sealed = {}
   for (const identity of recipients) sealed[identity] = seal(target, identity)
   return { type: 'move', move: signValue({ purpose: P.move, sheetId, sealed, by: hex(owner.publicKey) }, owner.secretKey) }
+}
+
+// The owner deletes the sheet for everyone (proposals/2026-10-04-deleting-sheets.md).
+function deleteOp ({ sheetId, owner }) {
+  return { type: 'delete', delete: signValue({ purpose: P.delete, sheetId, by: hex(owner.publicKey) }, owner.secretKey) }
 }
 
 // The joiner's half of an inviteUse: proof of the invite secret, and proof that
@@ -311,6 +317,18 @@ async function applyMembershipOp (op, { view, base, groupId, node, log }) {
     return true
   }
 
+  if (op.type === 'delete') {
+    const sheet = await get(view, 'sheet')
+    const d = op.delete
+    if (!sheet || !signedBy(d, 'by', P.delete, sheetId) || d.by !== sheet.owner) return skip('not signed by the owner')
+    const actor = await actorOf(view, node)
+    if (!actor || actor.identity !== sheet.owner) return skip('not appended by an owner device')
+    if (await get(view, 'deleted')) return skip('already deleted')
+    // Frozen from here on, as after a move (see sheetWire.js).
+    await view.put('deleted', { by: d.by })
+    return true
+  }
+
   if (op.type === 'name') {
     const r = op.name
     if (!signedBy(r, 'identity', P.name, sheetId)) return skip('bad signature')
@@ -374,6 +392,7 @@ module.exports = {
   memberOp,
   admitOp,
   moveOp,
+  deleteOp,
   seal,
   unseal,
   claimFor,

@@ -16,6 +16,7 @@ export function App () {
   const [navOpen, setNavOpen] = useState(false) // phone layout: the sheet list slides in
   const [devices, setDevices] = useState(null) // { link } | { startWith } | {} when open
   const [nudge, setNudge] = useState(false)
+  const [notice, setNotice] = useState(null)
   const desktop = !!(window.pearsheet && window.pearsheet.platform === 'desktop')
   const [keepOnline, setKeepOnline] = useState(null)
 
@@ -39,6 +40,10 @@ export function App () {
       // A sheet moved to fresh keys: follow it if it is the one on screen.
       on('sheet:moved', async ({ from, to }) => { await refresh(); setCurrent((c) => (c === from ? to : c)) }),
       on('sheet:removed', refresh),
+      // A sheet left this device (removed here, deleted by its owner, or an
+      // old copy after a move).
+      on('sheet:gone', async ({ sheetId }) => { setCurrent((c) => (c === sheetId ? null : c)); await refresh() }),
+      on('sheet:deleted', ({ title }) => setNotice('"' + (title || 'A sheet') + '" was deleted by its owner.')),
       on('app:deeplink', ({ url }) => { call('app:takeLink').catch(() => {}); openLink(url) })
     ]
     // A link that opened the app before this page was listening.
@@ -164,6 +169,7 @@ export function App () {
       {devices && <DevicesPanel initialLink={devices.link || ''} startWith={devices.startWith || null} onClose={() => setDevices(null)} onError={setError} />}
       {seeder && <SeederPanel initialLink={typeof seeder === 'string' ? seeder : ''} onClose={() => setSeeder(false)} onError={setError} />}
       <main className='main'>
+        {notice && <div className='banner info'>{notice} <button className='link-button' onClick={() => setNotice(null)}>OK</button></div>}
         {nudge && (
           <div className='banner info'>
             Write down your recovery phrase so you can get your identity back if you lose this device.{' '}
@@ -173,7 +179,7 @@ export function App () {
         )}
         {error && <div className='banner' role='alert'>{error} <button className='link-button' onClick={() => setError(null)}>Dismiss</button></div>}
         {current
-          ? <SheetView key={current} sheetId={current} onTitleChange={refresh} onError={setError} />
+          ? <SheetView key={current} sheetId={current} onTitleChange={refresh} onError={setError} onGone={async () => { setCurrent(null); await refresh() }} />
           : (
             <div className='empty'>
               <h1>Shared spreadsheets, device to device.</h1>

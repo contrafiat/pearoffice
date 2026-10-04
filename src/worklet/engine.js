@@ -9,6 +9,7 @@ const { createJoinService } = require('./join')
 const { createSeeding } = require('./seeding')
 const { createMoves } = require('./moves')
 const { createLinking } = require('./linking')
+const { createDeleting } = require('./deleting')
 
 function createSheetEngine (opts = {}) {
   const { createSwarm: makeSwarm, log = () => {}, ...rest } = opts
@@ -17,6 +18,7 @@ function createSheetEngine (opts = {}) {
   let seeding = null
   let moves = null
   let linking = null
+  let deleting = null
   const emit = (event, data) => engine && engine.emit(event, data)
 
   const sheets = createSheets({
@@ -30,6 +32,8 @@ function createSheetEngine (opts = {}) {
     ...createSheetMethods(sheets, { getJoin: () => join, getMoves: () => moves }),
     'seeder:pair': async ({ link }) => seeding.pair(link),
     'seeder:list': async () => seeding.list(),
+    'sheet:removeLocal': async ({ sheetId }) => deleting.removeLocal(sheetId),
+    'sheet:deleteForEveryone': async ({ sheetId }) => deleting.deleteForEveryone(sheetId),
     'link:start': async () => linking.start(),
     'link:join': async ({ link }) => linking.join(link),
     'link:phrase': async () => ({ phrase: linking.phrase() }),
@@ -52,6 +56,7 @@ function createSheetEngine (opts = {}) {
         emit('sheet:members', { sheetId })
         if (type === 'seeder' && seeding) seeding.register(sheetId).catch(() => {})
         if (type === 'move' && moves) moves.onMoved(sheetId).catch((e) => log('move failed: ' + e.message))
+        if (type === 'delete' && deleting) deleting.onDeleted(sheetId).catch((e) => log('delete failed: ' + e.message))
       },
       log
     }),
@@ -71,8 +76,9 @@ function createSheetEngine (opts = {}) {
       setTimeout(() => join.resume().catch((e) => log('resume joins failed: ' + e.message)), 0)
       seeding = createSeeding({ engine, log })
       setTimeout(() => seeding.start(), 0)
-      moves = createMoves({ engine, sheets, getJoin: () => join, emit, log })
+      moves = createMoves({ engine, sheets, getJoin: () => join, getDeleting: () => deleting, emit, log })
       linking = createLinking({ engine, log })
+      deleting = createDeleting({ engine, sheets, getSeeding: () => seeding, emit, log })
       // Core has no hook for "init finished", so catch up a little after
       // start, and once more later: open sheets that came with a device link,
       // follow sheets that moved, ask to be admitted where needed.
@@ -80,6 +86,7 @@ function createSheetEngine (opts = {}) {
         const t = setTimeout(async () => {
           try { await linking.resume() } catch (e) { log('link resume failed: ' + e.message) }
           try { await moves.resume() } catch {}
+          try { await deleting.resume() } catch {}
         }, ms)
         if (t.unref) t.unref()
       }
@@ -100,6 +107,7 @@ function createSheetEngine (opts = {}) {
   engine.methods = methods
   Object.defineProperty(engine, 'join', { get: () => join })
   Object.defineProperty(engine, 'seeding', { get: () => seeding })
+  Object.defineProperty(engine, 'deleting', { get: () => deleting })
   return engine
 }
 

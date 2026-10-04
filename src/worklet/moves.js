@@ -18,7 +18,7 @@ const m = require('./membership')
 const hex = (buf) => b4a.toString(buf, 'hex')
 const DEVICE_RESEND_MS = 3000
 
-function createMoves ({ engine, sheets, getJoin, emit, log = () => {} }) {
+function createMoves ({ engine, sheets, getJoin, getDeleting = () => null, emit, log = () => {} }) {
   const following = new Map() // newSheetId -> { timer, device }
 
   async function viewGet (sheetId, key) {
@@ -90,6 +90,7 @@ function createMoves ({ engine, sheets, getJoin, emit, log = () => {} }) {
     await engine.localDb.put('moves:' + oldId, { to: newId, removed: false, at: Date.now() })
     emit('sheet:moved', { from: oldId, to: newId })
     log('moved ' + oldId.slice(0, 8) + ' to ' + newId.slice(0, 8))
+    if (getDeleting()) getDeleting().afterMove(oldId).catch(() => {})
     return { sheetId: newId }
   }
 
@@ -121,6 +122,7 @@ function createMoves ({ engine, sheets, getJoin, emit, log = () => {} }) {
     if (getJoin()) getJoin().addSheet(target.sheetId)
     emit('sheet:moved', { from: oldId, to: target.sheetId })
     followDevice(target.sheetId)
+    if (getDeleting()) getDeleting().afterMove(oldId).catch(() => {})
   }
 
   // Get this device admitted in the new sheet: send its proof on the join
