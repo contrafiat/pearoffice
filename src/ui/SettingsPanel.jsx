@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react'
-import { CaretLeft, X } from '@phosphor-icons/react'
+import { ArrowSquareOut, CaretLeft, Devices, EnvelopeSimple, HardDrives, X } from '@phosphor-icons/react'
 import { call } from './bridge.js'
 import { Avatar, shrinkPicture } from './Avatar.jsx'
 import { readPref, writePref } from './prefs.js'
@@ -24,7 +24,9 @@ const CREDITS = [
   ['React', 'MIT', 'the interface'],
   ['Electron', 'MIT', 'the desktop app'],
   ['React Native and Expo', 'MIT', 'the phone app'],
-  ['qrcode-generator', 'MIT', 'QR codes']
+  ['qrcode-generator', 'MIT', 'QR codes'],
+  ['Manrope', 'OFL-1.1', 'the font'],
+  ['Phosphor Icons', 'MIT', 'icons']
 ]
 
 function openUrl (url) {
@@ -130,11 +132,11 @@ export function SettingsPanel ({ me, onMe, desktop, keepOnline, startAtLogin, on
 
             <h3>Devices</h3>
             <p className='small'>Use PearSheet on another device as the same person, and keep your recovery phrase.</p>
-            <div className='row'><button className='settings-devices' onClick={onDevices}>Devices and recovery phrase</button></div>
+            <div className='row'><button className='settings-devices' onClick={onDevices}><Devices size={16} /> Devices and recovery phrase</button></div>
 
             <h3>Seeder</h3>
             <p className='small'>An always-on computer that keeps an encrypted copy of your sheets online. It cannot read them.</p>
-            <div className='row'><button className='settings-seeder' onClick={onSeeder}>Seeder</button></div>
+            <div className='row'><button className='settings-seeder' onClick={onSeeder}><HardDrives size={16} /> Seeder</button></div>
 
             <div className='row about-row'>
               <button className='link-button about-link' onClick={() => setMode('about')}>About PearSheet{VERSION ? ' ' + VERSION : ''}</button>
@@ -148,9 +150,9 @@ export function SettingsPanel ({ me, onMe, desktop, keepOnline, startAtLogin, on
             <p className='small'>Version {VERSION || 'unknown'}</p>
             <h3>How it works</h3>
             <p>Your sheets live on your devices. When you share one, it syncs straight between the devices of the people in it, encrypted, with no company server in between. A seeder you run can keep a copy online while everyone is offline, and it cannot read it.</p>
-            <div className='row'><button onClick={() => openUrl('https://pears.com/')}>Learn about peer-to-peer</button></div>
+            <div className='row'><button onClick={() => openUrl('https://pears.com/')}><ArrowSquareOut size={16} /> Learn about peer-to-peer</button></div>
             <h3>Contact</h3>
-            <div className='row'><button onClick={() => openUrl('mailto:peerloomllc@proton.me?subject=%5BPearSheet%5D%20Feedback')}>Email PeerLoom</button></div>
+            <div className='row'><button onClick={() => openUrl('mailto:peerloomllc@proton.me?subject=%5BPearSheet%5D%20Feedback')}><EnvelopeSimple size={16} /> Email PeerLoom</button></div>
             <h3>Open-source software</h3>
             <p className='small'>PearSheet is built on these projects, used under their licences.</p>
             <ul className='credits'>

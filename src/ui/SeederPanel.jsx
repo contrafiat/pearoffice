@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { CaretLeft, X } from '@phosphor-icons/react'
+import { CaretLeft, QrCode as QrIcon, X } from '@phosphor-icons/react'
 import { call } from './bridge.js'
 import { toSvg } from '../shared/qr.js'
 import { ScanButton } from './Qr.jsx'
@@ -37,7 +37,7 @@ function LocalSeeder ({ onPaired, onError }) {
         <>
           <p className='muted small'>Holding {host.sheets} sheet{host.sheets === 1 ? '' : 's'} for {host.pairedDevices} paired device{host.pairedDevices === 1 ? '' : 's'}. It runs in the background while PearSheet is open or in the tray.</p>
           <div className='row'>
-            <button type='button' onClick={async () => { try { setPairing(await call('app:seederHostPair')) } catch (err) { onError(err.message) } }}>Show pairing code</button>
+            <button type='button' onClick={async () => { try { setPairing(await call('app:seederHostPair')) } catch (err) { onError(err.message) } }}><QrIcon size={16} /> Show pairing code</button>
             <button
               type='button'
               disabled={busy}
