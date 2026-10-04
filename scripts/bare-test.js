@@ -1,5 +1,5 @@
 // Runs under Node, drives the real Bare binary:
-//   1. the formula corpus must match the golden file bit for bit;
+//   1. the formula and function corpora must match their golden files bit for bit;
 //   2. the worklet bundle must create, edit and read a sheet over stdin/stdout,
 //      the same IPC path Electron uses.
 const fs = require('fs')
@@ -15,8 +15,11 @@ async function main () {
   const corpus = pack(path.join(root, 'test', 'fixtures', 'formula-bare-entry.js'), path.join(root, 'dist', 'test-corpus', 'corpus.bundle'))
   const got = JSON.parse(execFileSync(bare, [corpus]).toString())
   const golden = JSON.parse(fs.readFileSync(path.join(root, 'test', 'fixtures', 'formula-golden.json'), 'utf8'))
-  assert.deepEqual(got, golden)
+  assert.deepEqual(got.corpus, golden)
   console.log('ok - formula corpus under Bare matches the golden file')
+  const functionGolden = JSON.parse(fs.readFileSync(path.join(root, 'test', 'fixtures', 'function-golden.json'), 'utf8'))
+  assert.deepEqual(got.functions, functionGolden)
+  console.log('ok - function corpus under Bare matches the golden file')
 
   require('./build-worklet')
   const bundle = path.join(root, 'dist', 'worklet', 'worklet.bundle')
