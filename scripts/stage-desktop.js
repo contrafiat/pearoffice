@@ -48,7 +48,17 @@ execFileSync(process.execPath, [
   path.join(root, 'src', 'worklet', 'bare.js')
 ], { cwd: root, stdio: 'inherit' })
 
-// 3. The UI, minified.
+// 3. The blind seeder bundle ("Run a seeder on this computer"), same addons.
+execFileSync(process.execPath, [
+  path.join(root, 'node_modules', 'bare-pack', 'bin.js'),
+  '--host', host,
+  '--offload-addons',
+  '--imports', path.join(root, 'scripts', 'bare-imports.js'),
+  '-o', path.join(out, 'seeder', 'seeder.bundle'),
+  path.join(root, 'src', 'seeder', 'bare.js')
+], { cwd: root, stdio: 'inherit' })
+
+// 4. The UI, minified.
 execFileSync(process.execPath, [path.join(root, 'scripts', 'build-ui.mjs'), '--minify'], { cwd: root, stdio: 'inherit' })
 fs.cpSync(path.join(root, 'dist', 'ui'), path.join(out, 'ui'), { recursive: true })
 

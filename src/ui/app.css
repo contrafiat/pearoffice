@@ -309,3 +309,7 @@ button, input, select { font: inherit; color: inherit; }
 .panel textarea { border: 1px solid var(--line-strong); border-radius: 8px; padding: 8px 10px; background: var(--paper); font: inherit; resize: vertical; }
 .panel .ok { color: var(--pear-dark); }
 .panel .small { font-size: 12px; }
+
+.keep-online.inline { margin-top: 0; padding: 0; }
+.pairing { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.pairing .qr { background: #fff; padding: 8px; border-radius: 8px; line-height: 0; }

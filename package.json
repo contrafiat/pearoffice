@@ -21,7 +21,8 @@
     "build:ui:mobile": "node scripts/build-ui.mjs --minify --mobile",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "build:android": "scripts/build-android.sh"
+    "build:android": "scripts/build-android.sh",
+    "dist:seeder": "node scripts/dist-seeder.js"
   },
   "dependencies": {
     "@formulajs/formulajs": "^4.6.1",
@@ -59,6 +60,7 @@
     "jstat": "^1.9.6",
     "protomux": "^3.10.3",
     "protomux-wakeup": "2.9.0",
+    "qrcode-generator": "^2.0.4",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-native": "0.81.5",

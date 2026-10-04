@@ -191,6 +191,19 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
     await js("document.querySelector('.panel .close').click()")
     step('seeder and devices panels')
 
+    // Run a seeder on this computer, pair this device with it, show its QR.
+    await js("[...document.querySelectorAll('.seeder-button')].find((b) => b.textContent === 'Seeder').click()")
+    await waitFor('local seeder switch', "[...document.querySelectorAll('.panel label')].some((l) => l.textContent.includes('Run a seeder'))")
+    await js("[...document.querySelectorAll('.panel label')].find((l) => l.textContent.includes('Run a seeder')).querySelector('input').click()")
+    await waitFor('local seeder running', "document.querySelector('.panel').textContent.includes('Holding')", 60000)
+    await js("[...document.querySelectorAll('.panel button')].find((b) => b.textContent === 'Pair this device with it').click()")
+    await waitFor('paired with the local seeder', "document.querySelector('.panel').textContent.includes('Paired. Your sheets are backing up.')", 60000)
+    await js("[...document.querySelectorAll('.panel button')].find((b) => b.textContent === 'Show pairing code').click()")
+    await waitFor('pairing QR', "!!document.querySelector('.pairing .qr svg')")
+    await waitFor('seeder holds the sheets', "/Holding [1-9]/.test(document.querySelector('.panel').textContent)", 30000)
+    await js("document.querySelector('.panel .close').click()")
+    step('local seeder: running, paired, QR, holding sheets')
+
     // Keep sheets online: closing the window hides it, the app keeps running.
     await js("document.querySelector('.keep-online input').click()")
     await waitFor('setting on', "document.querySelector('.keep-online input').checked")

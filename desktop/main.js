@@ -6,6 +6,7 @@ const { app, BrowserWindow, Tray, Menu, ipcMain, shell } = require('electron')
 const path = require('node:path')
 const fs = require('node:fs')
 const { Worklet } = require('./worklet')
+const { SeederProcess } = require('./seeder-process')
 const { resolvePaths } = require('./paths')
 
 const SMOKE = !!process.env.PEARSHEET_SMOKE
@@ -39,16 +40,37 @@ let tray = null
 
 // Desktop-only settings, kept next to the data (not in the sheets).
 const settingsFile = path.join(dataDir, 'desktop-settings.json')
+const DEFAULTS = { keepOnline: false, runSeeder: false }
 function readSettings () {
-  try { return { keepOnline: false, ...JSON.parse(fs.readFileSync(settingsFile, 'utf8')) } } catch { return { keepOnline: false } }
+  try { return { ...DEFAULTS, ...JSON.parse(fs.readFileSync(settingsFile, 'utf8')) } } catch { return { ...DEFAULTS } }
 }
+// The tray (and hide-on-close) is on while either keeps the app running.
+const stayRunning = () => settings.keepOnline || settings.runSeeder
 let settings = readSettings()
 function writeSettings (patch) {
   settings = { ...settings, ...patch }
   fs.mkdirSync(path.dirname(settingsFile), { recursive: true })
   fs.writeFileSync(settingsFile, JSON.stringify(settings, null, 2))
-  if (settings.keepOnline) createTray()
+  if (stayRunning()) createTray()
   else if (tray) { tray.destroy(); tray = null }
+  if (settings.runSeeder) startSeeder().catch((err) => log('seeder failed to start:', err.message))
+  else stopSeeder()
+}
+
+// "Run a seeder on this computer": the blind seeder as its own process.
+let seeder = null
+function startSeeder () {
+  if (seeder && seeder.running) return Promise.resolve()
+  seeder = new SeederProcess({
+    barePath: paths.bare,
+    bundlePath: paths.seeder,
+    dataDir: path.join(dataDir, 'seeder'),
+    onLog: (kind, text) => log(kind, text)
+  })
+  return seeder.start()
+}
+function stopSeeder () {
+  if (seeder) { const s = seeder; seeder = null; return s.stop() }
 }
 
 function showWindow () {
@@ -67,7 +89,7 @@ function createTray () {
     log('tray failed:', err.message)
     return
   }
-  tray.setToolTip('PearSheet: keeping your sheets online')
+  tray.setToolTip('PearSheet is running')
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: 'Open PearSheet', click: showWindow },
     { type: 'separator' },
@@ -106,8 +128,18 @@ ipcMain.handle('worklet:call', async (_e, method, args) => {
   // fresh worklet and reload the UI.
   if (method === 'app:settings') return settings
   if (method === 'app:setSetting') {
-    if (args && typeof args.keepOnline === 'boolean') writeSettings({ keepOnline: args.keepOnline })
+    const patch = {}
+    for (const k of Object.keys(DEFAULTS)) if (args && typeof args[k] === 'boolean') patch[k] = args[k]
+    writeSettings(patch)
     return settings
+  }
+  if (method === 'app:seederHost') {
+    if (!seeder || !seeder.running) return { running: false }
+    return { running: true, ...(await seeder.call('status')) }
+  }
+  if (method === 'app:seederHostPair') {
+    if (!seeder || !seeder.running) throw new Error('The seeder on this computer is not running')
+    return seeder.call('pair')
   }
   if (method === 'app:restart') {
     await worklet.stop()
@@ -138,7 +170,7 @@ function createWindow () {
   })
   win.removeMenu()
   win.on('close', (e) => {
-    if (!quitting && settings.keepOnline) {
+    if (!quitting && stayRunning()) {
       e.preventDefault()
       win.hide()
     }
@@ -160,7 +192,8 @@ app.whenReady().then(async () => {
     throw err
   })
   createWindow()
-  if (settings.keepOnline) createTray()
+  if (stayRunning()) createTray()
+  if (settings.runSeeder) startSeeder().catch((err) => log('seeder failed to start:', err.message))
   if (SMOKE) {
     // Downloads (Export) go straight to the smoke test's data folder.
     win.webContents.session.on('will-download', (_e, item) => {
@@ -187,6 +220,6 @@ app.on('before-quit', async (e) => {
   if (quitting || !worklet) return
   e.preventDefault()
   quitting = true
-  await worklet.stop()
+  await Promise.all([worklet.stop(), stopSeeder()])
   app.quit()
 })

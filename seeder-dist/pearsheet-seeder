@@ -1,0 +1,7 @@
+#!/bin/sh
+# PearSheet seeder launcher. Data goes to $PEARSHEET_SEEDER_DATA, or
+# ~/.pearsheet-seeder. Type `pair` for a new pairing code, `status` for counts.
+here="$(cd "$(dirname "$0")" && pwd)"
+data="${PEARSHEET_SEEDER_DATA:-$HOME/.pearsheet-seeder}"
+mkdir -p "$data"
+exec "$here/bare" "$here/seeder/seeder.bundle" --data "$data" "$@"
