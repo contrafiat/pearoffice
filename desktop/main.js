@@ -2,8 +2,9 @@
 // (the same bundle the phones will run), opens the window and relays calls and
 // events between the UI and the worklet. See proposal section 9.
 
-const { app, BrowserWindow, ipcMain, shell } = require('electron')
+const { app, BrowserWindow, Tray, Menu, ipcMain, shell } = require('electron')
 const path = require('node:path')
+const fs = require('node:fs')
 const { Worklet } = require('./worklet')
 const { resolvePaths } = require('./paths')
 
@@ -34,6 +35,46 @@ const dataDir = process.env.PEARSHEET_DATA || path.join(app.getPath('userData'),
 let win = null
 let worklet = null
 let quitting = false
+let tray = null
+
+// Desktop-only settings, kept next to the data (not in the sheets).
+const settingsFile = path.join(dataDir, 'desktop-settings.json')
+function readSettings () {
+  try { return { keepOnline: false, ...JSON.parse(fs.readFileSync(settingsFile, 'utf8')) } } catch { return { keepOnline: false } }
+}
+let settings = readSettings()
+function writeSettings (patch) {
+  settings = { ...settings, ...patch }
+  fs.mkdirSync(path.dirname(settingsFile), { recursive: true })
+  fs.writeFileSync(settingsFile, JSON.stringify(settings, null, 2))
+  if (settings.keepOnline) createTray()
+  else if (tray) { tray.destroy(); tray = null }
+}
+
+function showWindow () {
+  if (!win || win.isDestroyed()) return
+  win.show()
+  win.focus()
+}
+
+// "Keep my sheets online" (proposal section 8): with it on, closing the
+// window hides it and PearSheet keeps syncing from the tray.
+function createTray () {
+  if (tray && !tray.isDestroyed()) return
+  try {
+    tray = new Tray(path.join(__dirname, 'build', 'icon.png'))
+  } catch (err) {
+    log('tray failed:', err.message)
+    return
+  }
+  tray.setToolTip('PearSheet: keeping your sheets online')
+  tray.setContextMenu(Menu.buildFromTemplate([
+    { label: 'Open PearSheet', click: showWindow },
+    { type: 'separator' },
+    { label: 'Quit PearSheet', click: () => app.quit() }
+  ]))
+  tray.on('click', showWindow)
+}
 
 function log (...args) {
   if (!app.isPackaged || SMOKE) console.log('[pearsheet]', ...args)
@@ -63,6 +104,11 @@ ipcMain.handle('worklet:call', async (_e, method, args) => {
   if (method === 'app:takeLink') { const url = pendingLink; pendingLink = null; return { url } }
   // After a device link or a phrase restore the identity changed: start a
   // fresh worklet and reload the UI.
+  if (method === 'app:settings') return settings
+  if (method === 'app:setSetting') {
+    if (args && typeof args.keepOnline === 'boolean') writeSettings({ keepOnline: args.keepOnline })
+    return settings
+  }
   if (method === 'app:restart') {
     await worklet.stop()
     await startWorklet()
@@ -91,6 +137,12 @@ function createWindow () {
     }
   })
   win.removeMenu()
+  win.on('close', (e) => {
+    if (!quitting && settings.keepOnline) {
+      e.preventDefault()
+      win.hide()
+    }
+  })
   // Links open in the system browser, never inside the app.
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:/.test(url)) shell.openExternal(url)
@@ -108,6 +160,7 @@ app.whenReady().then(async () => {
     throw err
   })
   createWindow()
+  if (settings.keepOnline) createTray()
   if (SMOKE) {
     // Downloads (Export) go straight to the smoke test's data folder.
     win.webContents.session.on('will-download', (_e, item) => {
@@ -115,18 +168,20 @@ app.whenReady().then(async () => {
       require('node:fs').mkdirSync(path.dirname(target), { recursive: true })
       item.setSavePath(target)
     })
-    require('./smoke-run').run({ app, win, ready, log, dataDir })
+    require('./smoke-run').run({ app, win, ready, log, dataDir, getTray: () => tray })
   }
 })
 
 app.on('second-instance', (_e, argv) => {
-  if (win) { if (win.isMinimized()) win.restore(); win.focus() }
+  if (win) { if (win.isMinimized()) win.restore(); win.show(); win.focus() }
   sendLink(linkIn(argv))
 })
 
 app.on('open-url', (e, url) => { e.preventDefault(); sendLink(url) }) // macOS
 
 app.on('window-all-closed', () => app.quit())
+
+app.on('activate', showWindow) // macOS: clicking the dock icon
 
 app.on('before-quit', async (e) => {
   if (quitting || !worklet) return

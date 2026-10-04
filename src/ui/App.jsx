@@ -16,6 +16,8 @@ export function App () {
   const [navOpen, setNavOpen] = useState(false) // phone layout: the sheet list slides in
   const [devices, setDevices] = useState(null) // { link } | { startWith } | {} when open
   const [nudge, setNudge] = useState(false)
+  const desktop = !!(window.pearsheet && window.pearsheet.platform === 'desktop')
+  const [keepOnline, setKeepOnline] = useState(null)
 
   const refresh = useCallback(async () => {
     try {
@@ -29,6 +31,7 @@ export function App () {
   useEffect(() => {
     refresh()
     call('app:me').then((me) => { setName(me.name); setNudge(!!me.phraseNudge) }).catch(() => {})
+    if (desktop) call('app:settings').then((s) => setKeepOnline(!!s.keepOnline)).catch(() => {})
     const offs = [
       on('worklet:exit', () => setError('The sync engine stopped. Restart PearSheet.')),
       on('join:progress', refresh),
@@ -124,7 +127,20 @@ export function App () {
             </button>
           ))}
         </nav>
-        <button className='seeder-button' onClick={() => setDevices({})}>Devices</button>
+        {desktop && keepOnline !== null && (
+          <label className='keep-online' title='Closing the window hides PearSheet in the tray, so people can sync with you while this computer is on'>
+            <input
+              type='checkbox'
+              checked={keepOnline}
+              onChange={async (e) => {
+                const r = await call('app:setSetting', { keepOnline: e.target.checked }).catch((err) => { setError(err.message); return null })
+                if (r) setKeepOnline(!!r.keepOnline)
+              }}
+            />
+            Keep sheets online when closed
+          </label>
+        )}
+        <button className={'seeder-button' + (desktop ? ' second' : '')} onClick={() => setDevices({})}>Devices</button>
         <button className='seeder-button second' onClick={() => setSeeder(true)}>Seeder</button>
         <label className='my-name'>
           <span>Your name</span>

@@ -33,7 +33,8 @@
       "worklet.js",
       "paths.js",
       "smoke-run.js",
-      "package.json"
+      "package.json",
+      "build/icon.png"
     ],
     "extraResources": [
       {

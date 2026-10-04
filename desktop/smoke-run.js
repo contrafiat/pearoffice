@@ -7,7 +7,7 @@ const fs = require('node:fs')
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
-async function run ({ app, win, ready, log, dataDir }) {
+async function run ({ app, win, ready, log, dataDir, getTray }) {
   const wc = win.webContents
   const result = { ok: false, steps: [] }
   const js = (code) => wc.executeJavaScript(code, true)
@@ -191,6 +191,14 @@ async function run ({ app, win, ready, log, dataDir }) {
     await js("document.querySelector('.panel .close').click()")
     step('seeder and devices panels')
 
+    // Keep sheets online: closing the window hides it, the app keeps running.
+    await js("document.querySelector('.keep-online input').click()")
+    await waitFor('setting on', "document.querySelector('.keep-online input').checked")
+    win.close()
+    await sleep(500)
+    result.keepOnline = !win.isDestroyed() && !!getTray()
+    step('keep online: window hidden, tray up')
+
     // Share: the owner gets a single-use invite link.
     await js("document.querySelector('.toolbar .share').click()")
     await waitFor('share panel', "!!document.querySelector('.panel .invite-actions')")
@@ -206,7 +214,7 @@ async function run ({ app, win, ready, log, dataDir }) {
       fs.writeFileSync(shot, image.toPNG())
       step('screenshot', shot)
     }
-    result.ok = result.importedFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000 && result.pastedFormula === '=SUM(C1:C2)' && result.inviteLink === 'pearsheet://join?s=' + result.inviteLink.slice(19) && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
+    result.ok = result.keepOnline && result.importedFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000 && result.pastedFormula === '=SUM(C1:C2)' && result.inviteLink === 'pearsheet://join?s=' + result.inviteLink.slice(19) && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
   } catch (err) {
     result.error = err.message
     // What the page showed, to tell a UI failure from a load failure.
