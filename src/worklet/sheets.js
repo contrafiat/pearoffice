@@ -280,6 +280,13 @@ function createSheets ({ emit, getBase, getLocalDb = () => null, getStore = () =
     return e.values
   }
 
+  // Values as of the latest edit, for actions that act on them (sort, find):
+  // the cached ones are refreshed a moment after a change.
+  function currentValues (e) {
+    if (e.timer) e.values = null
+    return values(e)
+  }
+
   function forget (sheetId) {
     const e = open.get(sheetId)
     if (e && e.timer) clearTimeout(e.timer)
@@ -291,7 +298,7 @@ function createSheets ({ emit, getBase, getLocalDb = () => null, getStore = () =
     return e && e.loading ? e : null
   }
 
-  return { load, attach, onUpdate, noteLocal, values, forget, entryFor, peek, yKey, saveSnapshot, flushSnapshots, changed }
+  return { load, attach, onUpdate, noteLocal, values, currentValues, forget, entryFor, peek, yKey, saveSnapshot, flushSnapshots, changed }
 }
 
 module.exports = { createSheets, GuardedDoc, yKey, Y_PREFIX }

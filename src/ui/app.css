@@ -227,7 +227,7 @@ button, input, select { font: inherit; color: inherit; }
 .people-stack .avatar { box-shadow: 0 0 0 2px var(--panel); }
 .people-stack .avatar + .avatar { margin-left: -8px; }
 .people-stack .more-people { background: var(--head); color: var(--ink); font-weight: 600; }
-.toolbar .export + .people-stack, .toolbar .people-stack + .share { margin-left: 0; }
+.toolbar .export + .people-stack, .toolbar .find-button + .people-stack, .toolbar .people-stack + .share { margin-left: 0; }
 .sheet-link.waiting { color: var(--muted); font-style: italic; }
 .badge { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); background: var(--head); border-radius: 999px; padding: 2px 8px; white-space: nowrap; }
 .badge.view-only { color: var(--pear-dark); background: var(--pear-soft); }
@@ -446,3 +446,20 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 .tabbar .totals b { color: var(--ink); font-weight: 500; }
 @media (max-width: 720px) { .tabbar .totals .wide { display: none; } }
 .tools .decimals { font-size: 12px; font-variant-numeric: tabular-nums; gap: 1px; }
+
+/* Find and replace, and Sort. */
+.toolbar .find-button { border: 1px solid var(--line-strong); background: var(--panel); border-radius: 8px; cursor: pointer; }
+.toolbar .export + .find-button + .share { margin-left: 0; }
+.toolbar .find-button + .share { margin-left: 0; }
+.find-form { display: flex; flex-direction: column; gap: 10px; }
+.find-options { display: flex; flex-wrap: wrap; gap: 6px 16px; }
+.find-options .check { font-size: 13px; align-items: center; }
+.find-options .check input { margin-top: 0; }
+.find-status { min-height: 1.2em; }
+.find-form > .link-button { align-self: center; }
+.sort-key .small { width: 64px; flex: none; }
+.sort-key select { flex: 1; min-width: 0; border: 1px solid var(--line-strong); border-radius: 8px; padding: 7px 8px; background: var(--paper); }
+@media (min-width: 721px) {
+  .find-backdrop { background: transparent; justify-content: flex-end; padding: 70px 24px 0 0; pointer-events: none; }
+  .find-backdrop .find-panel { pointer-events: auto; width: 380px; }
+}

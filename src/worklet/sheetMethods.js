@@ -104,13 +104,44 @@ function createSheetMethods (sheets, { getJoin, getMoves, getProfiles }) {
     return ids[0]
   }
 
+  async function requireEdit (ctx, sheetId) {
+    if (await isFrozen(ctx, sheetId)) throw new Error('This copy of the sheet is frozen')
+    const role = await myRole(ctx, sheetId)
+    if (role !== 'owner' && role !== 'editor') throw new Error('You can view this sheet but not edit it')
+    const base = ctx.bases.get(sheetId)
+    if (!base.writable) throw new Error('Still getting edit access to this sheet. Try again in a moment.')
+  }
+
+  // Find and replace: does `text` match, and what does it become.
+  function matcher ({ query, matchCase, wholeCell }) {
+    const q = String(query || '')
+    if (!q) throw new Error('Type something to find')
+    const esc = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const re = new RegExp(wholeCell ? '^' + esc + '$' : esc, matchCase ? 'g' : 'gi')
+    return {
+      test: (text) => { re.lastIndex = 0; return re.test(text) },
+      replace: (text, by) => { re.lastIndex = 0; return text.replace(re, () => String(by)) }
+    }
+  }
+
+  // Sorting order for values, as SORT uses: numbers, text without case,
+  // booleans, errors; blanks last whichever way.
+  function sortCompare (a, b) {
+    const blank = (v) => !v || v.error === undefined && (v.value === null || v.value === undefined || v.value === '')
+    if (blank(a) || blank(b)) return blank(a) === blank(b) ? 0 : blank(a) ? 1 : -1
+    const rank = (v) => (v.error !== undefined ? 3 : typeof v.value === 'number' ? 0 : typeof v.value === 'string' ? 1 : 2)
+    const ra = rank(a)
+    const rb = rank(b)
+    if (ra !== rb) return ra - rb
+    if (ra === 3) return 0
+    const x = ra === 1 ? a.value.toUpperCase() : a.value
+    const y = rb === 1 ? b.value.toUpperCase() : b.value
+    return x < y ? -1 : x > y ? 1 : 0
+  }
+
   function mutate (fn) {
     return async (args, ctx) => {
-      if (await isFrozen(ctx, args.sheetId)) throw new Error('This copy of the sheet is frozen')
-      const role = await myRole(ctx, args.sheetId)
-      if (role !== 'owner' && role !== 'editor') throw new Error('You can view this sheet but not edit it')
-      const base = ctx.bases.get(args.sheetId)
-      if (!base.writable) throw new Error('Still getting edit access to this sheet. Try again in a moment.')
+      await requireEdit(ctx, args.sheetId)
       const { doc } = await docFor(args.sheetId)
       const tabId = firstTab(doc, args.tabId)
       return commit(ctx, args.sheetId, fn(doc, tabId, args))
@@ -266,6 +297,104 @@ function createSheetMethods (sheets, { getJoin, getMoves, getProfiles }) {
     'sheet:renameTab': mutate((doc, tab, a) => model.renameTab(doc, tab, String(a.name))),
     'sheet:setTitle': mutate((doc, tab, a) => model.setTitle(doc, String(a.title))),
     'sheet:setWidth': mutate((doc, tab, a) => model.setWidth(doc, tab, a.col, a.px)),
+
+    // Sort the rows of a range by one or more of its columns
+    // (keys: [{ col, desc }]); with header, the first row stays put.
+    'sheet:sortRange': async ({ sheetId, tabId, r1, c1, r2, c2, keys, header }, ctx) => {
+      await requireEdit(ctx, sheetId)
+      const { e, doc } = await docFor(sheetId)
+      const tab = firstTab(doc, tabId)
+      const top = header ? r1 + 1 : r1
+      if (!Array.isArray(keys) || !keys.length || keys.some((k) => k.col < c1 || k.col > c2)) throw new Error('Sort by a column inside the range')
+      if (top >= r2) return { changed: false }
+      const values = sheets.currentValues(e).get(tab) || new Map()
+      const rows = []
+      for (let r = top; r <= r2; r++) rows.push(r)
+      rows.sort((a, b) => {
+        for (const k of keys) {
+          const va = values.get(a + ',' + k.col)
+          const vb = values.get(b + ',' + k.col)
+          const blankA = !va || (va.error === undefined && (va.value === null || va.value === ''))
+          const blankB = !vb || (vb.error === undefined && (vb.value === null || vb.value === ''))
+          if (blankA || blankB) { if (blankA !== blankB) return blankA ? 1 : -1; continue }
+          const c = sortCompare(va, vb)
+          if (c) return k.desc ? -c : c
+        }
+        return a - b
+      })
+      if (rows.every((r, i) => r === top + i)) return { changed: false }
+      return commit(ctx, sheetId, model.sortRows(doc, tab, top, c1, r2, c2, rows))
+    },
+
+    // Cells matching a search, in reading order: in what cells show
+    // (lookIn 'values') or what was typed, formulas included ('formulas').
+    'sheet:find': async ({ sheetId, tabId, query, matchCase, wholeCell, lookIn = 'values', allTabs }) => {
+      const m = matcher({ query, matchCase, wholeCell })
+      const { e, doc } = await docFor(sheetId)
+      const tabs = allTabs ? model.tabIds(doc) : [firstTab(doc, tabId)]
+      const all = sheets.currentValues(e)
+      const out = []
+      for (const id of tabs) {
+        const values = all.get(id) || new Map()
+        const hits = []
+        if (lookIn === 'formulas') {
+          const t = model.tabMap(doc, id)
+          const rows = t.get('rows').toArray()
+          const cols = t.get('cols').toArray()
+          const rowIndex = new Map(rows.map((x, i) => [x, i + 1]))
+          const colIndex = new Map(cols.map((x, i) => [x, i + 1]))
+          for (const key of t.get('cells').keys()) {
+            const [rowId, colId] = key.split(':')
+            const row = rowIndex.get(rowId)
+            const col = colIndex.get(colId)
+            if (row !== undefined && col !== undefined && m.test(model.getInput(doc, id, row, col))) hits.push([row, col])
+          }
+        } else {
+          for (const [rc, v] of values) {
+            const [row, col] = rc.split(',').map(Number)
+            const fmt = v.from ? model.getFormat(doc, id, v.from[0], v.from[1]) : model.getFormat(doc, id, row, col)
+            if (m.test(present(v, fmt).display)) hits.push([row, col])
+          }
+        }
+        hits.sort((a, b) => a[0] - b[0] || a[1] - b[1])
+        for (const [row, col] of hits) out.push({ tabId: id, row, col })
+      }
+      return { matches: out }
+    },
+
+    // Replace in what was typed, formulas included. With `at` ({ tabId, row,
+    // col }) only that cell; otherwise every match. Returns how many cells changed.
+    'sheet:replace': async ({ sheetId, tabId, query, replacement, matchCase, wholeCell, allTabs, at }, ctx) => {
+      await requireEdit(ctx, sheetId)
+      const m = matcher({ query, matchCase, wholeCell })
+      const { doc } = await docFor(sheetId)
+      const tabs = at ? [at.tabId] : allTabs ? model.tabIds(doc) : [firstTab(doc, tabId)]
+      let count = 0
+      for (const id of tabs) {
+        const t = model.tabMap(doc, id)
+        const rows = t.get('rows').toArray()
+        const cols = t.get('cols').toArray()
+        const rowIndex = new Map(rows.map((x, i) => [x, i + 1]))
+        const colIndex = new Map(cols.map((x, i) => [x, i + 1]))
+        const changes = []
+        for (const key of t.get('cells').keys()) {
+          const [rowId, colId] = key.split(':')
+          const row = rowIndex.get(rowId)
+          const col = colIndex.get(colId)
+          if (row === undefined || col === undefined) continue
+          if (at && (row !== at.row || col !== at.col)) continue
+          const input = model.getInput(doc, id, row, col)
+          if (!m.test(input)) continue
+          const next = m.replace(input, replacement || '')
+          if (next !== input) changes.push([row, col, next])
+        }
+        if (changes.length) {
+          count += changes.length
+          await commit(ctx, sheetId, model.replaceInputs(doc, id, changes))
+        }
+      }
+      return { count }
+    },
 
     'sheet:addTab': async ({ sheetId, name }, ctx) => {
       const { doc } = await docFor(sheetId)
