@@ -12,6 +12,8 @@ export function SharePanel ({ sheetId, onClose, onError }) {
   const [data, setData] = useState(null)
   const [link, setLink] = useState(null) // { link, role }
   const [copied, setCopied] = useState(false)
+  const [confirming, setConfirming] = useState(null) // identity being removed
+  const [removing, setRemoving] = useState(false)
 
   const load = useCallback(async () => {
     try { setData(await call('sheet:members', { sheetId })) } catch (err) { onError(err.message) }
@@ -40,6 +42,18 @@ export function SharePanel ({ sheetId, onClose, onError }) {
   }
 
   const isOwner = data && data.myRole === 'owner'
+
+  async function remove (identity) {
+    setRemoving(true)
+    try {
+      await call('sheet:removeMember', { sheetId, identity })
+      onClose()
+    } catch (err) {
+      onError(err.message)
+      setRemoving(false)
+      setConfirming(null)
+    }
+  }
 
   return (
     <div className='panel-backdrop' onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
@@ -72,14 +86,22 @@ export function SharePanel ({ sheetId, onClose, onError }) {
               </div>
             )}
             {!isOwner && <p className='muted'>Only the owner can invite people or change roles.</p>}
+            {isOwner && confirming && <p className='warn'>Removing someone moves the sheet to new keys. They keep what they already had and see nothing new. Anyone editing the old copy at that moment may lose that last change.</p>}
 
             <h3>People</h3>
             <ul className='people'>
               {data.members.map((p) => (
                 <li key={p.identity}>
                   <span className='who'>{p.name || 'Unnamed'}{p.isMe ? ' (you)' : ''}</span>
-                  {isOwner && p.role !== 'owner'
+                  {isOwner && p.role !== 'owner' && confirming === p.identity && (
+                    <span className='confirm'>
+                      <button className='danger' disabled={removing} onClick={() => remove(p.identity)}>{removing ? 'Removing...' : 'Remove'}</button>
+                      <button disabled={removing} onClick={() => setConfirming(null)}>Keep</button>
+                    </span>
+                  )}
+                  {isOwner && p.role !== 'owner' && confirming !== p.identity
                     ? (
+                      <span className='member-actions'>
                       <select
                         aria-label={'Role for ' + (p.name || 'this person')}
                         value={p.role}
@@ -90,8 +112,10 @@ export function SharePanel ({ sheetId, onClose, onError }) {
                         <option value='editor'>Can edit</option>
                         <option value='viewer'>Can view</option>
                       </select>
+                      <button className='link-button' onClick={() => setConfirming(p.identity)}>Remove</button>
+                      </span>
                       )
-                    : <span className='role'>{ROLE_LABEL[p.role]}</span>}
+                    : confirming !== p.identity && <span className='role'>{ROLE_LABEL[p.role]}</span>}
                 </li>
               ))}
             </ul>

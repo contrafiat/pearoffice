@@ -32,7 +32,8 @@ Bare worklet, the Yjs sheet model, the vendored formula engine and sync over
 `@peerloom/core`. The Electron shell and grid UI work on Linux. Sharing works: single-use
 invites, owner, editor and viewer roles, renames. The blind seeder works:
 pair by link, every member backs up to it, a member can catch up from it
-alone. Removal by key move, packaging and the mobile app are next.
+alone. Removing someone moves the sheet to fresh keys. Desktop installers build for
+Linux, macOS and Windows. The mobile app and signing are next.
 See `TODO.md`.
 
 ## Layout
@@ -44,6 +45,7 @@ See `TODO.md`.
 - `src/worklet/` - the Bare program: `bare.js` entry, `engine.js` (core
   wiring), `sheetWire.js` (apply rules), `membership.js` (signed membership
   ops, built and checked), `join.js` (the `pearsheet/join/1` handshake),
+  `moves.js` (removal by moving to fresh keys), `seeding.js` (seeder client),
   `sheetMethods.js` (IPC), `sheets.js` (live documents).
 - `src/ui/` - the React spreadsheet UI. Talks only to `window.pearsheet`
   (`call`, `on`), which the desktop preload provides and the mobile WebView
@@ -93,9 +95,10 @@ builds are unsigned for now.
   golden file, the same corpus in four timezones, formula reference
   translation, Yjs merging, bad-update handling, a two-engine sync test and
   the invite and role rules (single use, expiry, viewers cannot write, forged
-  and replayed ops skipped) and the seeder (pairing, sync from the seeder
-  alone, no readable data on it, strangers refused), all over a local DHT
-  testnet.
+  and replayed ops skipped), the seeder (pairing, sync from the seeder
+  alone, no readable data on it, strangers refused) and removal (others
+  follow, including one who was offline; the removed person cannot open the
+  new sheet; the old one freezes), all over a local DHT testnet.
 - `npm run test:bare`: bundles for this machine and runs the real Bare binary.
   The formula corpus must match the golden file bit for bit, and the worklet
   bundle must create, edit and read a sheet over stdin/stdout, and the seeder

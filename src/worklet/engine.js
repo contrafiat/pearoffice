@@ -7,12 +7,14 @@ const { createApplyOps } = require('./sheetWire')
 const { createSheetMethods } = require('./sheetMethods')
 const { createJoinService } = require('./join')
 const { createSeeding } = require('./seeding')
+const { createMoves } = require('./moves')
 
 function createSheetEngine (opts = {}) {
   const { createSwarm: makeSwarm, log = () => {}, ...rest } = opts
   let engine = null
   let join = null
   let seeding = null
+  let moves = null
   const emit = (event, data) => engine && engine.emit(event, data)
 
   const sheets = createSheets({
@@ -21,7 +23,7 @@ function createSheetEngine (opts = {}) {
   })
 
   const methods = {
-    ...createSheetMethods(sheets, { getJoin: () => join }),
+    ...createSheetMethods(sheets, { getJoin: () => join, getMoves: () => moves }),
     'seeder:pair': async ({ link }) => seeding.pair(link),
     'seeder:list': async () => seeding.list(),
     // Close stores cleanly, then exit. The desktop shell calls this on quit.
@@ -41,6 +43,7 @@ function createSheetEngine (opts = {}) {
       onMembership: (sheetId, type) => {
         emit('sheet:members', { sheetId })
         if (type === 'seeder' && seeding) seeding.register(sheetId).catch(() => {})
+        if (type === 'move' && moves) moves.onMoved(sheetId).catch((e) => log('move failed: ' + e.message))
       },
       log
     }),
@@ -60,6 +63,13 @@ function createSheetEngine (opts = {}) {
       setTimeout(() => join.resume().catch((e) => log('resume joins failed: ' + e.message)), 0)
       seeding = createSeeding({ engine, log })
       setTimeout(() => seeding.start(), 0)
+      moves = createMoves({ engine, sheets, getJoin: () => join, emit, log })
+      // Core has no hook for "init finished", so look for sheets that moved
+      // while this device was off a little after start, and once more later.
+      for (const ms of [2000, 10000]) {
+        const t = setTimeout(() => moves.resume().catch(() => {}), ms)
+        if (t.unref) t.unref()
+      }
       return swarm
     },
     ...rest
@@ -68,6 +78,7 @@ function createSheetEngine (opts = {}) {
   engine.close = async () => {
     if (join) join.close()
     if (seeding) await seeding.close()
+    if (moves) moves.close()
     return coreClose()
   }
   engine.sheets = sheets

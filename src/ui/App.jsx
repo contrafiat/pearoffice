@@ -27,6 +27,9 @@ export function App () {
       on('worklet:exit', () => setError('The sync engine stopped. Restart PearSheet.')),
       on('join:progress', refresh),
       on('sheet:joined', async ({ sheetId }) => { await refresh(); setCurrent(sheetId) }),
+      // A sheet moved to fresh keys: follow it if it is the one on screen.
+      on('sheet:moved', async ({ from, to }) => { await refresh(); setCurrent((c) => (c === from ? to : c)) }),
+      on('sheet:removed', refresh),
       on('app:deeplink', ({ url }) => { if (/^pearsheet:\/\/join\?/.test(url)) setJoining(url) })
     ]
     return () => offs.forEach((off) => off())
@@ -62,9 +65,9 @@ export function App () {
           {sheets && [...sheets].reverse().map((s) => (
             <button
               key={s.sheetId}
-              className={'sheet-link' + (s.sheetId === current ? ' active' : '') + (s.joining ? ' joining' : '')}
+              className={'sheet-link' + (s.sheetId === current ? ' active' : '') + (s.joining ? ' joining' : '') + (s.removed ? ' removed' : '')}
               disabled={s.waiting}
-              title={s.waiting ? 'Waiting for someone in this sheet to come online' : undefined}
+              title={s.waiting ? 'Waiting for someone in this sheet to come online' : s.removed ? 'You were removed from this sheet' : undefined}
               onClick={() => setCurrent(s.sheetId)}
             >
               {s.waiting ? 'Joining...' : (s.title || 'Untitled sheet')}

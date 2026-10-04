@@ -257,3 +257,9 @@ button, input, select { font: inherit; color: inherit; }
 .people li { display: flex; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--line); gap: 8px; }
 .people .role { color: var(--muted); font-size: 13px; }
 .people select { border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; background: var(--panel); }
+
+.banner.info { background: var(--pear-soft); color: var(--pear-dark); }
+.member-actions, .confirm { display: flex; align-items: center; gap: 6px; }
+.panel button.danger { border-color: var(--danger); color: var(--danger); }
+.panel .warn { color: var(--danger); font-size: 13px; }
+.sheet-link.removed { color: var(--muted); text-decoration: line-through; }

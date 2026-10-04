@@ -25,7 +25,8 @@ const P = {
   join: 'pearsheet/join/v1',
   role: 'pearsheet/role/v1',
   name: 'pearsheet/name/v1',
-  seeder: 'pearsheet/seeder/v1'
+  seeder: 'pearsheet/seeder/v1',
+  move: 'pearsheet/move/v1'
 }
 
 const hex = (buf) => b4a.toString(buf, 'hex')
@@ -98,6 +99,52 @@ function nameOp ({ sheetId, identity, name, n }) {
 // "Back this sheet up to that seeder". Any owner or editor can add one.
 function seederOp ({ sheetId, identity, seederKey }) {
   return { type: 'seeder', seeder: signValue({ purpose: P.seeder, sheetId, seederKey, identity: hex(identity.publicKey) }, identity.secretKey) }
+}
+
+// A member the owner carries into a moved sheet (section 7). Owner-signed.
+function memberOp ({ sheetId, owner, identity, role, name }) {
+  const by = hex(owner.publicKey)
+  return { type: 'member', member: signValue({ purpose: P.member, sheetId, identity, role, name: cleanName(name), v: 1, by }, owner.secretKey) }
+}
+
+// An existing member's device becomes known in a sheet: appended by an owner
+// or editor, carrying the device's own proof.
+function admitOp ({ device }) {
+  return { type: 'admit', device }
+}
+
+// --- sealing keys to a person (section 7) ------------------------------------
+
+function x25519 (identity) {
+  const pk = b4a.alloc(32)
+  sodium.crypto_sign_ed25519_pk_to_curve25519(pk, typeof identity === 'string' ? b4a.from(identity, 'hex') : identity)
+  return pk
+}
+
+function seal (obj, identityHex) {
+  const m = b4a.from(JSON.stringify(obj))
+  const c = b4a.alloc(m.length + sodium.crypto_box_SEALBYTES)
+  sodium.crypto_box_seal(c, m, x25519(identityHex))
+  return b4a.toString(c, 'base64')
+}
+
+function unseal (sealedB64, identity) {
+  const c = b4a.from(sealedB64, 'base64')
+  if (c.length <= sodium.crypto_box_SEALBYTES) return null
+  const pk = x25519(identity.publicKey)
+  const sk = b4a.alloc(32)
+  sodium.crypto_sign_ed25519_sk_to_curve25519(sk, identity.secretKey)
+  const m = b4a.alloc(c.length - sodium.crypto_box_SEALBYTES)
+  if (!sodium.crypto_box_seal_open(m, c, pk, sk)) return null
+  try { return JSON.parse(b4a.toString(m)) } catch { return null }
+}
+
+// The owner moves the sheet to a fresh key: everything a remaining person
+// needs is sealed to their identity. Nothing about the new sheet is in clear.
+function moveOp ({ sheetId, owner, target, recipients }) {
+  const sealed = {}
+  for (const identity of recipients) sealed[identity] = seal(target, identity)
+  return { type: 'move', move: signValue({ purpose: P.move, sheetId, sealed, by: hex(owner.publicKey) }, owner.secretKey) }
 }
 
 // The joiner's half of an inviteUse: proof of the invite secret, and proof that
@@ -194,9 +241,10 @@ async function applyMembershipOp (op, { view, base, groupId, node, log }) {
     if (!sheet || !signedBy(m, 'by', P.member, sheetId) || m.by !== sheet.owner) return skip('not signed by the owner')
     const actor = await actorOf(view, node)
     if (!actor || actor.identity !== sheet.owner) return skip('not appended by an owner device')
-    // In v1 the only member op is the owner's own founding record.
-    if (m.identity !== sheet.owner || m.role !== 'owner' || await get(view, 'member/' + m.identity)) return skip('only the founding owner record')
-    await view.put('member/' + m.identity, { identity: m.identity, role: 'owner', name: m.name || '', v: 1 })
+    if (await get(view, 'member/' + m.identity)) return skip('already a member')
+    // The owner's own founding record, or a member carried into a moved sheet.
+    if (m.identity === sheet.owner ? m.role !== 'owner' : !INVITE_ROLES.includes(m.role)) return skip('bad role')
+    await view.put('member/' + m.identity, { identity: m.identity, role: m.role, name: m.name || '', v: 1 })
     return true
   }
 
@@ -234,6 +282,32 @@ async function applyMembershipOp (op, { view, base, groupId, node, log }) {
     await view.put('member/' + claim.identity, { identity: claim.identity, role: invite.role, name: claim.name || '', v: 1, via: claim.inviteId })
     await view.put('device/' + claim.writerKey, { identity: claim.identity, writerKey: claim.writerKey })
     if (invite.role === 'editor') await base.addWriter(b4a.from(claim.writerKey, 'hex'), { indexer: true })
+    return true
+  }
+
+  if (op.type === 'admit') {
+    const actor = await actorOf(view, node)
+    if (!actor || (actor.role !== 'owner' && actor.role !== 'editor')) return skip('appender is not an owner or editor')
+    const d = op.device
+    if (!signedBy(d, 'identity', P.device, sheetId) || !HEX64.test(d.writerKey || '')) return skip('bad device proof')
+    const member = await get(view, 'member/' + d.identity)
+    if (!member) return skip('not a member')
+    if (await get(view, 'device/' + d.writerKey)) return skip('device already known')
+    await view.put('device/' + d.writerKey, { identity: d.identity, writerKey: d.writerKey })
+    if (member.role === 'owner' || member.role === 'editor') await base.addWriter(b4a.from(d.writerKey, 'hex'), { indexer: true })
+    return true
+  }
+
+  if (op.type === 'move') {
+    const sheet = await get(view, 'sheet')
+    const mv = op.move
+    if (!sheet || !signedBy(mv, 'by', P.move, sheetId) || mv.by !== sheet.owner) return skip('not signed by the owner')
+    const actor = await actorOf(view, node)
+    if (!actor || actor.identity !== sheet.owner) return skip('not appended by an owner device')
+    if (!mv.sealed || typeof mv.sealed !== 'object') return skip('bad move')
+    if (await get(view, 'moved')) return skip('already moved')
+    // From here on apply ignores every op in this base (see sheetWire.js).
+    await view.put('moved', { sealed: mv.sealed })
     return true
   }
 
@@ -297,7 +371,13 @@ module.exports = {
   roleOp,
   nameOp,
   seederOp,
+  memberOp,
+  admitOp,
+  moveOp,
+  seal,
+  unseal,
   claimFor,
+  deviceProof,
   inviteKeyPair,
   inviteLink,
   parseInviteLink,
