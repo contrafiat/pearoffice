@@ -67,6 +67,25 @@ See `TODO.md`.
 (override with `PEARSHEET_SEEDER_DATA`). It prints a pairing link; type `pair`
 for a new one and `status` for counts.
 
+## Packaging
+
+Installers land in `desktop/dist/`. Each build ends with the packaged smoke
+test (`scripts/smoke-packaged.js`) run against the installed-layout app.
+
+- `npm run dist:linux` - AppImage and deb, built here.
+- `npm run dist:mac` - dmg and zip for Apple silicon, built on the Mac Mini
+  over SSH in `~/peerloomllc/pearsheet-build` (`scripts/build-desktop-mac.sh`,
+  `x64` for Intel; the Mac has no Rosetta, so the Intel build cannot be
+  smoke-tested there).
+- `npm run dist:windows` - NSIS installer, built on the local libvirt VM
+  `win11-pearguard` (start it with `virsh -c qemu:///system start
+  win11-pearguard`, shut it down after).
+
+`scripts/stage-desktop.js` gathers the Bare runtime, the worklet bundle with
+the target's addons and the minified UI into `desktop/build/resources`, which
+electron-builder copies into the app (`desktop/paths.js` finds them). All
+builds are unsigned for now.
+
 ## Verify
 
 `npm run verify` is the merge gate (Constitution §5). It runs:
