@@ -43,7 +43,8 @@ from their device and the owner can delete it for everyone, seeder included
 a device can stop using one and a seeder can forget a device
 (proposals/2026-10-04-stop-backing-up.md).
 On desktop, PearSheet can start hidden in the tray at login
-(`desktop/login.js`; XDG autostart on Linux, login items elsewhere).
+(`desktop/login.js`; XDG autostart on Linux, a LaunchAgent on macOS, login
+items on Windows). `PEARSHEET_DEBUG=1` turns on logging in an installed copy.
 See `TODO.md`.
 
 ## Layout
