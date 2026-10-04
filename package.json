@@ -16,7 +16,12 @@
     "seeder": "node scripts/run-seeder.js",
     "dist:linux": "node scripts/dist-linux.js",
     "dist:mac": "scripts/build-desktop-mac.sh arm64",
-    "dist:windows": "scripts/build-desktop-windows.sh"
+    "dist:windows": "scripts/build-desktop-windows.sh",
+    "build:bare:mobile": "bare-pack --linked --defer fs --defer path --defer bare-process --imports scripts/bare-imports.js -o assets/bare-universal.bundle src/worklet/bare.js",
+    "build:ui:mobile": "node scripts/build-ui.mjs --minify --mobile",
+    "android": "expo run:android",
+    "ios": "expo run:ios",
+    "build:android": "scripts/build-android.sh"
   },
   "dependencies": {
     "@formulajs/formulajs": "^4.6.1",
@@ -30,7 +35,7 @@
     "bare-encoding": "^1.0.3",
     "bare-fs": "4.7.3",
     "bare-process": "^4.5.1",
-    "bare-signals": "^5.0.0",
+    "bare-signals": "4.2.0",
     "bessel": "^1.0.2",
     "blind-peer": "3.15.1",
     "blind-peering": "2.10.0",
@@ -46,18 +51,48 @@
     "protomux": "^3.10.3",
     "protomux-wakeup": "2.9.0",
     "sodium-universal": "^5.0.1",
-    "yjs": "^13.6.33"
+    "yjs": "^13.6.33",
+    "expo": "^54.0.10",
+    "expo-asset": "~12.0.9",
+    "expo-file-system": "~19.0.21",
+    "expo-linking": "~8.0.12",
+    "expo-build-properties": "^1.0.9",
+    "babel-preset-expo": "~54.0.10",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "react-native": "0.81.5",
+    "react-native-b4a": "^0.0.4",
+    "react-native-bare-kit": "^0.12.2",
+    "react-native-safe-area-context": "~5.6.0",
+    "react-native-webview": "13.15.0"
   },
   "devDependencies": {
     "@hyperswarm/testnet": "^3.1.4",
     "bare-pack": "^2.0.0",
     "bare-runtime": "^1.34.1",
-    "esbuild": "^0.28.2",
-    "react": "^19.3.0",
-    "react-dom": "^19.3.0"
+    "esbuild": "^0.28.2"
   },
   "overrides": {
+    "bare-buffer": "3.6.1",
+    "bare-dns": "2.1.4",
+    "bare-hrtime": "2.1.1",
+    "bare-inspect": "3.1.4",
+    "bare-module-lexer": "1.6.0",
+    "bare-pipe": "4.2.2",
+    "bare-signals": "4.2.0",
+    "bare-stdio": "1.0.2",
+    "bare-structured-clone": "1.6.0",
+    "bare-subprocess": "6.1.0",
+    "bare-tcp": "2.5.1",
+    "bare-tty": "5.1.1",
+    "bare-type": "1.1.0",
+    "bare-url": "2.4.5",
+    "fs-native-extensions": "1.5.0",
+    "quickbit-native": "2.4.8",
+    "udx-native": "1.20.7",
     "rocksdb-native": "3.17.2",
-    "bare-fs": "4.7.3"
-  }
+    "bare-fs": "4.7.3",
+    "bare-assert": "1.2.0"
+  },
+  "main": "index.js"
 }

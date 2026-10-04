@@ -1,0 +1,40 @@
+{
+  "expo": {
+    "name": "PearSheet",
+    "slug": "pearsheet",
+    "version": "0.1.0",
+    "newArchEnabled": true,
+    "orientation": "default",
+    "scheme": "pearsheet",
+    "userInterfaceStyle": "automatic",
+    "icon": "./desktop/build/icon.png",
+    "android": {
+      "package": "com.pearsheet",
+      "versionCode": 1,
+      "adaptiveIcon": {
+        "foregroundImage": "./desktop/build/icon.png",
+        "backgroundColor": "#f7f7f4"
+      },
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "data": [
+            { "scheme": "pearsheet", "host": "join" },
+            { "scheme": "pearsheet", "host": "seeder" }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
+    },
+    "ios": {
+      "bundleIdentifier": "com.pearsheet"
+    },
+    "plugins": [
+      ["expo-build-properties", { "android": { "minSdkVersion": 29 } }],
+      "./plugins/with-android-debug-standalone",
+      "./plugins/with-android-abis",
+      "./plugins/with-gradle-jvmargs"
+    ],
+    "assets": ["./assets/bare-universal.bundle", "./assets/app-ui.bundle"]
+  }
+}
