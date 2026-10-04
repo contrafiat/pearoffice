@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { call, on } from './bridge.js'
 import { SheetView } from './SheetView.jsx'
 import { JoinPanel } from './JoinPanel.jsx'
@@ -30,6 +30,12 @@ export function App () {
     }
   }, [])
 
+  const soon = useRef(null)
+  const refreshSoon = useCallback(() => {
+    if (soon.current) return
+    soon.current = setTimeout(() => { soon.current = null; refresh() }, 300)
+  }, [refresh])
+
   useEffect(() => {
     refresh()
     call('app:me').then((me) => { setName(me.name); setNudge(!!me.phraseNudge) }).catch(() => {})
@@ -41,6 +47,10 @@ export function App () {
       // A sheet moved to fresh keys: follow it if it is the one on screen.
       on('sheet:moved', async ({ from, to }) => { await refresh(); setCurrent((c) => (c === from ? to : c)) }),
       on('sheet:removed', refresh),
+      // Any edit or membership change anywhere: titles, roles and people in
+      // the sidebar stay live. Batched, since edits arrive in bursts.
+      on('sheet:changed', refreshSoon),
+      on('sheet:members', refreshSoon),
       // A sheet left this device (removed here, deleted by its owner, or an
       // old copy after a move).
       on('sheet:gone', async ({ sheetId }) => { setCurrent((c) => (c === sheetId ? null : c)); await refresh() }),
@@ -50,7 +60,7 @@ export function App () {
     // A link that opened the app before this page was listening.
     call('app:takeLink').then((r) => { if (r && r.url) openLink(r.url) }).catch(() => {})
     return () => offs.forEach((off) => off())
-  }, [refresh])
+  }, [refresh, refreshSoon])
 
   function openLink (url) {
     if (/^pearsheet:\/\/join\?/.test(url)) setJoining(url)

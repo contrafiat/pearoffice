@@ -78,6 +78,9 @@ function createSheets ({ emit, getBase, getLocalDb = () => null, getStore = () =
     return e
   }
 
+  // Tell the UI a sheet changed (also used once a background load is done).
+  function changed (sheetId) { emit('sheet:changed', { sheetId }) }
+
   function scheduleRecompute (sheetId) {
     const e = open.get(sheetId)
     if (!e || e.timer) return
@@ -288,7 +291,7 @@ function createSheets ({ emit, getBase, getLocalDb = () => null, getStore = () =
     return e && e.loading ? e : null
   }
 
-  return { load, attach, onUpdate, noteLocal, values, forget, entryFor, peek, yKey, saveSnapshot, flushSnapshots }
+  return { load, attach, onUpdate, noteLocal, values, forget, entryFor, peek, yKey, saveSnapshot, flushSnapshots, changed }
 }
 
 module.exports = { createSheets, GuardedDoc, yKey, Y_PREFIX }
