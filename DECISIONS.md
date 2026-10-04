@@ -2,6 +2,17 @@
 
 Append-only, newest on top. Per Constitution §4.
 
+## 2026-10-04 - A2# is ANCHORARRAY, rewritten before parsing
+Tier: T2
+Context: "the whole spill from A2" (proposals/2026-10-04-spill-reference.md).
+Choice: `ref#` is rewritten to Excel's ANCHORARRAY(ref) before a formula is
+parsed. ANCHORARRAY returns a reference to the block, as OFFSET does. Stored
+formulas keep `#` as typed; .xlsx uses `_xlfn.ANCHORARRAY`.
+Alternatives: a `#` token in the vendored parser's grammar (rejected - a
+bigger change to code we keep in step with upstream, for the same result).
+Consequences: older builds show #ERROR! in cells using `#`. LibreOffice 26.2
+does not read ANCHORARRAY from .xlsx, so those corpus cases use Excel values.
+
 ## 2026-10-04 - Formulas spill, computed on every device
 Tier: T2
 Context: FILTER, SORT, UNIQUE and SEQUENCE fill a block of cells; the v1

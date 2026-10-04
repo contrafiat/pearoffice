@@ -14,14 +14,17 @@ const MAX_IMPORT_CELLS = 200000
 // the first dynamic-array functions also _xlws. (spilling formulas,
 // proposals/2026-10-04-spilling-formulas.md). PearSheet stores plain names.
 const XLWS = new Set(['FILTER', 'SORT'])
-const XLFN = new Set(['SORTBY', 'UNIQUE', 'SEQUENCE', 'TEXTSPLIT', 'TAKE', 'DROP', 'VSTACK', 'HSTACK', 'TOCOL', 'TOROW',
+const XLFN = new Set(['ANCHORARRAY', 'SORTBY', 'UNIQUE', 'SEQUENCE', 'TEXTSPLIT', 'TAKE', 'DROP', 'VSTACK', 'HSTACK', 'TOCOL', 'TOROW',
   'CHOOSEROWS', 'CHOOSECOLS', 'WRAPROWS', 'WRAPCOLS', 'EXPAND', 'RANDARRAY', 'XLOOKUP', 'XMATCH', 'TEXTBEFORE', 'TEXTAFTER'])
 // Outside string literals only.
 function mapNames (f, fn) {
   return String(f).split(/("(?:[^"]|"")*")/).map((part, i) => (i % 2 ? part : fn(part))).join('')
 }
-const toFile = (f) => mapNames(f, (p) => p.replace(/\b([A-Z][A-Z0-9.]*)\(/g, (m, name) => (XLWS.has(name) ? '_xlfn._xlws.' + name + '(' : XLFN.has(name) ? '_xlfn.' + name + '(' : m)))
-const fromFile = (f) => mapNames(f, (p) => p.replace(/_xl(fn|ws)\./gi, ''))
+// A2# (the whole spill from A2) is ANCHORARRAY(A2) in a file.
+const SPILL_REF = /((?:'(?:[^']|'')+'|[A-Za-z_][\w.]*)!)?(\$?[A-Za-z]{1,3}\$?\d+)#/g
+const ANCHOR = /ANCHORARRAY\(((?:'(?:[^']|'')+'|[A-Za-z_][\w.]*)!)?(\$?[A-Za-z]{1,3}\$?\d+)\)/gi
+const toFile = (f) => mapNames(f, (p) => p.replace(SPILL_REF, (m, sheet, cell) => 'ANCHORARRAY(' + (sheet || '') + cell + ')').replace(/\b([A-Z][A-Z0-9.]*)\(/g, (m, name) => (XLWS.has(name) ? '_xlfn._xlws.' + name + '(' : XLFN.has(name) ? '_xlfn.' + name + '(' : m)))
+const fromFile = (f) => mapNames(f, (p) => p.replace(/_xl(fn|ws)\./gi, '').replace(ANCHOR, (m, sheet, cell) => (sheet || '') + cell + '#'))
 // Excel's error codes. PearSheet's own #CIRCULAR! has none; Excel recomputes
 // formula cells on open anyway.
 const ERROR_CODES = { '#NULL!': 0x00, '#DIV/0!': 0x07, '#VALUE!': 0x0F, '#REF!': 0x17, '#NAME?': 0x1D, '#NUM!': 0x24, '#N/A': 0x2A }

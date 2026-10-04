@@ -68,6 +68,7 @@ test('a spilling formula goes out as a dynamic array and comes back as one formu
   model.setCells(doc, tab, 1, 1, [['pear'], ['apple'], ['fig']])
   model.setCell(doc, tab, 1, 3, '=SORT(A1:A3)')
   model.setCell(doc, tab, 1, 4, '=SEQUENCE(2,2)')
+  model.setCell(doc, tab, 5, 1, '=COUNTA(C1#)')
 
   const wb = dumpToWorkbook(XLSX, dump(doc))
   const ws = wb.Sheets[wb.SheetNames[0]]
@@ -77,6 +78,7 @@ test('a spilling formula goes out as a dynamic array and comes back as one formu
   assert.equal(ws.C3.v, 'pear', 'filled cells are written as values')
   assert.equal(ws.C3.f, undefined)
   assert.equal(ws.D1.F, 'D1:E2')
+  assert.equal(ws.A5.f, 'COUNTA(_xlfn.ANCHORARRAY(C1))')
 
   const bytes = XLSX.write(wb, { type: 'array', bookType: 'xlsx' })
   const sheetXml = XLSX.read(bytes, { type: 'array', bookFiles: true }).files['xl/worksheets/sheet1.xml']
@@ -93,6 +95,8 @@ test('a spilling formula goes out as a dynamic array and comes back as one formu
   const v = evaluateSheet(doc2).get(t2)
   assert.deepEqual([1, 2, 3].map((r) => v.get(r + ',3').value), ['apple', 'fig', 'pear'])
   assert.deepEqual(v.get('2,5').value, 4)
+  assert.equal(model.getInput(doc2, t2, 5, 1), '=COUNTA(C1#)')
+  assert.equal(v.get('5,1').value, 3)
 })
 
 test('text that would read as a number or formula keeps an apostrophe', () => {

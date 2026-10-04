@@ -106,6 +106,10 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
     const cellAt = (a1) => "[...document.querySelectorAll('.cell')].find((c) => c.dataset.r === '" + a1[1] + "' && c.dataset.c === '8')"
     await waitFor('spilled', cellAt('H3') + ".textContent === '3' && " + cellAt('H2') + ".textContent === '2'")
     await waitFor('spill outline', "!!document.querySelector('.spill-outline') && document.querySelector('.formula-bar input').value === '=SEQUENCE(3)' && document.querySelector('.formula-bar input').classList.contains('spilled')")
+    // H1# is the whole spill from H1.
+    await key('Up'); await key('Right')
+    await enter('=SUM(H1#)', 'Enter', '6')
+    await key('Left')
     await key('Down')
     await enter('x', 'Enter')
     for (let i = 0; i < 3; i++) await key('Up')
@@ -116,6 +120,7 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
     await key('Up'); await key('Up')
     await key('Delete')
     await waitFor('spill cleared', cellAt('H1') + ".textContent === '' && !document.querySelector('.spill-outline')")
+    await key('Right'); await key('Delete'); await key('Left')
     for (let i = 0; i < 6; i++) await key('Left')
     for (let i = 0; i < 3; i++) await key('Down')
     result.spill = true
