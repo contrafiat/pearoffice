@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { call, on } from './bridge.js'
 import { SheetView } from './SheetView.jsx'
-import { JoinPanel } from './JoinPanel.jsx'
+import { JoinPanel, WaitingJoinPanel } from './JoinPanel.jsx'
 import { SeederPanel } from './SeederPanel.jsx'
 import { DevicesPanel } from './DevicesPanel.jsx'
 import { importFile, pickAndImport, isMobile } from './xlsx.js'
@@ -58,6 +58,7 @@ export function App () {
   const [avatar, setAvatar] = useState(null) // { data, mime, hash } or null
   const [myId, setMyId] = useState(null)
   const [settings, setSettings] = useState(false)
+  const [waitingJoin, setWaitingJoin] = useState(null) // sheetId
   const [seeder, setSeeder] = useState(false)
   const [navOpen, setNavOpen] = useState(false) // phone layout: the sheet list slides in
   const [devices, setDevices] = useState(null) // { link } | { startWith } | {} when open
@@ -106,6 +107,7 @@ export function App () {
       // A sheet left this device (removed here, deleted by its owner, or an
       // old copy after a move).
       on('sheet:gone', async ({ sheetId }) => { setCurrent((c) => (c === sheetId ? null : c)); await refresh() }),
+      on('join:gaveUp', async () => { setNotice('PearSheet stopped waiting to join a sheet after 7 days. Ask for a new invite.'); await refresh() }),
       on('sheet:deleted', ({ title }) => setNotice('"' + (title || 'A sheet') + '" was deleted by its owner.')),
       on('app:deeplink', ({ url }) => { call('app:takeLink').catch(() => {}); openLink(url) })
     ]
@@ -155,10 +157,9 @@ export function App () {
           {sheets && [...sheets].reverse().map((s) => (
             <button
               key={s.sheetId}
-              className={'sheet-link' + (s.sheetId === current ? ' active' : '') + (s.joining ? ' joining' : '') + (s.removed ? ' removed' : '')}
-              disabled={s.waiting}
+              className={'sheet-link' + (s.sheetId === current ? ' active' : '') + (s.joining ? ' joining' : '') + (s.waiting ? ' waiting' : '') + (s.removed ? ' removed' : '')}
               title={s.waiting ? 'Waiting for someone in this sheet to come online' : s.removed ? 'You were removed from this sheet' : undefined}
-              onClick={() => setCurrent(s.sheetId)}
+              onClick={() => (s.waiting ? setWaitingJoin(s.sheetId) : setCurrent(s.sheetId))}
             >
               {s.owner
                 ? (
@@ -206,6 +207,13 @@ export function App () {
           onDevices={() => { setSettings(false); setDevices({ fromSettings: true }) }}
           onSeeder={() => { setSettings(false); setSeeder('fromSettings') }}
           onClose={() => setSettings(false)}
+          onError={setError}
+        />
+      )}
+      {waitingJoin && sheets && sheets.find((x) => x.sheetId === waitingJoin && x.waiting) && (
+        <WaitingJoinPanel
+          entry={sheets.find((x) => x.sheetId === waitingJoin)}
+          onClose={() => setWaitingJoin(null)}
           onError={setError}
         />
       )}

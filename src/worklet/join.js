@@ -32,6 +32,9 @@ const CLAIM_RESEND_MS = 3000
 // again. A joiner that looked before any member had announced would sit idle,
 // so look again on a short timer while the join is pending.
 const LOOKUP_EVERY_MS = [3000, 5000, 10000, 15000]
+// A join that has found nobody to let it in for this long stops by itself:
+// invites last at most 7 days (sheetMethods.js).
+const GIVE_UP_MS = 7 * 24 * 3600 * 1000
 const hex = (buf) => b4a.toString(buf, 'hex')
 
 function createJoinService ({ engine, emit, onProfile = async () => {}, log = () => {}, now = () => Date.now() }) {
@@ -113,7 +116,8 @@ function createJoinService ({ engine, emit, onProfile = async () => {}, log = ()
       emit('join:progress', { sheetId, stage: 'welcomed' })
       await openBase(sheetId, j)
     } else if (msg.t === 'reject') {
-      emit('join:progress', { sheetId, stage: 'waiting', reason: String(msg.reason || '') })
+      j.reason = String(msg.reason || '').slice(0, 200)
+      emit('join:progress', { sheetId, stage: 'waiting', reason: j.reason })
     }
   }
 
@@ -197,7 +201,7 @@ function createJoinService ({ engine, emit, onProfile = async () => {}, log = ()
   }
 
   async function persist (sheetId, j) {
-    await engine.localDb.put('joins:pending:' + sheetId, { link: j.raw, name: j.name, welcomed: !!j.welcome })
+    await engine.localDb.put('joins:pending:' + sheetId, { link: j.raw, name: j.name, welcomed: !!j.welcome, startedAt: j.startedAt })
   }
 
   async function start (rawLink, { name = '' } = {}) {
@@ -209,7 +213,7 @@ function createJoinService ({ engine, emit, onProfile = async () => {}, log = ()
     if (joins.has(sheetId)) return { sheetId }
     // Invited back after removing the sheet from this device: allow it.
     await engine.localDb.del('removed:' + sheetId)
-    const j = { raw: rawLink, link, name: m.cleanName(name), welcome: null, channels: new Set(), timer: null, done: false, claimMsg: null }
+    const j = { raw: rawLink, link, name: m.cleanName(name), welcome: null, channels: new Set(), timer: null, done: false, claimMsg: null, startedAt: now() }
     joins.set(sheetId, j)
     await persist(sheetId, j)
     lookFor(sheetId, j)
@@ -225,7 +229,14 @@ function createJoinService ({ engine, emit, onProfile = async () => {}, log = ()
       if (joins.has(sheetId) || !value || !value.link) continue
       let link
       try { link = m.parseInviteLink(value.link) } catch { await engine.localDb.del(key); continue }
-      const j = { raw: value.link, link, name: value.name || '', welcome: value.welcomed ? {} : null, channels: new Set(), timer: null, done: false, claimMsg: null }
+      const j = { raw: value.link, link, name: value.name || '', welcome: value.welcomed ? {} : null, channels: new Set(), timer: null, done: false, claimMsg: null, startedAt: value.startedAt || now() }
+      if (!value.startedAt) await persist(sheetId, j)
+      if (!j.welcome && now() - j.startedAt > GIVE_UP_MS) {
+        await engine.localDb.del(key)
+        log('gave up joining ' + sheetId.slice(0, 6))
+        emit('join:gaveUp', { sheetId })
+        continue
+      }
       joins.set(sheetId, j)
       lookFor(sheetId, j)
       for (const mux of muxes) openChannel(mux, sheetId)
@@ -289,14 +300,33 @@ function createJoinService ({ engine, emit, onProfile = async () => {}, log = ()
   }
 
   function pending () {
-    return [...joins.entries()].map(([sheetId, j]) => ({ sheetId, stage: j.welcome ? 'claiming' : 'looking', role: j.link.role }))
+    return [...joins.entries()].map(([sheetId, j]) => ({ sheetId, stage: j.welcome ? 'claiming' : 'looking', role: j.link.role, reason: j.reason || undefined, startedAt: j.startedAt }))
+  }
+
+  // Stop a join. Returns whether keys had arrived, in which case the caller
+  // also removes the half-opened sheet.
+  async function cancel (sheetId) {
+    const j = joins.get(sheetId)
+    if (j) {
+      j.done = true
+      clearInterval(j.timer)
+      clearTimeout(j.lookup)
+      for (const ch of j.channels) { try { ch.close() } catch {} }
+      joins.delete(sheetId)
+      if (!engine.bases.get(sheetId)) {
+        try { await engine.swarm.leave(topicForKey(j.link.groupKey)) } catch {}
+      }
+    }
+    await engine.localDb.del('joins:pending:' + sheetId)
+    log('stopped joining ' + sheetId.slice(0, 6))
+    return { welcomed: !!(j && j.welcome) }
   }
 
   function close () {
     for (const j of joins.values()) { clearInterval(j.timer); clearTimeout(j.lookup) }
   }
 
-  return { onConnection, addSheet, start, resume, pending, close, sendDevice, sendToMembers }
+  return { onConnection, addSheet, start, resume, pending, cancel, close, sendDevice, sendToMembers }
 }
 
 module.exports = { createJoinService, PROTOCOL }
