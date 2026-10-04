@@ -20,7 +20,15 @@ const inputs = {
   M1: '1', M2: '2', M3: '3', N1: '0.2', N2: '0.5', N3: '0.3',
   O1: '5', O2: '10',
   // A 4x4 matrix
-  Q1: '2', R1: '-1', S1: '0', T1: '3', Q2: '1', R2: '3', S2: '2', T2: '-2', Q3: '0', R3: '1', S3: '4', T3: '1', Q4: '5', R4: '2', S4: '-3', T4: '2'
+  Q1: '2', R1: '-1', S1: '0', T1: '3', Q2: '1', R2: '3', S2: '2', T2: '-2', Q3: '0', R3: '1', S3: '4', T3: '1', Q4: '5', R4: '2', S4: '-3', T4: '2',
+  // A small database and two criteria blocks
+  V1: 'Tree', W1: 'Height', X1: 'Profit',
+  V2: 'Apple', W2: '18', X2: '105', V3: 'Pear', W3: '12', X3: '96', V4: 'Cherry', W4: '13', X4: '105',
+  V5: 'Apple', W5: '14', X5: '75', V6: 'Pear', W6: '9', X6: '76.8', V7: 'Apple', W7: '8', X7: '45',
+  Z1: 'Tree', AA1: 'Height', Z2: 'Apple', AA2: '>10', Z4: 'Tree', Z5: 'Pear', Z6: 'Cherry',
+  // Text for TEXTBEFORE / TEXTAFTER and a date column for XNPV / XIRR
+  AF1: 'Tree', AF2: 'Cherry',
+  AC1: "Red riding hood's, red hood", AD1: '45292', AD2: '45351', AD3: '45383', AD4: '45657'
 }
 
 const formulas = [
@@ -121,7 +129,19 @@ const formulas = [
   '=TRIM("lead and  inner  spaces ")', '=SEARCH("b*n", C2)', '=TRUNC(PI(), 3)',
   '=MDETERM(Q1:T4)', '=INDEX(MINVERSE(Q1:T4), 2, 3)', '=SUMPRODUCT(Q1:T1, Q2:T2)', '=T.TEST(A1:A10, B1:B10, 2, 2)',
   '=T.TEST(A1:A10, B1:B10, 1, 3)', '=INDEX(LINEST(B1:B10, A1:A10), 1, 2)', '=INDEX(LOGEST(B1:B10, A1:A10), 1, 2)',
-  '=IMDIV("1+2i", "3-4i")', '=COMPLEX(0, -1)'
+  '=IMDIV("1+2i", "3-4i")', '=COMPLEX(0, -1)',
+
+  // Newer functions (src/shared/formula/newer.js)
+  '=XLOOKUP("cherry", C1:C6, D1:D6)', '=XLOOKUP("fig", C1:C6, D1:D6, "none")', '=XLOOKUP(11, A1:A10, B1:B10, , -1)',
+  '=XLOOKUP(11, A1:A10, B1:B10, , 1)', '=XLOOKUP("apple", C1:C6, D1:D6, , 0, -1)', '=XLOOKUP("b*", C1:C6, D1:D6, , 2)',
+  '=XLOOKUP(7, K1:L1, K2:L2)', '=XMATCH("date", C1:C6)', '=XMATCH(11, A1:A10, 1)', '=XMATCH("apple", C1:C6, 0, -1)',
+  '=TEXTBEFORE(AC1, "hood")', '=TEXTBEFORE(AC1, "HOOD", 1, 1)', '=TEXTAFTER(AC1, "red ", -1)', '=TEXTAFTER(AC1, ",")',
+  '=TEXTBEFORE(AC1, "x", 1, 0, 0, "-")', '=TEXTAFTER(AC1, "hood", 2)',
+  '=SUM(OFFSET(A1, 2, 0, 3, 1))', '=OFFSET(C1, 2, 1)', '=SUM(OFFSET(A1:B2, 1, 0))', '=INDIRECT("C3")', '=SUM(INDIRECT("A1:A" & A2))',
+  '=INDIRECT("R2C4", FALSE)', '=XNPV(0.09, G1:G4, AD1:AD4)', '=XIRR(G1:G4, AD1:AD4)',
+  '=DSUM(V1:X7, "Profit", Z1:AA2)', '=DAVERAGE(V1:X7, 3, Z4:Z5)', '=DCOUNT(V1:X7, "Height", Z1:AA2)', '=DCOUNTA(V1:X7, "Tree", Z4:Z6)',
+  '=DGET(V1:X7, "Profit", AF1:AF2)', '=DGET(V1:X7, "Profit", Z4:Z5)', '=DMAX(V1:X7, "Profit", Z4:Z6)', '=DMIN(V1:X7, "Height", Z1:AA2)', '=DPRODUCT(V1:X7, "Height", Z4:Z5)',
+  '=DSTDEV(V1:X7, "Profit", Z1:Z2)', '=DSTDEVP(V1:X7, "Profit", Z1:Z2)', '=DVAR(V1:X7, "Profit", Z1:Z2)', '=DVARP(V1:X7, "Profit", Z1:Z2)'
 ]
 
 // Where LibreOffice is wrong or cannot answer, Excel's value, and why.
@@ -131,7 +151,9 @@ const EXCEL_OVERRIDES = {
   '=BESSELJ(1.9, 2)': [0.329925829, 'value from Excel\'s BESSELJ docs example; LibreOffice differs in the 7th digit'],
   '=BINOM.DIST.RANGE(10, 0.4, 3, 5)': [0.6664716288, 'LibreOffice does not read this function from .xlsx; worked out by hand'],
   '=NETWORKDAYS.INTL(E1, E3, 11)': [79, 'LibreOffice does not read this function from .xlsx; counted by hand (Sundays off)'],
-  '=WORKDAY.INTL(E1, 30, 11)': [45327, 'LibreOffice does not read this function from .xlsx; counted by hand (2024-02-05)']
+  '=WORKDAY.INTL(E1, 30, 11)': [45327, 'LibreOffice does not read this function from .xlsx; counted by hand (2024-02-05)'],
+  '=TEXTAFTER(AC1, "hood", 2)': ['', 'empty text; LibreOffice\'s file reads back as a blank cell'],
+  '=DGET(V1:X7, "Profit", Z4:Z5)': [{ error: '#NUM!' }, 'Excel\'s DGET gives #NUM! for more than one match; LibreOffice uses its own Err:502']
 }
 
 // PearSheet's distribution and gamma functions (jStat, through
