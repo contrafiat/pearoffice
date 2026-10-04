@@ -2,6 +2,20 @@
 
 Append-only, newest on top. Per Constitution §4.
 
+## 2026-10-04 - Charts: shared descriptions drawn with ECharts
+Tier: T2
+Context: charts were the biggest gap against Calc
+(proposals/2026-10-04-charts.md).
+Choice: each tab has a `charts` Y.Map of chart descriptions (one key per
+setting, data range stored with cell ids like a formula), drawn on every
+device with ECharts as SVG. Charts float over the grid anchored to a cell.
+.xlsx exports carry them as DrawingML chart parts PearSheet writes itself.
+Alternatives: Chart.js (rejected - fewer types, no SVG, add-ons for labels);
+charts as images (rejected - would not follow the data); a chart per tab
+(rejected - charts belong next to their data).
+Consequences: about 620 KB more interface code. Older builds show no charts.
+Charts in imported .xlsx files are not read.
+
 ## 2026-10-04 - Single-value functions run per value over a range
 Tier: T2
 Context: =UPPER(A1:A3) and =IF(A1:A3>1, ...) should fill three cells as in
