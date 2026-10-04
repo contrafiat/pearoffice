@@ -33,7 +33,10 @@ const formulas = [
   '=WRAPROWS(F1:F7, 3)', '=WRAPROWS(F1:F7, 3, 0)', '=WRAPCOLS(F1:F7, 3, "")',
   '=EXPAND(F1:F2, 3, 2, 0)',
   '=F1:F3*10', '=A2:A4&"!"', '=C2:C7>50', '=F1:F3+TRANSPOSE(F1:F3)',
-  '=SUM(SEQUENCE(10))', '=ROWS(FILTER(A2:A7, C2:C7>50))', '=INDEX(SORT(C2:C7), 2)'
+  '=SUM(SEQUENCE(10))', '=ROWS(FILTER(A2:A7, C2:C7>50))', '=INDEX(SORT(C2:C7), 2)',
+  // A2#, the whole spill from a cell above: M151 is SEQUENCE(4), M121 is
+  // UNIQUE(A2:A7) and M71 is FILTER(A2:C7, C2:C7>50).
+  '=SUM(M151#)', '=SORT(M121#, 1, -1)', '=ROWS(M71#)', '=M151#*2'
 ]
 
 const SPACING = 10
@@ -45,7 +48,12 @@ const cases = formulas.map((f, i) => ['M' + (1 + i * SPACING), f])
 const EXCEL_OVERRIDES = {
   '=TEXTSPLIT(H2, " ")': [['one', '', 'two', 'three']],
   '=WRAPCOLS(F1:F7, 3, "")': [[1, 4, 7], [2, 5, ''], [3, 6, '']],
-  '=C2:C7>50': [[false], [true], [true], [true], [false], [true]]
+  '=C2:C7>50': [[false], [true], [true], [true], [false], [true]],
+  // LibreOffice 26.2 does not read ANCHORARRAY (A2#) from .xlsx (#NAME?).
+  '=SUM(M151#)': [[10]],
+  '=SORT(M121#, 1, -1)': [['pear'], ['kiwi'], ['fig'], ['Date'], ['Apple']],
+  '=ROWS(M71#)': [[4]],
+  '=M151#*2': [[2], [4], [6], [8]]
 }
 
 module.exports = { inputs, cases, EXCEL_OVERRIDES, SPACING }

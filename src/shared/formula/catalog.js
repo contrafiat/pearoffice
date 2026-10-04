@@ -15,6 +15,7 @@ ADDRESS|row, column, [abs_num], [a1], [sheet]|Cell address as text, like $C$2
 AGGREGATE|function_num, options, ref1, [ref2, ...]|Sum, average, max and more, optionally skipping errors or hidden rows
 AND|logical1, [logical2, ...]|TRUE if every argument is TRUE
 ARABIC|text|Roman numeral as a number
+ANCHORARRAY|reference|The whole block a formula spills, also written A2#
 AREAS|reference|Number of areas in a reference
 ASC|text|Full-width letters as half-width
 ASIN|number|Arcsine, in radians

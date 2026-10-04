@@ -148,3 +148,40 @@ test('operators work value by value on ranges', () => {
   assert.equal(v.get('1,5').value, 50)
   assert.deepEqual([1, 2, 3].map((r) => v.get(r + ',6').value), [-1, -2, -3])
 })
+
+// The A2# spill reference (proposals/2026-10-04-spill-reference.md).
+test('A2# is the whole spill from A2 and follows it as it grows', () => {
+  const { doc, tab } = sheet()
+  model.setCells(doc, tab, 1, 1, [['5'], ['50'], ['7']])
+  model.setCell(doc, tab, 1, 2, '=FILTER(A1:A9, A1:A9>4)')
+  model.setCell(doc, tab, 1, 4, '=SUM(B1#)')
+  model.setCell(doc, tab, 2, 4, '=ROWS(B1#)')
+  assert.deepEqual([shown(at(doc, tab, 1, 4)), shown(at(doc, tab, 2, 4))], [62, 3])
+  model.setCell(doc, tab, 4, 1, '100')
+  assert.deepEqual([shown(at(doc, tab, 1, 4)), shown(at(doc, tab, 2, 4))], [162, 4])
+  model.insertRows(doc, tab, 1, 1)
+  assert.equal(model.getInput(doc, tab, 2, 4), '=SUM(B2#)', 'the reference moves with its cell')
+  assert.equal(shown(at(doc, tab, 2, 4)), 162)
+})
+
+test('A2# on a cell without a formula or on a blocked spill is #REF!; on one value it is that value', () => {
+  const { doc, tab } = sheet()
+  model.setCell(doc, tab, 1, 1, '5')
+  model.setCell(doc, tab, 1, 3, '=A1#')
+  model.setCell(doc, tab, 5, 1, '=SEQUENCE(3)')
+  model.setCell(doc, tab, 6, 1, 'x')
+  model.setCell(doc, tab, 2, 3, '=SUM(A5#)')
+  model.setCell(doc, tab, 8, 1, '=2+3')
+  model.setCell(doc, tab, 3, 3, '=A8#*2')
+  model.setCell(doc, tab, 4, 3, '="A8#"')
+  const v = evaluateSheet(doc).get(tab)
+  assert.deepEqual(['1,3', '2,3', '3,3', '4,3'].map((k) => shown(v.get(k))), ['#REF!', '#REF!', 10, 'A8#'])
+})
+
+test('A2# works across tabs', () => {
+  const { doc, tab } = sheet()
+  const { id: other } = model.addTab(doc, 'Data sheet')
+  model.setCell(doc, other, 1, 1, '=SEQUENCE(4)')
+  model.setCell(doc, tab, 1, 1, "=SUM('Data sheet'!A1#)")
+  assert.equal(shown(at(doc, tab, 1, 1)), 10)
+})

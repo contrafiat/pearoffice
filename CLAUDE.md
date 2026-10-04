@@ -205,13 +205,14 @@ fills the cells below and to the right, computed on each device and never
 stored; `src/shared/formula/index.js` has the four blocking rules
 (`#SPILL!`) and evaluates in reading order. The array functions (FILTER,
 SORT, UNIQUE, SEQUENCE, TEXTSPLIT, TAKE, DROP, VSTACK and the rest) are in
-`src/shared/formula/arrays.js`. `test/spill.test.js` covers the rules;
+`src/shared/formula/arrays.js`. `A2#` (the whole spill from A2) is rewritten
+to ANCHORARRAY(A2) before parsing (proposals/2026-10-04-spill-reference.md). `test/spill.test.js` covers the rules;
 `test/spill-corpus.test.js` checks whole blocks
 (`test/fixtures/spill-corpus.js`) against LibreOffice: after adding cases,
 run `node scripts/spill-expectations.js`.
 
 Formula suggestions come from `src/shared/formula/catalog.js` (name, arguments
-and one line for each of the 398 working functions); `test/catalog.test.js`
+and one line for each of the 399 working functions); `test/catalog.test.js`
 fails if a function is added to the engine without an entry.
 
 After a deliberate formula change, regenerate the golden file with

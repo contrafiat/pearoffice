@@ -821,6 +821,81 @@
      30
     ]
    ]
+  },
+  "M461": {
+   "formula": "=SUM(M151#)",
+   "libreoffice": [
+    [
+     {
+      "error": "#NAME?"
+     }
+    ]
+   ]
+  },
+  "M471": {
+   "formula": "=SORT(M121#, 1, -1)",
+   "libreoffice": [
+    [
+     {
+      "error": "#NAME?"
+     }
+    ],
+    [
+     {
+      "error": "#NAME?"
+     }
+    ],
+    [
+     {
+      "error": "#NAME?"
+     }
+    ],
+    [
+     {
+      "error": "#NAME?"
+     }
+    ],
+    [
+     {
+      "error": "#NAME?"
+     }
+    ]
+   ]
+  },
+  "M481": {
+   "formula": "=ROWS(M71#)",
+   "libreoffice": [
+    [
+     {
+      "error": "#NAME?"
+     }
+    ]
+   ]
+  },
+  "M491": {
+   "formula": "=M151#*2",
+   "libreoffice": [
+    [
+     {
+      "error": "#NAME?"
+     }
+    ],
+    [
+     {
+      "error": "#NAME?"
+     }
+    ],
+    [
+     {
+      "error": "#NAME?"
+     }
+    ],
+    [
+     {
+      "error": "#NAME?"
+     }
+    ]
+   ]
   }
  }
 }

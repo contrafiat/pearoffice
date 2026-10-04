@@ -10,6 +10,7 @@ const FormulaParser = require('./vendor/fast-formula-parser')
 const FormulaError = require('./vendor/fast-formula-parser/formulas/error')
 const { installDeterministicMath } = require('./detmath')
 const { fillFunctions } = require('./fills')
+const { makeRef } = require('./newer')
 const refs = require('../refs')
 const model = require('../sheetModel')
 
@@ -52,6 +53,14 @@ const MAX_SPILL = 100000
 // formula turns out to depend on a cell that is itself still being evaluated.
 // The candidate is then treated as unknown (see `skipped`).
 class ProbeAbort extends Error {}
+
+// `A2#` (the whole spill from A2, proposals/2026-10-04-spill-reference.md)
+// is Excel's ANCHORARRAY(A2). Rewritten before parsing, outside text in quotes.
+const SPILL_REF = /((?:'(?:[^']|'')+'|[A-Za-z_][\w.]*)!)?(\$?[A-Za-z]{1,3}\$?\d+)#/g
+function spillRefs (text) {
+  if (text.indexOf('#') === -1) return text
+  return text.split(/("(?:[^"]|"")*")/).map((part, i) => (i % 2 ? part : part.replace(SPILL_REF, (m, sheet, cell) => 'ANCHORARRAY(' + (sheet || '') + cell + ')'))).join('')
+}
 
 function isBlock (v) {
   return Array.isArray(v) && Array.isArray(v[0])
@@ -118,7 +127,7 @@ function evaluateSheet (doc) {
     let v
     try {
       const raw = rawAt(tab, row, col)
-      const text = refs.toDisplay(raw.slice(1), { tabId: tab.id, tabs }, index)
+      const text = spillRefs(refs.toDisplay(raw.slice(1), { tabId: tab.id, tabs }, index))
       const parser = parserFor(tab)
       parseDepth++
       try {
@@ -306,6 +315,21 @@ function evaluateSheet (doc) {
         return out
       }
     })
+    // ANCHORARRAY gets its reference unresolved, as OFFSET does, and returns
+    // a reference to the block that cell's formula spills.
+    p.funsNeedContextAndNoDataRetrieve.push('ANCHORARRAY')
+    p.functions.ANCHORARRAY = (context, reference) => {
+      if (!reference || !reference.ref || reference.ref.from || !reference.ref.row) throw FormulaError.REF
+      const t = reference.ref.sheet ? tabByName(reference.ref.sheet) : tab
+      if (!t) throw FormulaError.REF
+      const { row, col } = reference.ref
+      if (!isFormula(rawAt(t, row, col))) throw FormulaError.REF
+      const res = resultOf(t, row, col)
+      if (!isBlock(res)) return makeRef(reference.ref.sheet, row, col, 1, 1)
+      const st = spillOf(t, row, col)
+      if (!st || st.blocked) throw FormulaError.REF
+      return makeRef(reference.ref.sheet, row, col, st.rows, st.cols)
+    }
     parsers.set(pkey, p)
     return p
   }

@@ -15,6 +15,7 @@ test('the suggestions list every working function and nothing else', () => {
   const dir = path.join(__dirname, '..', 'src', 'shared', 'formula', 'vendor', 'fast-formula-parser', 'formulas', 'functions')
   const engine = new Set(Object.keys(fillFunctions()))
   for (const f of fs.readdirSync(dir)) for (const [k, v] of Object.entries(require(path.join(dir, f)))) if (typeof v === 'function') engine.add(k)
+  engine.add('ANCHORARRAY') // the evaluator adds it (src/shared/formula/index.js)
   const listed = new Set(FUNCTIONS.map((f) => f.name))
   assert.deepEqual([...engine].filter((n) => !listed.has(n) && !NOT_LISTED.has(n)), [], 'in the engine but not suggested')
   assert.deepEqual([...listed].filter((n) => !engine.has(n)), [], 'suggested but not in the engine')
