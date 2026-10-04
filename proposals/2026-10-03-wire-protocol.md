@@ -446,3 +446,22 @@ are affected.
   paired person's sheets were refused and disconnected.
 - 2026-10-03, seeder: deleting old cores a week after a move is not built yet.
   It arrives with removal (section 7), since moves do not exist before that.
+- 2026-10-03, removal: a move creates a sheet with a **new** sheet id, where
+  section 7 kept the same one. Every signed op carries the sheet id, so with
+  the same id a dishonest editor could copy the owner's old signed invites or
+  role changes into the new sheet and, for example, let the removed person
+  back in. The old sheet's `moved` record points to the new one; devices hide
+  the old sheet once they have followed.
+- 2026-10-03, removal: the whole move target (new sheet id, topic key,
+  bootstrap and encryption key) is sealed to each remaining person; nothing
+  about the new sheet is in clear in the old one.
+- 2026-10-03, removal: the old sheet freezes in `apply` (every op after
+  `moved` is ignored) instead of revoking every writer, since Autobase will
+  not remove its last indexer. An edit made in the old copy by someone who
+  had not yet seen the move is lost; the Share panel says so before removing.
+- 2026-10-03, removal: two ops added. `member` may now also be an
+  owner-signed record for someone else (used to carry members into the new
+  sheet). `admit` lets an owner or editor register an existing member's
+  device, carrying the device's own proof; it is how remaining members'
+  devices become writers in the new sheet, and the same op will serve linked
+  devices.

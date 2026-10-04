@@ -13,8 +13,9 @@ test('two devices converge after concurrent offline edits, and survive a restart
   const testnet = await createTestnet(3)
   const mkSwarm = ({ keyPair }) => new Hyperswarm({ keyPair, bootstrap: testnet.bootstrap })
   const dirA = tmpDir()
-  let A = createSheetEngine({ corestore: new Corestore(dirA), createSwarm: mkSwarm })
-  const B = createSheetEngine({ corestore: new Corestore(tmpDir()), createSwarm: mkSwarm })
+  const dbg = (who) => process.env.DEBUG_JOIN ? (msg) => console.log(Date.now() % 100000, who, msg) : undefined
+  let A = createSheetEngine({ corestore: new Corestore(dirA), createSwarm: mkSwarm, log: dbg('A') })
+  const B = createSheetEngine({ corestore: new Corestore(tmpDir()), createSwarm: mkSwarm, log: dbg('B') })
   t.after(async () => {
     try { await A.close() } catch {}
     try { await B.close() } catch {}
@@ -37,7 +38,8 @@ test('two devices converge after concurrent offline edits, and survive a restart
 
   await waitFor('B sees the sheet', async () => {
     if (!B.bases.get(sheetId)) return false
-    const g = await grid(B, sheetId).catch(() => null)
+    const g = await grid(B, sheetId).catch((e) => ({ err: e.message }))
+    if (process.env.DEBUG_JOIN) console.log('B grid', JSON.stringify(g))
     return g && g['3,2'] === '=SUM(B1:B2) -> 1650.5'
   })
   await waitFor('B is a writer', async () => B.bases.get(sheetId).writable && (await call(B, 'sheet:view', { sheetId })).myRole === 'editor')

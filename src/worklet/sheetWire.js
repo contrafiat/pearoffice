@@ -16,6 +16,9 @@ function createApplyOps ({ onUpdate, onMembership, log }) {
   return async function applySheetOp (op, ctx) {
     const { view, groupId, node } = ctx
 
+    // A moved sheet is frozen: after the owner's `move`, nothing applies.
+    if (await view.get('moved')) return
+
     if (op.type === 'y') {
       if (typeof op.data !== 'string' || op.data.length > MAX_UPDATE_BYTES * 4 / 3 + 4) return
       if (!(await mayEdit(view, node))) return

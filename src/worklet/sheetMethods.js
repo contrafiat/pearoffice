@@ -29,7 +29,7 @@ function present (v, fmt) {
   return { display: String(value), kind: 'text' }
 }
 
-function createSheetMethods (sheets, { getJoin }) {
+function createSheetMethods (sheets, { getJoin, getMoves }) {
   async function profileName (ctx) {
     const p = await ctx.localDb.get('profile')
     return (p && p.value && p.value.name) || ''
@@ -46,6 +46,17 @@ function createSheetMethods (sheets, { getJoin }) {
   async function myRole (ctx, sheetId) {
     const me = await viewGet(ctx, sheetId, 'member/' + hex(ctx.identity.publicKey))
     return me ? me.role : null
+  }
+
+  // A sheet that moved (or that removed this person) is read-only here.
+  async function frozenInfo (ctx, sheetId) {
+    const rec = (await ctx.localDb.get('moves:' + sheetId))?.value
+    if (rec) return rec.removed ? { removed: true } : { movedTo: rec.to }
+    return (await viewGet(ctx, sheetId, 'moved')) ? { moving: true } : null
+  }
+
+  async function isFrozen (ctx, sheetId) {
+    return !!(await frozenInfo(ctx, sheetId))
   }
 
   async function requireOwner (ctx, sheetId) {
@@ -73,8 +84,11 @@ function createSheetMethods (sheets, { getJoin }) {
 
   function mutate (fn) {
     return async (args, ctx) => {
+      if (await isFrozen(ctx, args.sheetId)) throw new Error('This copy of the sheet is frozen')
       const role = await myRole(ctx, args.sheetId)
       if (role !== 'owner' && role !== 'editor') throw new Error('You can view this sheet but not edit it')
+      const base = ctx.bases.get(args.sheetId)
+      if (!base.writable) throw new Error('Still getting edit access to this sheet. Try again in a moment.')
       const { doc } = await docFor(args.sheetId)
       const tabId = firstTab(doc, args.tabId)
       return commit(ctx, args.sheetId, fn(doc, tabId, args))
@@ -103,9 +117,12 @@ function createSheetMethods (sheets, { getJoin }) {
       const joining = new Map((getJoin() ? getJoin().pending() : []).map((p) => [p.sheetId, p]))
       for await (const { value } of ctx.localDb.createReadStream({ gt: 'groups:joined:', lt: 'groups:joined:~' })) {
         if (!value || !value.groupId) continue
+        // A sheet that moved to a fresh key is replaced by its new copy.
+        const moved = (await ctx.localDb.get('moves:' + value.groupId))?.value
+        if (moved && moved.to) continue
         // Prefer the live title: the stored name is what it was called at join.
         const e = sheets.peek(value.groupId)
-        out.push({ sheetId: value.groupId, title: (e && model.title(e.guarded.doc)) || value.name || '', joining: joining.has(value.groupId) || undefined })
+        out.push({ sheetId: value.groupId, title: (e && model.title(e.guarded.doc)) || value.name || '', joining: joining.has(value.groupId) || undefined, removed: (moved && moved.removed) || undefined })
         joining.delete(value.groupId)
       }
       // Joins that have not been welcomed yet have no base.
@@ -148,7 +165,11 @@ function createSheetMethods (sheets, { getJoin }) {
         cols: cols.length,
         cells,
         widths,
-        myRole: await myRole(ctx, sheetId),
+        myRole: (await isFrozen(ctx, sheetId)) ? 'viewer' : await myRole(ctx, sheetId),
+        frozen: await frozenInfo(ctx, sheetId),
+        // An editor's device can lag behind its role for a few seconds after
+        // joining or a move, until a writer has added it.
+        writable: !!(ctx.bases.get(sheetId) && ctx.bases.get(sheetId).writable),
         canUndo: !!(e.undo && e.undo.canUndo()),
         canRedo: !!(e.undo && e.undo.canRedo())
       }
@@ -216,6 +237,9 @@ function createSheetMethods (sheets, { getJoin }) {
       }
       return { members, invites, myRole: (members.find((x) => x.isMe) || {}).role || null }
     },
+
+    // Remove someone: the sheet moves to fresh keys without them.
+    'sheet:removeMember': async ({ sheetId, identity }) => getMoves().removeMember(sheetId, identity),
 
     'sheet:join': async ({ link }, ctx) => {
       if (!getJoin()) throw new Error('Not ready yet')

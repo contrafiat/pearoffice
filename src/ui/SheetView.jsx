@@ -47,14 +47,16 @@ export function SheetView ({ sheetId, onTitleChange, onError }) {
   useEffect(() => { load() }, [load])
   useEffect(() => on('sheet:changed', (d) => { if (d.sheetId === sheetId) load() }), [sheetId, load])
   useEffect(() => on('sheet:members', (d) => { if (d.sheetId === sheetId) load() }), [sheetId, load])
-  // Content for a just-joined sheet arrives over the network; poll until it does.
+  // Content for a just-joined sheet arrives over the network, and edit access
+  // can trail the role by a few seconds; poll until both are in.
   useEffect(() => {
-    if (!view || !view.loading) return
+    if (!view || !(view.loading || (view.myRole === 'editor' && !view.writable))) return
     const t = setInterval(load, 1000)
     return () => clearInterval(t)
   }, [view, load])
 
-  const canEdit = !!view && (view.myRole === 'owner' || view.myRole === 'editor')
+  const hasEditRole = !!view && (view.myRole === 'owner' || view.myRole === 'editor')
+  const canEdit = hasEditRole && view.writable
 
   const cells = useMemo(() => {
     const m = new Map()
@@ -156,6 +158,9 @@ export function SheetView ({ sheetId, onTitleChange, onError }) {
 
   if (!view) return <div className='loading'>Opening sheet...</div>
   if (view.loading) return <div className='loading'>Waiting for the sheet to arrive from the people in it...</div>
+  const frozenNote = view.frozen && (view.frozen.removed
+    ? 'The owner removed you from this sheet. This is a read-only copy of what you had.'
+    : 'This sheet moved to new keys. Opening the new copy...')
 
   const fmt = (selected && selected.fmt) || {}
   const barValue = editing && editing.row === sel.row && editing.col === sel.col ? editing.value : (selected ? selected.input : '')
@@ -172,7 +177,7 @@ export function SheetView ({ sheetId, onTitleChange, onError }) {
           onBlur={async (e) => { if (e.target.value !== view.title) { await run('sheet:setTitle', { title: e.target.value }); onTitleChange() } }}
           onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur() }}
         />
-        {!canEdit && <span className='badge view-only'>View only</span>}
+        {!canEdit && <span className='badge view-only'>{hasEditRole ? 'Getting edit access...' : 'View only'}</span>}
         <div className='tools' role='toolbar' aria-label='Formatting' hidden={!canEdit}>
           <button title='Undo (Ctrl+Z)' disabled={!view.canUndo} onClick={() => run('sheet:undo')}>Undo</button>
           <button title='Redo (Ctrl+Y)' disabled={!view.canRedo} onClick={() => run('sheet:redo')}>Redo</button>
@@ -190,6 +195,7 @@ export function SheetView ({ sheetId, onTitleChange, onError }) {
         <button className='share' onClick={() => setSharing(true)}>Share</button>
       </header>
 
+      {frozenNote && <div className='banner info'>{frozenNote}</div>}
       <div className='formula-bar'>
         <span className='address'>{colName(sel.col) + sel.row}</span>
         <span className='fx' aria-hidden='true'>fx</span>

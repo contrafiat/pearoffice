@@ -86,14 +86,54 @@ function createSheets ({ emit, getBase }) {
         const base = getBase(sheetId)
         if (!base) throw new Error('unknown sheet: ' + sheetId)
         await base.ready()
+        e.version = base.view.version
         for await (const { value } of base.view.createReadStream({ gt: Y_PREFIX, lt: Y_PREFIX + '~' })) {
           if (value && typeof value.data === 'string') e.guarded.apply(b4a.from(value.data, 'base64'))
         }
         trackUndo(e)
+        // Autobase can fast-forward a device to the shared view without running
+        // apply for those entries, so onUpdate never sees them. Catch up from
+        // the view whenever Autobase says it changed.
+        if (!e.listening) {
+          e.listening = true
+          base.on('update', () => catchUp(sheetId, base).catch(() => {}))
+          catchUp(sheetId, base).catch(() => {})
+        }
       })()
       e.loading.catch(() => { if (open.get(sheetId) === e) open.delete(sheetId) })
     }
     return e.loading.then(() => e)
+  }
+
+  // Apply y/ entries that appeared in the view since we last looked.
+  function catchUp (sheetId, base) {
+    const e = open.get(sheetId)
+    if (!e) return Promise.resolve()
+    e.catching = (e.catching || Promise.resolve()).then(async () => {
+      const view = base.view
+      const version = view.version
+      if (version === e.version) return
+      let applied = 0
+      const take = (value) => {
+        if (value && typeof value.data === 'string' && e.guarded.apply(b4a.from(value.data, 'base64'))) applied++
+      }
+      try {
+        if (!(e.version > 1)) throw new Error('full scan')
+        for await (const { left } of view.createDiffStream(e.version, { gt: Y_PREFIX, lt: Y_PREFIX + '~' })) {
+          if (left) take(left.value)
+        }
+      } catch {
+        // No usable older version (first look, or the view was rebuilt): read
+        // everything. Applying an update twice is harmless.
+        for await (const { value } of view.createReadStream({ gt: Y_PREFIX, lt: Y_PREFIX + '~' })) take(value)
+      }
+      e.version = version
+      if (applied) {
+        trackUndo(e)
+        scheduleRecompute(sheetId)
+      }
+    })
+    return e.catching
   }
 
   function trackUndo (e) {

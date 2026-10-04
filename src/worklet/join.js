@@ -75,6 +75,7 @@ function createJoinService ({ engine, emit, log = () => {}, now = () => Date.now
       id,
       onopen: () => {
         const j = joins.get(sheetId)
+        log('join channel open ' + sheetId.slice(0, 6) + (j ? ' (joining)' : ''))
         if (!j || j.done) return
         j.channels.add(ch)
         if (j.claimMsg) ch.msg.send(j.claimMsg)
@@ -82,6 +83,7 @@ function createJoinService ({ engine, emit, log = () => {}, now = () => Date.now
       },
       onclose: () => {
         const j = joins.get(sheetId)
+        log('join channel closed ' + sheetId.slice(0, 6))
         if (j) j.channels.delete(ch)
       }
     })
@@ -95,8 +97,10 @@ function createJoinService ({ engine, emit, log = () => {}, now = () => Date.now
     if (!msg || typeof msg.t !== 'string') return
     if (msg.t === 'request') return answerRequest(ch, sheetId, msg)
     if (msg.t === 'claim') return takeClaim(ch, sheetId, msg)
+    if (msg.t === 'device') return takeDevice(sheetId, msg)
     const j = joins.get(sheetId)
     if (!j || j.done) return
+    log('join got ' + msg.t + (msg.reason ? ': ' + msg.reason : ''))
     if (msg.t === 'welcome' && !j.welcome) {
       j.welcome = msg
       await persist(sheetId, j)
@@ -110,7 +114,8 @@ function createJoinService ({ engine, emit, log = () => {}, now = () => Date.now
   // --- member side ---------------------------------------------------------
 
   async function answerRequest (ch, sheetId, msg) {
-    const reject = (reason) => ch.msg.send({ t: 'reject', reason })
+    log('answer request ' + String(msg.inviteId).slice(0, 6))
+    const reject = (reason) => { log('reject: ' + reason); ch.msg.send({ t: 'reject', reason }) }
     const invite = await get(sheetId, 'invite/' + msg.inviteId)
     if (!invite) return reject('This device has not seen that invite yet')
     if (await get(sheetId, 'invite-used/' + msg.inviteId)) return reject('This invite has already been used or was cancelled')
@@ -142,6 +147,34 @@ function createJoinService ({ engine, emit, log = () => {}, now = () => Date.now
     recentlyAppended.set(claim.inviteId, now())
     log('inviteUse ' + claim.inviteId.slice(0, 8))
     await engine.append(sheetId, { type: 'inviteUse', claim, device })
+  }
+
+  // A member's new device (after a move) asks to be admitted.
+  async function takeDevice (sheetId, msg) {
+    const base = engine.bases.get(sheetId)
+    if (!base || !base.writable) return
+    const d = msg.device
+    if (!d || d.purpose !== m.P.device || d.sheetId !== sheetId || !verifyValueWithSigner(d, 'identity')) return
+    const key = 'device:' + d.writerKey
+    const last = recentlyAppended.get(key)
+    if (last && now() - last < 30000) return
+    if (await get(sheetId, 'device/' + d.writerKey)) return
+    if (!(await get(sheetId, 'member/' + d.identity))) return
+    const me = await get(sheetId, 'member/' + hex(engine.identity.publicKey))
+    if (!me || (me.role !== 'owner' && me.role !== 'editor')) return
+    recentlyAppended.set(key, now())
+    await engine.append(sheetId, m.admitOp({ device: d }))
+  }
+
+  // Send a device proof to every peer reachable for a sheet.
+  function sendDevice (sheetId, device) {
+    for (const mux of muxes) {
+      const id = b4a.from(sheetId)
+      let ch = null
+      for (const c of mux) if (c.protocol === PROTOCOL && b4a.equals(c.id, id)) ch = c
+      if (!ch) ch = openChannel(mux, sheetId)
+      if (ch && ch.opened && ch.msg) ch.msg.send({ t: 'device', device })
+    }
   }
 
   // --- joiner side -----------------------------------------------------------
@@ -194,6 +227,9 @@ function createJoinService ({ engine, emit, log = () => {}, now = () => Date.now
     const again = () => {
       if (j.done || j.claimMsg) return
       discovery.refresh({ server: false, client: true }).catch(() => {})
+      // A member that had not set up its listener yet rejects our channel,
+      // and nothing reopens it on that connection. Try again.
+      if (!j.welcome) for (const mux of muxes) openChannel(mux, sheetId)
       j.lookup = setTimeout(again, LOOKUP_EVERY_MS[Math.min(n++, LOOKUP_EVERY_MS.length - 1)])
       if (j.lookup.unref) j.lookup.unref()
     }
@@ -248,7 +284,7 @@ function createJoinService ({ engine, emit, log = () => {}, now = () => Date.now
     for (const j of joins.values()) { clearInterval(j.timer); clearTimeout(j.lookup) }
   }
 
-  return { onConnection, addSheet, start, resume, pending, close }
+  return { onConnection, addSheet, start, resume, pending, close, sendDevice }
 }
 
 module.exports = { createJoinService, PROTOCOL }
