@@ -93,7 +93,8 @@ function workbookToTabs (XLSX, wb) {
       const px = w.wpx || (w.wch ? Math.round(w.wch * 7 + 5) : 0)
       if (px) widths[i + 1] = px
     }
-    tabs.push({ name: String(name).slice(0, 100), cells, widths })
+    const merges = (ws['!merges'] || []).map((m) => [m.s.r + 1, m.s.c + 1, m.e.r + 1, m.e.c + 1]).filter(([r1, c1, r2, c2]) => r2 <= MAX_ROWS && c2 <= MAX_COLS && (r1 !== r2 || c1 !== c2))
+    tabs.push({ name: String(name).slice(0, 100), cells, widths, merges })
   }
   if (!tabs.length) throw new Error('This file has no sheets')
   return { tabs }
@@ -123,6 +124,7 @@ function dumpToWorkbook (XLSX, dump) {
       maxR = Math.max(maxR, cell.row)
       maxC = Math.max(maxC, cell.col)
     }
+    if (tab.merges && tab.merges.length) ws['!merges'] = tab.merges.map((m) => ({ s: { r: m.r1 - 1, c: m.c1 - 1 }, e: { r: m.r2 - 1, c: m.c2 - 1 } }))
     ws['!ref'] = XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: Math.max(0, maxR - 1), c: Math.max(0, maxC - 1) } })
     const cols = []
     for (const [col, px] of Object.entries(tab.widths || {})) cols[Number(col) - 1] = { wpx: px }

@@ -91,6 +91,12 @@ function evaluateSheet (doc) {
   const isFormula = (raw) => typeof raw === 'string' && raw[0] === '='
   const hasInput = (raw) => raw !== undefined && raw !== null && raw !== ''
 
+  const mergesByTab = new Map()
+  const mergesOf = (tab) => {
+    if (!mergesByTab.has(tab.id)) mergesByTab.set(tab.id, model.getMerges(doc, tab.id))
+    return mergesByTab.get(tab.id)
+  }
+
   // Each tab's formula cells in reading order: the cells that can spill.
   const formulaCellsByTab = new Map()
   function formulaCells (tab) {
@@ -201,7 +207,11 @@ function evaluateSheet (doc) {
             if ((r !== row || c !== col) && hasInput(rawAt(tab, r, c))) inWay.push([r, c])
           }
         }
+        // A merge in the way blocks it too (proposals/2026-10-04-cell-formats.md).
+        const merge = mergesOf(tab).find((m) => m.r1 <= row + rows - 1 && m.r2 >= row && m.c1 <= col + cols - 1 && m.c2 >= col &&
+          !(m.r1 === row && m.c1 === col && m.r2 === row && m.c2 === col))
         if (inWay.length) state = { blocked: { kind: 'cells', cells: inWay.slice(0, 5), more: Math.max(0, inWay.length - 5) } }
+        else if (merge) state = { blocked: { kind: 'merge', at: [merge.r1, merge.c1] } }
         else {
           // An earlier anchor whose spill reaches into this block wins.
           for (const e of formulaCells(tab)) {
