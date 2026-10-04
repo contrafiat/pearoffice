@@ -10,6 +10,7 @@ const { execFileSync, spawn } = require('node:child_process')
 const root = path.join(__dirname, '..')
 execFileSync(process.execPath, [path.join(root, 'scripts', 'build-ui.mjs')], { stdio: 'inherit' })
 execFileSync(process.execPath, [path.join(root, 'scripts', 'build-worklet.js')], { stdio: 'inherit' })
+execFileSync(process.execPath, [path.join(root, 'scripts', 'build-seeder.js')], { stdio: 'inherit' })
 require(path.join(root, 'scripts', 'bare.js')).barePath() // fixes the execute bit
 
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pearsheet-smoke-'))
@@ -36,5 +37,5 @@ child.on('exit', () => {
     console.error('not ok - desktop smoke', JSON.stringify(result))
     process.exit(1)
   }
-  console.log('ok - desktop smoke: create, type, fast typing, formula, copy/paste, fill, clear range, bold, undo, rename, export, import, seeder and devices panels, keep online, invite link')
+  console.log('ok - desktop smoke: create, type, fast typing, formula, copy/paste, fill, clear range, bold, undo, rename, export, import, seeder and devices panels, local seeder, keep online, invite link')
 })

@@ -31,6 +31,7 @@
       "main.js",
       "preload.js",
       "worklet.js",
+      "seeder-process.js",
       "paths.js",
       "smoke-run.js",
       "package.json",

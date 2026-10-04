@@ -9,6 +9,7 @@ function resolvePaths ({ packaged, resourcesPath }) {
     return {
       bare: path.join(resourcesPath, 'bare', bareName),
       bundle: path.join(resourcesPath, 'worklet', 'worklet.bundle'),
+      seeder: path.join(resourcesPath, 'seeder', 'seeder.bundle'),
       ui: path.join(resourcesPath, 'ui', 'index.html')
     }
   }
@@ -16,6 +17,7 @@ function resolvePaths ({ packaged, resourcesPath }) {
   return {
     bare: path.join(root, 'node_modules', `bare-runtime-${process.platform}-${process.arch}`, 'bin', bareName),
     bundle: path.join(root, 'dist', 'worklet', 'worklet.bundle'),
+    seeder: path.join(root, 'dist', 'seeder', 'seeder.bundle'),
     ui: path.join(root, 'dist', 'ui', 'index.html')
   }
 }

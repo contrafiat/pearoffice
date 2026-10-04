@@ -35,8 +35,8 @@ pair by link, every member backs up to it, a member can catch up from it
 alone. Removing someone moves the sheet to fresh keys. Desktop installers build for
 Linux, macOS and Windows. The Android app runs on the emulator and the TCL.
 A person can link their devices (one-time link) and keep a 24-word recovery
-phrase (proposals/2026-10-03-device-linking.md). Signing, iOS and seeder
-packaging are next.
+phrase (proposals/2026-10-03-device-linking.md). The seeder ships inside the
+desktop app and as a Linux server download. Signing and iOS are next.
 See `TODO.md`.
 
 ## Layout
@@ -77,8 +77,15 @@ See `TODO.md`.
 `~/.pearsheet-dev` for data (override with `PEARSHEET_DATA`).
 
 `npm run seeder` builds and runs the seeder with data in `~/.pearsheet-seeder`
-(override with `PEARSHEET_SEEDER_DATA`). It prints a pairing link; type `pair`
-for a new one and `status` for counts.
+(override with `PEARSHEET_SEEDER_DATA`). It prints a pairing link and QR code;
+type `pair` for a new one and `status` for counts. With `--ipc` it speaks
+newline JSON instead; the desktop app uses that for "Run a seeder on this
+computer" (`desktop/seeder-process.js`, a separate process from the member
+worklet).
+
+`npm run dist:seeder` builds the headless download for Linux x64 and arm64
+(`dist/seeder-pkg/*.tar.gz`: Bare runtime, seeder bundle, launcher, systemd
+user unit, README from `seeder-dist/`) and checks the x64 one starts.
 
 ## Android
 

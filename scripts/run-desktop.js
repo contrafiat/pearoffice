@@ -7,6 +7,7 @@ const os = require('os')
 const root = path.join(__dirname, '..')
 execFileSync(process.execPath, [path.join(root, 'scripts', 'build-ui.mjs')], { stdio: 'inherit' })
 execFileSync(process.execPath, [path.join(root, 'scripts', 'build-worklet.js')], { stdio: 'inherit' })
+execFileSync(process.execPath, [path.join(root, 'scripts', 'build-seeder.js')], { stdio: 'inherit' })
 require('./bare').barePath() // fixes the execute bit
 
 const electron = require(path.join(root, 'desktop', 'node_modules', 'electron'))

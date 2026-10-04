@@ -1,0 +1,18 @@
+# systemd user service for the PearSheet seeder.
+#   mkdir -p ~/.config/systemd/user && cp pearsheet-seeder.service ~/.config/systemd/user/
+#   edit ExecStart if you unpacked somewhere other than ~/pearsheet-seeder
+#   systemctl --user daemon-reload && systemctl --user enable --now pearsheet-seeder
+#   loginctl enable-linger "$USER"     (keeps it running when you are logged out)
+# Pairing code: journalctl --user -u pearsheet-seeder, or run it once by hand.
+[Unit]
+Description=PearSheet seeder (stores encrypted sheet data, cannot read it)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=%h/pearsheet-seeder/pearsheet-seeder
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
