@@ -139,17 +139,25 @@ Installers land in `desktop/dist/`. Each build ends with the packaged smoke
 test (`scripts/smoke-packaged.js`) run against the installed-layout app.
 
 - `npm run dist:linux` - AppImage and deb, built here.
-- `npm run dist:mac` - dmg and zip for Apple silicon, built on the Mac Mini
-  over SSH in `~/peerloomllc/pearsheet-build` (`scripts/build-desktop-mac.sh`;
-  pass `x64` for Intel, smoke-tested under Rosetta).
+- `npm run dist:mac` (Apple silicon) and `npm run dist:mac:intel` - dmg and
+  zip, built on the Mac Mini over SSH in `~/peerloomllc/pearsheet-build`
+  (`scripts/build-desktop-mac.sh` drives `scripts/mac-build-desktop.sh` on the
+  Mac). Signed with the Developer ID Application certificate and notarized
+  with a notarytool profile, both in the Mac's build keychain (empty
+  password, works over SSH; `NOTARY_PROFILE` defaults to
+  `pearcircle-seeder-notary`). Checked with codesign, stapler and Gatekeeper,
+  then the packaged smoke. Hardened runtime entitlements are in
+  `desktop/build/entitlements.mac.plist` (V8 JIT for Electron and Bare, Bare's
+  addons, network). The Intel build is smoke-tested under Rosetta.
 - `npm run dist:windows` - NSIS installer, built on the local libvirt VM
   `win11-pearguard` (start it with `virsh -c qemu:///system start
   win11-pearguard`, shut it down after).
 
 `scripts/stage-desktop.js` gathers the Bare runtime, the worklet bundle with
 the target's addons and the minified UI into `desktop/build/resources`, which
-electron-builder copies into the app (`desktop/paths.js` finds them). All
-builds are unsigned for now.
+electron-builder copies into the app (`desktop/paths.js` finds them). Mac
+builds are signed and notarized; Linux and Windows builds are unsigned
+(no Windows code-signing certificate yet).
 
 ## Verify
 
