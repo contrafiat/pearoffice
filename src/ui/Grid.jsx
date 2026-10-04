@@ -1,17 +1,22 @@
 import React, { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { colName } from './a1.js'
 
-const ROW_H = 24
+const BASE_ROW_H = 24
 const HEAD_H = 26
 const ROWHEAD_W = 52
 const DEFAULT_W = 100
 const OVERSCAN = 6
+export const MIN_ZOOM = 0.5
+export const MAX_ZOOM = 2.5
 
 // Spreadsheet grid. Only the visible rows and columns are rendered, so large
 // sheets stay fast. Headers are drawn outside the scroll area and moved with
 // the scroll position.
 export const Grid = forwardRef(function Grid (props, ref) {
-  const { view, cells, sel, ext = sel, range, editing, onSelect, onEdit, onEditChange, onEditKey, onEditBlur, onKeyDown, onHeaderMenu, onResize, onCopy, onPaste } = props
+  const { view, cells, sel, ext = sel, range, editing, onSelect, onEdit, onEditChange, onEditKey, onEditBlur, onKeyDown, onHeaderMenu, onResize, onCopy, onPaste, zoom = 1, onZoom, inputMode } = props
+  // Row height and column widths scale with the zoom (pinch on a phone);
+  // stored widths stay unzoomed.
+  const ROW_H = Math.round(BASE_ROW_H * zoom)
   const bodyRef = useRef(null)
   const [scroll, setScroll] = useState({ top: 0, left: 0, width: 800, height: 600 })
   const [drag, setDrag] = useState(null) // { col, startX, startW, w }
@@ -44,10 +49,10 @@ export const Grid = forwardRef(function Grid (props, ref) {
 
   const widths = useMemo(() => {
     const w = new Array(view.cols + 1)
-    for (let c = 1; c <= view.cols; c++) w[c] = view.widths[c] || DEFAULT_W
+    for (let c = 1; c <= view.cols; c++) w[c] = Math.round((view.widths[c] || DEFAULT_W) * zoom)
     if (drag) w[drag.col] = drag.w
     return w
-  }, [view.cols, view.widths, drag])
+  }, [view.cols, view.widths, drag, zoom])
 
   // colX[c] is the left edge of column c; colX[cols + 1] is the total width.
   const colX = useMemo(() => {
@@ -69,6 +74,40 @@ export const Grid = forwardRef(function Grid (props, ref) {
     return () => ro.disconnect()
   }, [])
 
+  // Pinch to zoom, keeping the point between the fingers in place.
+  const pinch = useRef(null) // { d0, z0 } while two fingers are down
+  const pinched = useRef(false) // a pinch happened since the last touch start
+  const anchor = useRef(null) // { x, y, from } to restore after a zoom
+  const dist = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY)
+  function onTouchStart (e) {
+    if (e.touches.length === 1) pinched.current = false
+    if (e.touches.length === 2 && onZoom) { pinch.current = { d0: dist(e.touches), z0: zoom }; pinched.current = true }
+  }
+  function onTouchMove (e) {
+    if (!pinch.current || e.touches.length !== 2) return
+    const z = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, pinch.current.z0 * dist(e.touches) / pinch.current.d0))
+    if (Math.abs(z - zoom) < 0.01) return
+    const rect = bodyRef.current.getBoundingClientRect()
+    anchor.current = {
+      x: (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left,
+      y: (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top,
+      from: zoom
+    }
+    onZoom(z)
+  }
+  function onTouchEnd (e) {
+    if (e.touches.length < 2) pinch.current = null
+  }
+  useLayoutEffect(() => {
+    const a = anchor.current
+    const el = bodyRef.current
+    if (!a || !el) return
+    anchor.current = null
+    const k = zoom / a.from
+    el.scrollLeft = (el.scrollLeft + a.x) * k - a.x
+    el.scrollTop = (el.scrollTop + a.y) * k - a.y
+  }, [zoom])
+
   function onScroll () {
     const el = bodyRef.current
     setScroll((s) => ({ ...s, top: el.scrollTop, left: el.scrollLeft }))
@@ -85,7 +124,9 @@ export const Grid = forwardRef(function Grid (props, ref) {
     else if (y + ROW_H > el.scrollTop + el.clientHeight) el.scrollTop = y + ROW_H - el.clientHeight
     if (x < el.scrollLeft) el.scrollLeft = x
     else if (x + w > el.scrollLeft + el.clientWidth) el.scrollLeft = x + w - el.clientWidth
-  }, [ext.row, ext.col, colX, widths])
+    // Only when the selection moves: a pinch zoom must not snap back to it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ext.row, ext.col])
 
   const firstRow = Math.max(1, Math.floor(scroll.top / ROW_H) + 1 - OVERSCAN)
   const lastRow = Math.min(view.rows, Math.ceil((scroll.top + scroll.height) / ROW_H) + OVERSCAN)
@@ -111,7 +152,7 @@ export const Grid = forwardRef(function Grid (props, ref) {
       window.removeEventListener('mouseup', up)
       const w = Math.max(24, startW + ev.clientX - startX)
       setDrag(null)
-      if (w !== startW) onResize(col, w)
+      if (w !== startW) onResize(col, Math.round(w / zoom))
     }
     window.addEventListener('mousemove', move)
     window.addEventListener('mouseup', up)
@@ -121,7 +162,7 @@ export const Grid = forwardRef(function Grid (props, ref) {
   const isEditingHere = editing && editing.source !== 'bar' && editing.row >= firstRow && editing.row <= lastRow
 
   return (
-    <div className='grid' style={{ '--row-h': ROW_H + 'px', '--head-h': HEAD_H + 'px', '--rowhead-w': ROWHEAD_W + 'px' }}>
+    <div className='grid' style={{ '--row-h': ROW_H + 'px', '--head-h': HEAD_H + 'px', '--rowhead-w': ROWHEAD_W + 'px', '--cell-font': Math.round(14 * zoom * 10) / 10 + 'px' }}>
       <div className='corner' />
       <div className='col-heads'>
         <div style={{ transform: `translateX(${-scroll.left}px)`, width: totalW, position: 'relative', height: '100%' }}>
@@ -154,7 +195,7 @@ export const Grid = forwardRef(function Grid (props, ref) {
           ))}
         </div>
       </div>
-      <div className='body' ref={bodyRef} tabIndex={0} onScroll={onScroll} onKeyDown={onKeyDown} aria-label='Spreadsheet' role='grid'>
+      <div className='body' ref={bodyRef} tabIndex={0} onScroll={onScroll} onKeyDown={onKeyDown} onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} aria-label='Spreadsheet' role='grid'>
         <div className='canvas' style={{ width: totalW, height: totalH }}>
           {rows.map((r) => cols.map((c) => {
             const cell = cells.get(r + ',' + c)
@@ -171,7 +212,7 @@ export const Grid = forwardRef(function Grid (props, ref) {
                 onMouseEnter={() => { if (dragging.current) onSelect(r, c, true) }}
                 onDoubleClick={() => onEdit(r, c)}
                 // Touch screens: tapping the cell that is already selected edits it.
-                onTouchEnd={(e) => { if (sel.row === r && sel.col === c) { e.preventDefault(); onEdit(r, c) } }}
+                onTouchEnd={(e) => { if (!pinched.current && e.touches.length === 0 && sel.row === r && sel.col === c) { e.preventDefault(); onEdit(r, c) } }}
                 title={cell && cell.volatile ? 'Changes on each device (time or random)' : undefined}
               >
                 {cell ? cell.display : ''}
@@ -208,6 +249,7 @@ export const Grid = forwardRef(function Grid (props, ref) {
               className='editor'
               autoFocus
               aria-label='Edit cell'
+              inputMode={inputMode}
               style={{ top: (editing.row - 1) * ROW_H, left: colX[editing.col], minWidth: widths[editing.col], height: ROW_H }}
               value={editing.value}
               onChange={(e) => onEditChange(e.target.value)}
