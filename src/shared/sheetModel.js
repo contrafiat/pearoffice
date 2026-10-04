@@ -102,8 +102,12 @@ function title (doc) {
   return doc.getMap('meta').get('title') || ''
 }
 
+// The tabs in order. Moving a tab removes its id and inserts it again, so two
+// people moving the same tab at once can leave it listed twice; the first
+// one counts, the same on every device.
 function tabIds (doc) {
-  return doc.getArray('tabs').toArray()
+  const seen = new Set()
+  return doc.getArray('tabs').toArray().filter((id) => (seen.has(id) ? false : seen.add(id)))
 }
 
 // Plain-object view of every tab's id lists, for formula translation.
@@ -412,6 +416,73 @@ function addTab (doc, name) {
   return { id, update }
 }
 
+// Remove a tab from the sheet (its cells stay in the document, unseen).
+// Formulas that pointed at it show #REF!. The last tab cannot go.
+function deleteTab (doc, tabId) {
+  if (tabIds(doc).length <= 1) throw new Error('A sheet needs at least one tab')
+  return capture(doc, () => {
+    const tabs = doc.getArray('tabs')
+    for (let i = tabs.length - 1; i >= 0; i--) if (tabs.get(i) === tabId) tabs.delete(i, 1)
+  })
+}
+
+// Move a tab to a position (0-based) among the tabs.
+function moveTab (doc, tabId, to) {
+  const ids = tabIds(doc)
+  const from = ids.indexOf(tabId)
+  if (from === -1) throw new Error('unknown tab')
+  const target = Math.max(0, Math.min(ids.length - 1, to))
+  if (target === from) return null
+  return capture(doc, () => {
+    const tabs = doc.getArray('tabs')
+    for (let i = tabs.length - 1; i >= 0; i--) if (tabs.get(i) === tabId) tabs.delete(i, 1)
+    // Insert next to the tab that will be its neighbour.
+    const rest = ids.filter((id) => id !== tabId)
+    const before = rest[target]
+    const at = before === undefined ? tabs.length : tabs.toArray().indexOf(before)
+    tabs.insert(at, [tabId])
+  })
+}
+
+// A copy of a tab, placed after it: cells, formats and widths. References to
+// its own cells point at the copy's cells, as in Excel.
+function duplicateTab (doc, tabId) {
+  const ids = tabIds(doc)
+  const src = tabMap(doc, tabId)
+  const taken = new Set(ids.map((id) => String(tabMap(doc, id).get('name')).toUpperCase()))
+  let name = src.get('name') + ' 2'
+  for (let n = 3; taken.has(name.toUpperCase()); n++) name = src.get('name') + ' ' + n
+  let id = null
+  const update = capture(doc, () => {
+    const rows = src.get('rows').toArray()
+    const cols = src.get('cols').toArray()
+    id = newTab(doc, name, rows.length, cols.length)
+    const tabs = doc.getArray('tabs')
+    tabs.insert(tabs.toArray().indexOf(tabId) + 1, [id])
+    const copy = tabMap(doc, id)
+    const newRows = copy.get('rows').toArray()
+    const newCols = copy.get('cols').toArray()
+    const rowAt = new Map(rows.map((r, i) => [r, i]))
+    const colAt = new Map(cols.map((c, i) => [c, i]))
+    const ctx = makeCtx(doc, id)
+    const prebuilt = refs.indexTabs(tabsContext(doc))
+    for (const key of src.get('cells').keys()) {
+      const [rowId, colId] = key.split(':')
+      if (!rowAt.has(rowId) || !colAt.has(colId)) continue
+      const r = rowAt.get(rowId) + 1
+      const c = colAt.get(colId) + 1
+      writeCell(doc, ctx, id, r, c, getInput(doc, tabId, r, c, prebuilt))
+    }
+    for (const [key, value] of src.get('fmt').entries()) {
+      const [rowId, colId, attr] = key.split(':')
+      if (!rowAt.has(rowId) || !colAt.has(colId)) continue
+      copy.get('fmt').set(cellKey(newRows[rowAt.get(rowId)], newCols[colAt.get(colId)]) + ':' + attr, value)
+    }
+    for (const [colId, px] of src.get('widths').entries()) if (colAt.has(colId)) copy.get('widths').set(newCols[colAt.get(colId)], px)
+  })
+  return { id, update }
+}
+
 function renameTab (doc, tabId, name) {
   return capture(doc, () => tabMap(doc, tabId).set('name', name))
 }
@@ -450,5 +521,8 @@ module.exports = {
   sortRows,
   replaceInputs,
   addTab,
-  renameTab
+  renameTab,
+  deleteTab,
+  moveTab,
+  duplicateTab
 }

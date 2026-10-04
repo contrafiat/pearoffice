@@ -9,10 +9,10 @@ import { PeopleStack } from './Avatar.jsx'
 import { FindPanel } from './FindPanel.jsx'
 import { SortPanel } from './SortPanel.jsx'
 import { readPref, writePref } from './prefs.js'
-import { ArrowCounterClockwise, ArrowClockwise, TextB, TextItalic, TextAUnderline, PaintBucket, Copy, Scissors, ClipboardText, Eraser, Numpad, FileXls, DotsThree, Plus, MagnifyingGlass } from '@phosphor-icons/react'
+import { ArrowCounterClockwise, ArrowClockwise, TextB, TextItalic, TextAUnderline, PaintBucket, Copy, Scissors, ClipboardText, Eraser, Numpad, FileXls, DotsThree, Plus, MagnifyingGlass, X } from '@phosphor-icons/react'
 import { DeletePanel } from './DeletePanel.jsx'
 import { FormulaHelp, helpFor, insertFunction } from './FormulaHelp.jsx'
-import { exportSheet, isMobile } from './xlsx.js'
+import { exportSheet, exportCsv, printTab, isMobile } from './xlsx.js'
 
 const COLOURS = ['#1f2420', '#b3261e', '#c2410c', '#a16207', '#15803d', '#0e7490', '#1d4ed8', '#7e22ce']
 const FILLS = ['#fee2e2', '#ffedd5', '#fef3c7', '#dcfce7', '#cffafe', '#dbeafe', '#ede9fe', '#e5e7eb']
@@ -129,6 +129,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
   const [deleting, setDeleting] = useState(null) // 'local' | 'everyone' | null
   const [finding, setFinding] = useState(null) // { replace } while Find is open
   const [sorting, setSorting] = useState(null) // what the Sort panel sorts
+  const [droppingTab, setDroppingTab] = useState(null) // a tab waiting for "Delete"
   const gridRef = useRef(null)
 
   // Everyone in the sheet, for the pictures next to Share.
@@ -616,6 +617,9 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
           {more && (
             <ul className='menu more-menu' role='menu' onClick={() => setMore(false)}>
               <li role='menuitem' onClick={() => setFinding({ replace: canEdit })}>Find and replace</li>
+              <li role='menuitem' onClick={() => exportCsv(view).catch((err) => onError(err.message))}>Download this tab as CSV</li>
+              {!phone && <li role='menuitem' onClick={() => printTab(view, 'pdf').catch((err) => onError(err.message))}>Save this tab as PDF</li>}
+              {!phone && <li role='menuitem' onClick={() => printTab(view, 'print').catch((err) => onError(err.message))}>Print this tab...</li>}
               {canEdit && <li role='menuitem' onClick={openSort}>Sort...</li>}
               <li role='menuitem' onClick={() => setDeleting('local')}>Remove from this device</li>
               {view.myRole === 'owner' && <li role='menuitem' className='danger' onClick={() => setDeleting('everyone')}>Delete for everyone</li>}
@@ -689,6 +693,30 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
         onResize={(col, px) => { if (canEdit) run('sheet:setWidth', { col, px }) }}
       />
 
+      {droppingTab && (
+        <div className='panel-backdrop' onMouseDown={(e) => { if (e.target === e.currentTarget) setDroppingTab(null) }}>
+          <section className='panel' role='dialog' aria-label='Delete tab'>
+            <header>
+              <h2>Delete "{droppingTab.name}"?</h2>
+              <button className='close' aria-label='Close' onClick={() => setDroppingTab(null)}><X size={18} /></button>
+            </header>
+            <p>The tab and its cells go for everyone in this sheet. Formulas on other tabs that use it will show #REF!. Undo brings it back.</p>
+            <div className='row end'>
+              <button onClick={() => setDroppingTab(null)}>Keep it</button>
+              <button
+                className='danger'
+                onClick={async () => {
+                  const t = droppingTab
+                  setDroppingTab(null)
+                  const r = await run('sheet:deleteTab', { tabId: t.id })
+                  if (r && t.id === view.tabId) { setTabId(null); select(1, 1) }
+                }}
+              >Delete tab
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
       {finding && (
         <FindPanel
           sheetId={sheetId}
@@ -716,7 +744,22 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
       {deleting && <DeletePanel sheetId={sheetId} title={view.title} kind={deleting} onClose={() => setDeleting(null)} onError={onError} onDone={() => { setDeleting(null); onGone() }} />}
 
       {menu && (
-        <ul className='menu' style={{ left: menu.x, top: menu.y }} role='menu'>
+        <ul className='menu' style={menu.kind === 'tab' ? { left: menu.x, bottom: window.innerHeight - menu.y } : { left: menu.x, top: menu.y }} role='menu'>
+          {menu.kind === 'tab' && (() => {
+            const i = view.tabs.findIndex((x) => x.id === menu.tabId)
+            const tab = view.tabs[i]
+            if (!tab) return null
+            const act = (fn) => () => { setMenu(null); fn() }
+            return (
+              <>
+                <li role='menuitem' onClick={act(() => setRenaming({ id: tab.id, value: tab.name }))}>Rename</li>
+                <li role='menuitem' onClick={act(async () => { const r = await run('sheet:duplicateTab', { tabId: tab.id }); if (r) { setTabId(r.tabId); select(1, 1) } })}>Duplicate</li>
+                {i > 0 && <li role='menuitem' onClick={act(() => run('sheet:moveTab', { tabId: tab.id, to: i - 1 }))}>Move left</li>}
+                {i < view.tabs.length - 1 && <li role='menuitem' onClick={act(() => run('sheet:moveTab', { tabId: tab.id, to: i + 1 }))}>Move right</li>}
+                {view.tabs.length > 1 && <li role='menuitem' className='danger' onClick={act(() => setDroppingTab(tab))}>Delete tab</li>}
+              </>
+            )
+          })()}
           {menu.kind === 'cell' && (
             <>
               {canEdit && <li role='menuitem' onClick={() => { setMenu(null); menuCopy(true).catch((err) => onError(err.message)) }}>Cut</li>}
@@ -730,9 +773,9 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
               {canEdit && <li role='menuitem' className='danger' onClick={() => { setMenu(null); run('sheet:clearRange', range) }}>Clear contents</li>}
             </>
           )}
-          {menu.kind !== 'cell' && <li role='menuitem' onClick={() => lineAction('before')}>Insert {menu.kind === 'row' ? 'row above' : 'column left'}</li>}
-          {menu.kind !== 'cell' && <li role='menuitem' onClick={() => lineAction('after')}>Insert {menu.kind === 'row' ? 'row below' : 'column right'}</li>}
-          {menu.kind !== 'cell' && <li role='menuitem' className='danger' onClick={() => lineAction('delete')}>Delete {menu.kind === 'row' ? 'row ' + menu.index : 'column ' + colName(menu.index)}</li>}
+          {(menu.kind === 'row' || menu.kind === 'col') && <li role='menuitem' onClick={() => lineAction('before')}>Insert {menu.kind === 'row' ? 'row above' : 'column left'}</li>}
+          {(menu.kind === 'row' || menu.kind === 'col') && <li role='menuitem' onClick={() => lineAction('after')}>Insert {menu.kind === 'row' ? 'row below' : 'column right'}</li>}
+          {(menu.kind === 'row' || menu.kind === 'col') && <li role='menuitem' className='danger' onClick={() => lineAction('delete')}>Delete {menu.kind === 'row' ? 'row ' + menu.index : 'column ' + colName(menu.index)}</li>}
         </ul>
       )}
 
@@ -761,6 +804,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
               title='Double-click to rename'
               onClick={() => { setTabId(t.id); select(1, 1) }}
               onDoubleClick={() => { if (canEdit) setRenaming({ id: t.id, value: t.name }) }}
+              onContextMenu={(e) => { e.preventDefault(); if (canEdit) setMenu({ kind: 'tab', tabId: t.id, x: e.clientX, y: e.clientY }) }}
             >
               {t.name}
             </button>

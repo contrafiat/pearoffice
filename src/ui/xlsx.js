@@ -43,3 +43,90 @@ export async function exportSheet (sheetId) {
   a.remove()
   setTimeout(() => URL.revokeObjectURL(a.href), 10000)
 }
+
+// --- one tab as .csv, and as a printable page (PDF, print) -------------------
+
+// The used part of a tab: up to the last row and column with something shown.
+function usedBlock (view) {
+  let rows = 0
+  let cols = 0
+  for (const c of view.cells) if (c.display !== '') { rows = Math.max(rows, c.row); cols = Math.max(cols, c.col) }
+  const at = new Map(view.cells.map((c) => [c.row + ',' + c.col, c]))
+  return { rows, cols, at }
+}
+
+const fileName = (s) => String(s || 'PearSheet').replace(/[\\/:*?"<>|]/g, ' ')
+
+// What the cells show, comma-separated, with a byte order mark so Excel
+// reads it as UTF-8.
+export function tabCsv (view) {
+  const { rows, cols, at } = usedBlock(view)
+  const quote = (s) => (/[",\r\n]/.test(s) || /^\s|\s$/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s)
+  const lines = []
+  for (let r = 1; r <= rows; r++) {
+    const line = []
+    for (let c = 1; c <= cols; c++) { const x = at.get(r + ',' + c); line.push(quote(x ? x.display : '')) }
+    lines.push(line.join(','))
+  }
+  return '\ufeff' + lines.join('\r\n') + '\r\n'
+}
+
+export async function exportCsv (view) {
+  const tab = (view.tabs.find((t) => t.id === view.tabId) || {}).name
+  const name = fileName(view.title + (view.tabs.length > 1 ? ' - ' + tab : '')) + '.csv'
+  const text = tabCsv(view)
+  if (isMobile()) {
+    const bytes = new TextEncoder().encode(text)
+    let bin = ''
+    for (const b of bytes) bin += String.fromCharCode(b)
+    return call('app:shareFile', { name, mime: 'text/csv', base64: btoa(bin) })
+  }
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(new Blob([text], { type: 'text/csv' }))
+  a.download = name
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  setTimeout(() => URL.revokeObjectURL(a.href), 10000)
+}
+
+const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
+// A tab as a printable HTML page: the used block with widths, bold, italic
+// and colours.
+export function tabHtml (view) {
+  const { rows, cols, at } = usedBlock(view)
+  const tab = (view.tabs.find((t) => t.id === view.tabId) || {}).name
+  const width = (c) => (view.widths && view.widths[c]) || 100
+  let body = ''
+  for (let r = 1; r <= rows; r++) {
+    body += '<tr>'
+    for (let c = 1; c <= cols; c++) {
+      const x = at.get(r + ',' + c)
+      const f = (x && x.fmt) || {}
+      const style = [
+        x && (x.kind === 'number' || x.kind === 'bool') ? 'text-align:right' : '',
+        f.b ? 'font-weight:bold' : '',
+        f.i ? 'font-style:italic' : '',
+        f.color ? 'color:' + f.color : '',
+        f.fill ? 'background:' + f.fill : ''
+      ].filter(Boolean).join(';')
+      body += '<td' + (style ? ' style="' + style + '"' : '') + '>' + esc(x ? x.display : '') + '</td>'
+    }
+    body += '</tr>'
+  }
+  const colgroup = Array.from({ length: cols }, (_, i) => '<col style="width:' + width(i + 1) + 'px">').join('')
+  return '<!doctype html><html><head><meta charset="utf-8"><title>' + esc(view.title) + '</title><style>' +
+    'body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:11px;margin:0}' +
+    'h1{font-size:14px;margin:0 0 8px}table{border-collapse:collapse;table-layout:fixed}' +
+    'td{border:1px solid #ccc;padding:2px 4px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}' +
+    '</style></head><body><h1>' + esc(view.title) + (view.tabs.length > 1 ? ' - ' + esc(tab) : '') + '</h1>' +
+    '<table><colgroup>' + colgroup + '</colgroup>' + body + '</table></body></html>'
+}
+
+// Desktop only: save the tab as a PDF, or open the print dialog.
+export function printTab (view, how) {
+  const tab = (view.tabs.find((t) => t.id === view.tabId) || {}).name
+  const name = fileName(view.title + (view.tabs.length > 1 ? ' - ' + tab : '')) + '.pdf'
+  return call(how === 'pdf' ? 'app:savePdf' : 'app:print', { html: tabHtml(view), name })
+}

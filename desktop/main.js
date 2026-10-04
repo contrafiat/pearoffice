@@ -2,7 +2,7 @@
 // (the same bundle the phones will run), opens the window and relays calls and
 // events between the UI and the worklet. See proposal section 9.
 
-const { app, BrowserWindow, Tray, Menu, ipcMain, shell, clipboard } = require('electron')
+const { app, BrowserWindow, Tray, Menu, ipcMain, shell, clipboard, dialog } = require('electron')
 const path = require('node:path')
 const fs = require('node:fs')
 const { Worklet } = require('./worklet')
@@ -145,6 +145,28 @@ ipcMain.handle('worklet:call', async (_e, method, args) => {
   // This Electron's clipboard calls return promises.
   if (method === 'app:setClipboard') { await clipboard.writeText(String((args && args.text) || '')); return { ok: true } }
   if (method === 'app:getClipboard') return { text: String((await clipboard.readText()) || '') }
+  // A tab as PDF or on paper: the UI sends a printable page.
+  if (method === 'app:savePdf' || method === 'app:print') {
+    const page = new BrowserWindow({ show: false, webPreferences: { javascript: false } })
+    try {
+      await page.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(String((args && args.html) || '')))
+      if (method === 'app:print') {
+        await new Promise((resolve) => page.webContents.print({ printBackground: true }, () => resolve()))
+        return { ok: true }
+      }
+      const pdf = await page.webContents.printToPDF({ printBackground: true, pageSize: 'A4' })
+      const name = String((args && args.name) || 'PearSheet.pdf').replace(/[\\/:*?"<>|]/g, ' ')
+      // The smoke test saves without asking.
+      const file = SMOKE
+        ? path.join(dataDir, name)
+        : (await dialog.showSaveDialog(win, { defaultPath: path.join(app.getPath('documents'), name), filters: [{ name: 'PDF', extensions: ['pdf'] }] })).filePath
+      if (!file) return { ok: false }
+      fs.writeFileSync(file, pdf)
+      return { ok: true, file }
+    } finally {
+      page.destroy()
+    }
+  }
   // About: web and email links open outside the app.
   if (method === 'app:openUrl') {
     const url = String((args && args.url) || '')
