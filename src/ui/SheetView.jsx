@@ -76,6 +76,15 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
   const [renaming, setRenaming] = useState(null) // { id, value } | null
   const [sharing, setSharing] = useState(false)
   const [more, setMore] = useState(false) // the ⋯ menu
+  // Refresh the sidebar when the title changes from anywhere: a rename on
+  // another device, or the name arriving after this device joined.
+  const title = view ? view.title : null
+  const shownTitle = useRef(null)
+  useEffect(() => {
+    if (title === null) return
+    if (shownTitle.current !== title) onTitleChange()
+    shownTitle.current = title
+  }, [title])
   // Phone settings, remembered on this device only.
   const [zoom, setZoomState] = useState(() => Number(readPref('pearsheet:zoom')) || 1)
   const [numPad, setNumPadState] = useState(() => readPref('pearsheet:numpad') === '1')
