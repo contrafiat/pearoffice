@@ -23,7 +23,9 @@ const Protomux = require('protomux')
 const c = require('compact-encoding')
 const b4a = require('b4a')
 const sodium = require('sodium-universal')
-const { PAIR_PROTOCOL, PAIR_WINDOW_MS, pairTopic, seederLink } = require('./protocol')
+const { PAIR_PROTOCOL, PAIR_WINDOW_MS, SEEDER_PROTOCOL, DROP_MAX_MS, pairTopic, seederLink } = require('./protocol')
+
+const DROP_SWEEP_MS = 60 * 60 * 1000
 
 const hex = (buf) => b4a.toString(buf, 'hex')
 
@@ -34,12 +36,14 @@ class SheetSeeder extends BlindPeer {
   }
 
   async _onaddcore (stream, record) {
-    await this.pearsheet.admit(stream, record.referrer)
+    const sheet = await this.pearsheet.admit(stream, record.referrer)
+    await this.pearsheet.track(sheet, [record.key])
     return super._onaddcore(stream, record)
   }
 
   async _onaddcores (stream, request) {
-    await this.pearsheet.admit(stream, request.referrer)
+    const sheet = await this.pearsheet.admit(stream, request.referrer)
+    await this.pearsheet.track(sheet, (request.cores || []).map((c) => c.key))
     return super._onaddcores(stream, request)
   }
 }
@@ -57,7 +61,7 @@ async function createSeeder ({ dataDir, bootstrap = null, log = () => {} }) {
   // blind-peering sends an Autobase in batches: writer cores with the sheet's
   // bootstrap key as referrer, then view cores with no referrer. A connection
   // that has already shown an allowed referrer may send the follow-ups.
-  const vouched = new WeakSet()
+  const vouched = new WeakMap() // stream -> the allowed sheet it vouched for
 
   const rules = {
     async admit (stream, referrer) {
@@ -69,14 +73,60 @@ async function createSeeder ({ dataDir, bootstrap = null, log = () => {} }) {
           await state.put('sheet/' + ref, { by: remote, at: Date.now() })
           log('allowed sheet ' + ref.slice(0, 8) + ' (registered by a paired device)')
         }
-        return
+        if (ref) vouched.set(stream, ref)
+        return ref || vouched.get(stream) || null
       }
-      if (ref && allowed.has(ref)) { vouched.add(stream); return }
-      if (!ref && vouched.has(stream)) return
+      if (ref && allowed.has(ref)) { vouched.set(stream, ref); return ref }
+      if (!ref && vouched.has(stream)) return vouched.get(stream)
       log('refused cores from ' + remote.slice(0, 8))
       throw new Error('This seeder only stores sheets registered by a paired device')
+    },
+
+    // Remember which cores belong to which sheet, so a drop can find them.
+    async track (sheet, keys) {
+      if (!sheet) return
+      const batch = state.batch()
+      for (const key of keys) if (key) await batch.put('core/' + sheet + '/' + hex(key), {})
+      await batch.flush()
     }
   }
+
+  // --- drops (proposals/2026-10-04-deleting-sheets.md) -----------------------
+
+  async function scheduleDrop (sheet, afterMs) {
+    const due = Date.now() + Math.max(0, Math.min(DROP_MAX_MS, Number(afterMs) || 0))
+    const existing = (await state.get('drop/' + sheet))?.value
+    if (!existing || existing.due > due) await state.put('drop/' + sheet, { due })
+    log('drop of sheet ' + sheet.slice(0, 8) + ' due ' + new Date(due).toISOString())
+    if (due <= Date.now()) runDrops().catch((e) => log('drop failed: ' + e.message))
+    return due
+  }
+
+  // Clear and forget every core of each sheet whose drop is due, through
+  // blind-peer's own delete path (it also stops announcing and replicating).
+  async function runDrops (now = Date.now()) {
+    const due = []
+    for await (const { key, value } of state.createReadStream({ gt: 'drop/', lt: 'drop/~' })) {
+      if (value && value.due <= now) due.push(key.slice(5))
+    }
+    for (const sheet of due) {
+      const self = { remotePublicKey: peer.publicKey, rawStream: { remoteHost: '127.0.0.1' } }
+      peer.addTrustedPubKey(peer.publicKey)
+      let n = 0
+      for await (const { key } of state.createReadStream({ gt: 'core/' + sheet + '/', lt: 'core/' + sheet + '/~' })) {
+        const coreKey = b4a.from(key.slice(('core/' + sheet + '/').length), 'hex')
+        try { if (await peer._ondeletecore(self, { key: coreKey })) n++ } catch (e) { log('could not delete a core: ' + e.message) }
+        await state.del(key)
+      }
+      allowed.delete(sheet)
+      await state.del('sheet/' + sheet)
+      await state.del('drop/' + sheet)
+      log('dropped sheet ' + sheet.slice(0, 8) + ' (' + n + ' cores)')
+    }
+    return due.length
+  }
+  const dropTimer = setInterval(() => runDrops().catch((e) => log('drop sweep failed: ' + e.message)), DROP_SWEEP_MS)
+  if (dropTimer.unref) dropTimer.unref()
 
   const peer = new SheetSeeder(dataDir, { bootstrap, pearsheet: rules, trustedPubKeys: [...paired].map((k) => b4a.from(k, 'hex')) })
   await peer.listen()
@@ -137,7 +187,29 @@ async function createSeeder ({ dataDir, bootstrap = null, log = () => {} }) {
     ch.open()
   }
 
-  peer.swarm.on('connection', (conn) => listenOn(conn))
+  // Requests from paired devices, on every connection.
+  function listenRequests (conn) {
+    const mux = Protomux.from(conn)
+    mux.pair({ protocol: SEEDER_PROTOCOL }, () => openRequests(conn, mux))
+  }
+
+  function openRequests (conn, mux) {
+    const ch = mux.createChannel({ protocol: SEEDER_PROTOCOL })
+    if (!ch) return
+    const msg = ch.addMessage({
+      encoding: c.json,
+      onmessage: async (m) => {
+        if (!m || m.t !== 'drop') return
+        if (!paired.has(hex(conn.remotePublicKey))) return msg.send({ t: 'no', reason: 'Only paired devices can ask for that' })
+        if (typeof m.bootstrap !== 'string' || !allowed.has(m.bootstrap)) return msg.send({ t: 'no', reason: 'This seeder does not hold that sheet' })
+        msg.send({ t: 'ok', due: await scheduleDrop(m.bootstrap, m.afterMs) })
+      }
+    })
+    ch.open()
+  }
+
+  peer.swarm.on('connection', (conn) => { listenOn(conn); listenRequests(conn) })
+  runDrops().catch(() => {}) // any that came due while the seeder was off
 
   async function status () {
     return {
@@ -150,13 +222,20 @@ async function createSeeder ({ dataDir, bootstrap = null, log = () => {} }) {
   }
 
   async function close () {
+    clearInterval(dropTimer)
     closePairing()
     await peer.close()
     await state.close()
     await stateStore.close()
   }
 
-  return { seederKey, peer, openPairing, closePairing, status, close, isPaired: (k) => paired.has(hex(k)), allowedSheets: () => [...allowed] }
+  async function drops () {
+    const out = []
+    for await (const { key, value } of state.createReadStream({ gt: 'drop/', lt: 'drop/~' })) out.push({ sheet: key.slice(5), due: value.due })
+    return out
+  }
+
+  return { seederKey, peer, openPairing, closePairing, status, close, runDrops, scheduleDrop, drops, isPaired: (k) => paired.has(hex(k)), allowedSheets: () => [...allowed] }
 }
 
 module.exports = { createSeeder }

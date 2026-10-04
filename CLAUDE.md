@@ -37,7 +37,9 @@ Linux, macOS and Windows. The Android app runs on the emulator and the TCL.
 A person can link their devices (one-time link) and keep a 24-word recovery
 phrase (proposals/2026-10-03-device-linking.md). The seeder ships inside the
 desktop app and as a Linux server download. iOS runs on the Simulator and
-the iPhone SE. Signing for distribution is next.
+the iPhone SE. Mac builds are signed and notarized. Anyone can remove a sheet
+from their device and the owner can delete it for everyone, seeder included
+(proposals/2026-10-04-deleting-sheets.md).
 See `TODO.md`.
 
 ## Layout

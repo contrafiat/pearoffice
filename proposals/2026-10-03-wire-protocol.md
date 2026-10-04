@@ -446,6 +446,9 @@ are affected.
   paired person's sheets were refused and disconnected.
 - 2026-10-03, seeder: deleting old cores a week after a move is not built yet.
   It arrives with removal (section 7), since moves do not exist before that.
+  Built 2026-10-04 with deleting sheets (proposals/2026-10-04-deleting-sheets.md):
+  the device sends a `drop` request on `pearsheet/seeder/1` right after the
+  move, and the seeder runs it 7 days later.
 - 2026-10-03, removal: a move creates a sheet with a **new** sheet id, where
   section 7 kept the same one. Every signed op carries the sheet id, so with
   the same id a dishonest editor could copy the owner's old signed invites or

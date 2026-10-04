@@ -323,3 +323,8 @@ button, input, select { font: inherit; color: inherit; }
 @media (pointer: coarse) {
   html, body { position: fixed; inset: 0; overscroll-behavior: none; }
 }
+
+.more { position: relative; }
+.toolbar .more-button { border: 1px solid var(--line); background: var(--panel); border-radius: 8px; padding: 4px 10px; cursor: pointer; font-size: 16px; line-height: 1; }
+.more-menu { position: absolute; right: 0; top: 36px; left: auto; }
+.panel .small { font-size: 13px; }

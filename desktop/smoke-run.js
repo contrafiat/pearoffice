@@ -220,6 +220,18 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
     result.inviteLink = (await js("document.querySelector('.invite-link input').value")).slice(0, 24)
     step('invite link')
 
+    // Remove the open sheet from this device: it leaves the list.
+    await js("document.querySelector('.panel .close').click()")
+    result.sheetsBefore = await js("document.querySelectorAll('.sheet-link').length")
+    await js("document.querySelector('.toolbar .more-button').click()")
+    await waitFor('more menu', "[...document.querySelectorAll('.more-menu li')].some((l) => l.textContent === 'Delete for everyone')")
+    await js("[...document.querySelectorAll('.more-menu li')].find((l) => l.textContent === 'Remove from this device').click()")
+    await waitFor('confirm', "[...document.querySelectorAll('.panel button')].some((b) => b.textContent === 'Remove from this device')")
+    await js("[...document.querySelectorAll('.panel button')].find((b) => b.textContent === 'Remove from this device').click()")
+    await waitFor('sheet removed', "!document.querySelector('.panel') && document.querySelectorAll('.sheet-link').length === " + (result.sheetsBefore - 1) + " && !document.querySelector('.toolbar .share')", 30000)
+    result.sheetsAfter = await js("document.querySelectorAll('.sheet-link').length")
+    step('removed from this device')
+
     await sleep(300)
     const shot = process.env.PEARSHEET_SMOKE_SHOT
     if (shot) {
@@ -227,7 +239,7 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
       fs.writeFileSync(shot, image.toPNG())
       step('screenshot', shot)
     }
-    result.ok = result.keepOnline && result.importedFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000 && result.pastedFormula === '=SUM(C1:C2)' && result.inviteLink === 'pearsheet://join?s=' + result.inviteLink.slice(19) && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
+    result.ok = result.keepOnline && result.sheetsAfter === result.sheetsBefore - 1 && result.importedFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000 && result.pastedFormula === '=SUM(C1:C2)' && result.inviteLink === 'pearsheet://join?s=' + result.inviteLink.slice(19) && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
   } catch (err) {
     result.error = err.message
     // What the page showed, to tell a UI failure from a load failure.

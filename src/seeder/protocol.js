@@ -18,6 +18,11 @@ const sodium = require('sodium-universal')
 const PAIR_PROTOCOL = 'pearsheet/seeder-pair/1'
 const PAIR_NAMESPACE = 'pearsheet/seeder-pair/v1'
 const PAIR_WINDOW_MS = 5 * 60 * 1000
+// Requests from paired devices after pairing (proposals/2026-10-04-deleting-sheets.md):
+//   { t: 'drop', bootstrap, afterMs }  ->  { t: 'ok', due } | { t: 'no', reason }
+const SEEDER_PROTOCOL = 'pearsheet/seeder/1'
+const DROP_MAX_MS = 30 * 24 * 3600 * 1000
+const DROP_GRACE_MS = 7 * 24 * 3600 * 1000
 
 function pairTopic (rv) {
   const out = b4a.alloc(32)
@@ -44,4 +49,4 @@ function parseSeederLink (link) {
   return { rv, seederKey: b4a.from(seeder, 'hex') }
 }
 
-module.exports = { PAIR_PROTOCOL, PAIR_NAMESPACE, PAIR_WINDOW_MS, pairTopic, seederLink, parseSeederLink }
+module.exports = { PAIR_PROTOCOL, PAIR_NAMESPACE, PAIR_WINDOW_MS, SEEDER_PROTOCOL, DROP_MAX_MS, DROP_GRACE_MS, pairTopic, seederLink, parseSeederLink }

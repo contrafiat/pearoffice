@@ -14,7 +14,7 @@ const Wakeup = require('protomux-wakeup')
 const Protomux = require('protomux')
 const c = require('compact-encoding')
 const b4a = require('b4a')
-const { PAIR_PROTOCOL, PAIR_WINDOW_MS, pairTopic, parseSeederLink } = require('../seeder/protocol')
+const { PAIR_PROTOCOL, PAIR_WINDOW_MS, SEEDER_PROTOCOL, pairTopic, parseSeederLink } = require('../seeder/protocol')
 const m = require('./membership')
 
 const hex = (buf) => b4a.toString(buf, 'hex')
@@ -131,6 +131,34 @@ function createSeeding ({ engine, log = () => {} }) {
     })
   }
 
+  // Ask every seeder this device is paired with, and that the sheet lists,
+  // to drop the sheet's data after `afterMs`. Best effort: a seeder that is
+  // unreachable keeps the data (proposals/2026-10-04-deleting-sheets.md).
+  async function requestDrop ({ bootstrap, seederKeys, afterMs }) {
+    const mine = new Set(await pairedSeeders())
+    const results = []
+    for (const key of seederKeys) {
+      if (!mine.has(key)) continue
+      results.push(await dropAt(key, bootstrap, afterMs).catch((e) => ({ seederKey: key, error: e.message })))
+    }
+    return results
+  }
+
+  function dropAt (seederKey, bootstrap, afterMs, timeoutMs = 20000) {
+    return new Promise((resolve, reject) => {
+      const socket = engine.swarm.dht.connect(b4a.from(seederKey, 'hex'), { keyPair: engine.swarm.keyPair })
+      const done = (err, value) => { clearTimeout(timer); try { socket.destroy() } catch {} if (err) reject(err); else resolve(value) }
+      const timer = setTimeout(() => done(new Error('seeder did not answer')), timeoutMs)
+      socket.on('error', () => {})
+      socket.on('open', () => {
+        const ch = Protomux.from(socket).createChannel({ protocol: SEEDER_PROTOCOL, onopen: () => msg.send({ t: 'drop', bootstrap, afterMs }) })
+        if (!ch) return done(new Error('could not open a channel'))
+        const msg = ch.addMessage({ encoding: c.json, onmessage: (m) => (m && m.t === 'ok' ? done(null, { seederKey, due: m.due }) : done(new Error((m && m.reason) || 'refused'))) })
+        ch.open()
+      })
+    })
+  }
+
   async function list () {
     return (await pairedSeeders()).map((seederKey) => ({ seederKey }))
   }
@@ -140,7 +168,7 @@ function createSeeding ({ engine, log = () => {} }) {
     if (peering) await peering.close().catch(() => {})
   }
 
-  return { start, pair, list, register, sweep, close, get peering () { return peering } }
+  return { start, pair, list, register, sweep, close, requestDrop, get peering () { return peering } }
 }
 
 module.exports = { createSeeding }
