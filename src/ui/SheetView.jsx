@@ -2,7 +2,36 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { call, on } from './bridge.js'
 import { Grid } from './Grid.jsx'
 import { colName } from './a1.js'
+import { shiftA1 } from '../shared/refs.js'
 import { SharePanel } from './SharePanel.jsx'
+
+const COLOURS = ['#1f2420', '#b3261e', '#c2410c', '#a16207', '#15803d', '#0e7490', '#1d4ed8', '#7e22ce']
+const FILLS = ['#fee2e2', '#ffedd5', '#fef3c7', '#dcfce7', '#cffafe', '#dbeafe', '#ede9fe', '#e5e7eb']
+
+// The clipboard as text: rows split by newlines, cells by tabs.
+function toTsv (grid) {
+  return grid.map((line) => line.map((v) => (/[\t\n"]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v)).join('\t')).join('\n')
+}
+
+function fromTsv (text) {
+  const rows = []
+  let row = []
+  let cell = ''
+  let quoted = false
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i]
+    if (quoted) {
+      if (ch === '"' && text[i + 1] === '"') { cell += '"'; i++ } else if (ch === '"') quoted = false
+      else cell += ch
+    } else if (ch === '"' && cell === '') quoted = true
+    else if (ch === '\t') { row.push(cell); cell = '' } else if (ch === '\n' || ch === '\r') {
+      if (ch === '\r' && text[i + 1] === '\n') i++
+      row.push(cell); rows.push(row); row = []; cell = ''
+    } else cell += ch
+  }
+  if (cell !== '' || row.length) { row.push(cell); rows.push(row) }
+  return rows
+}
 
 const NUMBER_FORMATS = [
   ['', 'Automatic'],
@@ -18,7 +47,12 @@ const NUMBER_FORMATS = [
 export function SheetView ({ sheetId, onTitleChange, onError }) {
   const [view, setView] = useState(null)
   const [tabId, setTabId] = useState(null)
-  const [sel, setSel] = useState({ row: 1, col: 1 })
+  const [sel, setSel] = useState({ row: 1, col: 1 }) // the active cell
+  // The far corner of the selected range. As in Excel, Shift+arrows and
+  // dragging move this corner while the active cell stays where it was.
+  const [ext, setExt] = useState({ row: 1, col: 1 })
+  const clip = useRef(null) // what we last copied: { text, row, col, inputs }
+  const [palette, setPalette] = useState(null) // 'color' | 'fill' | null
   const [editing, setEditingState] = useState(null) // { row, col, value, source } | null
   // Keys can arrive before React has drawn the cell editor (slow machines,
   // fast typists). A ref holds the latest edit so those keys add to it
@@ -94,17 +128,82 @@ export function SheetView ({ sheetId, onTitleChange, onError }) {
     focusGrid()
   }
 
-  function moveBy (dr, dc) {
+  const range = {
+    r1: Math.min(sel.row, ext.row),
+    c1: Math.min(sel.col, ext.col),
+    r2: Math.max(sel.row, ext.row),
+    c2: Math.max(sel.col, ext.col)
+  }
+
+  // Select a cell; with extend, move the far corner of the range instead.
+  function select (row, col, extend = false) {
+    if (!extend) setSel({ row, col })
+    setExt({ row, col })
+  }
+
+  function moveBy (dr, dc, extend = false) {
     if (!view) return
-    setSel((s) => ({
-      row: Math.max(1, Math.min(view.rows, s.row + dr)),
-      col: Math.max(1, Math.min(view.cols, s.col + dc))
-    }))
+    const from = extend ? ext : sel
+    const row = Math.max(1, Math.min(view.rows, from.row + dr))
+    const col = Math.max(1, Math.min(view.cols, from.col + dc))
+    select(row, col, extend)
+  }
+
+  function formatRange (patch) {
+    return run('sheet:setFormatRange', { ...range, patch })
   }
 
   function toggle (attr) {
     const fmt = (selected && selected.fmt) || {}
-    run('sheet:setFormat', { row: sel.row, col: sel.col, patch: { [attr]: fmt[attr] ? null : true } })
+    formatRange({ [attr]: fmt[attr] ? null : true })
+  }
+
+  // --- copy, cut, paste ------------------------------------------------------
+
+  function rangeGrid (pick) {
+    const out = []
+    for (let r = range.r1; r <= range.r2; r++) {
+      const line = []
+      for (let c = range.c1; c <= range.c2; c++) line.push(pick(cells.get(r + ',' + c) || null))
+      out.push(line)
+    }
+    return out
+  }
+
+  function onCopy (e, cut) {
+    const text = toTsv(rangeGrid((cell) => (cell ? cell.display : '')))
+    clip.current = { text, row: range.r1, col: range.c1, inputs: rangeGrid((cell) => (cell ? cell.input : '')) }
+    e.clipboardData.setData('text/plain', text)
+    e.preventDefault()
+    if (cut && canEdit) run('sheet:clearRange', range)
+  }
+
+  function onPaste (e) {
+    if (!canEdit) return
+    const text = e.clipboardData.getData('text/plain')
+    if (!text) return
+    e.preventDefault()
+    const ours = clip.current && clip.current.text === text ? clip.current : null
+    // From inside PearSheet: paste what was typed, moving relative references
+    // as Excel does. From elsewhere: paste the text.
+    let source = ours ? ours.inputs : fromTsv(text)
+    // One copied cell fills a larger selection.
+    const single = source.length === 1 && source[0].length === 1
+    const h = single ? range.r2 - range.r1 + 1 : source.length
+    const w = single ? range.c2 - range.c1 + 1 : Math.max(...source.map((l) => l.length))
+    if (single) source = Array.from({ length: h }, () => Array.from({ length: w }, () => source[0][0]))
+    // A pasted block moves as a whole; a single cell tiled over a range moves
+    // to each target cell in turn.
+    const at = (r, c, input) => {
+      if (!ours || typeof input !== 'string' || input[0] !== '=') return input
+      const dr = range.r1 - ours.row + (single ? r : 0)
+      const dc = range.c1 - ours.col + (single ? c : 0)
+      return '=' + shiftA1(input.slice(1), dr, dc)
+    }
+    const grid = source.map((line, r) => line.map((input, c) => at(r, c, input)))
+    run('sheet:setCells', { row: range.r1, col: range.c1, grid })
+    setSel({ row: range.r1, col: range.c1 })
+    setExt({ row: range.r1 + h - 1, col: range.c1 + w - 1 })
   }
 
   function onKeyDown (e) {
@@ -133,10 +232,11 @@ export function SheetView ({ sheetId, onTitleChange, onError }) {
     if (mod && (k === 'b' || k === 'B')) { e.preventDefault(); toggle('b'); return }
     if (mod && (k === 'i' || k === 'I')) { e.preventDefault(); toggle('i'); return }
     if (mod) return
-    const moves = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1], Tab: [0, e.shiftKey ? -1 : 1] }
-    if (moves[k]) { e.preventDefault(); moveBy(...moves[k]); return }
+    const moves = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] }
+    if (moves[k]) { e.preventDefault(); moveBy(...moves[k], e.shiftKey); return }
+    if (k === 'Tab') { e.preventDefault(); moveBy(0, e.shiftKey ? -1 : 1); return }
     if (k === 'Enter' || k === 'F2') { e.preventDefault(); setEditing({ ...sel, value: selected ? selected.input : '' }); return }
-    if (k === 'Delete' || k === 'Backspace') { e.preventDefault(); if (selected) run('sheet:setCell', { row: sel.row, col: sel.col, input: '' }); return }
+    if (k === 'Delete' || k === 'Backspace') { e.preventDefault(); run('sheet:clearRange', range); return }
     if (k.length === 1) { e.preventDefault(); setEditing({ ...sel, value: k, source: 'grid' }) }
   }
 
@@ -184,10 +284,26 @@ export function SheetView ({ sheetId, onTitleChange, onError }) {
           <span className='sep' />
           <button title='Bold (Ctrl+B)' className={'fmt-b' + (fmt.b ? ' on' : '')} onClick={() => toggle('b')}>B</button>
           <button title='Italic (Ctrl+I)' className={'fmt-i' + (fmt.i ? ' on' : '')} onClick={() => toggle('i')}>I</button>
+          <span className='picker'>
+            <button title='Text colour' className='swatch-button' onClick={() => setPalette(palette === 'color' ? null : 'color')}>
+              <span className='letter' style={{ borderBottomColor: fmt.color || 'currentColor' }}>A</span>
+            </button>
+            <button title='Fill colour' className='swatch-button' onClick={() => setPalette(palette === 'fill' ? null : 'fill')}>
+              <span className='fill-chip' style={{ background: fmt.fill || 'transparent' }} />
+            </button>
+            {palette && (
+              <span className='palette' role='menu'>
+                {(palette === 'color' ? COLOURS : FILLS).map((c) => (
+                  <button key={c} className='swatch' style={{ background: c }} title={c} onClick={() => { formatRange({ [palette]: c }); setPalette(null) }} />
+                ))}
+                <button className='swatch none' title='None' onClick={() => { formatRange({ [palette]: null }); setPalette(null) }}>×</button>
+              </span>
+            )}
+          </span>
           <select
             title='Number format'
             value={fmt.num || ''}
-            onChange={(e) => run('sheet:setFormat', { row: sel.row, col: sel.col, patch: { num: e.target.value || null } })}
+            onChange={(e) => formatRange({ num: e.target.value || null })}
           >
             {NUMBER_FORMATS.map(([code, label]) => <option key={code} value={code}>{label}</option>)}
           </select>
@@ -216,8 +332,12 @@ export function SheetView ({ sheetId, onTitleChange, onError }) {
         cells={cells}
         sel={sel}
         editing={editing}
-        onSelect={(row, col) => { if (editing) commit(null); setSel({ row, col }) }}
-        onEdit={(row, col) => { setSel({ row, col }); if (canEdit) setEditing({ row, col, value: (cells.get(row + ',' + col) || {}).input || '' }) }}
+        range={range}
+        ext={ext}
+        onSelect={(row, col, extend) => { if (editing) commit(null); select(row, col, extend) }}
+        onCopy={onCopy}
+        onPaste={onPaste}
+        onEdit={(row, col) => { select(row, col); if (canEdit) setEditing({ row, col, value: (cells.get(row + ',' + col) || {}).input || '' }) }}
         onEditChange={(value) => setEditing((ed) => ({ ...ed, value }))}
         onEditKey={onEditKey}
         onEditBlur={() => commit(null)}
@@ -259,7 +379,7 @@ export function SheetView ({ sheetId, onTitleChange, onError }) {
               key={t.id}
               className={'tab' + (t.id === view.tabId ? ' active' : '')}
               title='Double-click to rename'
-              onClick={() => { setTabId(t.id); setSel({ row: 1, col: 1 }) }}
+              onClick={() => { setTabId(t.id); select(1, 1) }}
               onDoubleClick={() => { if (canEdit) setRenaming({ id: t.id, value: t.name }) }}
             >
               {t.name}

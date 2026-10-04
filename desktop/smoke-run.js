@@ -76,6 +76,38 @@ async function run ({ app, win, ready, log }) {
     await enter('=SUM(B1:B2)', 'Enter', '1650.5')
     step('typed and computed')
 
+    // Ranges, copy and paste: select B1:B3, copy, paste into C1. The formula
+    // moves with it, as in Excel.
+    for (let i = 0; i < 3; i++) await key('Up')
+    wc.sendInputEvent({ type: 'keyDown', keyCode: 'Down', modifiers: ['shift'] }); wc.sendInputEvent({ type: 'keyUp', keyCode: 'Down', modifiers: ['shift'] }); await sleep(80)
+    wc.sendInputEvent({ type: 'keyDown', keyCode: 'Down', modifiers: ['shift'] }); wc.sendInputEvent({ type: 'keyUp', keyCode: 'Down', modifiers: ['shift'] }); await sleep(150)
+    await waitFor('range shown', "!!document.querySelector('.range')")
+    wc.copy()
+    await sleep(200)
+    await key('Right')
+    wc.paste()
+    await waitFor('pasted', "[...document.querySelectorAll('.cell')].filter((c) => c.textContent === '1650.5').length === 2")
+    // Go to C3 to read its formula, then reselect C1:C3 from there.
+    await key('Down')
+    await key('Down')
+    result.pastedFormula = await js("document.querySelector('.formula-bar input').value")
+    for (let i = 0; i < 2; i++) { wc.sendInputEvent({ type: 'keyDown', keyCode: 'Up', modifiers: ['shift'] }); wc.sendInputEvent({ type: 'keyUp', keyCode: 'Up', modifiers: ['shift'] }); await sleep(100) }
+    step('copy and paste')
+
+    // Fill colour on the pasted range, then clear it.
+    await js("document.querySelectorAll('.swatch-button')[1].click()")
+    await waitFor('palette', "!!document.querySelector('.palette')")
+    await js("document.querySelector('.palette .swatch').click()")
+    await waitFor('fill applied', "[...document.querySelectorAll('.cell')].filter((c) => c.style.background).length >= 3")
+    step('fill colour')
+    await js("document.querySelector('.grid .body').focus()")
+    await key('Delete')
+    await waitFor('range cleared', "[...document.querySelectorAll('.cell')].filter((c) => c.textContent === '1650.5').length === 1")
+    step('clear range')
+    // Back to B4, where the rest of the test expects to be (active cell is C3).
+    await key('Left')
+    await key('Down')
+
     result.grid = {
       A1: await cellText(1, 1),
       B1: await cellText(1, 2),
@@ -133,7 +165,7 @@ async function run ({ app, win, ready, log }) {
       fs.writeFileSync(shot, image.toPNG())
       step('screenshot', shot)
     }
-    result.ok = result.inviteLink === 'pearsheet://join?s=' + result.inviteLink.slice(19) && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
+    result.ok = result.pastedFormula === '=SUM(C1:C2)' && result.inviteLink === 'pearsheet://join?s=' + result.inviteLink.slice(19) && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
   } catch (err) {
     result.error = err.message
     // What the page showed, to tell a UI failure from a load failure.
