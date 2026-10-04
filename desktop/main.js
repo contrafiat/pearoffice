@@ -50,16 +50,22 @@ function readSettings () {
 // The tray (and hide-on-close) is on while either keeps the app running.
 const stayRunning = () => settings.keepOnline || settings.runSeeder
 let settings = readSettings()
-function writeSettings (patch) {
-  settings = { ...settings, ...patch }
+// Make the system's login entry match the setting. Runs on every start too,
+// so a reinstalled or moved app points the entry at itself again.
+function syncLoginItem () {
   // Starting at login only makes sense while PearSheet stays running.
   if (!stayRunning()) settings.startAtLogin = false
   try {
-    if (loginItem.isEnabled() !== settings.startAtLogin) loginItem.setEnabled(settings.startAtLogin)
+    if (settings.startAtLogin) loginItem.setEnabled(true)
+    else if (loginItem.isEnabled()) loginItem.setEnabled(false)
   } catch (err) {
     log('login item failed:', err.message)
     settings.startAtLogin = loginItem.isEnabled()
   }
+}
+function writeSettings (patch) {
+  settings = { ...settings, ...patch }
+  syncLoginItem()
   fs.mkdirSync(path.dirname(settingsFile), { recursive: true })
   fs.writeFileSync(settingsFile, JSON.stringify(settings, null, 2))
   if (stayRunning()) createTray()
@@ -211,6 +217,7 @@ app.whenReady().then(async () => {
     log('worklet failed to start:', err.message)
     throw err
   })
+  syncLoginItem()
   createWindow()
   if (stayRunning()) createTray()
   if (!SMOKE) log(win.isVisible() ? 'window shown' : 'started hidden in the tray')
