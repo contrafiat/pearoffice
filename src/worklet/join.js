@@ -75,6 +75,7 @@ function createJoinService ({ engine, emit, log = () => {}, now = () => Date.now
       id,
       onopen: () => {
         const j = joins.get(sheetId)
+        log('join channel open ' + sheetId.slice(0, 6) + (j ? ' (joining)' : ''))
         if (!j || j.done) return
         j.channels.add(ch)
         if (j.claimMsg) ch.msg.send(j.claimMsg)
@@ -82,6 +83,7 @@ function createJoinService ({ engine, emit, log = () => {}, now = () => Date.now
       },
       onclose: () => {
         const j = joins.get(sheetId)
+        log('join channel closed ' + sheetId.slice(0, 6))
         if (j) j.channels.delete(ch)
       }
     })
@@ -98,6 +100,7 @@ function createJoinService ({ engine, emit, log = () => {}, now = () => Date.now
     if (msg.t === 'device') return takeDevice(sheetId, msg)
     const j = joins.get(sheetId)
     if (!j || j.done) return
+    log('join got ' + msg.t + (msg.reason ? ': ' + msg.reason : ''))
     if (msg.t === 'welcome' && !j.welcome) {
       j.welcome = msg
       await persist(sheetId, j)
@@ -111,7 +114,8 @@ function createJoinService ({ engine, emit, log = () => {}, now = () => Date.now
   // --- member side ---------------------------------------------------------
 
   async function answerRequest (ch, sheetId, msg) {
-    const reject = (reason) => ch.msg.send({ t: 'reject', reason })
+    log('answer request ' + String(msg.inviteId).slice(0, 6))
+    const reject = (reason) => { log('reject: ' + reason); ch.msg.send({ t: 'reject', reason }) }
     const invite = await get(sheetId, 'invite/' + msg.inviteId)
     if (!invite) return reject('This device has not seen that invite yet')
     if (await get(sheetId, 'invite-used/' + msg.inviteId)) return reject('This invite has already been used or was cancelled')
@@ -223,6 +227,9 @@ function createJoinService ({ engine, emit, log = () => {}, now = () => Date.now
     const again = () => {
       if (j.done || j.claimMsg) return
       discovery.refresh({ server: false, client: true }).catch(() => {})
+      // A member that had not set up its listener yet rejects our channel,
+      // and nothing reopens it on that connection. Try again.
+      if (!j.welcome) for (const mux of muxes) openChannel(mux, sheetId)
       j.lookup = setTimeout(again, LOOKUP_EVERY_MS[Math.min(n++, LOOKUP_EVERY_MS.length - 1)])
       if (j.lookup.unref) j.lookup.unref()
     }

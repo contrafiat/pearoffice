@@ -94,7 +94,7 @@ test('asking for a sheet before it exists does not break loading it later', asyn
   const view = new Hyperbee(store.get({ name: 'v' }), { keyEncoding: 'utf-8', valueEncoding: 'json' })
   const src = model.createDoc()
   await view.put('y/aa/000000000001', { data: Buffer.from(model.initSheet(src)).toString('base64') })
-  base = { ready: async () => {}, view }
+  base = { ready: async () => {}, view, on: () => {} }
   const e = await sheets.load('s1')
   assert.equal(model.tabIds(e.guarded.doc).length, 1)
   await store.close()
