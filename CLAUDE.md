@@ -39,7 +39,9 @@ phrase (proposals/2026-10-03-device-linking.md). The seeder ships inside the
 desktop app and as a Linux server download. iOS runs on the Simulator and
 the iPhone SE. Mac builds are signed and notarized. Anyone can remove a sheet
 from their device and the owner can delete it for everyone, seeder included
-(proposals/2026-10-04-deleting-sheets.md).
+(proposals/2026-10-04-deleting-sheets.md). A seeder can be taken off a sheet,
+a device can stop using one and a seeder can forget a device
+(proposals/2026-10-04-stop-backing-up.md).
 See `TODO.md`.
 
 ## Layout
@@ -81,7 +83,8 @@ See `TODO.md`.
 
 `npm run seeder` builds and runs the seeder with data in `~/.pearsheet-seeder`
 (override with `PEARSHEET_SEEDER_DATA`). It prints a pairing link and QR code;
-type `pair` for a new one and `status` for counts. With `--ipc` it speaks
+type `pair` for a new one, `status` for counts, `devices` and
+`forget <key>` to unpair a device. With `--ipc` it speaks
 newline JSON instead; the desktop app uses that for "Run a seeder on this
 computer" (`desktop/seeder-process.js`, a separate process from the member
 worklet).

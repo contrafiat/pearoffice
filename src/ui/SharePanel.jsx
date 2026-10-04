@@ -138,9 +138,55 @@ export function SharePanel ({ sheetId, onClose, onError }) {
                 </ul>
               </>
             )}
+
+            <Backups sheetId={sheetId} members={data.members} onError={onError} />
           </>
         )}
       </section>
     </div>
+  )
+}
+
+// The seeders this sheet backs up to (proposals/2026-10-04-stop-backing-up.md).
+function Backups ({ sheetId, members, onError }) {
+  const [info, setInfo] = useState(null)
+  const [busy, setBusy] = useState(null) // seeder key being changed
+
+  const load = useCallback(async () => {
+    try { setInfo(await call('seeder:sheet', { sheetId })) } catch (err) { onError(err.message) }
+  }, [sheetId, onError])
+  useEffect(() => { load() }, [load])
+
+  async function change (method, seederKey) {
+    setBusy(seederKey)
+    try { await call(method, { sheetId, seederKey }); await load() } catch (err) { onError(err.message) }
+    setBusy(null)
+  }
+
+  if (!info || (!info.listed.length && !info.available.length)) return null
+  const nameOf = (identity) => {
+    const p = members.find((x) => x.identity === identity)
+    return p ? (p.isMe ? 'you' : p.name || 'someone') : 'someone'
+  }
+  return (
+    <>
+      <h3>Backed up to</h3>
+      {!info.listed.length && <p className='muted'>No seeder.</p>}
+      <ul className='people backups'>
+        {info.listed.map((s) => (
+          <li key={s.seederKey}>
+            <span className='who'><span className='mono'>{s.seederKey.slice(0, 12)}...</span> <span className='muted'>added by {nameOf(s.addedBy)}</span></span>
+            {s.canStop && <button className='link-button' disabled={busy === s.seederKey} onClick={() => change('seeder:removeFromSheet', s.seederKey)}>{busy === s.seederKey ? 'Stopping...' : 'Stop'}</button>}
+          </li>
+        ))}
+        {info.available.map((k) => (
+          <li key={k}>
+            <span className='who'><span className='mono'>{k.slice(0, 12)}...</span> <span className='muted'>your seeder, not used here</span></span>
+            <button className='link-button' disabled={busy === k} onClick={() => change('seeder:addToSheet', k)}>{busy === k ? 'Adding...' : 'Back up here'}</button>
+          </li>
+        ))}
+      </ul>
+      {info.listed.some((s) => s.canStop) && <p className='muted small'>Stopping a seeder deletes its copy of this sheet after 7 days.</p>}
+    </>
   )
 }

@@ -26,6 +26,7 @@ const P = {
   role: 'pearsheet/role/v1',
   name: 'pearsheet/name/v1',
   seeder: 'pearsheet/seeder/v1',
+  seederOff: 'pearsheet/seeder-off/v1',
   move: 'pearsheet/move/v1',
   delete: 'pearsheet/delete/v1'
 }
@@ -100,6 +101,12 @@ function nameOp ({ sheetId, identity, name, n }) {
 // "Back this sheet up to that seeder". Any owner or editor can add one.
 function seederOp ({ sheetId, identity, seederKey }) {
   return { type: 'seeder', seeder: signValue({ purpose: P.seeder, sheetId, seederKey, identity: hex(identity.publicKey) }, identity.secretKey) }
+}
+
+// "Stop backing this sheet up to that seeder". The owner, or whoever listed
+// it (proposals/2026-10-04-stop-backing-up.md).
+function seederOffOp ({ sheetId, identity, seederKey }) {
+  return { type: 'seederOff', seederOff: signValue({ purpose: P.seederOff, sheetId, seederKey, identity: hex(identity.publicKey) }, identity.secretKey) }
 }
 
 // A member the owner carries into a moved sheet (section 7). Owner-signed.
@@ -347,6 +354,20 @@ async function applyMembershipOp (op, { view, base, groupId, node, log }) {
     if (!actor || actor.identity !== r.identity || (actor.role !== 'owner' && actor.role !== 'editor')) return skip('not an owner or editor')
     if (await get(view, 'seeder/' + r.seederKey)) return skip('already listed')
     await view.put('seeder/' + r.seederKey, { seederKey: r.seederKey, addedBy: r.identity })
+    await view.del('seederOff/' + r.seederKey)
+    return true
+  }
+
+  if (op.type === 'seederOff') {
+    const r = op.seederOff
+    if (!signedBy(r, 'identity', P.seederOff, sheetId) || !HEX64.test(r.seederKey || '')) return skip('bad seeder-off record')
+    const actor = await actorOf(view, node)
+    if (!actor || actor.identity !== r.identity) return skip('not appended by the signer')
+    const listed = await get(view, 'seeder/' + r.seederKey)
+    if (!listed) return skip('not listed')
+    if (actor.role !== 'owner' && listed.addedBy !== r.identity) return skip('only the owner or whoever listed it')
+    await view.del('seeder/' + r.seederKey)
+    await view.put('seederOff/' + r.seederKey, { by: r.identity })
     return true
   }
 
@@ -389,6 +410,7 @@ module.exports = {
   roleOp,
   nameOp,
   seederOp,
+  seederOffOp,
   memberOp,
   admitOp,
   moveOp,

@@ -220,6 +220,15 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
     result.inviteLink = (await js("document.querySelector('.invite-link input').value")).slice(0, 24)
     step('invite link')
 
+    // Stop backing up this sheet to the local seeder, then add it back.
+    await waitFor('backups listed', "[...document.querySelectorAll('.backups button')].some((b) => b.textContent === 'Stop')", 30000)
+    await js("[...document.querySelectorAll('.backups button')].find((b) => b.textContent === 'Stop').click()")
+    await waitFor('seeder stopped', "[...document.querySelectorAll('.backups button')].some((b) => b.textContent === 'Back up here')", 30000)
+    await js("[...document.querySelectorAll('.backups button')].find((b) => b.textContent === 'Back up here').click()")
+    await waitFor('seeder back', "[...document.querySelectorAll('.backups button')].some((b) => b.textContent === 'Stop')", 30000)
+    result.backups = true
+    step('stop and restart a backup')
+
     // Remove the open sheet from this device: it leaves the list.
     await js("document.querySelector('.panel .close').click()")
     result.sheetsBefore = await js("document.querySelectorAll('.sheet-link').length")
@@ -239,7 +248,7 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
       fs.writeFileSync(shot, image.toPNG())
       step('screenshot', shot)
     }
-    result.ok = result.keepOnline && result.sheetsAfter === result.sheetsBefore - 1 && result.importedFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000 && result.pastedFormula === '=SUM(C1:C2)' && result.inviteLink === 'pearsheet://join?s=' + result.inviteLink.slice(19) && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
+    result.ok = result.keepOnline && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.importedFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000 && result.pastedFormula === '=SUM(C1:C2)' && result.inviteLink === 'pearsheet://join?s=' + result.inviteLink.slice(19) && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
   } catch (err) {
     result.error = err.message
     // What the page showed, to tell a UI failure from a load failure.

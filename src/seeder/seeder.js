@@ -23,7 +23,8 @@ const Protomux = require('protomux')
 const c = require('compact-encoding')
 const b4a = require('b4a')
 const sodium = require('sodium-universal')
-const { PAIR_PROTOCOL, PAIR_WINDOW_MS, SEEDER_PROTOCOL, DROP_MAX_MS, pairTopic, seederLink } = require('./protocol')
+const IdEnc = require('hypercore-id-encoding')
+const { PAIR_PROTOCOL, PAIR_WINDOW_MS, SEEDER_PROTOCOL, DROP_MAX_MS, DROP_GRACE_MS, pairTopic, seederLink } = require('./protocol')
 
 const DROP_SWEEP_MS = 60 * 60 * 1000
 
@@ -55,8 +56,26 @@ async function createSeeder ({ dataDir, bootstrap = null, log = () => {} }) {
 
   const paired = new Set()
   const allowed = new Set()
+  // Which paired devices registered each sheet
+  // (proposals/2026-10-04-stop-backing-up.md). Older records kept only the
+  // first, as a string.
+  const registrants = new Map() // bootstrap -> Set of device keys
   for await (const { key } of state.createReadStream({ gt: 'device/', lt: 'device/~' })) paired.add(key.slice(7))
-  for await (const { key } of state.createReadStream({ gt: 'sheet/', lt: 'sheet/~' })) allowed.add(key.slice(6))
+  for await (const { key, value } of state.createReadStream({ gt: 'sheet/', lt: 'sheet/~' })) {
+    const sheet = key.slice(6)
+    allowed.add(sheet)
+    const by = value && value.by
+    registrants.set(sheet, new Set(Array.isArray(by) ? by : by ? [by] : []))
+  }
+
+  async function addRegistrant (sheet, device) {
+    const set = registrants.get(sheet) || new Set()
+    if (allowed.has(sheet) && set.has(device)) return
+    set.add(device)
+    registrants.set(sheet, set)
+    allowed.add(sheet)
+    await state.put('sheet/' + sheet, { by: [...set], at: Date.now() })
+  }
 
   // blind-peering sends an Autobase in batches: writer cores with the sheet's
   // bootstrap key as referrer, then view cores with no referrer. A connection
@@ -68,10 +87,9 @@ async function createSeeder ({ dataDir, bootstrap = null, log = () => {} }) {
       const remote = hex(stream.remotePublicKey)
       const ref = referrer ? hex(referrer) : null
       if (paired.has(remote)) {
-        if (ref && !allowed.has(ref)) {
-          allowed.add(ref)
-          await state.put('sheet/' + ref, { by: remote, at: Date.now() })
-          log('allowed sheet ' + ref.slice(0, 8) + ' (registered by a paired device)')
+        if (ref && !(registrants.get(ref) || new Set()).has(remote)) {
+          if (!allowed.has(ref)) log('allowed sheet ' + ref.slice(0, 8) + ' (registered by a paired device)')
+          await addRegistrant(ref, remote)
         }
         if (ref) vouched.set(stream, ref)
         return ref || vouched.get(stream) || null
@@ -119,12 +137,52 @@ async function createSeeder ({ dataDir, bootstrap = null, log = () => {} }) {
         await state.del(key)
       }
       allowed.delete(sheet)
+      registrants.delete(sheet)
       await state.del('sheet/' + sheet)
       await state.del('drop/' + sheet)
       log('dropped sheet ' + sheet.slice(0, 8) + ' (' + n + ' cores)')
     }
     return due.length
   }
+  // A paired device still wants the sheet: cancel a pending drop.
+  async function keep (sheet, device) {
+    await addRegistrant(sheet, device)
+    const pending = (await state.get('drop/' + sheet))?.value
+    if (pending) { await state.del('drop/' + sheet); log('drop of sheet ' + sheet.slice(0, 8) + ' cancelled') }
+    return !!pending
+  }
+
+  // Forget a paired device: refuse it from now on and drop, after the grace
+  // period, every sheet no other paired device registered.
+  async function forgetDevice (deviceKey) {
+    if (!paired.has(deviceKey)) return { forgotten: false, dropping: 0 }
+    paired.delete(deviceKey)
+    await state.del('device/' + deviceKey)
+    peer.trustedPubKeys.delete(IdEnc.normalize(b4a.from(deviceKey, 'hex')))
+    for (const conn of peer.swarm.connections) {
+      if (conn.remotePublicKey && hex(conn.remotePublicKey) === deviceKey) conn.destroy()
+    }
+    let dropping = 0
+    for (const [sheet, set] of registrants) {
+      if (!set.delete(deviceKey)) continue
+      await state.put('sheet/' + sheet, { by: [...set], at: Date.now() })
+      if (![...set].some((d) => paired.has(d))) { await scheduleDrop(sheet, DROP_GRACE_MS); dropping++ }
+    }
+    log('forgot device ' + deviceKey.slice(0, 8) + ', dropping ' + dropping + ' sheet(s)')
+    return { forgotten: true, dropping }
+  }
+
+  async function devices () {
+    const out = []
+    for await (const { key, value } of state.createReadStream({ gt: 'device/', lt: 'device/~' })) {
+      const deviceKey = key.slice(7)
+      let sheets = 0
+      for (const set of registrants.values()) if (set.has(deviceKey)) sheets++
+      out.push({ deviceKey, pairedAt: value && value.at, sheets })
+    }
+    return out
+  }
+
   const dropTimer = setInterval(() => runDrops().catch((e) => log('drop sweep failed: ' + e.message)), DROP_SWEEP_MS)
   if (dropTimer.unref) dropTimer.unref()
 
@@ -199,9 +257,11 @@ async function createSeeder ({ dataDir, bootstrap = null, log = () => {} }) {
     const msg = ch.addMessage({
       encoding: c.json,
       onmessage: async (m) => {
-        if (!m || m.t !== 'drop') return
-        if (!paired.has(hex(conn.remotePublicKey))) return msg.send({ t: 'no', reason: 'Only paired devices can ask for that' })
+        if (!m || (m.t !== 'drop' && m.t !== 'keep')) return
+        const remote = hex(conn.remotePublicKey)
+        if (!paired.has(remote)) return msg.send({ t: 'no', reason: 'Only paired devices can ask for that' })
         if (typeof m.bootstrap !== 'string' || !allowed.has(m.bootstrap)) return msg.send({ t: 'no', reason: 'This seeder does not hold that sheet' })
+        if (m.t === 'keep') return msg.send({ t: 'ok', cancelled: await keep(m.bootstrap, remote) })
         msg.send({ t: 'ok', due: await scheduleDrop(m.bootstrap, m.afterMs) })
       }
     })
@@ -235,7 +295,7 @@ async function createSeeder ({ dataDir, bootstrap = null, log = () => {} }) {
     return out
   }
 
-  return { seederKey, peer, openPairing, closePairing, status, close, runDrops, scheduleDrop, drops, isPaired: (k) => paired.has(hex(k)), allowedSheets: () => [...allowed] }
+  return { seederKey, peer, openPairing, closePairing, status, close, runDrops, scheduleDrop, drops, keep, forgetDevice, devices, isPaired: (k) => paired.has(hex(k)), allowedSheets: () => [...allowed] }
 }
 
 module.exports = { createSeeder }
