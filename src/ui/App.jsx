@@ -75,7 +75,7 @@ export function App () {
 
   return (
     <div className={'app' + (navOpen ? ' nav-open' : '')}>
-      <button className='nav-toggle' aria-label='Your sheets' onClick={() => setNavOpen(true)}>☰</button>
+      <button className='nav-toggle' aria-label='Your sheets' aria-expanded={navOpen} onClick={() => setNavOpen(true)}><span aria-hidden='true'>☰</span></button>
       {navOpen && <div className='nav-scrim' onClick={() => setNavOpen(false)} />}
       <aside className='sidebar' onClick={(e) => { if (e.target.closest('.sheet-link')) setNavOpen(false) }}>
         <div className='brand'>

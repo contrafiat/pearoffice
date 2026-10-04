@@ -46,6 +46,13 @@ const NUMBER_FORMATS = [
   ['d mmm yyyy', '29 Feb 2024']
 ]
 
+function readPref (key) {
+  try { return window.localStorage.getItem(key) } catch { return null }
+}
+function writePref (key, value) {
+  try { window.localStorage.setItem(key, value) } catch {}
+}
+
 export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
   const [view, setView] = useState(null)
   const [tabId, setTabId] = useState(null)
@@ -69,6 +76,11 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
   const [renaming, setRenaming] = useState(null) // { id, value } | null
   const [sharing, setSharing] = useState(false)
   const [more, setMore] = useState(false) // the ⋯ menu
+  // Phone settings, remembered on this device only.
+  const [zoom, setZoomState] = useState(() => Number(readPref('pearsheet:zoom')) || 1)
+  const [numPad, setNumPadState] = useState(() => readPref('pearsheet:numpad') === '1')
+  const setZoom = (z) => { setZoomState(z); writePref('pearsheet:zoom', String(Math.round(z * 100) / 100)) }
+  const setNumPad = (on) => { setNumPadState(on); writePref('pearsheet:numpad', on ? '1' : '0') }
   const [deleting, setDeleting] = useState(null) // 'local' | 'everyone' | null
   const gridRef = useRef(null)
 
@@ -336,6 +348,19 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
             <button onClick={() => phoneCopy(true).catch((err) => onError(err.message))}>Cut</button>
             <button onClick={() => phonePaste().catch((err) => onError(err.message))}>Paste</button>
             <button onClick={() => run('sheet:clearRange', range)}>Clear</button>
+            <button
+              className={numPad ? 'on' : ''}
+              aria-pressed={numPad}
+              // Android WebView does not report aria-pressed, so the name
+              // carries the state.
+              aria-label={'Number keypad, ' + (numPad ? 'on' : 'off')}
+              title='Type with the number keypad'
+              // Keep the cell editor focused, so the keyboard switches now.
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => setNumPad(!numPad)}
+            >
+              123
+            </button>
           </div>
         )}
         {window.pearsheet && (
@@ -359,6 +384,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
         <span className='fx' aria-hidden='true'>fx</span>
         <input
           aria-label='Cell contents'
+          inputMode={numPad ? 'decimal' : undefined}
           readOnly={!canEdit}
           value={barValue}
           onFocus={() => { if (canEdit && !editing) setEditing({ ...sel, value: selected ? selected.input : '', source: 'bar' }) }}
@@ -374,6 +400,9 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
         cells={cells}
         sel={sel}
         editing={editing}
+        zoom={zoom}
+        onZoom={isMobile() ? setZoom : null}
+        inputMode={numPad ? 'decimal' : undefined}
         range={range}
         ext={ext}
         onSelect={(row, col, extend) => { if (editing) commit(null); select(row, col, extend) }}
