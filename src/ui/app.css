@@ -222,6 +222,9 @@ button, input, select { font: inherit; color: inherit; }
 .my-name input { border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; background: var(--paper); font-size: 13px; color: var(--ink); }
 .my-name input:focus { outline: none; border-color: var(--pear); }
 
+.toolbar .export { margin-left: auto; border: 1px solid var(--line-strong); background: var(--panel); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
+.toolbar .export + .share { margin-left: 0; }
+.join-sheet.import { text-align: center; display: block; }
 .toolbar .share {
   margin-left: auto;
   background: var(--pear);
