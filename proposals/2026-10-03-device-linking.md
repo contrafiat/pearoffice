@@ -114,8 +114,7 @@ Behind a setting until verified on two machines. Turning it off hides the link
 and phrase screens. Devices already linked keep working, since they are
 ordinary members.
 
-## Open questions
+## Settled
 
-1. Should the recovery phrase be offered right after creating the first
-   sheet, or only from settings? Recommended: only from settings in v1, with
-   a one-time nudge.
+- The recovery phrase lives in settings, with a one-time reminder after the
+  first sheet is created or joined (Tim, 2026-10-03).
