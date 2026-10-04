@@ -290,7 +290,15 @@ function createSheetMethods (sheets, { getJoin, getMoves }) {
       return getJoin().start(link, { name: await profileName(ctx) })
     },
 
-    'app:me': async (args, ctx) => ({ identity: hex(ctx.identity.publicKey), name: await profileName(ctx) }),
+    'app:me': async (args, ctx) => {
+      // One reminder to write down the recovery phrase, once there is a sheet
+      // worth recovering (proposals/2026-10-03-device-linking.md).
+      let hasSheet = false
+      for await (const _ of ctx.localDb.createReadStream({ gt: 'groups:joined:', lt: 'groups:joined:~', limit: 1 })) hasSheet = true
+      const nudged = !!(await ctx.localDb.get('phraseNudged'))
+      return { identity: hex(ctx.identity.publicKey), name: await profileName(ctx), phraseNudge: hasSheet && !nudged }
+    },
+    'app:phraseNudged': async (args, ctx) => { await ctx.localDb.put('phraseNudged', { at: Date.now() }); return { ok: true } },
 
     // Saves the name locally and updates it in every sheet this device can
     // write to. Viewers keep the name they joined with.

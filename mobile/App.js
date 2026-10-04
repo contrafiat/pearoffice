@@ -15,7 +15,7 @@ import * as DocumentPicker from 'expo-document-picker'
 import * as Clipboard from 'expo-clipboard'
 import b4a from 'b4a'
 
-const ALLOWED = /^(sheet|app|seeder):[A-Za-z]+$/
+const ALLOWED = /^(sheet|app|seeder|link):[A-Za-z]+$/
 
 // Phone features the web UI cannot reach on its own, answered by the shell.
 async function shellMethod (method, args) {
@@ -81,6 +81,17 @@ function startWorklet () {
   return started
 }
 
+// After a device link or a phrase restore the identity changed: throw the
+// worklet away and start a fresh one.
+async function restartWorklet () {
+  try { if (worklet) worklet.terminate() } catch {}
+  worklet = null
+  started = null
+  for (const resolve of pending.values()) resolve({ error: 'restarting' })
+  pending.clear()
+  await startWorklet()
+}
+
 function callWorklet (method, args) {
   return new Promise((resolve) => {
     const id = nextId++
@@ -137,6 +148,12 @@ export default function App () {
     const { id, method, args } = msg
     const reply = (body) => inject('window.__psResponse(' + JSON.stringify({ id, ...body }) + ')')
     if (method === 'app:takeLink') { const url = pendingLink; pendingLink = null; return reply({ result: { url } }) }
+    if (method === 'app:restart') {
+      try { await restartWorklet() } catch (err) { return reply({ error: String(err && err.message ? err.message : err) }) }
+      reply({ result: { ok: true } })
+      if (web.current) { loaded.current = false; web.current.reload() }
+      return
+    }
     try {
       const own = await shellMethod(method, args || {})
       if (own) return reply({ result: own })

@@ -176,6 +176,21 @@ async function run ({ app, win, ready, log, dataDir }) {
     result.importedFormula = await js("document.querySelector('.formula-bar input').value")
     step('import')
 
+    // The Seeder and Devices panels reach the engine (seeder: and link: calls).
+    await js("[...document.querySelectorAll('.seeder-button')].find((b) => b.textContent === 'Seeder').click()")
+    await waitFor('seeder panel lists seeders', "!!document.querySelector('.panel') && document.querySelector('.panel').textContent.includes('None yet')")
+    await js("document.querySelector('.panel .close').click()")
+    await js("[...document.querySelectorAll('.seeder-button')].find((b) => b.textContent === 'Devices').click()")
+    await waitFor('devices panel', "[...document.querySelectorAll('.panel button')].some((b) => b.textContent === 'Link a new device')")
+    await js("[...document.querySelectorAll('.panel button')].find((b) => b.textContent === 'Link a new device').click()")
+    await waitFor('device link', "(document.querySelector('.panel input') || {}).value?.startsWith('pearsheet://link?')")
+    await js("document.querySelector('.panel .close').click()")
+    await js("[...document.querySelectorAll('.seeder-button')].find((b) => b.textContent === 'Devices').click()")
+    await js("[...document.querySelectorAll('.panel button')].find((b) => b.textContent === 'Show my phrase').click()")
+    await waitFor('recovery phrase', "document.querySelectorAll('.phrase li').length === 24")
+    await js("document.querySelector('.panel .close').click()")
+    step('seeder and devices panels')
+
     // Share: the owner gets a single-use invite link.
     await js("document.querySelector('.toolbar .share').click()")
     await waitFor('share panel', "!!document.querySelector('.panel .invite-actions')")

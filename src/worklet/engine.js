@@ -8,6 +8,7 @@ const { createSheetMethods } = require('./sheetMethods')
 const { createJoinService } = require('./join')
 const { createSeeding } = require('./seeding')
 const { createMoves } = require('./moves')
+const { createLinking } = require('./linking')
 
 function createSheetEngine (opts = {}) {
   const { createSwarm: makeSwarm, log = () => {}, ...rest } = opts
@@ -15,6 +16,7 @@ function createSheetEngine (opts = {}) {
   let join = null
   let seeding = null
   let moves = null
+  let linking = null
   const emit = (event, data) => engine && engine.emit(event, data)
 
   const sheets = createSheets({
@@ -26,6 +28,10 @@ function createSheetEngine (opts = {}) {
     ...createSheetMethods(sheets, { getJoin: () => join, getMoves: () => moves }),
     'seeder:pair': async ({ link }) => seeding.pair(link),
     'seeder:list': async () => seeding.list(),
+    'link:start': async () => linking.start(),
+    'link:join': async ({ link }) => linking.join(link),
+    'link:phrase': async () => ({ phrase: linking.phrase() }),
+    'app:restorePhrase': async ({ phrase }) => linking.restore(phrase),
     // Close stores cleanly, then exit. The desktop shell calls this on quit.
     'app:close': async () => {
       setTimeout(async () => {
@@ -59,15 +65,20 @@ function createSheetEngine (opts = {}) {
       const swarm = makeSwarm ? makeSwarm(args) : new (require('hyperswarm'))(args)
       join = createJoinService({ engine, emit, log })
       // Let core attach replication first, then add our channel.
-      swarm.on('connection', (conn) => { Promise.resolve().then(() => join.onConnection(conn)) })
+      swarm.on('connection', (conn) => { Promise.resolve().then(() => { join.onConnection(conn); if (linking) linking.listen(conn) }) })
       setTimeout(() => join.resume().catch((e) => log('resume joins failed: ' + e.message)), 0)
       seeding = createSeeding({ engine, log })
       setTimeout(() => seeding.start(), 0)
       moves = createMoves({ engine, sheets, getJoin: () => join, emit, log })
-      // Core has no hook for "init finished", so look for sheets that moved
-      // while this device was off a little after start, and once more later.
+      linking = createLinking({ engine, log })
+      // Core has no hook for "init finished", so catch up a little after
+      // start, and once more later: open sheets that came with a device link,
+      // follow sheets that moved, ask to be admitted where needed.
       for (const ms of [2000, 10000]) {
-        const t = setTimeout(() => moves.resume().catch(() => {}), ms)
+        const t = setTimeout(async () => {
+          try { await linking.resume() } catch (e) { log('link resume failed: ' + e.message) }
+          try { await moves.resume() } catch {}
+        }, ms)
         if (t.unref) t.unref()
       }
       return swarm
@@ -79,6 +90,7 @@ function createSheetEngine (opts = {}) {
     if (join) join.close()
     if (seeding) await seeding.close()
     if (moves) moves.close()
+    if (linking) linking.close()
     return coreClose()
   }
   engine.sheets = sheets
