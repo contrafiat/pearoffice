@@ -23,6 +23,11 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
     throw new Error('timed out waiting for ' + label)
   }
 
+  async function openSettings () {
+    await js("document.querySelector('.me-row').click()")
+    await waitFor('settings open', "!!document.querySelector('.panel.settings')")
+  }
+
   async function type (text, gap = 40) {
     for (const ch of text) {
       const modifiers = /[A-Z]/.test(ch) ? ['shift'] : []
@@ -194,22 +199,26 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
     step('import')
 
     // The Seeder and Devices panels reach the engine (seeder: and link: calls).
-    await js("[...document.querySelectorAll('.seeder-button')].find((b) => b.textContent === 'Seeder').click()")
+    await openSettings()
+    await js("document.querySelector('.panel .settings-seeder').click()")
     await waitFor('seeder panel lists seeders', "!!document.querySelector('.panel') && document.querySelector('.panel').textContent.includes('None yet')")
     await js("document.querySelector('.panel .close').click()")
-    await js("[...document.querySelectorAll('.seeder-button')].find((b) => b.textContent === 'Devices').click()")
+    await openSettings()
+    await js("document.querySelector('.panel .settings-devices').click()")
     await waitFor('devices panel', "[...document.querySelectorAll('.panel button')].some((b) => b.textContent === 'Link a new device')")
     await js("[...document.querySelectorAll('.panel button')].find((b) => b.textContent === 'Link a new device').click()")
     await waitFor('device link', "(document.querySelector('.panel input') || {}).value?.startsWith('pearsheet://link?')")
     await js("document.querySelector('.panel .close').click()")
-    await js("[...document.querySelectorAll('.seeder-button')].find((b) => b.textContent === 'Devices').click()")
+    await openSettings()
+    await js("document.querySelector('.panel .settings-devices').click()")
     await js("[...document.querySelectorAll('.panel button')].find((b) => b.textContent === 'Show my phrase').click()")
     await waitFor('recovery phrase', "document.querySelectorAll('.phrase li').length === 24")
     await js("document.querySelector('.panel .close').click()")
     step('seeder and devices panels')
 
     // Run a seeder on this computer, pair this device with it, show its QR.
-    await js("[...document.querySelectorAll('.seeder-button')].find((b) => b.textContent === 'Seeder').click()")
+    await openSettings()
+    await js("document.querySelector('.panel .settings-seeder').click()")
     await waitFor('local seeder switch', "[...document.querySelectorAll('.panel label')].some((l) => l.textContent.includes('Run a seeder'))")
     await js("[...document.querySelectorAll('.panel label')].find((l) => l.textContent.includes('Run a seeder')).querySelector('input').click()")
     await waitFor('local seeder running', "document.querySelector('.panel').textContent.includes('Holding')", 60000)
@@ -222,11 +231,13 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
     step('local seeder: running, paired, QR, holding sheets')
 
     // Keep sheets online: closing the window hides it, the app keeps running.
-    await js("document.querySelector('.keep-online input').click()")
+    await openSettings()
+    await js("document.querySelector('.panel .keep-online input').click()")
     await waitFor('setting on', "document.querySelector('.keep-online input').checked")
     await waitFor('start at login shown', "!!document.querySelector('.start-at-login input')")
     await js("document.querySelector('.start-at-login input').click()")
     await waitFor('start at login on', "document.querySelector('.start-at-login input').checked")
+    await js("document.querySelector('.panel .close').click()")
     if (process.platform === 'linux') {
       const entry = fs.readFileSync(path.join(dataDir, 'autostart', 'pearsheet.desktop'), 'utf8')
       result.autostart = /^Exec=.* "--hidden"$/m.test(entry)
@@ -241,6 +252,7 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
 
     // Profile picture: a picked image is shrunk, saved and shown, here and
     // in the share panel.
+    await openSettings()
     await js(`(async () => {
       const c = document.createElement('canvas')
       c.width = 300; c.height = 200
@@ -249,12 +261,16 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
       const blob = await new Promise((resolve) => c.toBlob(resolve, 'image/png'))
       const dt = new DataTransfer()
       dt.items.add(new File([blob], 'me.png', { type: 'image/png' }))
-      const input = document.querySelector('.me input[type=file]')
+      const input = document.querySelector('.panel .me input[type=file]')
       input.files = dt.files
       input.dispatchEvent(new Event('change', { bubbles: true }))
     })()`)
-    await waitFor('own picture shown', "!!document.querySelector('.me-picture img.avatar')")
-    result.avatar = await js("document.querySelector('.me-picture img.avatar').src.startsWith('data:image/jpeg;base64,')")
+    await waitFor('own picture shown', "!!document.querySelector('.panel .me-picture img.avatar') && !!document.querySelector('.me-row img.avatar')")
+    result.avatar = await js("document.querySelector('.me-row img.avatar').src.startsWith('data:image/jpeg;base64,')")
+    // About: version and the open-source list.
+    await js("document.querySelector('.panel .about-link').click()")
+    await waitFor('about', "document.querySelector('.panel').textContent.includes('Open-source software') && /Version \\d/.test(document.querySelector('.panel').textContent)")
+    await js("document.querySelector('.panel .close').click()")
     await waitFor('owner picture in the sheet list', "!!document.querySelector('.sheet-link .sheet-owner img.avatar')")
     step('profile picture')
 

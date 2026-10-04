@@ -141,6 +141,12 @@ function startWorklet () {
 ipcMain.handle('worklet:call', async (_e, method, args) => {
   // The UI asks for a link that arrived before it was listening.
   if (method === 'app:takeLink') { const url = pendingLink; pendingLink = null; return { url } }
+  // About: web and email links open outside the app.
+  if (method === 'app:openUrl') {
+    const url = String((args && args.url) || '')
+    if (/^(https:|mailto:)/.test(url)) await shell.openExternal(url)
+    return { ok: true }
+  }
   // After a device link or a phrase restore the identity changed: start a
   // fresh worklet and reload the UI.
   if (method === 'app:settings') return { ...settings, startAtLogin: settings.startAtLogin && loginItem.isEnabled() }

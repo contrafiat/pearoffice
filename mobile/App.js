@@ -40,6 +40,11 @@ async function shellMethod (method, args) {
     const base64 = await FileSystem.readAsStringAsync(file.uri, { encoding: FileSystem.EncodingType.Base64 })
     return { name: file.name, base64 }
   }
+  if (method === 'app:openUrl') {
+    const url = String(args.url || '')
+    if (/^(https:|mailto:)/.test(url)) await Linking.openURL(url)
+    return { ok: true }
+  }
   if (method === 'app:setClipboard') { await Clipboard.setStringAsync(String(args.text || '')); return { ok: true } }
   if (method === 'app:getClipboard') return { text: await Clipboard.getStringAsync() }
   return null

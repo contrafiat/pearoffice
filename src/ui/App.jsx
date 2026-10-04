@@ -5,7 +5,8 @@ import { JoinPanel } from './JoinPanel.jsx'
 import { SeederPanel } from './SeederPanel.jsx'
 import { DevicesPanel } from './DevicesPanel.jsx'
 import { importFile, pickAndImport, isMobile } from './xlsx.js'
-import { Avatar, MemberAvatar, shrinkPicture } from './Avatar.jsx'
+import { Avatar, MemberAvatar } from './Avatar.jsx'
+import { SettingsPanel } from './SettingsPanel.jsx'
 
 export function App () {
   const [sheets, setSheets] = useState(null)
@@ -15,7 +16,7 @@ export function App () {
   const [name, setName] = useState(null)
   const [avatar, setAvatar] = useState(null) // { data, mime, hash } or null
   const [myId, setMyId] = useState(null)
-  const picRef = useRef(null)
+  const [settings, setSettings] = useState(false)
   const [seeder, setSeeder] = useState(false)
   const [navOpen, setNavOpen] = useState(false) // phone layout: the sheet list slides in
   const [devices, setDevices] = useState(null) // { link } | { startWith } | {} when open
@@ -34,6 +35,8 @@ export function App () {
     }
   }, [])
 
+  const loadMe = useCallback(() => call('app:me').then((me) => { setName(me.name); setAvatar(me.avatar || null); setMyId(me.identity); setNudge(!!me.phraseNudge) }).catch(() => {}), [])
+
   const soon = useRef(null)
   const refreshSoon = useCallback(() => {
     if (soon.current) return
@@ -42,7 +45,6 @@ export function App () {
 
   useEffect(() => {
     refresh()
-    const loadMe = () => call('app:me').then((me) => { setName(me.name); setAvatar(me.avatar || null); setMyId(me.identity); setNudge(!!me.phraseNudge) }).catch(() => {})
     loadMe()
     if (desktop) call('app:settings').then((s) => { setKeepOnline(!!s.keepOnline); setStartAtLogin(!!s.startAtLogin) }).catch(() => {})
     const offs = [
@@ -161,79 +163,11 @@ export function App () {
             </button>
           ))}
         </nav>
-        {desktop && keepOnline !== null && (
-          <label className='keep-online' title='Closing the window hides PearSheet in the tray, so people can sync with you while this computer is on'>
-            <input
-              type='checkbox'
-              checked={keepOnline}
-              onChange={async (e) => {
-                const r = await call('app:setSetting', { keepOnline: e.target.checked }).catch((err) => { setError(err.message); return null })
-                if (r) { setKeepOnline(!!r.keepOnline); setStartAtLogin(!!r.startAtLogin) }
-              }}
-            />
-            Keep sheets online when closed
-          </label>
-        )}
-        {desktop && keepOnline && (
-          <label className='keep-online start-at-login' title='Opens PearSheet hidden in the tray when you log in, so your sheets stay reachable after a restart'>
-            <input
-              type='checkbox'
-              checked={startAtLogin}
-              onChange={async (e) => {
-                const r = await call('app:setSetting', { startAtLogin: e.target.checked }).catch((err) => { setError(err.message); return null })
-                if (r) setStartAtLogin(!!r.startAtLogin)
-              }}
-            />
-            Start when the computer starts
-          </label>
-        )}
-        <button className={'seeder-button' + (desktop ? ' second' : '')} onClick={() => setDevices({})}>Devices</button>
-        <button className='seeder-button second' onClick={() => setSeeder(true)}>Seeder</button>
-        <div className='me'>
-          <button
-            className='me-picture'
-            title={avatar ? 'Change or remove your picture' : 'Add a picture'}
-            onClick={() => picRef.current && picRef.current.click()}
-          >
-            <Avatar name={name} src={avatar ? 'data:' + avatar.mime + ';base64,' + avatar.data : null} seed={myId} size={40} />
-          </button>
-          <input
-            ref={picRef}
-            type='file'
-            accept='image/*'
-            hidden
-            onChange={async (e) => {
-              const file = e.target.files && e.target.files[0]
-              e.target.value = ''
-              if (!file) return
-              try {
-                const pic = await shrinkPicture(file)
-                await call('app:setAvatar', pic)
-                const me = await call('app:me')
-                setAvatar(me.avatar || null)
-              } catch (err) { setError(err.message) }
-            }}
-          />
-          <div className='my-name'>
-            <label htmlFor='my-name-input'>Your name</label>
-            <input
-              id='my-name-input'
-              placeholder='Shown to people you share with'
-              defaultValue={name || ''}
-              key={name === null ? 'loading' : 'name:' + name}
-              onBlur={async (e) => { const v = e.target.value.trim(); if (v !== (name || '')) { await call('app:setName', { name: v }); setName(v) } }}
-              onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur() }}
-            />
-            {avatar && (
-              <button
-                className='link-button remove-picture' onClick={async () => {
-                  try { await call('app:setAvatar', { data: '' }); setAvatar(null) } catch (err) { setError(err.message) }
-                }}
-              >Remove picture
-              </button>
-            )}
-          </div>
-        </div>
+        <button className='me-row' onClick={() => setSettings(true)} aria-label='Settings'>
+          <Avatar name={name} src={avatar ? 'data:' + avatar.mime + ';base64,' + avatar.data : null} seed={myId} size={32} />
+          <span className='me-name'>{name || 'Set your name'}</span>
+          <svg className='gear' viewBox='0 0 24 24' width='18' height='18' aria-hidden='true'><path fill='currentColor' d='M19.4 13a7.6 7.6 0 0 0 0-2l2.1-1.6-2-3.5-2.5 1a7.4 7.4 0 0 0-1.7-1L15 3.3h-4l-.4 2.6a7.4 7.4 0 0 0-1.7 1l-2.5-1-2 3.5L6.6 11a7.6 7.6 0 0 0 0 2l-2.1 1.6 2 3.5 2.5-1a7.4 7.4 0 0 0 1.7 1l.4 2.6h4l.4-2.6a7.4 7.4 0 0 0 1.7-1l2.5 1 2-3.5zM13 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z' transform='translate(-1 0)' /></svg>
+        </button>
       </aside>
       {joining !== null && (
         <JoinPanel
@@ -241,6 +175,23 @@ export function App () {
           onClose={() => setJoining(null)}
           onError={setError}
           onJoined={async () => { setJoining(null); await refresh() }}
+        />
+      )}
+      {settings && (
+        <SettingsPanel
+          me={{ name, avatar, identity: myId }}
+          onMe={loadMe}
+          desktop={desktop}
+          keepOnline={keepOnline}
+          startAtLogin={startAtLogin}
+          onSetting={async (patch) => {
+            const r = await call('app:setSetting', patch).catch((err) => { setError(err.message); return null })
+            if (r) { setKeepOnline(!!r.keepOnline); setStartAtLogin(!!r.startAtLogin) }
+          }}
+          onDevices={() => { setSettings(false); setDevices({}) }}
+          onSeeder={() => { setSettings(false); setSeeder(true) }}
+          onClose={() => setSettings(false)}
+          onError={setError}
         />
       )}
       {devices && <DevicesPanel initialLink={devices.link || ''} startWith={devices.startWith || null} onClose={() => setDevices(null)} onError={setError} />}

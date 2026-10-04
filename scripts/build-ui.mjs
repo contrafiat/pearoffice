@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 const out = join(root, 'dist', 'ui')
+const version = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version
 
 rmSync(out, { recursive: true, force: true })
 mkdirSync(out, { recursive: true })
@@ -20,7 +21,7 @@ await build({
   jsx: 'automatic',
   minify: process.argv.includes('--minify'),
   sourcemap: process.argv.includes('--minify') ? false : 'inline',
-  define: { 'process.env.NODE_ENV': JSON.stringify(process.argv.includes('--minify') ? 'production' : 'development') },
+  define: { 'process.env.NODE_ENV': JSON.stringify(process.argv.includes('--minify') ? 'production' : 'development'), __APP_VERSION__: JSON.stringify(version) },
   logLevel: 'warning'
 })
 
@@ -39,7 +40,7 @@ if (process.argv.includes('--mobile')) {
     target: ['chrome100', 'safari15'],
     jsx: 'automatic',
     minify: true,
-    define: { 'process.env.NODE_ENV': '"production"' },
+    define: { 'process.env.NODE_ENV': '"production"', __APP_VERSION__: JSON.stringify(version) },
     logLevel: 'warning'
   })
   const css = readFileSync(join(root, 'src', 'ui', 'app.css'), 'utf8')
