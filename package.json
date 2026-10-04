@@ -29,6 +29,7 @@
   "dependencies": {
     "@formulajs/formulajs": "^4.6.1",
     "@peerloom/core": "file:../peerloom-core",
+    "@phosphor-icons/react": "^2.1.10",
     "@stdlib/math-base-special-cos": "^0.3.0",
     "@stdlib/math-base-special-pow": "^0.3.0",
     "@stdlib/math-base-special-sin": "^0.3.0",
