@@ -396,6 +396,24 @@ function createSheetMethods (sheets, { getJoin, getMoves, getProfiles }) {
       return { count }
     },
 
+    'sheet:deleteTab': async ({ sheetId, tabId }, ctx) => {
+      await requireEdit(ctx, sheetId)
+      const { doc } = await docFor(sheetId)
+      return commit(ctx, sheetId, model.deleteTab(doc, tabId))
+    },
+    'sheet:moveTab': async ({ sheetId, tabId, to }, ctx) => {
+      await requireEdit(ctx, sheetId)
+      const { doc } = await docFor(sheetId)
+      return commit(ctx, sheetId, model.moveTab(doc, tabId, Number(to)))
+    },
+    'sheet:duplicateTab': async ({ sheetId, tabId }, ctx) => {
+      await requireEdit(ctx, sheetId)
+      const { doc } = await docFor(sheetId)
+      const { id, update } = model.duplicateTab(doc, tabId)
+      await commit(ctx, sheetId, update)
+      return { tabId: id }
+    },
+
     'sheet:addTab': async ({ sheetId, name }, ctx) => {
       const { doc } = await docFor(sheetId)
       const { id, update } = model.addTab(doc, String(name || 'Sheet' + (model.tabIds(doc).length + 1)))

@@ -463,3 +463,5 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
   .find-backdrop { background: transparent; justify-content: flex-end; padding: 70px 24px 0 0; pointer-events: none; }
   .find-backdrop .find-panel { pointer-events: auto; width: 380px; }
 }
+/* A long press on a tab opens its menu; it should not select the name. */
+.tab { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }

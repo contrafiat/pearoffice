@@ -258,6 +258,37 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
     await sleep(500)
     result.exportedBytes = fs.existsSync(file) ? fs.statSync(file).size : 0
     step('export')
+
+    // CSV and PDF of this tab from the More menu; duplicate a tab and delete
+    // the copy from the tab menu.
+    const more = async (label) => {
+      await js("document.querySelector('.toolbar .more-button').click()")
+      await waitFor('more menu: ' + label, "[...document.querySelectorAll('.more-menu li')].some((l) => l.textContent === " + JSON.stringify(label) + ')')
+      await js("[...document.querySelectorAll('.more-menu li')].find((l) => l.textContent === " + JSON.stringify(label) + ').click()')
+    }
+    await more('Download this tab as CSV')
+    const csvFile = require('node:path').join(downloads, 'Household budget.csv')
+    for (const t0 = Date.now(); !fs.existsSync(csvFile) && Date.now() - t0 < 10000;) await sleep(200)
+    await sleep(300)
+    const csv = fs.existsSync(csvFile) ? fs.readFileSync(csvFile, 'utf8') : ''
+    await more('Save this tab as PDF')
+    const pdfFile = require('node:path').join(dataDir, 'Household budget.pdf')
+    for (const t0 = Date.now(); !fs.existsSync(pdfFile) && Date.now() - t0 < 15000;) await sleep(200)
+    await sleep(300)
+    const pdf = fs.existsSync(pdfFile) ? fs.readFileSync(pdfFile) : Buffer.alloc(0)
+    result.csvPdf = csv.includes('Rent,1200') && csv.includes('Total,1650.5') && pdf.length > 1000 && pdf.slice(0, 4).toString() === '%PDF'
+    await js("document.querySelector('.tab.active').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 60, clientY: 700 }))")
+    await waitFor('tab menu', "[...document.querySelectorAll('.menu li')].some((l) => l.textContent === 'Duplicate')")
+    await js("[...document.querySelectorAll('.menu li')].find((l) => l.textContent === 'Duplicate').click()")
+    await waitFor('duplicated', "document.querySelector('.tab.active').textContent === 'Sheet1 2' && [...document.querySelectorAll('.cell')].some((c) => c.textContent === '1650.5')")
+    await js("document.querySelector('.tab.active').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 160, clientY: 700 }))")
+    await waitFor('tab menu again', "[...document.querySelectorAll('.menu li')].some((l) => l.textContent === 'Delete tab')")
+    await js("[...document.querySelectorAll('.menu li')].find((l) => l.textContent === 'Delete tab').click()")
+    await waitFor('confirm delete tab', "[...document.querySelectorAll('.panel button')].some((b) => b.textContent.trim() === 'Delete tab')")
+    await js("[...document.querySelectorAll('.panel button')].find((b) => b.textContent.trim() === 'Delete tab').click()")
+    await waitFor('tab deleted', "document.querySelectorAll('.tab:not(.add)').length === 1 && document.querySelector('.tab.active').textContent === 'Sheet1'")
+    result.tabs = true
+    step('csv, pdf, duplicate and delete a tab')
     const b64 = fs.readFileSync(file).toString('base64')
     await js(`(() => {
       const bytes = Uint8Array.from(atob(${JSON.stringify(b64)}), (c) => c.charCodeAt(0))
@@ -394,7 +425,7 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
       fs.writeFileSync(shot, image.toPNG())
       step('screenshot', shot)
     }
-    result.ok = result.keepOnline && result.avatar && result.spill && result.quickWins && result.findSort && result.suggested === 'SUBSTITUTE,SUBTOTAL,SUM' && result.argHelp === 'number1' && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.importedFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000 && result.pastedFormula === '=SUM(C1:C2)' && result.inviteLink === 'pearsheet://join?s=' + result.inviteLink.slice(19) && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
+    result.ok = result.keepOnline && result.avatar && result.spill && result.quickWins && result.findSort && result.csvPdf && result.tabs && result.suggested === 'SUBSTITUTE,SUBTOTAL,SUM' && result.argHelp === 'number1' && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.importedFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000 && result.pastedFormula === '=SUM(C1:C2)' && result.inviteLink === 'pearsheet://join?s=' + result.inviteLink.slice(19) && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
   } catch (err) {
     result.error = err.message
     // What the page showed, to tell a UI failure from a load failure.
