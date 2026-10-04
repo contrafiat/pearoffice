@@ -465,3 +465,8 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 }
 /* A long press on a tab opens its menu; it should not select the name. */
 .tab { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+
+/* The fill handle (mouse) and what a drag will fill. */
+.fill-handle { position: absolute; width: 8px; height: 8px; background: var(--pear); border: 1px solid var(--panel); cursor: crosshair; z-index: 5; }
+@media (pointer: coarse) { .fill-handle { display: none; } }
+.fill-preview { position: absolute; border: 1px dashed var(--pear-dark); pointer-events: none; margin: -1px 0 0 -1px; z-index: 4; }

@@ -13,7 +13,7 @@ export const MAX_ZOOM = 2.5
 // sheets stay fast. Headers are drawn outside the scroll area and moved with
 // the scroll position.
 export const Grid = forwardRef(function Grid (props, ref) {
-  const { view, cells, sel, ext = sel, range, spillBox, editing, onSelect, onEdit, onEditChange, onEditKey, onEditBlur, onEditCaret = () => {}, onKeyDown, onHeaderMenu, onCellMenu = () => {}, onResize, onCopy, onPaste, zoom = 1, onZoom, inputMode } = props
+  const { view, cells, sel, ext = sel, range, spillBox, editing, onSelect, onEdit, onEditChange, onEditKey, onEditBlur, onEditCaret = () => {}, onKeyDown, onHeaderMenu, onCellMenu = () => {}, onFill = null, onResize, onCopy, onPaste, zoom = 1, onZoom, inputMode } = props
   // Row height and column widths scale with the zoom (pinch on a phone);
   // stored widths stay unzoomed.
   const ROW_H = Math.round(BASE_ROW_H * zoom)
@@ -25,11 +25,38 @@ export const Grid = forwardRef(function Grid (props, ref) {
 
   // Drag to select a range.
   const dragging = useRef(false)
+  // Drag the fill handle: the cell the pointer is over, while dragging.
+  const [fillTo, setFillTo] = useState(null)
+  const filling = useRef(false)
+  // Which way and how far a fill reaches: the longer stretch past the range.
+  const fillPlan = (to) => {
+    if (!to) return null
+    const down = to.row - range.r2
+    const up = range.r1 - to.row
+    const right = to.col - range.c2
+    const left = range.c1 - to.col
+    const best = Math.max(down, up, right, left)
+    if (best <= 0) return null
+    if (best === down) return { dir: 'down', n: down }
+    if (best === up) return { dir: 'up', n: up }
+    if (best === right) return { dir: 'right', n: right }
+    return { dir: 'left', n: left }
+  }
   useEffect(() => {
-    const up = () => { dragging.current = false }
+    const up = () => {
+      dragging.current = false
+      if (filling.current) {
+        filling.current = false
+        setFillTo((to) => {
+          const plan = fillPlan(to)
+          if (plan && onFill) onFill(plan.dir, plan.n)
+          return null
+        })
+      }
+    }
     window.addEventListener('mouseup', up)
     return () => window.removeEventListener('mouseup', up)
-  }, [])
+  })
 
   // Copy, cut and paste while the grid (not an input) has focus.
   useEffect(() => {
@@ -209,7 +236,7 @@ export const Grid = forwardRef(function Grid (props, ref) {
                 data-r={r}
                 data-c={c}
                 onMouseDown={(e) => { dragging.current = true; onSelect(r, c, e.shiftKey) }}
-                onMouseEnter={() => { if (dragging.current) onSelect(r, c, true) }}
+                onMouseEnter={() => { if (filling.current) setFillTo({ row: r, col: c }); else if (dragging.current) onSelect(r, c, true) }}
                 onDoubleClick={() => onEdit(r, c)}
                 onContextMenu={(e) => { e.preventDefault(); onCellMenu(r, c, e.clientX, e.clientY) }}
                 // Touch screens: tapping the cell that is already selected edits it.
@@ -236,6 +263,30 @@ export const Grid = forwardRef(function Grid (props, ref) {
             className='selection'
             style={{ top: (sel.row - 1) * ROW_H, left: colX[sel.col], width: widths[sel.col], height: ROW_H }}
           />
+          {/* Mouse: drag this square to fill (series or copies). */}
+          {onFill && (
+            <div
+              className='fill-handle'
+              title='Drag to fill'
+              style={{ top: range.r2 * ROW_H - 4, left: colX[Math.min(range.c2, view.cols) + 1] - 4 }}
+              onMouseDown={(e) => { e.preventDefault(); e.stopPropagation(); filling.current = true; setFillTo(null) }}
+            />
+          )}
+          {(() => {
+            const plan = fillPlan(fillTo)
+            if (!plan) return null
+            const box = { ...range }
+            if (plan.dir === 'down') box.r2 += plan.n
+            if (plan.dir === 'up') box.r1 -= plan.n
+            if (plan.dir === 'right') box.c2 += plan.n
+            if (plan.dir === 'left') box.c1 -= plan.n
+            return (
+              <div
+                className='fill-preview'
+                style={{ top: (box.r1 - 1) * ROW_H, left: colX[box.c1], width: colX[Math.min(box.c2, view.cols) + 1] - colX[box.c1], height: (box.r2 - box.r1 + 1) * ROW_H }}
+              />
+            )
+          })()}
           {/* Touch screens: drag this handle to grow the selection, since a
               finger dragging across the grid scrolls it. */}
           <div

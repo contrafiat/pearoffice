@@ -175,6 +175,42 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
     result.findSort = true
     step('find and sort')
 
+    // Fill: 1 and 2 in J1:J2, drag the fill handle to J5 for 3, 4, 5; Ctrl+D
+    // copies a formula down with its reference shifted.
+    const center = async (sel) => js(`(() => { const r = (${sel}).getBoundingClientRect(); return [Math.round(r.left + r.width / 2), Math.round(r.top + r.height / 2)] })()`)
+    await sendMod('Home', ['control'])
+    for (let i = 0; i < 9; i++) await key('Right')
+    await enter('1', 'Enter')
+    await enter('2', 'Enter')
+    await key('Up'); await key('Up')
+    await sendMod('Down', ['shift'])
+    await waitFor('fill handle', "!!document.querySelector('.fill-handle')")
+    const [hx, hy] = await center("document.querySelector('.fill-handle')")
+    const [tx, ty] = await center(cellNode(5, 10))
+    wc.sendInputEvent({ type: 'mouseDown', x: hx, y: hy, button: 'left', clickCount: 1 })
+    for (let i = 1; i <= 6; i++) { wc.sendInputEvent({ type: 'mouseMove', x: hx + Math.round((tx - hx) * i / 6), y: hy + Math.round((ty - hy) * i / 6), button: 'left' }); await sleep(40) }
+    wc.sendInputEvent({ type: 'mouseUp', x: tx, y: ty, button: 'left', clickCount: 1 })
+    await waitFor('filled series', cellNode(3, 10) + ".textContent === '3' && " + cellNode(5, 10) + ".textContent === '5'")
+    await js("document.querySelector('.grid .body').focus()")
+    await sendMod('Home', ['control'])
+    for (let i = 0; i < 10; i++) await key('Right')
+    await enter('=J1*10', 'Enter', '10')
+    await key('Up')
+    await sendMod('Down', ['shift']); await sendMod('Down', ['shift'])
+    await sendMod('D', ['control'])
+    await waitFor('ctrl+d', cellNode(3, 11) + ".textContent === '30'")
+    // Clear J1:K5 and go back to B4.
+    await sendMod('Home', ['control'])
+    for (let i = 0; i < 9; i++) await key('Right')
+    await sendMod('Right', ['shift'])
+    for (let i = 0; i < 4; i++) await sendMod('Down', ['shift'])
+    await key('Delete')
+    await waitFor('fill cleared', cellNode(5, 10) + ".textContent === '' && " + cellNode(1, 11) + ".textContent === ''")
+    await sendMod('Home', ['control'])
+    await key('Right'); for (let i = 0; i < 3; i++) await key('Down')
+    result.fill = true
+    step('fill handle and Ctrl+D')
+
     // Ranges, copy and paste: select B1:B3, copy, paste into C1. The formula
     // moves with it, as in Excel.
     for (let i = 0; i < 3; i++) await key('Up')
@@ -425,7 +461,7 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
       fs.writeFileSync(shot, image.toPNG())
       step('screenshot', shot)
     }
-    result.ok = result.keepOnline && result.avatar && result.spill && result.quickWins && result.findSort && result.csvPdf && result.tabs && result.suggested === 'SUBSTITUTE,SUBTOTAL,SUM' && result.argHelp === 'number1' && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.importedFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000 && result.pastedFormula === '=SUM(C1:C2)' && result.inviteLink === 'pearsheet://join?s=' + result.inviteLink.slice(19) && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
+    result.ok = result.keepOnline && result.avatar && result.spill && result.quickWins && result.findSort && result.fill && result.csvPdf && result.tabs && result.suggested === 'SUBSTITUTE,SUBTOTAL,SUM' && result.argHelp === 'number1' && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.importedFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000 && result.pastedFormula === '=SUM(C1:C2)' && result.inviteLink === 'pearsheet://join?s=' + result.inviteLink.slice(19) && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
   } catch (err) {
     result.error = err.message
     // What the page showed, to tell a UI failure from a load failure.
