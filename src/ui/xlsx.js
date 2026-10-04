@@ -2,7 +2,8 @@
 // build, vendored in vendor/). The conversion itself is in src/shared/xlsxMap.js.
 // On phones the shell does the file handling (share sheet, file picker).
 import * as XLSX from 'xlsx/dist/xlsx.mini.min.js'
-import { workbookToTabs, dumpToWorkbook, READ_OPTIONS } from '../shared/xlsxMap.js'
+import * as fflate from 'fflate'
+import { workbookToTabs, workbookBytes, READ_OPTIONS } from '../shared/xlsxMap.js'
 import { call } from './bridge.js'
 
 const MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -29,12 +30,13 @@ export async function pickAndImport () {
 
 export async function exportSheet (sheetId) {
   const dump = await call('sheet:dump', { sheetId })
-  const wb = dumpToWorkbook(XLSX, dump)
+  const bytes = workbookBytes(XLSX, fflate, dump)
   const name = (dump.title || 'PearSheet').replace(/[\\/:*?"<>|]/g, ' ') + '.xlsx'
   if (isMobile()) {
-    return call('app:shareFile', { name, mime: MIME, base64: XLSX.write(wb, { type: 'base64', bookType: 'xlsx' }) })
+    let bin = ''
+    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000))
+    return call('app:shareFile', { name, mime: MIME, base64: btoa(bin) })
   }
-  const bytes = XLSX.write(wb, { type: 'array', bookType: 'xlsx' })
   const a = document.createElement('a')
   a.href = URL.createObjectURL(new Blob([bytes], { type: MIME }))
   a.download = name
@@ -94,7 +96,7 @@ const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replac
 
 // A tab as a printable HTML page: the used block with widths, bold, italic
 // and colours.
-export function tabHtml (view) {
+export function tabHtml (view, chartSvgs = []) {
   const { rows, cols, at } = usedBlock(view)
   const tab = (view.tabs.find((t) => t.id === view.tabId) || {}).name
   const width = (c) => (view.widths && view.widths[c]) || 100
@@ -120,13 +122,15 @@ export function tabHtml (view) {
     'body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:11px;margin:0}' +
     'h1{font-size:14px;margin:0 0 8px}table{border-collapse:collapse;table-layout:fixed}' +
     'td{border:1px solid #ccc;padding:2px 4px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}' +
+    '.chart{margin-top:16px;break-inside:avoid;page-break-inside:avoid}.chart svg{max-width:100%;height:auto}' +
     '</style></head><body><h1>' + esc(view.title) + (view.tabs.length > 1 ? ' - ' + esc(tab) : '') + '</h1>' +
-    '<table><colgroup>' + colgroup + '</colgroup>' + body + '</table></body></html>'
+    '<table><colgroup>' + colgroup + '</colgroup>' + body + '</table>' +
+    chartSvgs.map((svg) => '<div class="chart">' + svg + '</div>').join('') + '</body></html>'
 }
 
 // Desktop only: save the tab as a PDF, or open the print dialog.
-export function printTab (view, how) {
+export function printTab (view, how, chartSvgs = []) {
   const tab = (view.tabs.find((t) => t.id === view.tabId) || {}).name
   const name = fileName(view.title + (view.tabs.length > 1 ? ' - ' + tab : '')) + '.pdf'
-  return call(how === 'pdf' ? 'app:savePdf' : 'app:print', { html: tabHtml(view), name })
+  return call(how === 'pdf' ? 'app:savePdf' : 'app:print', { html: tabHtml(view, chartSvgs), name })
 }

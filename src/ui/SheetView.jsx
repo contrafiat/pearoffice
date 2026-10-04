@@ -9,7 +9,7 @@ import { PeopleStack } from './Avatar.jsx'
 import { FindPanel } from './FindPanel.jsx'
 import { SortPanel } from './SortPanel.jsx'
 import { ChartPanel } from './ChartPanel.jsx'
-import { ChartView, downloadChart } from './Chart.jsx'
+import { ChartView, downloadChart, chartSvg } from './Chart.jsx'
 import { guessChart } from '../shared/charts.js'
 import { readPref, writePref } from './prefs.js'
 import { ArrowCounterClockwise, ArrowClockwise, TextB, TextItalic, TextAUnderline, PaintBucket, Copy, Scissors, ClipboardText, Eraser, Numpad, FileXls, DotsThree, Plus, MagnifyingGlass, X, ChartBar, PencilSimple, DownloadSimple, Trash } from '@phosphor-icons/react'
@@ -385,6 +385,10 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
     if (r) { setSelectedChart(r.chartId); setEditingChart(r.chartId) }
   }
 
+  // The tab's charts as SVG for PDF and print, in light colours on white.
+  const PAPER = { ink: '#1f2420', muted: '#6b716b', line: '#e2e3dd', lineStrong: '#c9cbc2', panel: '#ffffff' }
+  const printCharts = () => (view.charts || []).map((c) => chartSvg(c, c.size.w, c.size.h, PAPER)).filter(Boolean)
+
   const chartActions = {
     canEdit,
     select: (id) => setSelectedChart(id),
@@ -691,8 +695,8 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
             <ul className='menu more-menu' role='menu' onClick={() => setMore(false)}>
               <li role='menuitem' onClick={() => setFinding({ replace: canEdit })}>Find and replace</li>
               <li role='menuitem' onClick={() => exportCsv(view).catch((err) => onError(err.message))}>Download this tab as CSV</li>
-              {!phone && <li role='menuitem' onClick={() => printTab(view, 'pdf').catch((err) => onError(err.message))}>Save this tab as PDF</li>}
-              {!phone && <li role='menuitem' onClick={() => printTab(view, 'print').catch((err) => onError(err.message))}>Print this tab...</li>}
+              {!phone && <li role='menuitem' onClick={() => printTab(view, 'pdf', printCharts()).catch((err) => onError(err.message))}>Save this tab as PDF</li>}
+              {!phone && <li role='menuitem' onClick={() => printTab(view, 'print', printCharts()).catch((err) => onError(err.message))}>Print this tab...</li>}
               {canEdit && <li role='menuitem' onClick={openSort}>Sort...</li>}
               {canEdit && phone && <li role='menuitem' onClick={() => fillSelection('down')}>Fill down</li>}
               {canEdit && phone && <li role='menuitem' onClick={() => fillSelection('right')}>Fill right</li>}
