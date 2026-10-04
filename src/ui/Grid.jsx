@@ -120,6 +120,16 @@ export const Grid = forwardRef(function Grid (props, ref) {
     return lo
   }
   const span = (r1, r2) => rowY[Math.min(r2, view.rows) + 1] - rowY[r1]
+  // Merged cells: the top-left draws the whole block; the rest draw nothing.
+  const merged = useMemo(() => {
+    const top = new Map()
+    const hidden = new Set()
+    for (const m of view.merges || []) {
+      top.set(m.r1 + ',' + m.c1, m)
+      for (let r = m.r1; r <= m.r2; r++) for (let c = m.c1; c <= m.c2; c++) if (r !== m.r1 || c !== m.c1) hidden.add(r + ',' + c)
+    }
+    return { top, hidden }
+  }, [view.merges])
 
   const totalW = colX[view.cols + 1]
   const totalH = rowY[view.rows + 1]
@@ -275,7 +285,9 @@ export const Grid = forwardRef(function Grid (props, ref) {
       </div>
       <div className='body' ref={bodyRef} tabIndex={0} onScroll={onScroll} onKeyDown={onKeyDown} onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} aria-label='Spreadsheet' role='grid'>
         <div className='canvas' style={{ width: totalW, height: totalH }}>
-          {rows.map((r) => cols.map((c) => {
+          {[...(view.merges || []).filter((m) => (m.r1 < firstRow || m.c1 < firstCol) && m.r2 >= firstRow && m.c2 >= firstCol && m.r1 <= lastRow && m.c1 <= lastCol).map((m) => [m.r1, m.c1]), ...rows.flatMap((r) => cols.map((c) => [r, c]))].map(([r, c]) => {
+            if (merged.hidden.has(r + ',' + c)) return null
+            const m = merged.top.get(r + ',' + c)
             const cell = cells.get(r + ',' + c)
             const fmt = (cell && cell.fmt) || {}
             const cls = 'cell' + (cell ? ' k-' + cell.kind : '') + (fmt.b ? ' b' : '') + (fmt.i ? ' i' : '') + (fmt.wrap ? ' wrap' : '') + (fmt.valign ? ' v-' + fmt.valign : '')
@@ -283,7 +295,7 @@ export const Grid = forwardRef(function Grid (props, ref) {
               <div
                 key={r + ',' + c}
                 className={cls}
-                style={{ top: rowY[r], height: rowH[r], left: colX[c], width: widths[c], color: fmt.color, background: fmt.fill }}
+                style={{ top: rowY[r], height: m ? span(m.r1, m.r2) : rowH[r], left: colX[c], width: m ? colX[Math.min(m.c2, view.cols) + 1] - colX[c] : widths[c], color: fmt.color, background: fmt.fill }}
                 data-r={r}
                 data-c={c}
                 onMouseDown={(e) => { dragging.current = true; onSelect(r, c, e.shiftKey) }}
@@ -298,7 +310,7 @@ export const Grid = forwardRef(function Grid (props, ref) {
                 {hasBorder(fmt) && <span className='cell-borders' style={{ borderTop: borderCss(fmt.bt), borderRight: borderCss(fmt.br), borderBottom: borderCss(fmt.bb), borderLeft: borderCss(fmt.bl) }} />}
               </div>
             )
-          }))}
+          })}
           {(range.r1 !== range.r2 || range.c1 !== range.c2) && (
             <div
               className='range'
@@ -313,7 +325,12 @@ export const Grid = forwardRef(function Grid (props, ref) {
           )}
           <div
             className='selection'
-            style={{ top: rowY[sel.row], left: colX[sel.col], width: widths[sel.col], height: rowH[sel.row] }}
+            style={(() => {
+              const m = merged.top.get(sel.row + ',' + sel.col)
+              return m
+                ? { top: rowY[sel.row], left: colX[sel.col], width: colX[Math.min(m.c2, view.cols) + 1] - colX[sel.col], height: span(m.r1, m.r2), zIndex: 2 }
+                : { top: rowY[sel.row], left: colX[sel.col], width: widths[sel.col], height: rowH[sel.row], zIndex: 2 }
+            })()}
           />
           {charts.map((ch) => (
             <ChartFrame

@@ -555,6 +555,77 @@ function setBorders (doc, tabId, r1, c1, r2, c2, preset, line = 'thin') {
   })
 }
 
+// --- merged cells (proposals/2026-10-04-cell-formats.md) ------------------
+// The root map merges:<tabId>: the top-left cell's ids -> { toRow, toCol },
+// the bottom-right cell's ids, so a merge follows inserted and deleted rows.
+
+function mergesMap (doc, tabId) {
+  return doc.getMap('merges:' + tabId)
+}
+
+// The merges in force on a tab, as { r1, c1, r2, c2 }: those whose corners
+// still exist, and where two overlap, the one whose top-left comes first in
+// reading order. The same on every device.
+function getMerges (doc, tabId) {
+  const t = tabMap(doc, tabId)
+  const rowAt = new Map(t.get('rows').toArray().map((id, i) => [id, i + 1]))
+  const colAt = new Map(t.get('cols').toArray().map((id, i) => [id, i + 1]))
+  const all = []
+  for (const [key, to] of mergesMap(doc, tabId).entries()) {
+    const [rowId, colId] = key.split(':')
+    const m = { r1: rowAt.get(rowId), c1: colAt.get(colId), r2: rowAt.get(to && to.toRow), c2: colAt.get(to && to.toCol) }
+    if (!m.r1 || !m.c1 || !m.r2 || !m.c2 || m.r2 < m.r1 || m.c2 < m.c1 || (m.r1 === m.r2 && m.c1 === m.c2)) continue
+    all.push(m)
+  }
+  all.sort((a, b) => a.r1 - b.r1 || a.c1 - b.c1)
+  const kept = []
+  for (const m of all) {
+    if (kept.some((k) => m.r1 <= k.r2 && m.r2 >= k.r1 && m.c1 <= k.c2 && m.c2 >= k.c1)) continue
+    kept.push(m)
+  }
+  return kept
+}
+
+// Merge a range: keeps the top-left cell's contents and clears the rest, and
+// replaces any merge inside it.
+function mergeCells (doc, tabId, r1, c1, r2, c2) {
+  if (r1 === r2 && c1 === c2) return null
+  return capture(doc, () => {
+    const t = tabMap(doc, tabId)
+    const rows = t.get('rows')
+    const cols = t.get('cols')
+    const cells = t.get('cells')
+    const map = mergesMap(doc, tabId)
+    for (const m of getMerges(doc, tabId)) {
+      if (m.r1 <= r2 && m.r2 >= r1 && m.c1 <= c2 && m.c2 >= c1) map.delete(cellKey(rows.get(m.r1 - 1), cols.get(m.c1 - 1)))
+    }
+    for (let r = r1; r <= r2; r++) {
+      for (let c = c1; c <= c2; c++) {
+        if (r === r1 && c === c1) continue
+        const key = cellKey(rows.get(r - 1), cols.get(c - 1))
+        if (cells.has(key)) cells.delete(key)
+      }
+    }
+    map.set(cellKey(rows.get(r1 - 1), cols.get(c1 - 1)), { toRow: rows.get(r2 - 1), toCol: cols.get(c2 - 1) })
+  })
+}
+
+// Unmerge every merge that touches a range.
+function unmergeCells (doc, tabId, r1, c1, r2, c2) {
+  return capture(doc, () => {
+    const t = tabMap(doc, tabId)
+    const map = mergesMap(doc, tabId)
+    for (const [key, to] of [...map.entries()]) {
+      const [rowId, colId] = key.split(':')
+      const rows = t.get('rows').toArray()
+      const cols = t.get('cols').toArray()
+      const m = { r1: rows.indexOf(rowId) + 1, c1: cols.indexOf(colId) + 1, r2: rows.indexOf(to.toRow) + 1, c2: cols.indexOf(to.toCol) + 1 }
+      if (!m.r1 || !m.c1 || !m.r2 || !m.c2) { map.delete(key); continue }
+      if (m.r1 <= r2 && m.r2 >= r1 && m.c1 <= c2 && m.c2 >= c1) map.delete(key)
+    }
+  })
+}
+
 // Row heights (pixels at 100%), in the root map heights:<tabId> by row id.
 // A row without one is the default height, or taller to fit wrapped or
 // larger text on each device.
@@ -603,6 +674,12 @@ function importTabs (doc, payload) {
           const { rowId, colId } = idsAt(doc, id, row, col)
           t.get('fmt').set(cellKey(rowId, colId) + ':num', num)
         }
+      }
+      for (const [r1, c1, r2, c2] of tab.merges || []) {
+        ctx.extend(id, r2, c2)
+        const rows = t.get('rows')
+        const cols = t.get('cols')
+        mergesMap(doc, id).set(cellKey(rows.get(r1 - 1), cols.get(c1 - 1)), { toRow: rows.get(r2 - 1), toCol: cols.get(c2 - 1) })
       }
       for (const [col, px] of Object.entries(tab.widths || {})) {
         const colId = t.get('cols').get(Number(col) - 1)
@@ -723,6 +800,9 @@ module.exports = {
   deleteCols,
   setWidth,
   setBorders,
+  getMerges,
+  mergeCells,
+  unmergeCells,
   setHeight,
   getHeights,
   importTabs,

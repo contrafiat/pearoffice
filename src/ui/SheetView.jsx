@@ -13,7 +13,7 @@ import { ChartPanel } from './ChartPanel.jsx'
 import { ChartView, downloadChart, chartSvg } from './Chart.jsx'
 import { guessChart } from '../shared/charts.js'
 import { readPref, writePref } from './prefs.js'
-import { ArrowCounterClockwise, ArrowClockwise, TextB, TextItalic, TextAUnderline, PaintBucket, Copy, Scissors, ClipboardText, Eraser, Numpad, FileXls, DotsThree, Plus, MagnifyingGlass, X, ChartBar, PencilSimple, DownloadSimple, Trash, TextUnderline, TextStrikethrough, TextAlignLeft, TextAlignCenter, TextAlignRight, ArrowUDownLeft, FrameCorners, AlignTop, AlignCenterVertical, AlignBottom } from '@phosphor-icons/react'
+import { ArrowCounterClockwise, ArrowClockwise, TextB, TextItalic, TextAUnderline, PaintBucket, Copy, Scissors, ClipboardText, Eraser, Numpad, FileXls, DotsThree, Plus, MagnifyingGlass, X, ChartBar, PencilSimple, DownloadSimple, Trash, TextUnderline, TextStrikethrough, TextAlignLeft, TextAlignCenter, TextAlignRight, ArrowUDownLeft, FrameCorners, AlignTop, AlignCenterVertical, AlignBottom, ArrowsOutLineHorizontal } from '@phosphor-icons/react'
 import { DeletePanel } from './DeletePanel.jsx'
 import { FormulaHelp, helpFor, insertFunction } from './FormulaHelp.jsx'
 import { exportSheet, exportCsv, printTab, isMobile } from './xlsx.js'
@@ -61,6 +61,7 @@ const NUMBER_FORMATS = [
 function spillReason (b) {
   const at = (rc) => colName(rc[1]) + rc[0]
   if (b.kind === 'cells') return 'This answer needs cells that are not empty: ' + b.cells.map(at).join(', ') + (b.more ? ' and ' + b.more + ' more' : '') + '. Clear them to let it fill in.'
+  if (b.kind === 'merge') return 'Merged cells at ' + at(b.at) + ' are in the way. Unmerge them to let it fill in.'
   if (b.kind === 'overlap') return 'The answer of the formula in ' + at(b.anchor) + ' already fills some of the cells this answer needs.'
   if (b.kind === 'edge') return 'The answer does not fit on this tab.'
   if (b.kind === 'size') return 'The answer is larger than 100,000 cells.'
@@ -135,6 +136,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
   const [finding, setFinding] = useState(null) // { replace } while Find is open
   const [sorting, setSorting] = useState(null) // what the Sort panel sorts
   const [droppingTab, setDroppingTab] = useState(null) // a tab waiting for "Delete"
+  const [confirmMerge, setConfirmMerge] = useState(null) // a range whose merge would clear cells
   const [selectedChart, setSelectedChart] = useState(null) // chart id (desktop)
   const [editingChart, setEditingChart] = useState(null) // chart id in the editor
   const [viewingChart, setViewingChart] = useState(null) // chart id full screen (phones)
@@ -221,22 +223,41 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
     focusGrid()
   }
 
-  const range = {
-    r1: Math.min(sel.row, ext.row),
-    c1: Math.min(sel.col, ext.col),
-    r2: Math.max(sel.row, ext.row),
-    c2: Math.max(sel.col, ext.col)
-  }
+  // Merged cells (proposals/2026-10-04-cell-formats.md).
+  const merges = (view && view.merges) || []
+  const mergeAt = (row, col) => merges.find((m) => row >= m.r1 && row <= m.r2 && col >= m.c1 && col <= m.c2)
+  // The selection, grown to cover every merge it touches.
+  const range = (() => {
+    const box = { r1: Math.min(sel.row, ext.row), c1: Math.min(sel.col, ext.col), r2: Math.max(sel.row, ext.row), c2: Math.max(sel.col, ext.col) }
+    for (let grew = true; grew;) {
+      grew = false
+      for (const m of merges) {
+        if (m.r1 > box.r2 || m.r2 < box.r1 || m.c1 > box.c2 || m.c2 < box.c1) continue
+        if (m.r1 < box.r1) { box.r1 = m.r1; grew = true }
+        if (m.c1 < box.c1) { box.c1 = m.c1; grew = true }
+        if (m.r2 > box.r2) { box.r2 = m.r2; grew = true }
+        if (m.c2 > box.c2) { box.c2 = m.c2; grew = true }
+      }
+    }
+    return box
+  })()
+  const mergeSelected = merges.find((m) => m.r1 === range.r1 && m.c1 === range.c1 && m.r2 === range.r2 && m.c2 === range.c2)
 
   // Select a cell; with extend, move the far corner of the range instead.
   function select (row, col, extend = false) {
+    // Into a merge: select it from its top-left cell.
+    const m = !extend && mergeAt(row, col)
+    if (m) { setSel({ row: m.r1, col: m.c1 }); setExt({ row: m.r1, col: m.c1 }); return }
     if (!extend) setSel({ row, col })
     setExt({ row, col })
   }
 
   function moveBy (dr, dc, extend = false) {
     if (!view) return
-    const from = extend ? ext : sel
+    let from = extend ? ext : sel
+    // Out of a merge: step from its far edge.
+    const m = mergeAt(from.row, from.col)
+    if (m) from = { row: dr > 0 ? m.r2 : dr < 0 ? m.r1 : from.row, col: dc > 0 ? m.c2 : dc < 0 ? m.c1 : from.col }
     const row = Math.max(1, Math.min(view.rows, from.row + dr))
     const col = Math.max(1, Math.min(view.cols, from.col + dc))
     select(row, col, extend)
@@ -432,6 +453,10 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
   }
 
   async function sortBy (box, keys, header) {
+    if (merges.some((m) => m.r1 <= box.r2 && m.r2 >= box.r1 && m.c1 <= box.c2 && m.c2 >= box.c1)) {
+      onError('Sorting cannot move merged cells. Unmerge them first.')
+      return
+    }
     await run('sheet:sortRange', { ...box, keys, header })
     setSel({ row: box.r1, col: box.c1 })
     setExt({ row: box.r2, col: box.c2 })
@@ -709,6 +734,19 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
               </span>
             )}
           </span>
+          <button
+            title={mergeSelected ? 'Unmerge cells' : 'Merge cells'}
+            aria-label={mergeSelected ? 'Unmerge cells' : 'Merge cells'}
+            className={mergeSelected ? 'on' : ''}
+            disabled={!mergeSelected && range.r1 === range.r2 && range.c1 === range.c2}
+            onClick={() => {
+              if (mergeSelected) { run('sheet:unmerge', range); return }
+              const lost = view.cells.some((x) => x.input && !(x.row === range.r1 && x.col === range.c1) && x.row >= range.r1 && x.row <= range.r2 && x.col >= range.c1 && x.col <= range.c2)
+              if (lost) setConfirmMerge({ ...range })
+              else run('sheet:merge', range)
+            }}
+          ><ArrowsOutLineHorizontal size={ICON} />
+          </button>
           <button title='Insert a chart of the selection' aria-label='Insert chart' className='insert-chart' onClick={() => insertChart().catch((err) => onError(err.message))}><ChartBar size={ICON} /></button>
           {phone && (
             <>
@@ -827,6 +865,21 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
         onRowResize={(row, px) => { if (canEdit) run('sheet:setHeight', { row, px }) }}
       />
 
+      {confirmMerge && (
+        <div className='panel-backdrop' onMouseDown={(e) => { if (e.target === e.currentTarget) setConfirmMerge(null) }}>
+          <section className='panel' role='dialog' aria-label='Merge cells'>
+            <header>
+              <h2>Merge cells?</h2>
+              <button className='close' aria-label='Close' onClick={() => setConfirmMerge(null)}><X size={18} /></button>
+            </header>
+            <p>Merging keeps only the top-left cell's contents. The other cells in {colName(confirmMerge.c1) + confirmMerge.r1}:{colName(confirmMerge.c2) + confirmMerge.r2} will be cleared. Undo brings them back.</p>
+            <div className='row end'>
+              <button onClick={() => setConfirmMerge(null)}>Cancel</button>
+              <button className='primary' onClick={() => { const r = confirmMerge; setConfirmMerge(null); run('sheet:merge', r) }}>Merge</button>
+            </div>
+          </section>
+        </div>
+      )}
       {droppingTab && (
         <div className='panel-backdrop' onMouseDown={(e) => { if (e.target === e.currentTarget) setDroppingTab(null) }}>
           <section className='panel' role='dialog' aria-label='Delete tab'>

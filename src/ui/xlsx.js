@@ -101,13 +101,22 @@ export function tabHtml (view, chartSvgs = []) {
   const { rows, cols, at } = usedBlock(view)
   const tab = (view.tabs.find((t) => t.id === view.tabId) || {}).name
   const width = (c) => (view.widths && view.widths[c]) || 100
+  // Merged cells: one table cell spanning the block; the cells it covers are left out.
+  const spans = new Map()
+  const covered = new Set()
+  for (const m of view.merges || []) {
+    spans.set(m.r1 + ',' + m.c1, m)
+    for (let r = m.r1; r <= m.r2; r++) for (let c = m.c1; c <= m.c2; c++) if (r !== m.r1 || c !== m.c1) covered.add(r + ',' + c)
+  }
   let body = ''
   for (let r = 1; r <= rows; r++) {
     const rh = view.heights && view.heights[r]
     body += rh ? '<tr style="height:' + Math.round(rh * 11 / 14) + 'px">' : '<tr>'
     for (let c = 1; c <= cols; c++) {
+      if (covered.has(r + ',' + c)) continue
       const x = at.get(r + ',' + c)
       const f = (x && x.fmt) || {}
+      const m = spans.get(r + ',' + c)
       const style = [
         f.align ? 'text-align:' + f.align : x && (x.kind === 'number' || x.kind === 'bool') ? 'text-align:right' : '',
         'vertical-align:' + (f.valign || 'bottom'),
@@ -124,7 +133,8 @@ export function tabHtml (view, chartSvgs = []) {
         f.bb ? 'border-bottom:' + borderCss(f.bb) : '',
         f.bl ? 'border-left:' + borderCss(f.bl) : ''
       ].filter(Boolean).join(';')
-      body += '<td' + (style ? ' style="' + style + '"' : '') + '>' + esc(x ? x.display : '') + '</td>'
+      const spanAttrs = m ? (m.c2 > m.c1 ? ' colspan="' + (Math.min(m.c2, cols) - m.c1 + 1) + '"' : '') + (m.r2 > m.r1 ? ' rowspan="' + (Math.min(m.r2, rows) - m.r1 + 1) + '"' : '') : ''
+      body += '<td' + spanAttrs + (style ? ' style="' + style + '"' : '') + '>' + esc(x ? x.display : '') + '</td>'
     }
     body += '</tr>'
   }
