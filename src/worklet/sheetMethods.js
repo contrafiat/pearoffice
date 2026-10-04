@@ -237,7 +237,7 @@ function createSheetMethods (sheets, { getJoin, getMoves, getProfiles }) {
         const widths = {}
         for (const [colId, px] of t.get('widths').entries()) if (colIndex.has(colId)) widths[colIndex.get(colId)] = px
         const tabCharts = model.getCharts(doc, id).map((c) => ({ ...c, resolved: resolveChart(doc, id, c, values) }))
-        return { name: t.get('name'), cells, widths, heights: model.getHeights(doc, id), merges: model.getMerges(doc, id), charts: tabCharts }
+        return { name: t.get('name'), cells, widths, heights: model.getHeights(doc, id), merges: model.getMerges(doc, id), freeze: model.getFreeze(doc, id), charts: tabCharts }
       })
       return { title: model.title(doc), tabs }
     },
@@ -316,6 +316,7 @@ function createSheetMethods (sheets, { getJoin, getMoves, getProfiles }) {
         canRedo: !!(e.undo && e.undo.canRedo()),
         heights: model.getHeights(doc, tab),
         merges: model.getMerges(doc, tab),
+        freeze: model.getFreeze(doc, tab),
         charts: model.getCharts(doc, tab).map((c) => ({ ...c, resolved: resolveChart(doc, tab, c, sheets.values(e)) }))
       }
     },
@@ -336,6 +337,7 @@ function createSheetMethods (sheets, { getJoin, getMoves, getProfiles }) {
     'sheet:setTitle': mutate((doc, tab, a) => model.setTitle(doc, String(a.title))),
     'sheet:setWidth': mutate((doc, tab, a) => model.setWidth(doc, tab, a.col, a.px)),
     'sheet:setHeight': mutate((doc, tab, a) => model.setHeight(doc, tab, a.row, a.px === null ? null : a.px)),
+    'sheet:setFreeze': mutate((doc, tab, a) => model.setFreeze(doc, tab, Math.max(0, a.rows | 0), Math.max(0, a.cols | 0))),
     'sheet:merge': mutate((doc, tab, a) => model.mergeCells(doc, tab, a.r1, a.c1, a.r2, a.c2)),
     'sheet:unmerge': mutate((doc, tab, a) => model.unmergeCells(doc, tab, a.r1, a.c1, a.r2, a.c2)),
     'sheet:setBorders': mutate((doc, tab, a) => model.setBorders(doc, tab, a.r1, a.c1, a.r2, a.c2, a.preset, a.line)),

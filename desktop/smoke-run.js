@@ -312,7 +312,20 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
     await js("document.querySelector('.grid .body').focus()")
     await sendMod('Home', ['control'])
     await key('Right'); for (let i = 0; i < 3; i++) await key('Down')
-    result.formats = true
+    // Freeze the top row from the More menu: it stays at the top while the
+    // grid scrolls; then unfreeze.
+    await js("document.querySelector('.toolbar .more-button').click()")
+    await js("[...document.querySelectorAll('.more-menu li')].find((l) => l.textContent === 'Freeze top row').click()")
+    await waitFor('frozen', "!!document.querySelector('.frozen-top')")
+    await js("document.querySelector('.grid .body').scrollTop = 400")
+    await sleep(300)
+    result.frozenStays = await js("(() => { const b = document.querySelector('.grid .body').getBoundingClientRect(); const c = document.querySelector('.frozen-top .cell[data-r=\"1\"][data-c=\"1\"]'); return !!c && Math.abs(c.getBoundingClientRect().top - b.top) < 2 && c.textContent === 'Rent' })()")
+    await js("document.querySelector('.toolbar .more-button').click()")
+    await js("[...document.querySelectorAll('.more-menu li')].find((l) => l.textContent === 'Unfreeze').click()")
+    await waitFor('unfrozen', "!document.querySelector('.frozen-top')")
+    await js("document.querySelector('.grid .body').scrollTop = 0")
+    await js("document.querySelector('.grid .body').focus()")
+    result.formats = result.frozenStays === true
     step('cell formats and row heights')
 
     // Ranges, copy and paste: select B1:B3, copy, paste into C1. The formula

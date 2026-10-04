@@ -2,6 +2,17 @@
 
 Append-only, newest on top. Per Constitution §4.
 
+## 2026-10-04 - Freeze panes shared, filters each person's own
+Tier: T2 (freeze); T1 (filters)
+Context: proposals/2026-10-04-freeze-filter.md.
+Choice: frozen rows and columns are stored per tab in `view:<tabId>` as the
+last frozen row and column ids, seen by everyone and written to .xlsx.
+Filters stay on the device that set them and hide rows only there.
+Alternatives: shared filters as in Excel (rejected - one person filtering
+would hide rows from others mid-edit); per-person freeze (rejected - the
+header is part of the sheet's layout).
+Consequences: .xlsx exports carry no filter.
+
 ## 2026-10-04 - More cell formats, merged cells, row heights
 Tier: T2
 Context: the everyday formatting gaps against Calc

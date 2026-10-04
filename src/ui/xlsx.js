@@ -3,15 +3,17 @@
 // On phones the shell does the file handling (share sheet, file picker).
 import * as XLSX from 'xlsx/dist/xlsx.mini.min.js'
 import * as fflate from 'fflate'
-import { workbookToTabs, workbookBytes, READ_OPTIONS } from '../shared/xlsxMap.js'
+import { workbookToTabs, workbookBytes, freezeFromXlsx, READ_OPTIONS } from '../shared/xlsxMap.js'
 import { call } from './bridge.js'
 import { borderCss, fontPx, FONTS } from './cellStyle.js'
 
 const MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 export const isMobile = () => !!(window.pearsheet && window.pearsheet.platform === 'mobile')
 
-function importWorkbook (wb, name) {
+function importWorkbook (wb, name, bytes) {
   const { tabs } = workbookToTabs(XLSX, wb)
+  // Frozen panes come from the raw file (SheetJS does not report them).
+  if (bytes) freezeFromXlsx(bytes, fflate).forEach((f, i) => { if (f && tabs[i]) tabs[i].freeze = f })
   const title = String(name || '').replace(/\.[^.]+$/, '') || 'Imported sheet'
   return call('sheet:import', { title, tabs })
 }
@@ -19,14 +21,15 @@ function importWorkbook (wb, name) {
 // Desktop: a File from an <input type=file>.
 export async function importFile (file) {
   const data = new Uint8Array(await file.arrayBuffer())
-  return importWorkbook(XLSX.read(data, { type: 'array', ...READ_OPTIONS }), file.name)
+  return importWorkbook(XLSX.read(data, { type: 'array', ...READ_OPTIONS }), file.name, data)
 }
 
 // Phones: the shell's file picker. Resolves to null if cancelled.
 export async function pickAndImport () {
   const picked = await call('app:pickFile')
   if (!picked || picked.canceled) return null
-  return importWorkbook(XLSX.read(picked.base64, { type: 'base64', ...READ_OPTIONS }), picked.name)
+  const bytes = Uint8Array.from(atob(picked.base64), (ch) => ch.charCodeAt(0))
+  return importWorkbook(XLSX.read(bytes, { type: 'array', ...READ_OPTIONS }), picked.name, bytes)
 }
 
 export async function exportSheet (sheetId) {

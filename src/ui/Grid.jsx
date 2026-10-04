@@ -182,6 +182,15 @@ export const Grid = forwardRef(function Grid (props, ref) {
     setScroll((s) => ({ ...s, top: el.scrollTop, left: el.scrollLeft }))
   }
 
+  // Frozen rows and columns, unless they would fill more than half the view.
+  const wantRows = (view.freeze && view.freeze.rows) || 0
+  const wantCols = (view.freeze && view.freeze.cols) || 0
+  const fr = wantRows && rowY[wantRows + 1] <= scroll.height / 2 ? wantRows : 0
+  const fc = wantCols && colX[wantCols + 1] <= scroll.width / 2 ? wantCols : 0
+  const frozenH = fr ? rowY[fr + 1] : 0
+  const frozenW = fc ? colX[fc + 1] : 0
+  const inFrozen = (r, c) => r <= fr || c <= fc
+
   // Keep the moving corner of the selection in view.
   useEffect(() => {
     const el = bodyRef.current
@@ -189,10 +198,15 @@ export const Grid = forwardRef(function Grid (props, ref) {
     const y = rowY[ext.row]
     const x = colX[ext.col]
     const w = widths[ext.col]
-    if (y < el.scrollTop) el.scrollTop = y
-    else if (y + rowH[ext.row] > el.scrollTop + el.clientHeight) el.scrollTop = y + rowH[ext.row] - el.clientHeight
-    if (x < el.scrollLeft) el.scrollLeft = x
-    else if (x + w > el.scrollLeft + el.clientWidth) el.scrollLeft = x + w - el.clientWidth
+    // A frozen row or column is always in view; others must clear the frozen part.
+    if (ext.row > fr) {
+      if (y - frozenH < el.scrollTop) el.scrollTop = y - frozenH
+      else if (y + rowH[ext.row] > el.scrollTop + el.clientHeight) el.scrollTop = y + rowH[ext.row] - el.clientHeight
+    }
+    if (ext.col > fc) {
+      if (x - frozenW < el.scrollLeft) el.scrollLeft = x - frozenW
+      else if (x + w > el.scrollLeft + el.clientWidth) el.scrollLeft = x + w - el.clientWidth
+    }
     // Only when the selection moves: a pinch zoom must not snap back to it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ext.row, ext.col])
@@ -245,6 +259,126 @@ export const Grid = forwardRef(function Grid (props, ref) {
     window.addEventListener('mouseup', up)
   }
 
+  function colHead (c) {
+    return (
+      <div
+        key={c}
+        className={'col-head' + (c >= range.c1 && c <= range.c2 ? ' on' : '')}
+        style={{ left: colX[c], width: widths[c] }}
+        onClick={(e) => { if (e.shiftKey) onSelect(view.rows, c, true); else { onSelect(1, c); onSelect(view.rows, c, true) } }}
+        onContextMenu={(e) => { e.preventDefault(); onHeaderMenu('col', c, e.clientX, e.clientY) }}
+      >
+        {colName(c)}
+        <span className='resize' onMouseDown={(e) => startResize(e, c)} />
+      </div>
+    )
+  }
+
+  function rowHead (r) {
+    return (
+      <div
+        key={r}
+        className={'row-head' + (r >= range.r1 && r <= range.r2 ? ' on' : '')}
+        style={{ top: rowY[r], height: rowH[r] }}
+        onClick={(e) => { if (e.shiftKey) onSelect(r, view.cols, true); else { onSelect(r, 1); onSelect(r, view.cols, true) } }}
+        onContextMenu={(e) => { e.preventDefault(); onHeaderMenu('row', r, e.clientX, e.clientY) }}
+      >
+        {r}
+        <span className='row-resize' title='Drag to resize; double-click to fit' onMouseDown={(e) => startRowResize(e, r)} onDoubleClick={(e) => { e.stopPropagation(); onRowResize(r, null) }} onClick={(e) => e.stopPropagation()} />
+      </div>
+    )
+  }
+
+  // One cell (or the whole of a merge, from its top-left).
+  function cellAt (r, c) {
+        if (merged.hidden.has(r + ',' + c)) return null
+        const m = merged.top.get(r + ',' + c)
+        const cell = cells.get(r + ',' + c)
+        const fmt = (cell && cell.fmt) || {}
+        const cls = 'cell' + (cell ? ' k-' + cell.kind : '') + (fmt.b ? ' b' : '') + (fmt.i ? ' i' : '') + (fmt.wrap ? ' wrap' : '') + (fmt.valign ? ' v-' + fmt.valign : '')
+        return (
+          <div
+            key={r + ',' + c}
+            className={cls}
+            style={{ top: rowY[r], height: m ? span(m.r1, m.r2) : rowH[r], left: colX[c], width: m ? colX[Math.min(m.c2, view.cols) + 1] - colX[c] : widths[c], color: fmt.color, background: fmt.fill }}
+            data-r={r}
+            data-c={c}
+            onMouseDown={(e) => { dragging.current = true; onSelect(r, c, e.shiftKey) }}
+            onMouseEnter={() => { if (filling.current) setFillTo({ row: r, col: c }); else if (dragging.current) onSelect(r, c, true) }}
+            onDoubleClick={() => onEdit(r, c)}
+            onContextMenu={(e) => { e.preventDefault(); onCellMenu(r, c, e.clientX, e.clientY) }}
+            // Touch screens: tapping the cell that is already selected edits it.
+            onTouchEnd={(e) => { if (!pinched.current && e.touches.length === 0 && sel.row === r && sel.col === c) { e.preventDefault(); onEdit(r, c) } }}
+            title={cell && cell.volatile ? 'Changes on each device (time or random)' : cell && cell.blocked ? 'This answer cannot fill in. Select the cell to see why.' : undefined}
+          >
+            <span className='cell-text' style={textStyle(fmt, zoom)}>{cell ? cell.display : ''}</span>
+            {hasBorder(fmt) && <span className='cell-borders' style={{ borderTop: borderCss(fmt.bt), borderRight: borderCss(fmt.br), borderBottom: borderCss(fmt.bb), borderLeft: borderCss(fmt.bl) }} />}
+          </div>
+        )
+  }
+
+  function editorAt () {
+    return (
+      <input
+          className='editor'
+          autoFocus
+          aria-label='Edit cell'
+          inputMode={inputMode}
+          style={{ top: rowY[editing.row], left: colX[editing.col], minWidth: widths[editing.col], height: rowH[editing.row], ...textStyle((cells.get(editing.row + ',' + editing.col) || {}).fmt, zoom), textAlign: undefined }}
+          value={editing.value}
+          onChange={(e) => { onEditChange(e.target.value); onEditCaret(e.target.selectionStart) }}
+          onSelect={(e) => onEditCaret(e.target.selectionStart)}
+          onKeyDown={onEditKey}
+          onBlur={onEditBlur}
+        />
+    )
+  }
+
+  // Frozen rows and columns (proposals/2026-10-04-freeze-filter.md): sticky
+  // layers at the start of the canvas, drawn over the rest as it scrolls. A
+  // frozen part bigger than half the view is ignored on this device.
+  function frozenLayers () {
+    if (!fr && !fc) return null
+    const visCols = cols.filter((c) => c > fc)
+    const visRows = rows.filter((r) => r > fr)
+    const frozenRows = []
+    for (let r = 1; r <= fr; r++) frozenRows.push(r)
+    const frozenCols = []
+    for (let c = 1; c <= fc; c++) frozenCols.push(c)
+    const marks = (rr, cc) => {
+      const inPane = (r, c) => rr(r) && cc(c)
+      return (
+        <>
+          {(range.r1 !== range.r2 || range.c1 !== range.c2) && <div className='range' style={{ top: rowY[range.r1], left: colX[range.c1], width: colX[Math.min(range.c2, view.cols) + 1] - colX[range.c1], height: span(range.r1, range.r2) }} />}
+          {inPane(sel.row, sel.col) && <div className='selection' style={{ top: rowY[sel.row], left: colX[sel.col], width: widths[sel.col], height: rowH[sel.row], zIndex: 2 }} />}
+          {isEditingHere && inPane(editing.row, editing.col) && editorAt()}
+        </>
+      )
+    }
+    return (
+      <>
+        {fr > 0 && (
+          <div className='frozen frozen-top' style={{ height: frozenH, width: totalW, marginBottom: -frozenH }}>
+            {frozenRows.flatMap((r) => visCols.map((c) => cellAt(r, c)))}
+            {marks((r) => r <= fr, (c) => c > fc)}
+            {fc > 0 && (
+              <div className='frozen frozen-corner' style={{ width: frozenW, height: frozenH }}>
+                {frozenRows.flatMap((r) => frozenCols.map((c) => cellAt(r, c)))}
+                {marks((r) => r <= fr, (c) => c <= fc)}
+              </div>
+            )}
+          </div>
+        )}
+        {fc > 0 && (
+          <div className='frozen frozen-left' style={{ width: frozenW, height: totalH, marginBottom: -totalH }}>
+            {visRows.flatMap((r) => frozenCols.map((c) => cellAt(r, c)))}
+            {marks((r) => r > fr, (c) => c <= fc)}
+          </div>
+        )}
+      </>
+    )
+  }
+
   // The formula bar edits too; only draw the in-cell editor for grid edits.
   const isEditingHere = editing && editing.source !== 'bar' && editing.row >= firstRow && editing.row <= lastRow
 
@@ -253,64 +387,20 @@ export const Grid = forwardRef(function Grid (props, ref) {
       <div className='corner' />
       <div className='col-heads'>
         <div style={{ transform: `translateX(${-scroll.left}px)`, width: totalW, position: 'relative', height: '100%' }}>
-          {cols.map((c) => (
-            <div
-              key={c}
-              className={'col-head' + (c >= range.c1 && c <= range.c2 ? ' on' : '')}
-              style={{ left: colX[c], width: widths[c] }}
-              onClick={(e) => { if (e.shiftKey) onSelect(view.rows, c, true); else { onSelect(1, c); onSelect(view.rows, c, true) } }}
-              onContextMenu={(e) => { e.preventDefault(); onHeaderMenu('col', c, e.clientX, e.clientY) }}
-            >
-              {colName(c)}
-              <span className='resize' onMouseDown={(e) => startResize(e, c)} />
-            </div>
-          ))}
+          {cols.filter((c) => c > fc).map(colHead)}
         </div>
+        {fc > 0 && <div className='frozen-heads' style={{ width: frozenW, height: '100%' }}>{Array.from({ length: fc }, (_, i) => colHead(i + 1))}</div>}
       </div>
       <div className='row-heads'>
         <div style={{ transform: `translateY(${-scroll.top}px)`, height: totalH, position: 'relative' }}>
-          {rows.map((r) => (
-            <div
-              key={r}
-              className={'row-head' + (r >= range.r1 && r <= range.r2 ? ' on' : '')}
-              style={{ top: rowY[r], height: rowH[r] }}
-              onClick={(e) => { if (e.shiftKey) onSelect(r, view.cols, true); else { onSelect(r, 1); onSelect(r, view.cols, true) } }}
-              onContextMenu={(e) => { e.preventDefault(); onHeaderMenu('row', r, e.clientX, e.clientY) }}
-            >
-              {r}
-              <span className='row-resize' title='Drag to resize; double-click to fit' onMouseDown={(e) => startRowResize(e, r)} onDoubleClick={(e) => { e.stopPropagation(); onRowResize(r, null) }} onClick={(e) => e.stopPropagation()} />
-            </div>
-          ))}
+          {rows.filter((r) => r > fr).map(rowHead)}
         </div>
+        {fr > 0 && <div className='frozen-heads' style={{ width: '100%', height: frozenH }}>{Array.from({ length: fr }, (_, i) => rowHead(i + 1))}</div>}
       </div>
       <div className='body' ref={bodyRef} tabIndex={0} onScroll={onScroll} onKeyDown={onKeyDown} onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} aria-label='Spreadsheet' role='grid'>
         <div className='canvas' style={{ width: totalW, height: totalH }}>
-          {[...(view.merges || []).filter((m) => (m.r1 < firstRow || m.c1 < firstCol) && m.r2 >= firstRow && m.c2 >= firstCol && m.r1 <= lastRow && m.c1 <= lastCol).map((m) => [m.r1, m.c1]), ...rows.flatMap((r) => cols.map((c) => [r, c]))].map(([r, c]) => {
-            if (merged.hidden.has(r + ',' + c)) return null
-            const m = merged.top.get(r + ',' + c)
-            const cell = cells.get(r + ',' + c)
-            const fmt = (cell && cell.fmt) || {}
-            const cls = 'cell' + (cell ? ' k-' + cell.kind : '') + (fmt.b ? ' b' : '') + (fmt.i ? ' i' : '') + (fmt.wrap ? ' wrap' : '') + (fmt.valign ? ' v-' + fmt.valign : '')
-            return (
-              <div
-                key={r + ',' + c}
-                className={cls}
-                style={{ top: rowY[r], height: m ? span(m.r1, m.r2) : rowH[r], left: colX[c], width: m ? colX[Math.min(m.c2, view.cols) + 1] - colX[c] : widths[c], color: fmt.color, background: fmt.fill }}
-                data-r={r}
-                data-c={c}
-                onMouseDown={(e) => { dragging.current = true; onSelect(r, c, e.shiftKey) }}
-                onMouseEnter={() => { if (filling.current) setFillTo({ row: r, col: c }); else if (dragging.current) onSelect(r, c, true) }}
-                onDoubleClick={() => onEdit(r, c)}
-                onContextMenu={(e) => { e.preventDefault(); onCellMenu(r, c, e.clientX, e.clientY) }}
-                // Touch screens: tapping the cell that is already selected edits it.
-                onTouchEnd={(e) => { if (!pinched.current && e.touches.length === 0 && sel.row === r && sel.col === c) { e.preventDefault(); onEdit(r, c) } }}
-                title={cell && cell.volatile ? 'Changes on each device (time or random)' : cell && cell.blocked ? 'This answer cannot fill in. Select the cell to see why.' : undefined}
-              >
-                <span className='cell-text' style={textStyle(fmt, zoom)}>{cell ? cell.display : ''}</span>
-                {hasBorder(fmt) && <span className='cell-borders' style={{ borderTop: borderCss(fmt.bt), borderRight: borderCss(fmt.br), borderBottom: borderCss(fmt.bb), borderLeft: borderCss(fmt.bl) }} />}
-              </div>
-            )
-          })}
+          {frozenLayers()}
+          {[...(view.merges || []).filter((m) => (m.r1 < firstRow || m.c1 < firstCol) && m.r2 >= firstRow && m.c2 >= firstCol && m.r1 <= lastRow && m.c1 <= lastCol).map((m) => [m.r1, m.c1]), ...rows.flatMap((r) => cols.map((c) => [r, c]))].map(([r, c]) => cellAt(r, c))}
           {(range.r1 !== range.r2 || range.c1 !== range.c2) && (
             <div
               className='range'
@@ -385,20 +475,7 @@ export const Grid = forwardRef(function Grid (props, ref) {
               if (cell) onSelect(Number(cell.dataset.r), Number(cell.dataset.c), true)
             }}
           />
-          {isEditingHere && (
-            <input
-              className='editor'
-              autoFocus
-              aria-label='Edit cell'
-              inputMode={inputMode}
-              style={{ top: rowY[editing.row], left: colX[editing.col], minWidth: widths[editing.col], height: rowH[editing.row], ...textStyle((cells.get(editing.row + ',' + editing.col) || {}).fmt, zoom), textAlign: undefined }}
-              value={editing.value}
-              onChange={(e) => { onEditChange(e.target.value); onEditCaret(e.target.selectionStart) }}
-              onSelect={(e) => onEditCaret(e.target.selectionStart)}
-              onKeyDown={onEditKey}
-              onBlur={onEditBlur}
-            />
-          )}
+          {isEditingHere && !inFrozen(editing.row, editing.col) && editorAt()}
         </div>
       </div>
     </div>

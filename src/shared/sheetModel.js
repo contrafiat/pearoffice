@@ -626,6 +626,31 @@ function unmergeCells (doc, tabId, r1, c1, r2, c2) {
   })
 }
 
+// --- frozen panes (proposals/2026-10-04-freeze-filter.md) ------------------
+// The root map view:<tabId>: freezeRow and freezeCol, the ids of the last
+// frozen row and column, so inserting inside the frozen part grows it.
+
+function setFreeze (doc, tabId, rows, cols) {
+  return capture(doc, () => {
+    const t = tabMap(doc, tabId)
+    const v = doc.getMap('view:' + tabId)
+    const r = rows > 0 ? t.get('rows').get(Math.min(rows, t.get('rows').length) - 1) : null
+    const c = cols > 0 ? t.get('cols').get(Math.min(cols, t.get('cols').length) - 1) : null
+    if (r) { if (v.get('freezeRow') !== r) v.set('freezeRow', r) } else if (v.has('freezeRow')) v.delete('freezeRow')
+    if (c) { if (v.get('freezeCol') !== c) v.set('freezeCol', c) } else if (v.has('freezeCol')) v.delete('freezeCol')
+  })
+}
+
+// { rows, cols } frozen on a tab (0 when none, or when that row or column
+// was deleted).
+function getFreeze (doc, tabId) {
+  const t = tabMap(doc, tabId)
+  const v = doc.getMap('view:' + tabId)
+  const rows = v.has('freezeRow') ? t.get('rows').toArray().indexOf(v.get('freezeRow')) + 1 : 0
+  const cols = v.has('freezeCol') ? t.get('cols').toArray().indexOf(v.get('freezeCol')) + 1 : 0
+  return { rows, cols }
+}
+
 // Row heights (pixels at 100%), in the root map heights:<tabId> by row id.
 // A row without one is the default height, or taller to fit wrapped or
 // larger text on each device.
@@ -674,6 +699,12 @@ function importTabs (doc, payload) {
           const { rowId, colId } = idsAt(doc, id, row, col)
           t.get('fmt').set(cellKey(rowId, colId) + ':num', num)
         }
+      }
+      if (tab.freeze && (tab.freeze.rows || tab.freeze.cols)) {
+        ctx.extend(id, tab.freeze.rows || 0, tab.freeze.cols || 0)
+        const v = doc.getMap('view:' + id)
+        if (tab.freeze.rows) v.set('freezeRow', t.get('rows').get(tab.freeze.rows - 1))
+        if (tab.freeze.cols) v.set('freezeCol', t.get('cols').get(tab.freeze.cols - 1))
       }
       for (const [r1, c1, r2, c2] of tab.merges || []) {
         ctx.extend(id, r2, c2)
@@ -800,6 +831,8 @@ module.exports = {
   deleteCols,
   setWidth,
   setBorders,
+  setFreeze,
+  getFreeze,
   getMerges,
   mergeCells,
   unmergeCells,

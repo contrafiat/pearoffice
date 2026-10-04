@@ -525,3 +525,12 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 .tools .palette.align-menu button { min-width: 0; height: 32px; padding: 0; }
 .tools .palette.align-menu button.on { background: var(--pear-soft); border-color: var(--pear); color: var(--pear-dark); }
 .tools .palette .wrap-toggle { grid-column: 1 / -1; gap: 6px; font-size: 12px; padding: 0 8px; }
+
+/* Frozen rows and columns (proposals/2026-10-04-freeze-filter.md). */
+.frozen { position: sticky; z-index: 8; background: var(--panel); clip-path: inset(0 -3px -3px 0); }
+.frozen-top { top: 0; z-index: 9; box-shadow: 0 2px 0 var(--line-strong); }
+.frozen-left { left: 0; box-shadow: 2px 0 0 var(--line-strong); }
+.frozen-corner { position: sticky; left: 0; top: 0; z-index: 9; box-shadow: 2px 2px 0 var(--line-strong); }
+.frozen-heads { position: absolute; top: 0; left: 0; background: var(--head); z-index: 2; overflow: hidden; }
+.col-heads .frozen-heads { box-shadow: 2px 0 0 var(--line-strong); }
+.row-heads .frozen-heads { box-shadow: 0 2px 0 var(--line-strong); }

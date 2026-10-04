@@ -6,7 +6,22 @@
 // Other formatting is not exported (SheetJS Community Edition does not write
 // styles); see DECISIONS.md.
 
-const { MAX_ROWS, MAX_COLS } = require('./a1')
+const { MAX_ROWS, MAX_COLS, numToCol } = require('./a1')
+
+// Frozen panes in a file's sheets ([{ rows, cols }] in sheet order), read from
+// the raw parts since SheetJS does not report them.
+function freezeFromXlsx (bytes, fflate) {
+  let files
+  try { files = fflate.unzipSync(bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes)) } catch { return [] }
+  const out = []
+  for (let i = 1; files['xl/worksheets/sheet' + i + '.xml']; i++) {
+    const xml = fflate.strFromU8(files['xl/worksheets/sheet' + i + '.xml'])
+    const m = /<pane\b[^>]*state="frozen(?:Split)?"[^>]*\/?>/.exec(xml)
+    const get = (k) => (m && new RegExp(k + '="(\\d+)"').exec(m[0])) || null
+    out.push(m ? { rows: get('ySplit') ? Number(get('ySplit')[1]) : 0, cols: get('xSplit') ? Number(get('xSplit')[1]) : 0 } : null)
+  }
+  return out
+}
 
 const MAX_IMPORT_CELLS = 200000
 
@@ -149,10 +164,20 @@ function workbookBytes (XLSX, fflate, dump) {
   const names = new Map(dump.tabs.map((t, i) => [String(t.name).toUpperCase(), wb.SheetNames[i]]))
   const rename = (data) => String(data || '').replace(/^'((?:[^']|'')+)'!|^([A-Za-z_][\w.]*)!/, (m, q, b) => { const n = names.get((q !== undefined ? q.replace(/''/g, "'") : b).toUpperCase()); return n ? "'" + n.replace(/'/g, "''") + "'!" : m })
   const tabs = dump.tabs.map((t, i) => ({ name: wb.SheetNames[i], charts: (t.charts || []).map((c) => ({ ...c, data: rename(c.data) })) }))
-  // Styles first (src/shared/xlsxStyles.js), then charts.
+  // Styles first (src/shared/xlsxStyles.js), then frozen panes, then charts.
   const files = fflate.unzipSync(bytes)
   require('./xlsxStyles').addStyles(files, dump.tabs, fflate)
+  dump.tabs.forEach((t, i) => {
+    const f = t.freeze || {}
+    const path = 'xl/worksheets/sheet' + (i + 1) + '.xml'
+    if ((!f.rows && !f.cols) || !files[path]) return
+    const cell = numToCol((f.cols || 0) + 1) + ((f.rows || 0) + 1)
+    const pane = '<pane' + (f.cols ? ' xSplit="' + f.cols + '"' : '') + (f.rows ? ' ySplit="' + f.rows + '"' : '') + ' topLeftCell="' + cell + '" activePane="' +
+      (f.rows && f.cols ? 'bottomRight' : f.rows ? 'bottomLeft' : 'topRight') + '" state="frozen"/>'
+    const xml = fflate.strFromU8(files[path]).replace(/<sheetView(\s[^>]*?)?(\/?)>/, (m, attrs = '', empty) => '<sheetView' + attrs + '>' + pane + (empty ? '</sheetView>' : ''))
+    files[path] = fflate.strToU8(xml)
+  })
   return require('./xlsxCharts').addChartsToXlsx(fflate.zipSync(files), tabs, fflate)
 }
 
-module.exports = { workbookBytes, workbookToTabs, dumpToWorkbook, textInput, toFile, fromFile, READ_OPTIONS, MAX_IMPORT_CELLS }
+module.exports = { freezeFromXlsx, workbookBytes, workbookToTabs, dumpToWorkbook, textInput, toFile, fromFile, READ_OPTIONS, MAX_IMPORT_CELLS }

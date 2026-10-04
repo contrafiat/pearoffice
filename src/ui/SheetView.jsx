@@ -412,6 +412,17 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
   const PAPER = { ink: '#1f2420', muted: '#6b716b', line: '#e2e3dd', lineStrong: '#c9cbc2', panel: '#ffffff' }
   const printCharts = () => (view.charts || []).map((c) => chartSvg(c, c.size.w, c.size.h, PAPER)).filter(Boolean)
 
+  // Freeze panes (proposals/2026-10-04-freeze-filter.md), shared by everyone.
+  const frozen = (view && view.freeze) || { rows: 0, cols: 0 }
+  const freezeItems = (close) => canEdit && (
+    <>
+      <li role='menuitem' onClick={() => { close(); run('sheet:setFreeze', { rows: 1, cols: frozen.cols }) }}>Freeze top row</li>
+      <li role='menuitem' onClick={() => { close(); run('sheet:setFreeze', { rows: frozen.rows, cols: 1 }) }}>Freeze first column</li>
+      {(sel.row > 1 || sel.col > 1) && <li role='menuitem' onClick={() => { close(); run('sheet:setFreeze', { rows: sel.row - 1, cols: sel.col - 1 }) }}>Freeze above and left of {colName(sel.col) + sel.row}</li>}
+      {(frozen.rows > 0 || frozen.cols > 0) && <li role='menuitem' onClick={() => { close(); run('sheet:setFreeze', { rows: 0, cols: 0 }) }}>Unfreeze</li>}
+    </>
+  )
+
   const chartActions = {
     canEdit,
     select: (id) => setSelectedChart(id),
@@ -786,6 +797,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
               {!phone && <li role='menuitem' onClick={() => printTab(view, 'pdf', printCharts()).catch((err) => onError(err.message))}>Save this tab as PDF</li>}
               {!phone && <li role='menuitem' onClick={() => printTab(view, 'print', printCharts()).catch((err) => onError(err.message))}>Print this tab...</li>}
               {canEdit && <li role='menuitem' onClick={openSort}>Sort...</li>}
+              {freezeItems(() => setMore(false))}
               {canEdit && phone && <li role='menuitem' onClick={() => fillSelection('down')}>Fill down</li>}
               {canEdit && phone && <li role='menuitem' onClick={() => fillSelection('right')}>Fill right</li>}
               <li role='menuitem' onClick={() => setDeleting('local')}>Remove from this device</li>
@@ -989,6 +1001,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
               {canEdit && <li role='menuitem' onClick={() => { setMenu(null); quickSort(false) }}>Sort A to Z</li>}
               {canEdit && <li role='menuitem' onClick={() => { setMenu(null); quickSort(true) }}>Sort Z to A</li>}
               {canEdit && <li role='menuitem' onClick={() => { setMenu(null); openSort() }}>Sort...</li>}
+              {freezeItems(() => setMenu(null))}
               {canEdit && <li role='menuitem' className='danger' onClick={() => { setMenu(null); run('sheet:clearRange', range) }}>Clear contents</li>}
             </>
           )}
