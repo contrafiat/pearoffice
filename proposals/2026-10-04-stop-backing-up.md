@@ -134,3 +134,13 @@ a sheet that is in use.
 Hide the buttons. Listings already removed stay removed and can be added back
 with the share panel's button. Pending drops can be cancelled by deleting
 their `drop/` records on the seeder.
+
+## Changes after approval
+
+- 2026-10-04, keep requests: a device sends `keep` only when it lists a seeder
+  (an explicit add, or automatic listing after pairing again), not whenever
+  it registers a sheet. A device that has not yet seen a `seederOff` still
+  registers the sheet for a moment, and that must not cancel the drop.
+- 2026-10-04, the server download: `forget <key>` and `devices` are also
+  typed commands, and `forget` takes a unique start of the key. The
+  `--forget` flag forgets on start and then runs as usual.

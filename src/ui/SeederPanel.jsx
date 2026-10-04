@@ -35,8 +35,9 @@ function LocalSeeder ({ onPaired, onError }) {
         <>
           <p className='muted small'>Holding {host.sheets} sheet{host.sheets === 1 ? '' : 's'} for {host.pairedDevices} paired device{host.pairedDevices === 1 ? '' : 's'}. It runs in the background while PearSheet is open or in the tray.</p>
           <div className='row'>
-            <button onClick={async () => { try { setPairing(await call('app:seederHostPair')) } catch (err) { onError(err.message) } }}>Show pairing code</button>
+            <button type='button' onClick={async () => { try { setPairing(await call('app:seederHostPair')) } catch (err) { onError(err.message) } }}>Show pairing code</button>
             <button
+              type='button'
               disabled={busy}
               onClick={async () => {
                 setBusy(true)
@@ -52,6 +53,7 @@ function LocalSeeder ({ onPaired, onError }) {
               {busy ? 'Pairing...' : 'Pair this device with it'}
             </button>
           </div>
+          <HostDevices onError={onError} />
           {pairing && (
             <div className='pairing'>
               <div className='qr' dangerouslySetInnerHTML={{ __html: toSvg(pairing.link, 200) }} />
@@ -62,6 +64,80 @@ function LocalSeeder ({ onPaired, onError }) {
         </>
       )}
     </>
+  )
+}
+
+// Devices paired with the seeder on this computer, each with Forget.
+function HostDevices ({ onError }) {
+  const [devices, setDevices] = useState(null)
+  const [confirming, setConfirming] = useState(null)
+  async function load () {
+    try { setDevices(await call('app:seederHostDevices')) } catch (err) { onError(err.message) }
+  }
+  useEffect(() => { load() }, [])
+  if (!devices || !devices.length) return null
+  return (
+    <ul className='people host-devices'>
+      {devices.map((d) => (
+        <li key={d.deviceKey}>
+          <span className='who'><span className='mono'>{d.deviceKey.slice(0, 12)}...</span> <span className='muted'>{d.sheets} sheet{d.sheets === 1 ? '' : 's'}</span></span>
+          {confirming === d.deviceKey
+            ? (
+              <span className='confirm'>
+                <button
+                  type='button'
+                  className='danger'
+                  onClick={async () => {
+                    try { await call('app:seederHostForget', { deviceKey: d.deviceKey }) } catch (err) { onError(err.message) }
+                    setConfirming(null)
+                    load()
+                  }}
+                >
+                  Forget
+                </button>
+                <button type='button' onClick={() => setConfirming(null)}>Keep</button>
+              </span>
+              )
+            : <button type='button' className='link-button' onClick={() => setConfirming(d.deviceKey)}>Forget</button>}
+        </li>
+      ))}
+      {confirming && <li className='muted small'>The seeder stops accepting that device. Sheets no other paired device backs up are deleted from it after 7 days.</li>}
+    </ul>
+  )
+}
+
+// "Stop using this seeder" on this device, with what it will change.
+function StopUsing ({ seederKey, onDone, onError }) {
+  const [preview, setPreview] = useState(null)
+  const [busy, setBusy] = useState(false)
+  if (!preview) {
+    return (
+      <button type='button' className='link-button' onClick={async () => { try { setPreview(await call('seeder:stopPreview', { seederKey })) } catch (err) { onError(err.message) } }}>
+        Stop using
+      </button>
+    )
+  }
+  const names = (list) => list.map((x) => x.title || 'Untitled sheet').join(', ')
+  return (
+    <div className='stop-using'>
+      {preview.stop.length > 0 && <p className='small'>Stops backing up: {names(preview.stop)}. The seeder deletes its copies after 7 days.</p>}
+      {preview.keep.length > 0 && <p className='small muted'>Still backed up there by other people: {names(preview.keep)}.</p>}
+      {!preview.stop.length && !preview.keep.length && <p className='small muted'>No sheets back up to it.</p>}
+      <div className='row'>
+        <button
+          type='button'
+          className='danger'
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true)
+            try { await call('seeder:stopUsing', { seederKey }); onDone() } catch (err) { onError(err.message); setBusy(false) }
+          }}
+        >
+          {busy ? 'Stopping...' : 'Stop using this seeder'}
+        </button>
+        <button type='button' onClick={() => setPreview(null)}>Keep</button>
+      </div>
+    </div>
   )
 }
 
@@ -117,7 +193,12 @@ export function SeederPanel ({ initialLink = '', onClose, onError }) {
         <h3>Paired seeders</h3>
         {seeders && seeders.length === 0 && <p className='muted'>None yet.</p>}
         <ul className='people'>
-          {(seeders || []).map((s) => <li key={s.seederKey}><span className='who mono'>{s.seederKey.slice(0, 16)}...</span></li>)}
+          {(seeders || []).map((s) => (
+            <li key={s.seederKey} className='seeder-row'>
+              <span className='who mono'>{s.seederKey.slice(0, 16)}...</span>
+              <StopUsing seederKey={s.seederKey} onDone={load} onError={onError} />
+            </li>
+          ))}
         </ul>
       </form>
     </div>

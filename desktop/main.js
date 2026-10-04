@@ -141,6 +141,14 @@ ipcMain.handle('worklet:call', async (_e, method, args) => {
     if (!seeder || !seeder.running) throw new Error('The seeder on this computer is not running')
     return seeder.call('pair')
   }
+  if (method === 'app:seederHostDevices') {
+    if (!seeder || !seeder.running) throw new Error('The seeder on this computer is not running')
+    return seeder.call('devices')
+  }
+  if (method === 'app:seederHostForget') {
+    if (!seeder || !seeder.running) throw new Error('The seeder on this computer is not running')
+    return seeder.call('forget', { deviceKey: String((args && args.deviceKey) || '') })
+  }
   if (method === 'app:restart') {
     await worklet.stop()
     await startWorklet()

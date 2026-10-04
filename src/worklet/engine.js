@@ -32,6 +32,11 @@ function createSheetEngine (opts = {}) {
     ...createSheetMethods(sheets, { getJoin: () => join, getMoves: () => moves }),
     'seeder:pair': async ({ link }) => seeding.pair(link),
     'seeder:list': async () => seeding.list(),
+    'seeder:sheet': async ({ sheetId }) => seeding.sheetSeeders(sheetId),
+    'seeder:removeFromSheet': async ({ sheetId, seederKey }) => seeding.removeFromSheet(sheetId, seederKey),
+    'seeder:addToSheet': async ({ sheetId, seederKey }) => seeding.addToSheet(sheetId, seederKey),
+    'seeder:stopPreview': async ({ seederKey }) => seeding.stopPreview(seederKey),
+    'seeder:stopUsing': async ({ seederKey }) => seeding.stopUsing(seederKey),
     'sheet:removeLocal': async ({ sheetId }) => deleting.removeLocal(sheetId),
     'sheet:deleteForEveryone': async ({ sheetId }) => deleting.deleteForEveryone(sheetId),
     'link:start': async () => linking.start(),
@@ -54,7 +59,8 @@ function createSheetEngine (opts = {}) {
       onUpdate: sheets.onUpdate,
       onMembership: (sheetId, type) => {
         emit('sheet:members', { sheetId })
-        if (type === 'seeder' && seeding) seeding.register(sheetId).catch(() => {})
+        // The view shows the change only once this apply batch is done.
+        if ((type === 'seeder' || type === 'seederOff') && seeding) setTimeout(() => seeding.sweep().catch(() => {}), 200)
         if (type === 'move' && moves) moves.onMoved(sheetId).catch((e) => log('move failed: ' + e.message))
         if (type === 'delete' && deleting) deleting.onDeleted(sheetId).catch((e) => log('delete failed: ' + e.message))
       },

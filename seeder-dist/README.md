@@ -14,6 +14,11 @@ It prints a QR code and a pairing link that work for 5 minutes. In PearSheet,
 open **Seeder** and paste the link (or scan the code on a phone). Type `pair`
 for a new code and `status` to see how many devices and sheets it holds.
 
+`devices` lists the paired devices and `forget <device key>` stops accepting
+one (the first 6 or more characters of the key are enough). Sheets that no
+other paired device backs up are deleted after 7 days. When it runs as a
+service, start it once with `--forget <device key>` instead.
+
 ## Keep it running
 
 See the comments at the top of `pearsheet-seeder.service` for a systemd user
