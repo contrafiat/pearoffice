@@ -144,10 +144,19 @@ function createMoves ({ engine, sheets, getJoin, emit, log = () => {} }) {
     tick()
   }
 
-  // Sheets that moved while this device was off.
+  // On start: follow sheets that moved while this device was off, and ask to
+  // be admitted wherever this identity is a member but this device is not yet
+  // known (after a key move, or on a newly linked device).
   async function resume () {
-    for (const sheetId of engine.bases.keys()) {
-      try { if (await viewGet(sheetId, 'moved')) await onMoved(sheetId) } catch (e) { log('resume move failed: ' + e.message) }
+    const me = hex(engine.identity.publicKey)
+    for (const [sheetId, base] of engine.bases) {
+      try {
+        if (await viewGet(sheetId, 'moved')) { await onMoved(sheetId); continue }
+        await base.update()
+        const member = await viewGet(sheetId, 'member/' + me)
+        const known = await viewGet(sheetId, 'device/' + hex(base.local.key))
+        if (member && !known) followDevice(sheetId)
+      } catch (e) { log('resume failed for ' + sheetId.slice(0, 8) + ': ' + e.message) }
     }
   }
 
@@ -160,7 +169,7 @@ function createMoves ({ engine, sheets, getJoin, emit, log = () => {} }) {
     for (const f of following.values()) clearInterval(f.timer)
   }
 
-  return { removeMember, onMoved, resume, status, close }
+  return { removeMember, onMoved, resume, followDevice, status, close }
 }
 
 module.exports = { createMoves }

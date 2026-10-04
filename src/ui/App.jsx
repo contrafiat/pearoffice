@@ -3,6 +3,7 @@ import { call, on } from './bridge.js'
 import { SheetView } from './SheetView.jsx'
 import { JoinPanel } from './JoinPanel.jsx'
 import { SeederPanel } from './SeederPanel.jsx'
+import { DevicesPanel } from './DevicesPanel.jsx'
 import { importFile, pickAndImport, isMobile } from './xlsx.js'
 
 export function App () {
@@ -13,10 +14,13 @@ export function App () {
   const [name, setName] = useState(null)
   const [seeder, setSeeder] = useState(false)
   const [navOpen, setNavOpen] = useState(false) // phone layout: the sheet list slides in
+  const [devices, setDevices] = useState(null) // { link } | { startWith } | {} when open
+  const [nudge, setNudge] = useState(false)
 
   const refresh = useCallback(async () => {
     try {
       setSheets(await call('sheet:list'))
+      call('app:me').then((me) => setNudge(!!me.phraseNudge)).catch(() => {})
     } catch (err) {
       setError(err.message)
     }
@@ -24,7 +28,7 @@ export function App () {
 
   useEffect(() => {
     refresh()
-    call('app:me').then((me) => setName(me.name)).catch(() => {})
+    call('app:me').then((me) => { setName(me.name); setNudge(!!me.phraseNudge) }).catch(() => {})
     const offs = [
       on('worklet:exit', () => setError('The sync engine stopped. Restart PearSheet.')),
       on('join:progress', refresh),
@@ -42,6 +46,7 @@ export function App () {
   function openLink (url) {
     if (/^pearsheet:\/\/join\?/.test(url)) setJoining(url)
     else if (/^pearsheet:\/\/seeder\?/.test(url)) setSeeder(url)
+    else if (/^pearsheet:\/\/link\?/.test(url)) setDevices({ link: url })
   }
 
   async function create () {
@@ -119,7 +124,8 @@ export function App () {
             </button>
           ))}
         </nav>
-        <button className='seeder-button' onClick={() => setSeeder(true)}>Seeder</button>
+        <button className='seeder-button' onClick={() => setDevices({})}>Devices</button>
+        <button className='seeder-button second' onClick={() => setSeeder(true)}>Seeder</button>
         <label className='my-name'>
           <span>Your name</span>
           <input
@@ -139,8 +145,16 @@ export function App () {
           onJoined={async () => { setJoining(null); await refresh() }}
         />
       )}
+      {devices && <DevicesPanel initialLink={devices.link || ''} startWith={devices.startWith || null} onClose={() => setDevices(null)} onError={setError} />}
       {seeder && <SeederPanel initialLink={typeof seeder === 'string' ? seeder : ''} onClose={() => setSeeder(false)} onError={setError} />}
       <main className='main'>
+        {nudge && (
+          <div className='banner info'>
+            Write down your recovery phrase so you can get your identity back if you lose this device.{' '}
+            <button className='link-button' onClick={() => { setNudge(false); setDevices({ startWith: 'menu' }) }}>Show it</button>
+            <button className='link-button' onClick={() => { setNudge(false); call('app:phraseNudged').catch(() => {}) }}>Later</button>
+          </div>
+        )}
         {error && <div className='banner' role='alert'>{error} <button className='link-button' onClick={() => setError(null)}>Dismiss</button></div>}
         {current
           ? <SheetView key={current} sheetId={current} onTitleChange={refresh} onError={setError} />

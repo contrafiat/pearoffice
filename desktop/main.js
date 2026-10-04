@@ -61,7 +61,15 @@ function startWorklet () {
 ipcMain.handle('worklet:call', async (_e, method, args) => {
   // The UI asks for a link that arrived before it was listening.
   if (method === 'app:takeLink') { const url = pendingLink; pendingLink = null; return { url } }
-  if (typeof method !== 'string' || !/^(sheet|app):[A-Za-z]+$/.test(method)) throw new Error('bad method')
+  // After a device link or a phrase restore the identity changed: start a
+  // fresh worklet and reload the UI.
+  if (method === 'app:restart') {
+    await worklet.stop()
+    await startWorklet()
+    if (win && !win.isDestroyed()) win.webContents.reload()
+    return { ok: true }
+  }
+  if (typeof method !== 'string' || !/^(sheet|app|seeder|link):[A-Za-z]+$/.test(method)) throw new Error('bad method')
   return worklet.call(method, args || {})
 })
 

@@ -33,8 +33,10 @@ Bare worklet, the Yjs sheet model, the vendored formula engine and sync over
 invites, owner, editor and viewer roles, renames. The blind seeder works:
 pair by link, every member backs up to it, a member can catch up from it
 alone. Removing someone moves the sheet to fresh keys. Desktop installers build for
-Linux, macOS and Windows. The Android app runs on the emulator and joins
-sheets shared from a desktop engine. Signing and phone testing are next.
+Linux, macOS and Windows. The Android app runs on the emulator and the TCL.
+A person can link their devices (one-time link) and keep a 24-word recovery
+phrase (proposals/2026-10-03-device-linking.md). Signing, iOS and seeder
+packaging are next.
 See `TODO.md`.
 
 ## Layout
@@ -47,6 +49,7 @@ See `TODO.md`.
   wiring), `sheetWire.js` (apply rules), `membership.js` (signed membership
   ops, built and checked), `join.js` (the `pearsheet/join/1` handshake),
   `moves.js` (removal by moving to fresh keys), `seeding.js` (seeder client),
+  `linking.js` (linking a person's devices, recovery phrase),
   `sheetMethods.js` (IPC), `sheets.js` (live documents).
 - `src/ui/` - the React spreadsheet UI. Talks only to `window.pearsheet`
   (`call`, `on`), which the desktop preload provides and the mobile WebView

@@ -92,11 +92,13 @@ function createSeeding ({ engine, log = () => {} }) {
     const swarm = engine.swarm
     return new Promise((resolve, reject) => {
       let done = false
+      const channels = []
       const finish = async (err) => {
         if (done) return
         done = true
         clearTimeout(timer)
         clearInterval(again)
+        for (const ch of channels) { try { ch.close() } catch {} }
         swarm.off('connection', onConnection)
         swarm.leave(topic).catch(() => {})
         if (err) return reject(err)
@@ -110,6 +112,7 @@ function createSeeding ({ engine, log = () => {} }) {
         const mux = Protomux.from(conn)
         const ch = mux.createChannel({ protocol: PAIR_PROTOCOL, id: rv, onopen: () => msg.send({ t: 'trust', deviceKey: hex(swarm.keyPair.publicKey) }) })
         if (!ch) return
+        channels.push(ch)
         const msg = ch.addMessage({
           encoding: c.json,
           onmessage: (r) => {
