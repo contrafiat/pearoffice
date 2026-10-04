@@ -14,6 +14,7 @@ import * as Sharing from 'expo-sharing'
 import * as DocumentPicker from 'expo-document-picker'
 import * as Clipboard from 'expo-clipboard'
 import b4a from 'b4a'
+import { requestLocalNetworkPermission } from '../modules/local-network'
 
 const ALLOWED = /^(sheet|app|seeder|link):[A-Za-z]+$/
 
@@ -127,6 +128,9 @@ export default function App () {
 
   useEffect(() => {
     let alive = true
+    // iOS: ask for Local Network access up front, so people on the same Wi-Fi
+    // can connect directly (modules/local-network). No-op elsewhere.
+    requestLocalNetworkPermission()
     Promise.all([startWorklet(), loadHtml(dark)])
       .then(([, h]) => { if (alive) setHtml(h) })
       .catch((err) => { if (alive) setError(String(err && err.message ? err.message : err)) })
