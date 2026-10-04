@@ -82,6 +82,7 @@ function createMoves ({ engine, sheets, getJoin, emit, log = () => {} }) {
       await engine.append(newId, m.seederOp({ sheetId: newId, identity: engine.identity, seederKey }))
     }
     if (getJoin()) getJoin().addSheet(newId)
+    await sheets.attach(newId)
 
     // 4. Freeze the old sheet and hand each remaining person the new keys.
     const target = { sheetId: newId, groupKey: created.groupKey, encryptionKey: created.encryptionKey, bootstrap: created.bootstrap, name: title }

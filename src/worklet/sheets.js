@@ -53,7 +53,20 @@ class GuardedDoc {
   }
 }
 
-function createSheets ({ emit, getBase }) {
+// Local snapshots (proposal section 4, "Loading a sheet"): reopening a sheet
+// with a long history replayed every update (7.6 s at 100,000 edits, measured
+// 2026-10-03). Each device keeps the document state plus the view version and
+// fork it covers in its local Hyperbee, and replays only what came after. If
+// the view's fork changed (Autobase rewound it), the snapshot is ignored and
+// the sheet is rebuilt from the view.
+const SNAPSHOT_EVERY = 2000 // updates applied since the last snapshot
+const SNAPSHOT_CHUNK = 512 * 1024
+// The state itself goes in a per-sheet local core, and older copies are
+// cleared after each save. (In the local Hyperbee, which only appends, every
+// old snapshot stayed on disk: 343 MB instead of 178 MB at 100,000 edits.)
+// The Hyperbee holds only a small record pointing at the latest copy.
+
+function createSheets ({ emit, getBase, getLocalDb = () => null, getStore = () => null }) {
   const open = new Map() // sheetId -> entry
 
   function entryFor (sheetId) {
@@ -86,23 +99,52 @@ function createSheets ({ emit, getBase }) {
         const base = getBase(sheetId)
         if (!base) throw new Error('unknown sheet: ' + sheetId)
         await base.ready()
-        e.version = base.view.version
-        for await (const { value } of base.view.createReadStream({ gt: Y_PREFIX, lt: Y_PREFIX + '~' })) {
-          if (value && typeof value.data === 'string') e.guarded.apply(b4a.from(value.data, 'base64'))
+        const fork = base.view.core.fork
+        const snap = await readSnapshot(sheetId)
+        if (snap && snap.fork === fork && snap.version <= base.view.version && e.guarded.apply(b4a.from(snap.state, 'base64'))) {
+          // From the snapshot; catchUp below applies what came after it.
+          e.version = snap.version
+          e.fork = fork
+          e.sinceSnapshot = 0
+          e.fromSnapshot = true
+        } else {
+          e.version = base.view.version
+          e.fork = fork
+          let n = 0
+          for await (const { value } of base.view.createReadStream({ gt: Y_PREFIX, lt: Y_PREFIX + '~' })) {
+            if (value && typeof value.data === 'string') { e.guarded.apply(b4a.from(value.data, 'base64')); n++ }
+          }
+          e.sinceSnapshot = n
+          if (n >= SNAPSHOT_EVERY) saveSnapshot(sheetId).catch(() => {})
         }
         trackUndo(e)
-        // Autobase can fast-forward a device to the shared view without running
-        // apply for those entries, so onUpdate never sees them. Catch up from
-        // the view whenever Autobase says it changed.
-        if (!e.listening) {
-          e.listening = true
-          base.on('update', () => catchUp(sheetId, base).catch(() => {}))
-          catchUp(sheetId, base).catch(() => {})
-        }
+        listen(sheetId, e, base)
       })()
       e.loading.catch(() => { if (open.get(sheetId) === e) open.delete(sheetId) })
     }
     return e.loading.then(() => e)
+  }
+
+  // Autobase can fast-forward a device to the shared view without running
+  // apply for those entries, so onUpdate never sees them. Catch up from the
+  // view whenever Autobase says it changed.
+  function listen (sheetId, e, base) {
+    if (e.listening) return
+    e.listening = true
+    base.on('update', () => catchUp(sheetId, base).catch(() => {}))
+    catchUp(sheetId, base).catch(() => {})
+  }
+
+  // A sheet this device just made (created, imported or moved to) is filled
+  // directly rather than loaded; start following its view from here, so it
+  // catches up and gets snapshots like any other.
+  async function attach (sheetId) {
+    const e = open.get(sheetId)
+    const base = getBase(sheetId)
+    if (!e || !base) return
+    await base.ready()
+    if (e.version === undefined) { e.version = base.view.version; e.fork = base.view.core.fork; e.sinceSnapshot = 0 }
+    listen(sheetId, e, base)
   }
 
   // Apply y/ entries that appeared in the view since we last looked.
@@ -112,13 +154,16 @@ function createSheets ({ emit, getBase }) {
     e.catching = (e.catching || Promise.resolve()).then(async () => {
       const view = base.view
       const version = view.version
-      if (version === e.version) return
+      const fork = view.core.fork
+      if (version === e.version && fork === e.fork) return
       let applied = 0
       const take = (value) => {
         if (value && typeof value.data === 'string' && e.guarded.apply(b4a.from(value.data, 'base64'))) applied++
       }
       try {
-        if (!(e.version > 1)) throw new Error('full scan')
+        // A changed fork means the view was rewound; old versions no longer
+        // line up, so read everything.
+        if (!(e.version > 1) || fork !== e.fork) throw new Error('full scan')
         for await (const { left } of view.createDiffStream(e.version, { gt: Y_PREFIX, lt: Y_PREFIX + '~' })) {
           if (left) take(left.value)
         }
@@ -128,12 +173,76 @@ function createSheets ({ emit, getBase }) {
         for await (const { value } of view.createReadStream({ gt: Y_PREFIX, lt: Y_PREFIX + '~' })) take(value)
       }
       e.version = version
+      e.fork = fork
+      e.sinceSnapshot = (e.sinceSnapshot || 0) + applied
+      if (e.sinceSnapshot >= SNAPSHOT_EVERY) saveSnapshot(sheetId).catch(() => {})
       if (applied) {
         trackUndo(e)
         scheduleRecompute(sheetId)
       }
     })
     return e.catching
+  }
+
+  function snapCore (sheetId) {
+    const store = getStore()
+    return store ? store.get({ name: 'pearsheet-snapshot-' + sheetId }) : null
+  }
+
+  async function readSnapshot (sheetId) {
+    const db = getLocalDb()
+    if (!db) return null
+    const node = await db.get('snap:' + sheetId)
+    const rec = node && node.value
+    if (!rec || typeof rec.start !== 'number') return null
+    const core = snapCore(sheetId)
+    if (!core) return null
+    try {
+      await core.ready()
+      const chunks = []
+      for (let i = rec.start; i < rec.start + rec.count; i++) {
+        const block = await core.get(i, { wait: false })
+        if (!block) return null
+        chunks.push(block)
+      }
+      return { version: rec.version, fork: rec.fork, state: b4a.toString(b4a.concat(chunks), 'base64') }
+    } finally {
+      await core.close()
+    }
+  }
+
+  // The state is labelled with the version catchUp last finished at: every
+  // update up to there is in the document. Updates after it may be in the
+  // document too (applied live); replaying them on the next open is harmless.
+  async function saveSnapshot (sheetId) {
+    const e = open.get(sheetId)
+    const db = getLocalDb()
+    if (!e || !db || !(e.version > 0) || e.fork === undefined) return
+    const version = e.version
+    const fork = e.fork
+    const state = model.encodeState(e.guarded.doc)
+    const core = snapCore(sheetId)
+    if (!core) return
+    try {
+      await core.ready()
+      const start = core.length
+      const chunks = []
+      for (let i = 0; i < state.byteLength; i += SNAPSHOT_CHUNK) chunks.push(state.subarray(i, i + SNAPSHOT_CHUNK))
+      if (!chunks.length) chunks.push(b4a.alloc(0))
+      await core.append(chunks)
+      await db.put('snap:' + sheetId, { version, fork, start, count: chunks.length, at: Date.now() })
+      if (start > 0) await core.clear(0, start) // free the older copies
+    } finally {
+      await core.close()
+    }
+    e.sinceSnapshot = 0
+  }
+
+  // Before shutting down: snapshot sheets that changed since the last one.
+  async function flushSnapshots () {
+    for (const [sheetId, e] of open) {
+      if (e.loading && e.sinceSnapshot > 0) { try { await e.catching; await saveSnapshot(sheetId) } catch {} }
+    }
   }
 
   function trackUndo (e) {
@@ -179,7 +288,7 @@ function createSheets ({ emit, getBase }) {
     return e && e.loading ? e : null
   }
 
-  return { load, onUpdate, noteLocal, values, forget, entryFor, peek, yKey }
+  return { load, attach, onUpdate, noteLocal, values, forget, entryFor, peek, yKey, saveSnapshot, flushSnapshots }
 }
 
 module.exports = { createSheets, GuardedDoc, yKey, Y_PREFIX }

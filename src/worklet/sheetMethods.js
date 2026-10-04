@@ -111,6 +111,7 @@ function createSheetMethods (sheets, { getJoin, getMoves }) {
       // noteLocal (inside commit) starts undo tracking after the founding
       // layout already exists, so the layout itself cannot be undone.
       await commit(ctx, groupId, update)
+      await sheets.attach(groupId)
       return { sheetId: groupId }
     },
 
