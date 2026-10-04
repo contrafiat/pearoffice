@@ -7,13 +7,13 @@
     "orientation": "default",
     "scheme": "pearsheet",
     "userInterfaceStyle": "automatic",
-    "icon": "./desktop/build/icon.png",
+    "icon": "./assets/images/icon.png",
     "android": {
       "package": "com.pearsheet",
       "versionCode": 1,
       "adaptiveIcon": {
-        "foregroundImage": "./desktop/build/icon.png",
-        "backgroundColor": "#f7f7f4"
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#00271b"
       },
       "intentFilters": [
         {
