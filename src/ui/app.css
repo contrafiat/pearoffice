@@ -298,3 +298,7 @@ button, input, select { font: inherit; color: inherit; }
 .palette { position: absolute; top: 34px; left: 0; z-index: 12; display: grid; grid-template-columns: repeat(3, 26px); gap: 6px; padding: 8px; background: var(--panel); border: 1px solid var(--line-strong); border-radius: 8px; box-shadow: 0 6px 24px rgb(0 0 0 / 0.16); }
 .tools .palette .swatch { width: 26px; height: 26px; min-width: 0; padding: 0; border-radius: 6px; border: 1px solid var(--line-strong); }
 .tools .palette .swatch.none { background: var(--panel); color: var(--muted); }
+
+.range-handle { display: none; position: absolute; width: 18px; height: 18px; border-radius: 50%; background: var(--pear); border: 3px solid var(--panel); box-shadow: 0 1px 4px rgb(0 0 0 / 0.3); touch-action: none; z-index: 4; }
+@media (pointer: coarse) { .range-handle { display: block; } }
+.phone-tools { order: 4; width: 100%; }

@@ -4,7 +4,7 @@ import { Grid } from './Grid.jsx'
 import { colName } from './a1.js'
 import { shiftA1 } from '../shared/refs.js'
 import { SharePanel } from './SharePanel.jsx'
-import { exportSheet } from './xlsx.js'
+import { exportSheet, isMobile } from './xlsx.js'
 
 const COLOURS = ['#1f2420', '#b3261e', '#c2410c', '#a16207', '#15803d', '#0e7490', '#1d4ed8', '#7e22ce']
 const FILLS = ['#fee2e2', '#ffedd5', '#fef3c7', '#dcfce7', '#cffafe', '#dbeafe', '#ede9fe', '#e5e7eb']
@@ -171,12 +171,18 @@ export function SheetView ({ sheetId, onTitleChange, onError }) {
     return out
   }
 
-  function onCopy (e, cut) {
+  // The selection as clipboard text; remembers the inputs so a paste back
+  // into PearSheet keeps formulas.
+  function copyText (cut) {
     const text = toTsv(rangeGrid((cell) => (cell ? cell.display : '')))
     clip.current = { text, row: range.r1, col: range.c1, inputs: rangeGrid((cell) => (cell ? cell.input : '')) }
-    e.clipboardData.setData('text/plain', text)
-    e.preventDefault()
     if (cut && canEdit) run('sheet:clearRange', range)
+    return text
+  }
+
+  function onCopy (e, cut) {
+    e.clipboardData.setData('text/plain', copyText(cut))
+    e.preventDefault()
   }
 
   function onPaste (e) {
@@ -184,6 +190,18 @@ export function SheetView ({ sheetId, onTitleChange, onError }) {
     const text = e.clipboardData.getData('text/plain')
     if (!text) return
     e.preventDefault()
+    pasteText(text)
+  }
+
+  // Phones: the shell's clipboard, from the toolbar buttons.
+  async function phoneCopy (cut) { await call('app:setClipboard', { text: copyText(cut) }) }
+  async function phonePaste () {
+    if (!canEdit) return
+    const { text } = await call('app:getClipboard')
+    if (text) pasteText(text)
+  }
+
+  function pasteText (text) {
     const ours = clip.current && clip.current.text === text ? clip.current : null
     // From inside PearSheet: paste what was typed, moving relative references
     // as Excel does. From elsewhere: paste the text.
@@ -309,7 +327,15 @@ export function SheetView ({ sheetId, onTitleChange, onError }) {
             {NUMBER_FORMATS.map(([code, label]) => <option key={code} value={code}>{label}</option>)}
           </select>
         </div>
-        {window.pearsheet && window.pearsheet.platform === 'desktop' && (
+        {isMobile() && canEdit && (
+          <div className='tools phone-tools' role='toolbar' aria-label='Clipboard'>
+            <button onClick={() => phoneCopy(false).catch((err) => onError(err.message))}>Copy</button>
+            <button onClick={() => phoneCopy(true).catch((err) => onError(err.message))}>Cut</button>
+            <button onClick={() => phonePaste().catch((err) => onError(err.message))}>Paste</button>
+            <button onClick={() => run('sheet:clearRange', range)}>Clear</button>
+          </div>
+        )}
+        {window.pearsheet && (
           <button className='export' title='Save a copy as an Excel file' onClick={() => exportSheet(sheetId).catch((err) => onError(err.message))}>Export</button>
         )}
         <button className='share' onClick={() => setSharing(true)}>Share</button>

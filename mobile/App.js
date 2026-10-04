@@ -10,9 +10,38 @@ import { WebView } from 'react-native-webview'
 import { Worklet } from 'react-native-bare-kit'
 import { Asset } from 'expo-asset'
 import * as FileSystem from 'expo-file-system/legacy'
+import * as Sharing from 'expo-sharing'
+import * as DocumentPicker from 'expo-document-picker'
+import * as Clipboard from 'expo-clipboard'
 import b4a from 'b4a'
 
 const ALLOWED = /^(sheet|app|seeder):[A-Za-z]+$/
+
+// Phone features the web UI cannot reach on its own, answered by the shell.
+async function shellMethod (method, args) {
+  if (method === 'app:shareFile') {
+    // Export: write the file to the cache and open the share sheet (save to
+    // Files or Drive, send it, ...). A WebView cannot download a blob itself.
+    const safe = String(args.name || 'PearSheet.xlsx').replace(/[\\/:*?"<>|]/g, ' ')
+    const uri = FileSystem.cacheDirectory + safe
+    await FileSystem.writeAsStringAsync(uri, args.base64, { encoding: FileSystem.EncodingType.Base64 })
+    await Sharing.shareAsync(uri, { mimeType: args.mime, dialogTitle: safe, UTI: 'org.openxmlformats.spreadsheetml.sheet' })
+    return { ok: true }
+  }
+  if (method === 'app:pickFile') {
+    const res = await DocumentPicker.getDocumentAsync({
+      type: ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'text/csv', 'text/comma-separated-values', 'application/octet-stream'],
+      copyToCacheDirectory: true
+    })
+    if (res.canceled || !res.assets || !res.assets[0]) return { canceled: true }
+    const file = res.assets[0]
+    const base64 = await FileSystem.readAsStringAsync(file.uri, { encoding: FileSystem.EncodingType.Base64 })
+    return { name: file.name, base64 }
+  }
+  if (method === 'app:setClipboard') { await Clipboard.setStringAsync(String(args.text || '')); return { ok: true } }
+  if (method === 'app:getClipboard') return { text: await Clipboard.getStringAsync() }
+  return null
+}
 
 // The most recent pearsheet:// link, kept until the UI asks for it
 // (app:takeLink), so a link that arrives before the UI is listening is not lost.
@@ -108,6 +137,12 @@ export default function App () {
     const { id, method, args } = msg
     const reply = (body) => inject('window.__psResponse(' + JSON.stringify({ id, ...body }) + ')')
     if (method === 'app:takeLink') { const url = pendingLink; pendingLink = null; return reply({ result: { url } }) }
+    try {
+      const own = await shellMethod(method, args || {})
+      if (own) return reply({ result: own })
+    } catch (err) {
+      return reply({ error: String(err && err.message ? err.message : err) })
+    }
     if (typeof method !== 'string' || !ALLOWED.test(method)) return reply({ error: 'bad method' })
     const res = await callWorklet(method, args || {})
     reply(res.error ? { error: res.error } : { result: res.result ?? null })
