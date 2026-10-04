@@ -3,6 +3,7 @@ import { call, on } from './bridge.js'
 import { SheetView } from './SheetView.jsx'
 import { JoinPanel } from './JoinPanel.jsx'
 import { SeederPanel } from './SeederPanel.jsx'
+import { importFile } from './xlsx.js'
 
 export function App () {
   const [sheets, setSheets] = useState(null)
@@ -69,6 +70,26 @@ export function App () {
         </div>
         <button className='new-sheet' onClick={create}>New sheet</button>
         <button className='join-sheet' onClick={() => setJoining('')}>Join with a link</button>
+        <label className='join-sheet import'>
+          Import .xlsx
+          <input
+            type='file'
+            accept='.xlsx,.csv'
+            hidden
+            onChange={async (e) => {
+              const file = e.target.files && e.target.files[0]
+              e.target.value = ''
+              if (!file) return
+              try {
+                const { sheetId } = await importFile(file)
+                await refresh()
+                setCurrent(sheetId)
+              } catch (err) {
+                setError('Could not import ' + file.name + ': ' + err.message)
+              }
+            }}
+          />
+        </label>
         <nav className='sheet-list' aria-label='Your sheets'>
           {sheets === null && <p className='muted'>Starting...</p>}
           {sheets && sheets.length === 0 && <p className='muted'>No sheets yet.</p>}

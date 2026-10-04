@@ -100,7 +100,15 @@ app.whenReady().then(async () => {
     throw err
   })
   createWindow()
-  if (SMOKE) require('./smoke-run').run({ app, win, ready, log })
+  if (SMOKE) {
+    // Downloads (Export) go straight to the smoke test's data folder.
+    win.webContents.session.on('will-download', (_e, item) => {
+      const target = path.join(dataDir, 'downloads', item.getFilename())
+      require('node:fs').mkdirSync(path.dirname(target), { recursive: true })
+      item.setSavePath(target)
+    })
+    require('./smoke-run').run({ app, win, ready, log, dataDir })
+  }
 })
 
 app.on('second-instance', (_e, argv) => {

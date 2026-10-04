@@ -317,6 +317,41 @@ function setWidth (doc, tabId, col, px) {
   })
 }
 
+// Fill an empty, just-created sheet from an import payload
+// ({ tabs: [{ name, cells: [[row, col, input, numFmt?]], widths }] }) in one
+// change. Every tab exists before any cell is written, so formulas that point
+// at another tab resolve.
+function importTabs (doc, payload) {
+  return capture(doc, () => {
+    const ids = tabIds(doc)
+    payload.tabs.forEach((tab, i) => {
+      let id = ids[i]
+      if (!id) { id = newTab(doc, tab.name); doc.getArray('tabs').push([id]) } else tabMap(doc, id).set('name', tab.name)
+      ids[i] = id
+    })
+    payload.tabs.forEach((tab, i) => {
+      const id = ids[i]
+      const ctx = makeCtx(doc, id)
+      const t = tabMap(doc, id)
+      let maxR = 0
+      let maxC = 0
+      for (const [r, c] of tab.cells) { if (r > maxR) maxR = r; if (c > maxC) maxC = c }
+      ctx.extend(id, maxR + 20, Math.max(maxC + 2, DEFAULT_COLS))
+      for (const [row, col, input, num] of tab.cells) {
+        writeCell(doc, ctx, id, row, col, input)
+        if (num) {
+          const { rowId, colId } = idsAt(doc, id, row, col)
+          t.get('fmt').set(cellKey(rowId, colId) + ':num', num)
+        }
+      }
+      for (const [col, px] of Object.entries(tab.widths || {})) {
+        const colId = t.get('cols').get(Number(col) - 1)
+        if (colId) t.get('widths').set(colId, Math.max(24, Math.min(1000, Math.round(px))))
+      }
+    })
+  })
+}
+
 function addTab (doc, name) {
   let id = null
   const update = capture(doc, () => {
@@ -360,6 +395,7 @@ module.exports = {
   deleteRows,
   deleteCols,
   setWidth,
+  importTabs,
   addTab,
   renameTab
 }

@@ -4,6 +4,7 @@ import { Grid } from './Grid.jsx'
 import { colName } from './a1.js'
 import { shiftA1 } from '../shared/refs.js'
 import { SharePanel } from './SharePanel.jsx'
+import { exportSheet } from './xlsx.js'
 
 const COLOURS = ['#1f2420', '#b3261e', '#c2410c', '#a16207', '#15803d', '#0e7490', '#1d4ed8', '#7e22ce']
 const FILLS = ['#fee2e2', '#ffedd5', '#fef3c7', '#dcfce7', '#cffafe', '#dbeafe', '#ede9fe', '#e5e7eb']
@@ -308,6 +309,9 @@ export function SheetView ({ sheetId, onTitleChange, onError }) {
             {NUMBER_FORMATS.map(([code, label]) => <option key={code} value={code}>{label}</option>)}
           </select>
         </div>
+        {window.pearsheet && window.pearsheet.platform === 'desktop' && (
+          <button className='export' title='Save a copy as an Excel file' onClick={() => exportSheet(sheetId).catch((err) => onError(err.message))}>Export</button>
+        )}
         <button className='share' onClick={() => setSharing(true)}>Share</button>
       </header>
 

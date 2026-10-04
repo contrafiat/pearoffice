@@ -7,7 +7,7 @@ const fs = require('node:fs')
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
-async function run ({ app, win, ready, log }) {
+async function run ({ app, win, ready, log, dataDir }) {
   const wc = win.webContents
   const result = { ok: false, steps: [] }
   const js = (code) => wc.executeJavaScript(code, true)
@@ -150,6 +150,32 @@ async function run ({ app, win, ready, log }) {
     await waitFor('fast typing kept', "[...document.querySelectorAll('.cell')].some((c) => c.textContent === 'Typed fast 123')", 10000)
     step('fast typing')
 
+    // Export to .xlsx, then import that file back through the file picker.
+    const downloads = require('node:path').join(dataDir, 'downloads')
+    await js("document.querySelector('.toolbar .export').click()")
+    const file = require('node:path').join(downloads, 'Household budget.xlsx')
+    const start = Date.now()
+    while (!(fs.existsSync(file) && fs.statSync(file).size > 1000) && Date.now() - start < 20000) await sleep(200)
+    await sleep(500)
+    result.exportedBytes = fs.existsSync(file) ? fs.statSync(file).size : 0
+    step('export')
+    const b64 = fs.readFileSync(file).toString('base64')
+    await js(`(() => {
+      const bytes = Uint8Array.from(atob(${JSON.stringify(b64)}), (c) => c.charCodeAt(0))
+      const dt = new DataTransfer()
+      dt.items.add(new File([bytes], 'Imported budget.xlsx'))
+      const input = document.querySelector('.import input[type=file]')
+      input.files = dt.files
+      input.dispatchEvent(new Event('change', { bubbles: true }))
+    })()`)
+    await waitFor('imported sheet open', "[...document.querySelectorAll('.sheet-link')].some((b) => b.textContent === 'Imported budget') && document.querySelector('.title').value === 'Imported budget'")
+    await waitFor('imported values', "[...document.querySelectorAll('.cell')].some((c) => c.textContent === '1650.5') && [...document.querySelectorAll('.cell')].some((c) => c.textContent === 'Rent')")
+    await js("document.querySelector('.grid .body').focus()")
+    for (let i = 0; i < 2; i++) await key('Down')
+    await key('Right')
+    result.importedFormula = await js("document.querySelector('.formula-bar input').value")
+    step('import')
+
     // Share: the owner gets a single-use invite link.
     await js("document.querySelector('.toolbar .share').click()")
     await waitFor('share panel', "!!document.querySelector('.panel .invite-actions')")
@@ -165,7 +191,7 @@ async function run ({ app, win, ready, log }) {
       fs.writeFileSync(shot, image.toPNG())
       step('screenshot', shot)
     }
-    result.ok = result.pastedFormula === '=SUM(C1:C2)' && result.inviteLink === 'pearsheet://join?s=' + result.inviteLink.slice(19) && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
+    result.ok = result.importedFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000 && result.pastedFormula === '=SUM(C1:C2)' && result.inviteLink === 'pearsheet://join?s=' + result.inviteLink.slice(19) && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
   } catch (err) {
     result.error = err.message
     // What the page showed, to tell a UI failure from a load failure.

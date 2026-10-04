@@ -30,6 +30,8 @@ function present (v, fmt) {
 }
 
 function createSheetMethods (sheets, { getJoin, getMoves }) {
+  // The method table refers to itself (sheet:import builds on sheet:create).
+  let methods = null
   async function profileName (ctx) {
     const p = await ctx.localDb.get('profile')
     return (p && p.value && p.value.name) || ''
@@ -95,7 +97,7 @@ function createSheetMethods (sheets, { getJoin, getMoves }) {
     }
   }
 
-  return {
+  methods = {
     'sheet:create': async ({ title = 'Untitled sheet' } = {}, ctx) => {
       const { groupId } = await ctx.createGroup({ name: title })
       const base = ctx.bases.get(groupId)
@@ -110,6 +112,42 @@ function createSheetMethods (sheets, { getJoin, getMoves }) {
       // layout already exists, so the layout itself cannot be undone.
       await commit(ctx, groupId, update)
       return { sheetId: groupId }
+    },
+
+    // A new sheet from an imported file (the UI converts the file with SheetJS).
+    'sheet:import': async ({ title = 'Imported sheet', tabs } = {}, ctx) => {
+      if (!Array.isArray(tabs) || !tabs.length) throw new Error('Nothing to import')
+      const { sheetId } = await methods['sheet:create']({ title }, ctx)
+      const { doc } = await docFor(sheetId)
+      await commit(ctx, sheetId, model.importTabs(doc, { tabs }))
+      return { sheetId }
+    },
+
+    // Every tab's cells, typed values and formats, for export.
+    'sheet:dump': async ({ sheetId }) => {
+      const { e, doc } = await docFor(sheetId)
+      const values = sheets.values(e)
+      const tabs = model.tabIds(doc).map((id) => {
+        const t = model.tabMap(doc, id)
+        const rows = t.get('rows').toArray()
+        const cols = t.get('cols').toArray()
+        const rowIndex = new Map(rows.map((x, i) => [x, i + 1]))
+        const colIndex = new Map(cols.map((x, i) => [x, i + 1]))
+        const v = values.get(id) || new Map()
+        const cells = []
+        for (const key of t.get('cells').keys()) {
+          const [rowId, colId] = key.split(':')
+          const row = rowIndex.get(rowId)
+          const col = colIndex.get(colId)
+          if (row === undefined || col === undefined) continue
+          const val = v.get(row + ',' + col) || { value: null }
+          cells.push({ row, col, input: model.getInput(doc, id, row, col), value: val.error ? null : val.value, error: val.error, fmt: model.getFormat(doc, id, row, col) })
+        }
+        const widths = {}
+        for (const [colId, px] of t.get('widths').entries()) if (colIndex.has(colId)) widths[colIndex.get(colId)] = px
+        return { name: t.get('name'), cells, widths }
+      })
+      return { title: model.title(doc), tabs }
     },
 
     'sheet:list': async (args, ctx) => {
@@ -274,6 +312,7 @@ function createSheetMethods (sheets, { getJoin, getMoves }) {
     'sheet:undo': async ({ sheetId }, ctx) => undoRedo(sheetId, ctx, 'undo'),
     'sheet:redo': async ({ sheetId }, ctx) => undoRedo(sheetId, ctx, 'redo')
   }
+  return methods
 
   async function undoRedo (sheetId, ctx, which) {
     const { e, doc } = await docFor(sheetId)
