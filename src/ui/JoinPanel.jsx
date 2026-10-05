@@ -1,9 +1,9 @@
-import React, { useState } from 'react'
-import { X } from '@phosphor-icons/react'
+import React, { useEffect, useState } from 'react'
+import { X, CircleNotch, CheckCircle, Circle } from '@phosphor-icons/react'
 import { call } from './bridge.js'
 import { ScanButton } from './Qr.jsx'
 
-export function JoinPanel ({ initialLink = '', onJoined, onClose, onError }) {
+export function JoinPanel ({ initialLink = '', onStarted, onClose, onError }) {
   const [link, setLink] = useState(initialLink)
   const [busy, setBusy] = useState(false)
 
@@ -12,7 +12,7 @@ export function JoinPanel ({ initialLink = '', onJoined, onClose, onError }) {
     setBusy(true)
     try {
       const { sheetId } = await call('sheet:join', { link: (scanned || link).trim() })
-      onJoined(sheetId)
+      onStarted(sheetId)
     } catch (err) {
       onError(err.message)
       setBusy(false)
@@ -44,36 +44,72 @@ export function JoinPanel ({ initialLink = '', onJoined, onClose, onError }) {
   )
 }
 
-// A join still waiting for someone in the sheet to let it in.
-export function WaitingJoinPanel ({ entry, onClose, onError }) {
+// A join in progress: a spinner and its steps. After a few seconds it can
+// be sent to the background, where a pill at the bottom of the screen
+// (JoinPill) brings it back. entry: the sheet list's entry for the join.
+const BACKGROUND_AFTER_MS = 10000
+
+export function JoinProgress ({ entry, onBackground, onClose, onError }) {
   const [busy, setBusy] = useState(false)
-  const since = entry.startedAt ? Math.max(0, Math.floor((Date.now() - entry.startedAt) / 86400000)) : null
+  const [now, setNow] = useState(Date.now())
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t) }, [])
+  const started = entry.startedAt || now
+  const waited = Math.max(0, now - started)
+  const days = Math.floor(waited / 86400000)
+  // Two steps the app can tell apart: someone let us in, then the content.
+  const letIn = !entry.waiting
+  const steps = [
+    ['Reaching someone in the sheet', letIn ? 'done' : 'now'],
+    ['Getting the sheet', letIn ? 'now' : 'next']
+  ]
   return (
-    <div className='panel-backdrop' onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
-      <section className='panel' role='dialog' aria-label='Waiting to join'>
+    <div className='panel-backdrop' onMouseDown={(e) => { if (e.target === e.currentTarget) onBackground() }}>
+      <section className='panel join-progress' role='dialog' aria-label='Joining a sheet'>
         <header>
-          <h2>Waiting to join</h2>
-          <button className='close' aria-label='Close' onClick={onClose}><X size={18} /></button>
+          <h2>Joining {entry.title ? '"' + entry.title + '"' : 'a sheet'}</h2>
+          <button className='close' aria-label='Keep going in the background' onClick={onBackground}><X size={18} /></button>
         </header>
-        <p>
-          The invite link connects straight to the devices of the people already in the sheet, so one of them
-          needs to be online with PearSheet open.{since ? ' Waiting for ' + since + (since === 1 ? ' day.' : ' days.') : ''}
-        </p>
+        <CircleNotch className='join-spinner' size={40} aria-hidden='true' />
+        <ul className='join-steps'>
+          {steps.map(([label, state]) => (
+            <li key={label} className={state}>
+              {state === 'done' ? <CheckCircle size={18} weight='fill' /> : state === 'now' ? <CircleNotch size={18} className='spin' /> : <Circle size={18} />}
+              {label}
+            </li>
+          ))}
+        </ul>
+        {!letIn && waited > BACKGROUND_AFTER_MS && (
+          <p className='small'>
+            The invite connects straight to the people already in the sheet, so one of them needs to be online with PearSheet open.
+            {days ? ' Waiting for ' + days + (days === 1 ? ' day.' : ' days.') : ''} PearSheet stops waiting by itself after 7 days.
+          </p>
+        )}
         {entry.reason && <p className='warn'>Last reply: {entry.reason}</p>}
-        <p className='small'>If the invite has expired or was used, ask for a new one. PearSheet stops waiting by itself after 7 days.</p>
         <div className='row end'>
-          <button onClick={onClose}>Keep waiting</button>
           <button
             className='danger'
-            disabled={busy}
+            disabled={busy || letIn}
             onClick={async () => {
               setBusy(true)
               try { await call('sheet:cancelJoin', { sheetId: entry.sheetId }); onClose() } catch (err) { onError(err.message); setBusy(false) }
             }}
           >{busy ? 'Stopping...' : 'Stop joining'}
           </button>
+          {waited > BACKGROUND_AFTER_MS && <button onClick={onBackground}>Keep going in the background</button>}
         </div>
       </section>
     </div>
+  )
+}
+
+// Joins running in the background: a pill at the bottom of the screen.
+export function JoinPill ({ entries, onOpen }) {
+  if (!entries.length) return null
+  const first = entries[0]
+  return (
+    <button className='join-pill' onClick={() => onOpen(first.sheetId)}>
+      <CircleNotch size={16} className='spin' aria-hidden='true' />
+      {entries.length > 1 ? 'Joining ' + entries.length + ' sheets...' : first.title ? 'Joining "' + first.title + '"...' : 'Joining a sheet...'}
+    </button>
   )
 }
