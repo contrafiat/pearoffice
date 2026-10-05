@@ -604,7 +604,7 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
     await js("document.querySelector('.panel .close').click()")
     await openSettings()
     await js("document.querySelector('.panel .settings-devices').click()")
-    await js("[...document.querySelectorAll('.panel button')].find((b) => b.textContent.trim() === 'Show my phrase').click()")
+    await js("[...document.querySelectorAll('.panel button')].find((b) => b.textContent.trim() === 'Show phrase').click()")
     await waitFor('recovery phrase', "document.querySelectorAll('.phrase li').length === 24")
     await js("document.querySelector('.panel .close').click()")
     step('seeder and devices panels')

@@ -425,6 +425,7 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 
 .panel button:where(:not(.close):not(.link-button):not(.swatch):not(.me-picture)),
 .new-sheet, .join-sheet { display: inline-flex; align-items: center; justify-content: center; gap: 6px; text-align: center; }
+.panel .row:not(:has(input, select, textarea)) { align-items: stretch; }
 .panel .row:not(:has(input, select, textarea)) > button:not(.link-button) { flex: 1 1 0; min-width: 0; }
 .panel .row.end { justify-content: stretch; align-items: stretch; }
 .panel .scan-button { align-self: stretch; }
@@ -630,3 +631,13 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 .join-pill { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(46px + env(safe-area-inset-bottom)); z-index: 15; display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 999px; border: 1px solid var(--line-strong); background: var(--panel); color: var(--ink); box-shadow: 0 4px 16px rgb(0 0 0 / 0.18); cursor: pointer; font: inherit; white-space: nowrap; }
 .join-pill svg { color: var(--pear); }
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(46px + env(safe-area-inset-bottom)); z-index: 16; padding: 8px 16px; border-radius: 999px; background: var(--ink); color: var(--panel); box-shadow: 0 4px 16px rgb(0 0 0 / 0.18); white-space: nowrap; }
+
+/* Settings: change or remove your picture, as icons */
+.pic-actions { display: flex; gap: 8px; }
+.panel .pic-actions .pic-button { width: 36px; height: 36px; padding: 0; flex: none; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; color: var(--ink); }
+.panel .pic-actions .pic-button.remove-picture { color: var(--danger); }
+.me-pic { display: flex; flex-direction: column; align-items: center; gap: 8px; flex: none; }
+.me-pic .pic-actions { justify-content: center; }
+.my-name .name-row { display: flex; gap: 8px; align-items: stretch; }
+.panel .me .my-name .name-row input { flex: 1 1 auto; min-width: 0; }
+.panel .me .my-name .name-row button { flex: none; }

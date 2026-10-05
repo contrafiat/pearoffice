@@ -46,8 +46,8 @@ export function DevicesPanel ({ initialLink = '', startWith = null, onBack = nul
             <h3>Recovery phrase</h3>
             <p>24 words that bring back your identity if you lose every device. Anyone with them can act as you.</p>
             <div className='row'>
-              <button onClick={async () => { try { setPhrase((await call('link:phrase')).phrase); setMode('phrase'); call('app:phraseNudged').catch(() => {}) } catch (err) { onError(err.message) } }}><Key size={16} /> Show my phrase</button>
-              <button onClick={() => setMode('restore')}><ArrowCounterClockwise size={16} /> Restore from a phrase</button>
+              <button onClick={async () => { try { setPhrase((await call('link:phrase')).phrase); setMode('phrase'); call('app:phraseNudged').catch(() => {}) } catch (err) { onError(err.message) } }}><Key size={16} /> Show phrase</button>
+              <button onClick={() => setMode('restore')}><ArrowCounterClockwise size={16} /> Restore</button>
             </div>
             <p className='muted small'>If you lose a linked device, it still holds your identity. To cut it off, the owner of each sheet removes you and invites you again under a new identity.</p>
           </>

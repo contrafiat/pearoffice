@@ -1,5 +1,5 @@
-import React, { useRef, useState } from 'react'
-import { ArrowSquareOut, CaretLeft, Devices, EnvelopeSimple, HardDrives, X } from '@phosphor-icons/react'
+import React, { useEffect, useRef, useState } from 'react'
+import { ArrowSquareOut, Camera, CaretLeft, Devices, EnvelopeSimple, HardDrives, Trash, X } from '@phosphor-icons/react'
 import { call } from './bridge.js'
 import { Avatar, shrinkPicture } from './Avatar.jsx'
 import { readPref, writePref } from './prefs.js'
@@ -39,6 +39,16 @@ export function SettingsPanel ({ me, onMe, desktop, keepOnline, startAtLogin, on
   const [numPad, setNumPad] = useState(() => readPref('pearsheet:numpad') === '1')
   const picRef = useRef(null)
   const { name, avatar, identity } = me
+  const [nameDraft, setNameDraft] = useState(name || '')
+  const [savingName, setSavingName] = useState(false)
+  useEffect(() => { setNameDraft(name || '') }, [name])
+  const nameChanged = nameDraft.trim() !== (name || '')
+  async function saveName () {
+    if (!nameChanged) return
+    setSavingName(true)
+    try { await call('app:setName', { name: nameDraft.trim() }); onMe() } catch (err) { onError(err.message) }
+    setSavingName(false)
+  }
 
   return (
     <div className='panel-backdrop' onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
@@ -53,14 +63,29 @@ export function SettingsPanel ({ me, onMe, desktop, keepOnline, startAtLogin, on
           <>
             <h3>You</h3>
             <div className='me'>
-              <button
-                className='me-picture'
-                title={avatar ? 'Change your picture' : 'Add a picture'}
-                aria-label={avatar ? 'Change your picture' : 'Add a picture'}
-                onClick={() => picRef.current && picRef.current.click()}
-              >
-                <Avatar name={name} src={avatar ? 'data:' + avatar.mime + ';base64,' + avatar.data : null} seed={identity} size={56} />
-              </button>
+              {/* The picture, with change and remove beneath it. */}
+              <div className='me-pic'>
+                <button
+                  className='me-picture'
+                  title={avatar ? 'Change your picture' : 'Add a picture'}
+                  aria-label={avatar ? 'Change your picture' : 'Add a picture'}
+                  onClick={() => picRef.current && picRef.current.click()}
+                >
+                  <Avatar name={name} src={avatar ? 'data:' + avatar.mime + ';base64,' + avatar.data : null} seed={identity} size={56} />
+                </button>
+                <span className='pic-actions'>
+                  <button className='pic-button' title={avatar ? 'Change picture' : 'Add a picture'} aria-label={avatar ? 'Change picture' : 'Add a picture'} onClick={() => picRef.current && picRef.current.click()}><Camera size={18} /></button>
+                  {avatar && (
+                    <button
+                      className='pic-button remove-picture'
+                      title='Remove picture'
+                      aria-label='Remove picture'
+                      onClick={async () => { try { await call('app:setAvatar', { data: '' }); onMe() } catch (err) { onError(err.message) } }}
+                    ><Trash size={18} />
+                    </button>
+                  )}
+                </span>
+              </div>
               <input
                 ref={picRef}
                 type='file'
@@ -76,31 +101,19 @@ export function SettingsPanel ({ me, onMe, desktop, keepOnline, startAtLogin, on
                   } catch (err) { onError(err.message) }
                 }}
               />
-              <div className='my-name'>
+              {/* The name is saved with Save (or Enter), not on leaving the field. */}
+              <form className='my-name' onSubmit={async (e) => { e.preventDefault(); await saveName() }}>
                 <label htmlFor='my-name-input'>Your name</label>
-                <input
-                  id='my-name-input'
-                  placeholder='Shown to people you share with'
-                  defaultValue={name || ''}
-                  key={'name:' + name}
-                  onBlur={async (e) => {
-                    const v = e.target.value.trim()
-                    if (v === (name || '')) return
-                    try { await call('app:setName', { name: v }); onMe() } catch (err) { onError(err.message) }
-                  }}
-                  onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur() }}
-                />
-                <span className='row'>
-                  <button className='link-button' onClick={() => picRef.current && picRef.current.click()}>{avatar ? 'Change picture' : 'Add a picture'}</button>
-                  {avatar && (
-                    <button
-                      className='link-button remove-picture'
-                      onClick={async () => { try { await call('app:setAvatar', { data: '' }); onMe() } catch (err) { onError(err.message) } }}
-                    >Remove picture
-                    </button>
-                  )}
+                <span className='name-row'>
+                  <input
+                    id='my-name-input'
+                    placeholder='Shown to people you share with'
+                    value={nameDraft}
+                    onChange={(e) => setNameDraft(e.target.value)}
+                  />
+                  <button type='submit' className='primary' disabled={!nameChanged || savingName}>{savingName ? 'Saving...' : 'Save'}</button>
                 </span>
-              </div>
+              </form>
             </div>
             <p className='small'>The people you share sheets with see your name and picture.</p>
 
