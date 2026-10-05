@@ -71,6 +71,8 @@ See `TODO.md`.
   `node scripts/check-chart-export.js [dir]` has LibreOffice open one with
   every chart type (needs `soffice`). Cell styles go into exports through
   `src/shared/xlsxStyles.js` (SheetJS CE writes none).
+- `src/shared/jsonImport.js` turns a .json file into the same import payload
+  as an .xlsx (a tab per list of records, the rest on a Summary tab).
 - `src/ui/` - the React spreadsheet UI. Talks only to `window.pearsheet`
   (`call`, `on`), which the desktop preload provides and the mobile WebView
   will provide later. Built to `dist/ui` by `scripts/build-ui.mjs`.

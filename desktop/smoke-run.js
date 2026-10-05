@@ -602,6 +602,23 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
     await waitFor('the tidied copy is open', "!document.querySelector('.panel') && [...document.querySelectorAll('.cell')].some((c) => c.textContent === '1650.5')")
     result.tidied = beforeIds.length === 1
     step('tidy up')
+
+    // A .json file: lists of records become tabs, dates become dates
+    // (src/shared/jsonImport.js).
+    const json = JSON.stringify({ balance: 42, bills: [{ name: 'Rent', amount: 1200, due: '2026-11-01' }, { name: 'Water', amount: 30.5, due: '2026-11-15' }] })
+    await js(`(() => {
+      const dt = new DataTransfer()
+      dt.items.add(new File([${JSON.stringify(json)}], 'Budget export.json'))
+      const input = document.querySelector('.import input[type=file]')
+      input.files = dt.files
+      input.dispatchEvent(new Event('change', { bubbles: true }))
+    })()`)
+    await waitFor('json sheet open', "document.querySelector('.title').value === 'Budget export' && [...document.querySelectorAll('.tab:not(.add)')].map((t) => t.textContent).join() === 'Summary,bills'")
+    await js("[...document.querySelectorAll('.tab:not(.add)')].find((t) => t.textContent === 'bills').click()")
+    await waitFor('json values', "[...document.querySelectorAll('.cell')].some((c) => c.textContent === '2026-11-15') && [...document.querySelectorAll('.cell')].some((c) => c.textContent === '30.5')")
+    result.jsonImport = true
+    step('json import')
+
     const b64 = fs.readFileSync(file).toString('base64')
     await js(`(() => {
       const bytes = Uint8Array.from(atob(${JSON.stringify(b64)}), (c) => c.charCodeAt(0))
@@ -745,7 +762,7 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
       fs.writeFileSync(shot, image.toPNG())
       step('screenshot', shot)
     }
-    result.ok = result.moreChartTypes && result.importedFormats && result.keepOnline && result.avatar && result.spill && result.quickWins && result.findSort && result.fill && result.charts && result.formats && result.csvPdf && result.tabs && result.tidied && result.suggested === 'SUBSTITUTE,SUBTOTAL,SUM' && result.argHelp === 'number1' && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.importedFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000 && result.pastedFormula === '=SUM(C1:C2)' && result.inviteLink === 'pearsheet://join?s=' + result.inviteLink.slice(19) && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
+    result.ok = result.moreChartTypes && result.importedFormats && result.keepOnline && result.avatar && result.spill && result.quickWins && result.findSort && result.fill && result.charts && result.formats && result.csvPdf && result.tabs && result.tidied && result.jsonImport && result.suggested === 'SUBSTITUTE,SUBTOTAL,SUM' && result.argHelp === 'number1' && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.importedFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000 && result.pastedFormula === '=SUM(C1:C2)' && result.inviteLink === 'pearsheet://join?s=' + result.inviteLink.slice(19) && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
   } catch (err) {
     result.error = err.message
     // What the page showed, to tell a UI failure from a load failure.
