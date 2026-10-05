@@ -2,6 +2,19 @@
 
 Append-only, newest on top. Per Constitution §4.
 
+## 2026-10-05 - Histogram and waterfall .xlsx: as Excel writes them
+Tier: T1
+Context: PR #73's export, first opened in real Excel (Excel for the web).
+Choice: Excel repaired the file and dropped both charts. They now go out
+the way Excel itself writes them (test/fixtures/excel-histogram-waterfall.xlsx):
+no `dir` on the data references, a chart style and colour part per chart,
+and a text box as the fallback instead of a plain column chart. Checked in
+Excel for the web: A (dir only) still failed, B (all three) worked, and
+the code's own output worked.
+Alternatives: keep the column-chart fallback (rejected - Excel refused that
+version; LibreOffice reads the chartex part either way).
+Consequences: programs that read neither format show the text box.
+
 ## 2026-10-05 - Shared compaction: a move that keeps everyone
 Tier: T2
 Context: proposals/2026-10-05-shared-compaction.md.

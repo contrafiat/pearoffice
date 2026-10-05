@@ -60,7 +60,17 @@ test('all five go out to .xlsx and come back', () => {
   const files = fflate.unzipSync(bytes)
   assert.ok(files['xl/charts/chartEx4.xml'] && files['xl/charts/chartEx5.xml'], 'histogram and waterfall in Excel\'s newer format')
   assert.match(fflate.strFromU8(files['xl/workbook.xml']), /<definedName name="_xlchart\.v1\.0" hidden="1">/)
-  assert.match(fflate.strFromU8(files['xl/charts/chart4.xml']), /<c:barChart>/, 'with a plain column chart as fallback')
+  // As Excel writes them (test/fixtures/excel-histogram-waterfall.xlsx): no
+  // dir on the data references, style and colour parts, a text-box fallback.
+  // Excel for the web repaired the file and dropped both charts otherwise.
+  assert.ok(!files['xl/charts/chart4.xml'] && !files['xl/charts/chart5.xml'], 'no classic chart for these two')
+  assert.doesNotMatch(fflate.strFromU8(files['xl/charts/chartEx4.xml']), / dir=/)
+  assert.match(fflate.strFromU8(files['xl/charts/_rels/chartEx5.xml.rels']), /chartStyle" Target="style5\.xml".*chartColorStyle" Target="colors5\.xml"/)
+  assert.match(fflate.strFromU8(files['xl/charts/style5.xml']), /<cs:chartStyle [^>]*id="395"/)
+  assert.match(fflate.strFromU8(files['[Content_Types].xml']), /\/xl\/charts\/colors4\.xml" ContentType="application\/vnd\.ms-office\.chartcolorstyle\+xml"/)
+  const drawing = fflate.strFromU8(files['xl/drawings/drawing1.xml'])
+  assert.match(drawing, /<mc:Fallback><xdr:sp macro="" textlink="">/)
+  assert.doesNotMatch(drawing, /<mc:Fallback><xdr:graphicFrame/)
   const back = chartsFromXlsx(bytes, fflate, ['Data'])[0]
   assert.deepEqual(back.map((c) => [c.type, c.data]), [['radar', 'A1:C5'], ['bubble', 'G1:I4'], ['stock', 'A1:E5'], ['histogram', 'B1:B5'], ['waterfall', 'K1:L5']])
   assert.equal(back[0].title, 'Radar')
@@ -68,6 +78,11 @@ test('all five go out to .xlsx and come back', () => {
   assert.deepEqual(back[4].totals, [3])
   const XLSXread = XLSX.read(bytes, { type: 'array' })
   assert.ok(!(XLSXread.Workbook && XLSXread.Workbook.Names || []).some((n) => /^_xlchart/.test(n.Name) && !n.Hidden), 'the chart names are hidden')
+})
+
+test('a histogram and a waterfall made in Excel come in', () => {
+  const back = chartsFromXlsx(fs.readFileSync(path.join(__dirname, 'fixtures/excel-histogram-waterfall.xlsx')), fflate, ['Sheet1'])[0]
+  assert.deepEqual(back.map((c) => [c.type, c.data, c.title]), [['histogram', 'A1:A31', 'Histogram'], ['waterfall', 'D1:E7', 'Waterfall']])
 })
 
 test('radar, bubble and stock in a file saved by LibreOffice', () => {
