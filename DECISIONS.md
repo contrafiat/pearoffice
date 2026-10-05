@@ -2,6 +2,22 @@
 
 Append-only, newest on top. Per Constitution §4.
 
+## 2026-10-04 - Hiding, conditional formatting, validation, names, comments
+Tier: T2
+Context: the rest of the everyday gaps against Calc
+(proposals/2026-10-04-sheet-tools.md).
+Choice: each is a new shared map keyed by row and column ids
+(`hidden:<tabId>`, `cf:<tabId>`, `valid:<tabId>`, `comments:<tabId>`) or,
+for names, one `names` map per sheet. Conditional colours and validation
+marks are worked out on each device from the merged values. SUBTOTAL
+101-111 skips hidden rows but not filtered ones, because filters are
+personal. Comments come from editors and the owner only.
+Alternatives: per-person hiding (rejected - hiding is layout, as in
+Excel); viewer comments (deferred - needs a membership change, T3);
+formula rules for conditional formatting (deferred).
+Consequences: older builds show hidden rows, no colours or comments, and
+`#NAME?` for formulas that use names.
+
 ## 2026-10-04 - Freeze panes shared, filters each person's own
 Tier: T2 (freeze); T1 (filters)
 Context: proposals/2026-10-04-freeze-filter.md.

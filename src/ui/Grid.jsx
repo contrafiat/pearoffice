@@ -16,7 +16,7 @@ export const MAX_ZOOM = 2.5
 // sheets stay fast. Headers are drawn outside the scroll area and moved with
 // the scroll position.
 export const Grid = forwardRef(function Grid (props, ref) {
-  const { view, cells, sel, ext = sel, range, spillBox, editing, onSelect, onEdit, onEditChange, onEditKey, onEditBlur, onEditCaret = () => {}, onKeyDown, onHeaderMenu, onCellMenu = () => {}, onFill = null, charts = [], selectedChart = null, chartActions = null, onResize, onRowResize = () => {}, onCopy, onPaste, zoom = 1, onZoom, inputMode, hiddenRows = null, filterHead = null, onFilterMenu = () => {} } = props
+  const { view, cells, sel, ext = sel, range, spillBox, editing, onSelect, onEdit, onEditChange, onEditKey, onEditBlur, onEditCaret = () => {}, onKeyDown, onHeaderMenu, onCellMenu = () => {}, onFill = null, charts = [], selectedChart = null, chartActions = null, onResize, onRowResize = () => {}, onCopy, onPaste, zoom = 1, onZoom, inputMode, hiddenRows = null, hiddenCols = null, unhideMarks = null, onUnhide = () => {}, onAutoFit = () => {}, filterHead = null, onFilterMenu = () => {} } = props
   // Row height and column widths scale with the zoom (pinch on a phone);
   // stored widths stay unzoomed.
   const ROW_H = Math.round(BASE_ROW_H * zoom)
@@ -82,8 +82,10 @@ export const Grid = forwardRef(function Grid (props, ref) {
     const w = new Array(view.cols + 1)
     for (let c = 1; c <= view.cols; c++) w[c] = Math.round((view.widths[c] || DEFAULT_W) * zoom)
     if (drag) w[drag.col] = drag.w
+    // Hidden columns (proposals/2026-10-04-sheet-tools.md) take no space.
+    if (hiddenCols) for (const c of hiddenCols) if (c <= view.cols) w[c] = 0
     return w
-  }, [view.cols, view.widths, drag, zoom])
+  }, [view.cols, view.widths, drag, zoom, hiddenCols])
 
   // colX[c] is the left edge of column c; colX[cols + 1] is the total width.
   const colX = useMemo(() => {
@@ -224,7 +226,7 @@ export const Grid = forwardRef(function Grid (props, ref) {
   const rows = []
   for (let r = firstRow; r <= lastRow; r++) if (rowH[r] > 0) rows.push(r)
   const cols = []
-  for (let c = firstCol; c <= lastCol; c++) cols.push(c)
+  for (let c = firstCol; c <= lastCol; c++) if (widths[c] > 0) cols.push(c)
 
   function startResize (e, col) {
     e.preventDefault()
@@ -272,7 +274,8 @@ export const Grid = forwardRef(function Grid (props, ref) {
         onContextMenu={(e) => { e.preventDefault(); onHeaderMenu('col', c, e.clientX, e.clientY) }}
       >
         {colName(c)}
-        <span className='resize' onMouseDown={(e) => startResize(e, c)} />
+        <span className='resize' title='Drag to resize; double-click to fit' onMouseDown={(e) => startResize(e, c)} onDoubleClick={(e) => { e.stopPropagation(); onAutoFit(c) }} onClick={(e) => e.stopPropagation()} />
+        {unhideMarks && unhideMarks.cols.has(c - 1) && <button className='unhide-mark col' title='Show hidden columns' aria-label={'Show columns hidden before ' + colName(c)} onMouseDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onUnhide('col', c - 1) }} />}
       </div>
     )
   }
@@ -287,6 +290,7 @@ export const Grid = forwardRef(function Grid (props, ref) {
         onContextMenu={(e) => { e.preventDefault(); onHeaderMenu('row', r, e.clientX, e.clientY) }}
       >
         {r}
+        {unhideMarks && unhideMarks.rows.has(r - 1) && <button className='unhide-mark row' title='Show hidden rows' aria-label={'Show rows hidden above ' + r} onMouseDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onUnhide('row', r - 1) }} />}
         <span className='row-resize' title='Drag to resize; double-click to fit' onMouseDown={(e) => startRowResize(e, r)} onDoubleClick={(e) => { e.stopPropagation(); onRowResize(r, null) }} onClick={(e) => e.stopPropagation()} />
       </div>
     )
@@ -360,7 +364,7 @@ export const Grid = forwardRef(function Grid (props, ref) {
     const frozenRows = []
     for (let r = 1; r <= fr; r++) if (rowH[r] > 0) frozenRows.push(r)
     const frozenCols = []
-    for (let c = 1; c <= fc; c++) frozenCols.push(c)
+    for (let c = 1; c <= fc; c++) if (widths[c] > 0) frozenCols.push(c)
     const marks = (rr, cc) => {
       const inPane = (r, c) => rr(r) && cc(c)
       return (
@@ -405,7 +409,7 @@ export const Grid = forwardRef(function Grid (props, ref) {
         <div style={{ transform: `translateX(${-scroll.left}px)`, width: totalW, position: 'relative', height: '100%' }}>
           {cols.filter((c) => c > fc).map(colHead)}
         </div>
-        {fc > 0 && <div className='frozen-heads' style={{ width: frozenW, height: '100%' }}>{Array.from({ length: fc }, (_, i) => colHead(i + 1))}</div>}
+        {fc > 0 && <div className='frozen-heads' style={{ width: frozenW, height: '100%' }}>{Array.from({ length: fc }, (_, i) => i + 1).filter((c) => widths[c] > 0).map(colHead)}</div>}
       </div>
       <div className='row-heads'>
         <div style={{ transform: `translateY(${-scroll.top}px)`, height: totalH, position: 'relative' }}>

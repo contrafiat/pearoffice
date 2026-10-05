@@ -549,3 +549,13 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
   .filter-button { width: 26px; height: 26px; }
   .cell.filter-head { padding-right: 30px; }
 }
+
+/* Hidden rows and columns (proposals/2026-10-04-sheet-tools.md) */
+.unhide-mark { position: absolute; padding: 0; min-height: 0; border: 0; border-radius: 3px; background: var(--pear-dark); opacity: 0.7; cursor: pointer; z-index: 2; }
+.unhide-mark:hover { opacity: 1; }
+.unhide-mark.row { left: 4px; right: 4px; top: -3px; height: 6px; }
+.unhide-mark.col { top: 4px; bottom: 4px; left: -3px; width: 6px; }
+@media (pointer: coarse) {
+  .unhide-mark.row { top: -6px; height: 12px; }
+  .unhide-mark.col { left: -6px; width: 12px; }
+}

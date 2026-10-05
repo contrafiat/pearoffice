@@ -91,6 +91,17 @@ function evaluateSheet (doc) {
   const isFormula = (raw) => typeof raw === 'string' && raw[0] === '='
   const hasInput = (raw) => raw !== undefined && raw !== null && raw !== ''
 
+  // Row ids hidden in each tab (hidden:<tabId>).
+  const hiddenByTab = new Map()
+  const hiddenRowsOf = (tab) => {
+    if (!hiddenByTab.has(tab.id)) {
+      const set = new Set()
+      for (const [id, v] of doc.getMap('hidden:' + tab.id).entries()) if (v === true) set.add(id)
+      hiddenByTab.set(tab.id, set)
+    }
+    return hiddenByTab.get(tab.id)
+  }
+
   const mergesByTab = new Map()
   const mergesOf = (tab) => {
     if (!mergesByTab.has(tab.id)) mergesByTab.set(tab.id, model.getMerges(doc, tab.id))
@@ -341,6 +352,46 @@ function evaluateSheet (doc) {
       const st = spillOf(t, row, col)
       if (!st || st.blocked) throw FormulaError.REF
       return makeRef(reference.ref.sheet, row, col, st.rows, st.cols)
+    }
+    // SUBTOTAL 101-111 and AGGREGATE with options 1, 3, 5 or 7 skip hidden
+    // rows (proposals/2026-10-04-sheet-tools.md). Rows a filter hides do not
+    // count: a filter is one person's own and every device must agree.
+    p.funsNeedContextAndNoDataRetrieve.push('SUBTOTAL', 'AGGREGATE')
+    const plain = { SUBTOTAL: p.functions.SUBTOTAL, AGGREGATE: p.functions.AGGREGATE }
+    const scalar = (context, a) => context.utils.extractRefValue(a).val
+    const valuesOf = (context, a, skipHidden) => {
+      if (!a || !a.ref) return { value: scalar(context, a), isArray: Array.isArray(a && a.value) }
+      const r = a.ref
+      const t = r.sheet ? tabByName(r.sheet) : tab
+      if (!t) throw FormulaError.REF
+      const from = r.from || r
+      const to = r.to || r
+      const hidden = skipHidden ? hiddenRowsOf(t) : null
+      const out = []
+      for (let row = from.row; row <= Math.min(to.row, t.rows.length); row++) {
+        if (hidden && hidden.has(t.rows[row - 1])) continue
+        const line = []
+        for (let col = from.col; col <= Math.min(to.col, t.cols.length); col++) line.push(valueAt(t, row, col))
+        out.push(line)
+      }
+      return { value: out.length ? out : [[null]], isArray: true }
+    }
+    // formulajs reads only the first range, so several are joined into one.
+    const joined = (context, refs, skip) => {
+      const lines = refs.flatMap((a) => { const v = valuesOf(context, a, skip).value; return Array.isArray(v) ? v : [[v]] })
+      return { value: lines.flat().map((v) => [v]), isArray: true }
+    }
+    p.functions.SUBTOTAL = (context, code, ...refs) => {
+      const n = Math.trunc(Number(scalar(context, code)))
+      return plain.SUBTOTAL({ value: n }, joined(context, refs, n >= 101 && n <= 111))
+    }
+    p.functions.AGGREGATE = (context, code, options, ...rest) => {
+      const n = Math.trunc(Number(scalar(context, code)))
+      const opt = Math.trunc(Number(scalar(context, options)))
+      const skip = [1, 3, 5, 7].includes(opt)
+      // 14 to 19 take an array and k; the others any number of ranges.
+      if (n >= 14) return plain.AGGREGATE({ value: n }, { value: opt }, valuesOf(context, rest[0], skip), ...rest.slice(1).map((a) => ({ value: scalar(context, a) })))
+      return plain.AGGREGATE({ value: n }, { value: opt }, joined(context, rest, skip))
     }
     parsers.set(pkey, p)
     return p

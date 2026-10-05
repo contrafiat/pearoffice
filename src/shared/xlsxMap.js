@@ -108,8 +108,11 @@ function workbookToTabs (XLSX, wb) {
       const px = w.wpx || (w.wch ? Math.round(w.wch * 7 + 5) : 0)
       if (px) widths[i + 1] = px
     }
+    const hidden = { rows: [], cols: [] }
+    for (const [i, x] of (ws['!rows'] || []).entries()) if (x && x.hidden && i < MAX_ROWS) hidden.rows.push(i + 1)
+    for (const [i, x] of (ws['!cols'] || []).entries()) if (x && x.hidden && i < MAX_COLS) hidden.cols.push(i + 1)
     const merges = (ws['!merges'] || []).map((m) => [m.s.r + 1, m.s.c + 1, m.e.r + 1, m.e.c + 1]).filter(([r1, c1, r2, c2]) => r2 <= MAX_ROWS && c2 <= MAX_COLS && (r1 !== r2 || c1 !== c2))
-    tabs.push({ name: String(name).slice(0, 100), cells, widths, merges })
+    tabs.push({ name: String(name).slice(0, 100), cells, widths, merges, hidden })
   }
   if (!tabs.length) throw new Error('This file has no sheets')
   return { tabs }
@@ -149,7 +152,10 @@ function dumpToWorkbook (XLSX, dump) {
     if (cols.length) ws['!cols'] = Array.from(cols, (x) => x || {})
     const rows = []
     for (const [row, px] of Object.entries(tab.heights || {})) rows[Number(row) - 1] = { hpt: Math.round(px * 0.75 * 100) / 100 }
+    for (const row of (tab.hidden && tab.hidden.rows) || []) rows[row - 1] = { ...rows[row - 1], hidden: true }
+    for (const col of (tab.hidden && tab.hidden.cols) || []) cols[col - 1] = { ...cols[col - 1], hidden: true }
     if (rows.length) ws['!rows'] = Array.from(rows, (x) => x || {})
+    if (cols.length) ws['!cols'] = Array.from(cols, (x) => x || {})
     // Excel sheet names: 31 chars, no []:*?/\ and unique.
     let name = String(tab.name).replace(/[[\]:*?/\\]/g, ' ').slice(0, 31) || 'Sheet'
     for (let n = 2; used.has(name.toUpperCase()); n++) name = name.slice(0, 28) + ' ' + n

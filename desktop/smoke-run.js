@@ -341,8 +341,23 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
     await sendMod('L', ['control', 'shift'])
     await waitFor('filter off', "!document.querySelector('.filter-status') && !!document.querySelector('.cell[data-r=\"2\"]')")
     await key('Right'); for (let i = 0; i < 3; i++) await key('Down')
-    result.formats = result.frozenStays === true && /^Showing 1 of \d+ rows$/.test(result.filterStatus)
-    step('cell formats, row heights, freeze and filter')
+    // Hide row 2 from its header menu (shared): Down from A1 skips it; the
+    // mark between the headers shows it again.
+    await js(rowHead(2) + ".dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 20, clientY: 120 }))")
+    await waitFor('row menu', "[...document.querySelectorAll('.menu li')].some((l) => l.textContent === 'Hide row 2')")
+    await js("[...document.querySelectorAll('.menu li')].find((l) => l.textContent === 'Hide row 2').click()")
+    await waitFor('row hidden', "!" + cellNode(2, 1) + " && !!document.querySelector('.unhide-mark.row')")
+    await js("document.querySelector('.grid .body').focus()")
+    await sendMod('Home', ['control'])
+    await key('Down')
+    result.skipsHidden = await js("document.querySelector('.formula-bar .address').textContent") === 'A3'
+    await js("document.querySelector('.unhide-mark.row').click()")
+    await waitFor('row shown', "!!" + cellNode(2, 1) + " && !document.querySelector('.unhide-mark')")
+    await js("document.querySelector('.grid .body').focus()")
+    await sendMod('Home', ['control'])
+    await key('Right'); for (let i = 0; i < 3; i++) await key('Down')
+    result.formats = result.frozenStays === true && /^Showing 1 of \d+ rows$/.test(result.filterStatus) && result.skipsHidden
+    step('cell formats, row heights, freeze, filter and hiding')
 
     // Ranges, copy and paste: select B1:B3, copy, paste into C1. The formula
     // moves with it, as in Excel.

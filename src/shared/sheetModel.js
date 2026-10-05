@@ -658,6 +658,31 @@ function getFreeze (doc, tabId) {
   return { rows, cols }
 }
 
+// Hidden rows and columns (proposals/2026-10-04-sheet-tools.md), shared by
+// everyone: the root map hidden:<tabId> holds row or column id -> true.
+// kind 'row' or 'col'; from..to inclusive.
+function setHidden (doc, tabId, kind, from, to, hidden) {
+  return capture(doc, () => {
+    const ids = tabMap(doc, tabId).get(kind === 'col' ? 'cols' : 'rows')
+    const map = doc.getMap('hidden:' + tabId)
+    for (let i = Math.max(1, from); i <= Math.min(to, ids.length); i++) {
+      const id = ids.get(i - 1)
+      if (hidden) { if (map.get(id) !== true) map.set(id, true) } else if (map.has(id)) map.delete(id)
+    }
+  })
+}
+
+// { rows: [row numbers], cols: [col numbers] }, in order.
+function getHidden (doc, tabId) {
+  const t = tabMap(doc, tabId)
+  const map = doc.getMap('hidden:' + tabId)
+  const out = { rows: [], cols: [] }
+  if (!map.size) return out
+  t.get('rows').toArray().forEach((id, i) => { if (map.get(id) === true) out.rows.push(i + 1) })
+  t.get('cols').toArray().forEach((id, i) => { if (map.get(id) === true) out.cols.push(i + 1) })
+  return out
+}
+
 // Row heights (pixels at 100%), in the root map heights:<tabId> by row id.
 // A row without one is the default height, or taller to fit wrapped or
 // larger text on each device.
@@ -721,6 +746,11 @@ function importTabs (doc, payload) {
       for (const [row, px] of Object.entries(tab.heights || {})) {
         const rowId = t.get('rows').get(Number(row) - 1)
         if (rowId && px > 0) doc.getMap('heights:' + id).set(rowId, Math.max(12, Math.min(600, Math.round(px))))
+      }
+      if (tab.hidden) {
+        const map = doc.getMap('hidden:' + id)
+        for (const r of tab.hidden.rows || []) { const rid = t.get('rows').get(r - 1); if (rid) map.set(rid, true) }
+        for (const c of tab.hidden.cols || []) { const cid = t.get('cols').get(c - 1); if (cid) map.set(cid, true) }
       }
       if (tab.freeze && (tab.freeze.rows || tab.freeze.cols)) {
         ctx.extend(id, tab.freeze.rows || 0, tab.freeze.cols || 0)
@@ -847,6 +877,8 @@ module.exports = {
   getInput,
   setFormat,
   getFormat,
+  setHidden,
+  getHidden,
   insertRows,
   insertCols,
   deleteRows,
