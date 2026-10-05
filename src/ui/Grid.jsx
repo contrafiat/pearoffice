@@ -2,6 +2,7 @@ import { ChartFrame } from './ChartFrame.jsx'
 import React, { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { colName } from './a1.js'
 import { textStyle, borderCss, hasBorder, neededHeight } from './cellStyle.js'
+import { Funnel, CaretDown } from '@phosphor-icons/react'
 
 const BASE_ROW_H = 24
 const HEAD_H = 26
@@ -15,7 +16,7 @@ export const MAX_ZOOM = 2.5
 // sheets stay fast. Headers are drawn outside the scroll area and moved with
 // the scroll position.
 export const Grid = forwardRef(function Grid (props, ref) {
-  const { view, cells, sel, ext = sel, range, spillBox, editing, onSelect, onEdit, onEditChange, onEditKey, onEditBlur, onEditCaret = () => {}, onKeyDown, onHeaderMenu, onCellMenu = () => {}, onFill = null, charts = [], selectedChart = null, chartActions = null, onResize, onRowResize = () => {}, onCopy, onPaste, zoom = 1, onZoom, inputMode } = props
+  const { view, cells, sel, ext = sel, range, spillBox, editing, onSelect, onEdit, onEditChange, onEditKey, onEditBlur, onEditCaret = () => {}, onKeyDown, onHeaderMenu, onCellMenu = () => {}, onFill = null, charts = [], selectedChart = null, chartActions = null, onResize, onRowResize = () => {}, onCopy, onPaste, zoom = 1, onZoom, inputMode, hiddenRows = null, filterHead = null, onFilterMenu = () => {} } = props
   // Row height and column widths scale with the zoom (pinch on a phone);
   // stored widths stay unzoomed.
   const ROW_H = Math.round(BASE_ROW_H * zoom)
@@ -104,8 +105,10 @@ export const Grid = forwardRef(function Grid (props, ref) {
     const h = new Array(view.rows + 2)
     for (let r = 1; r <= view.rows; r++) h[r] = Math.round(((view.heights && view.heights[r]) || need.get(r) || BASE_ROW_H) * zoom)
     if (rowDrag) h[rowDrag.row] = rowDrag.h
+    // Rows this device's filter hides take no space.
+    if (hiddenRows) for (const r of hiddenRows) if (r <= view.rows) h[r] = 0
     return h
-  }, [cells, view.rows, view.heights, view.widths, zoom, rowDrag])
+  }, [cells, view.rows, view.heights, view.widths, zoom, rowDrag, hiddenRows])
   const rowY = useMemo(() => {
     const y = new Array(view.rows + 2)
     y[1] = 0
@@ -219,7 +222,7 @@ export const Grid = forwardRef(function Grid (props, ref) {
   while (lastCol < view.cols && colX[lastCol] < scroll.left + scroll.width) lastCol++
 
   const rows = []
-  for (let r = firstRow; r <= lastRow; r++) rows.push(r)
+  for (let r = firstRow; r <= lastRow; r++) if (rowH[r] > 0) rows.push(r)
   const cols = []
   for (let c = firstCol; c <= lastCol; c++) cols.push(c)
 
@@ -278,7 +281,7 @@ export const Grid = forwardRef(function Grid (props, ref) {
     return (
       <div
         key={r}
-        className={'row-head' + (r >= range.r1 && r <= range.r2 ? ' on' : '')}
+        className={'row-head' + (r >= range.r1 && r <= range.r2 ? ' on' : '') + (hiddenRows && hiddenRows.has(r - 1) ? ' after-hidden' : '')}
         style={{ top: rowY[r], height: rowH[r] }}
         onClick={(e) => { if (e.shiftKey) onSelect(r, view.cols, true); else { onSelect(r, 1); onSelect(r, view.cols, true) } }}
         onContextMenu={(e) => { e.preventDefault(); onHeaderMenu('row', r, e.clientX, e.clientY) }}
@@ -295,7 +298,8 @@ export const Grid = forwardRef(function Grid (props, ref) {
         const m = merged.top.get(r + ',' + c)
         const cell = cells.get(r + ',' + c)
         const fmt = (cell && cell.fmt) || {}
-        const cls = 'cell' + (cell ? ' k-' + cell.kind : '') + (fmt.b ? ' b' : '') + (fmt.i ? ' i' : '') + (fmt.wrap ? ' wrap' : '') + (fmt.valign ? ' v-' + fmt.valign : '')
+        const head = filterHead && r === filterHead.row && c >= filterHead.c1 && c <= filterHead.c2
+        const cls = 'cell' + (cell ? ' k-' + cell.kind : '') + (fmt.b ? ' b' : '') + (fmt.i ? ' i' : '') + (fmt.wrap ? ' wrap' : '') + (fmt.valign ? ' v-' + fmt.valign : '') + (head ? ' filter-head' : '')
         return (
           <div
             key={r + ',' + c}
@@ -313,6 +317,18 @@ export const Grid = forwardRef(function Grid (props, ref) {
           >
             <span className='cell-text' style={textStyle(fmt, zoom)}>{cell ? cell.display : ''}</span>
             {hasBorder(fmt) && <span className='cell-borders' style={{ borderTop: borderCss(fmt.bt), borderRight: borderCss(fmt.br), borderBottom: borderCss(fmt.bb), borderLeft: borderCss(fmt.bl) }} />}
+            {head && (
+              <button
+                className={'filter-button' + (filterHead.active.has(c) ? ' on' : '')}
+                aria-label={'Filter column ' + colName(c)}
+                onMouseDown={(e) => e.stopPropagation()}
+                onTouchEnd={(e) => e.stopPropagation()}
+                onDoubleClick={(e) => e.stopPropagation()}
+                onClick={(e) => { e.stopPropagation(); const b = e.currentTarget.getBoundingClientRect(); onFilterMenu(c, b.left, b.bottom) }}
+              >
+                {filterHead.active.has(c) ? <Funnel size={12} weight='fill' /> : <CaretDown size={12} weight='bold' />}
+              </button>
+            )}
           </div>
         )
   }
@@ -342,7 +358,7 @@ export const Grid = forwardRef(function Grid (props, ref) {
     const visCols = cols.filter((c) => c > fc)
     const visRows = rows.filter((r) => r > fr)
     const frozenRows = []
-    for (let r = 1; r <= fr; r++) frozenRows.push(r)
+    for (let r = 1; r <= fr; r++) if (rowH[r] > 0) frozenRows.push(r)
     const frozenCols = []
     for (let c = 1; c <= fc; c++) frozenCols.push(c)
     const marks = (rr, cc) => {
@@ -395,7 +411,7 @@ export const Grid = forwardRef(function Grid (props, ref) {
         <div style={{ transform: `translateY(${-scroll.top}px)`, height: totalH, position: 'relative' }}>
           {rows.filter((r) => r > fr).map(rowHead)}
         </div>
-        {fr > 0 && <div className='frozen-heads' style={{ width: '100%', height: frozenH }}>{Array.from({ length: fr }, (_, i) => rowHead(i + 1))}</div>}
+        {fr > 0 && <div className='frozen-heads' style={{ width: '100%', height: frozenH }}>{Array.from({ length: fr }, (_, i) => i + 1).filter((r) => rowH[r] > 0).map(rowHead)}</div>}
       </div>
       <div className='body' ref={bodyRef} tabIndex={0} onScroll={onScroll} onKeyDown={onKeyDown} onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} aria-label='Spreadsheet' role='grid'>
         <div className='canvas' style={{ width: totalW, height: totalH }}>

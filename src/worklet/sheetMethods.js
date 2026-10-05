@@ -445,7 +445,8 @@ function createSheetMethods (sheets, { getJoin, getMoves, getProfiles }) {
     'sheet:fill': mutate((doc, tab, a) => {
       if (!['down', 'up', 'right', 'left'].includes(a.dir)) throw new Error('bad fill direction')
       const n = Math.min(100000, Math.max(0, Math.trunc(Number(a.n) || 0)))
-      return model.fillRange(doc, tab, { r1: a.r1, c1: a.c1, r2: a.r2, c2: a.c2 }, a.dir, n, a.mode === 'copy' ? 'copy' : 'series')
+      return model.fillRange(doc, tab, { r1: a.r1, c1: a.c1, r2: a.r2, c2: a.c2 }, a.dir, n, a.mode === 'copy' ? 'copy' : 'series',
+        Array.isArray(a.skipRows) && a.skipRows.length ? new Set(a.skipRows.map(Number)) : null)
     }),
 
     // Charts (proposals/2026-10-04-charts.md).

@@ -300,10 +300,18 @@ function sortRows (doc, tabId, r1, c1, r2, c2, order) {
 // Fill n cells past a source range in one direction ('down', 'up', 'right',
 // 'left'), as one change: series or copies (src/shared/fill.js). Copied
 // formulas shift their references to the new cell; formats come along.
-function fillRange (doc, tabId, src, dir, n, mode = 'series') {
+// skipRows: rows a filter hides on this device, left untouched by a fill
+// up or down (as in Excel).
+function fillRange (doc, tabId, src, dir, n, mode = 'series', skipRows = null) {
   if (!(n > 0)) return null
   const vertical = dir === 'down' || dir === 'up'
   const backward = dir === 'up' || dir === 'left'
+  // The rows (or columns) filled, in order away from the source.
+  const targets = []
+  for (let step = 1; step <= n; step++) {
+    const at = vertical ? (backward ? src.r1 - step : src.r2 + step) : (backward ? src.c1 - step : src.c2 + step)
+    if (!(vertical && skipRows && skipRows.has(at))) targets.push(at)
+  }
   return capture(doc, () => {
     const ctx = makeCtx(doc, tabId)
     const t = tabMap(doc, tabId)
@@ -326,11 +334,10 @@ function fillRange (doc, tabId, src, dir, n, mode = 'series') {
         const f = formatOf(r, c)
         cellsOf.push({ r, c, input: getInput(doc, tabId, r, c, prebuilt), fmt: f, num: f.num })
       }
-      const plan = fillLine(cellsOf, n, { backward, mode })
+      const plan = fillLine(cellsOf, targets.length, { backward, mode })
       plan.forEach((p, t) => {
-        const step = t + 1
-        const r = vertical ? (backward ? src.r1 - step : src.r2 + step) : line
-        const c = vertical ? line : (backward ? src.c1 - step : src.c2 + step)
+        const r = vertical ? targets[t] : line
+        const c = vertical ? line : targets[t]
         if (r < 1 || c < 1) return
         let input
         let f

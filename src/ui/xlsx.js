@@ -5,6 +5,7 @@ import * as XLSX from 'xlsx/dist/xlsx.mini.min.js'
 import * as fflate from 'fflate'
 import { workbookToTabs, workbookBytes, freezeFromXlsx, READ_OPTIONS } from '../shared/xlsxMap.js'
 import { call } from './bridge.js'
+import { writePref } from './prefs.js'
 import { borderCss, fontPx, FONTS } from './cellStyle.js'
 
 const MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -15,7 +16,20 @@ function importWorkbook (wb, name, bytes) {
   // Frozen panes come from the raw file (SheetJS does not report them).
   if (bytes) freezeFromXlsx(bytes, fflate).forEach((f, i) => { if (f && tabs[i]) tabs[i].freeze = f })
   const title = String(name || '').replace(/\.[^.]+$/, '') || 'Imported sheet'
-  return call('sheet:import', { title, tabs })
+  return call('sheet:import', { title, tabs }).then(async (r) => {
+    // A filter in the file becomes this device's filter, with nothing hidden
+    // (proposals/2026-10-04-freeze-filter.md).
+    const ranges = wb.SheetNames.map((n) => { const f = wb.Sheets[n]['!autofilter']; return f && f.ref ? XLSX.utils.decode_range(f.ref) : null })
+    if (r && r.sheetId && ranges.some(Boolean)) {
+      try {
+        const v = await call('sheet:view', { sheetId: r.sheetId })
+        ranges.forEach((box, i) => {
+          if (box && v.tabs[i]) writePref('pearsheet:filter:' + r.sheetId + ':' + v.tabs[i].id, JSON.stringify({ r1: box.s.r + 1, c1: box.s.c + 1, c2: box.e.c + 1, cols: {} }))
+        })
+      } catch {}
+    }
+    return r
+  })
 }
 
 // Desktop: a File from an <input type=file>.
