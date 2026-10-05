@@ -325,8 +325,24 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
     await waitFor('unfrozen', "!document.querySelector('.frozen-top')")
     await js("document.querySelector('.grid .body').scrollTop = 0")
     await js("document.querySelector('.grid .body').focus()")
-    result.formats = result.frozenStays === true
-    step('cell formats and row heights')
+    // Filter (this device only): from A1, Ctrl+Shift+L, then keep only
+    // "Total" in column A; row 2 hides and the status line counts.
+    await sendMod('Home', ['control'])
+    await sendMod('L', ['control', 'shift'])
+    await waitFor('filter on', "!!document.querySelector('.filter-button')")
+    await js("document.querySelector('.cell[data-r=\"1\"][data-c=\"1\"] .filter-button').click()")
+    await waitFor('filter panel', "!!document.querySelector('.panel[aria-label=\"Filter\"]')")
+    await js("document.querySelector('.filter-values .check input').click()")
+    await js("[...document.querySelectorAll('.filter-values .check')].find((l) => l.textContent.startsWith('Total')).querySelector('input').click()")
+    await js("[...document.querySelectorAll('.panel button')].find((b) => b.textContent.trim() === 'Apply').click()")
+    await waitFor('filtered', "!document.querySelector('.panel[aria-label=\"Filter\"]') && !document.querySelector('.cell[data-r=\"2\"]') && !!document.querySelector('.cell[data-r=\"3\"]')")
+    result.filterStatus = await js("document.querySelector('.filter-status').textContent")
+    await js("document.querySelector('.grid .body').focus()")
+    await sendMod('L', ['control', 'shift'])
+    await waitFor('filter off', "!document.querySelector('.filter-status') && !!document.querySelector('.cell[data-r=\"2\"]')")
+    await key('Right'); for (let i = 0; i < 3; i++) await key('Down')
+    result.formats = result.frozenStays === true && /^Showing 1 of \d+ rows$/.test(result.filterStatus)
+    step('cell formats, row heights, freeze and filter')
 
     // Ranges, copy and paste: select B1:B3, copy, paste into C1. The formula
     // moves with it, as in Excel.

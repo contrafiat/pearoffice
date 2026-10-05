@@ -9,6 +9,8 @@ import { SharePanel } from './SharePanel.jsx'
 import { PeopleStack } from './Avatar.jsx'
 import { FindPanel } from './FindPanel.jsx'
 import { SortPanel } from './SortPanel.jsx'
+import { FilterPanel } from './FilterPanel.jsx'
+import { filterRows, columnValues, isActive } from '../shared/filter.js'
 import { ChartPanel } from './ChartPanel.jsx'
 import { ChartView, downloadChart, chartSvg } from './Chart.jsx'
 import { guessChart } from '../shared/charts.js'
@@ -137,6 +139,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
   const [sorting, setSorting] = useState(null) // what the Sort panel sorts
   const [droppingTab, setDroppingTab] = useState(null) // a tab waiting for "Delete"
   const [confirmMerge, setConfirmMerge] = useState(null) // a range whose merge would clear cells
+  const [filtering, setFiltering] = useState(null) // the column whose filter panel is open
   const [selectedChart, setSelectedChart] = useState(null) // chart id (desktop)
   const [editingChart, setEditingChart] = useState(null) // chart id in the editor
   const [viewingChart, setViewingChart] = useState(null) // chart id full screen (phones)
@@ -179,6 +182,28 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
     if (view) for (const c of view.cells) m.set(c.row + ',' + c.col, c)
     return m
   }, [view])
+
+  // Filters (proposals/2026-10-04-freeze-filter.md) are this device's own,
+  // kept in its storage per sheet and tab, never in the sheet.
+  const viewTab = view && view.tabId
+  const filterKey = 'pearsheet:filter:' + sheetId + ':' + viewTab
+  const [filter, setFilterState] = useState(null)
+  useEffect(() => {
+    if (!viewTab) return
+    let f = null
+    try { f = JSON.parse(readPref(filterKey) || 'null') } catch {}
+    setFilterState(f && f.r1 > 0 && f.c1 > 0 && f.c2 >= f.c1 ? f : null)
+  }, [filterKey, viewTab])
+  const setFilter = (f) => { setFilterState(f); writePref(filterKey, f ? JSON.stringify(f) : '') }
+  const filtered = useMemo(() => (filter && view ? filterRows(cells, filter, view.rows) : null), [filter, cells, view])
+  const hidden = filtered && filtered.hidden.size ? filtered.hidden : null
+  const isHidden = (r) => !!(hidden && hidden.has(r))
+  const filterHead = useMemo(() => {
+    if (!filter) return null
+    const active = new Set()
+    for (let c = filter.c1; c <= filter.c2; c++) if (isActive(filter, c)) active.add(c)
+    return { row: filter.r1, c1: filter.c1, c2: filter.c2, active }
+  }, [filter])
 
   const selected = cells.get(sel.row + ',' + sel.col)
   // Spilling (proposals/2026-10-04-spilling-formulas.md): the formula a
@@ -258,8 +283,11 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
     // Out of a merge: step from its far edge.
     const m = mergeAt(from.row, from.col)
     if (m) from = { row: dr > 0 ? m.r2 : dr < 0 ? m.r1 : from.row, col: dc > 0 ? m.c2 : dc < 0 ? m.c1 : from.col }
-    const row = Math.max(1, Math.min(view.rows, from.row + dr))
+    let row = Math.max(1, Math.min(view.rows, from.row + dr))
     const col = Math.max(1, Math.min(view.cols, from.col + dc))
+    // Over rows the filter hides.
+    while (dr && isHidden(row) && row + Math.sign(dr) >= 1 && row + Math.sign(dr) <= view.rows) row += Math.sign(dr)
+    if (isHidden(row)) row = from.row
     select(row, col, extend)
   }
 
@@ -277,6 +305,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
   function rangeGrid (pick) {
     const out = []
     for (let r = range.r1; r <= range.r2; r++) {
+      if (isHidden(r)) continue // copy takes only the rows a filter shows
       const line = []
       for (let c = range.c1; c <= range.c2; c++) line.push(pick(cells.get(r + ',' + c) || null))
       out.push(line)
@@ -346,22 +375,26 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
     if (single) source = Array.from({ length: h }, () => Array.from({ length: w }, () => source[0][0]))
     // A pasted block moves as a whole; a single cell tiled over a range moves
     // to each target cell in turn.
+    // Rows a filter hides are skipped: line r goes to the r-th shown row.
+    const targets = []
+    for (let t = range.r1; targets.length < h; t++) if (!isHidden(t)) targets.push(t)
     const at = (r, c, input) => {
       if (!ours || mode === 'values' || typeof input !== 'string' || input[0] !== '=') return input
       // Transposed, the cell at (r, c) came from (c, r).
-      const dr = range.r1 - ours.row + (single ? r : 0) + (mode === 'transpose' ? r - c : 0)
+      const dr = range.r1 - ours.row + (single ? r : 0) + (mode === 'transpose' ? r - c : 0) + (targets[r] - range.r1 - r)
       const dc = range.c1 - ours.col + (single ? c : 0) + (mode === 'transpose' ? c - r : 0)
       return '=' + shiftA1(input.slice(1), dr, dc)
     }
-    const grid = source.map((line, r) => line.map((input, c) => at(r, c, input)))
-    run('sheet:setCells', { row: range.r1, col: range.c1, grid })
+    const grid = source.slice(0, targets.length).map((line, r) => line.map((input, c) => at(r, c, input)))
+    if (targets.length === h && targets[h - 1] === range.r1 + h - 1) run('sheet:setCells', { row: range.r1, col: range.c1, grid })
+    else grid.forEach((line, r) => run('sheet:setCells', { row: targets[r], col: range.c1, grid: [line] }))
     setSel({ row: range.r1, col: range.c1 })
-    setExt({ row: range.r1 + h - 1, col: range.c1 + w - 1 })
+    setExt({ row: targets[targets.length - 1] || range.r1, col: range.c1 + w - 1 })
   }
 
   // Fill n cells past the selection (the fill handle), then select it all.
   async function fillFrom (dir, n, src = range, mode = 'series') {
-    await run('sheet:fill', { ...src, dir, n, mode })
+    await run('sheet:fill', { ...src, dir, n, mode, skipRows: hidden && (dir === 'down' || dir === 'up') ? [...hidden] : undefined })
     const box = { ...src }
     if (dir === 'down') box.r2 += n
     if (dir === 'up') box.r1 -= n
@@ -422,6 +455,24 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
       {(frozen.rows > 0 || frozen.cols > 0) && <li role='menuitem' onClick={() => { close(); run('sheet:setFreeze', { rows: 0, cols: 0 }) }}>Unfreeze</li>}
     </>
   )
+
+  // Filter the table around the selection (its first row is the header),
+  // or turn the filter off.
+  function startFilter () {
+    const box = sortBox()
+    setFilter({ r1: box.r1, c1: box.c1, c2: box.c2, cols: {} })
+  }
+  const filterItems = (close) => (
+    filter
+      ? <li role='menuitem' onClick={() => { close(); setFilter(null) }}>Turn off filter</li>
+      : <li role='menuitem' onClick={() => { close(); startFilter() }}>Filter</li>
+  )
+  function setColumnRule (col, rule) {
+    const cols = { ...filter.cols }
+    if (rule) cols[col] = rule
+    else delete cols[col]
+    setFilter({ ...filter, cols })
+  }
 
   const chartActions = {
     canEdit,
@@ -538,6 +589,11 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
       setFinding({ replace: canEdit && (e.key === 'h' || e.key === 'H') })
       return
     }
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'l' || e.key === 'L')) {
+      e.preventDefault()
+      if (filter) setFilter(null); else startFilter()
+      return
+    }
     if (!canEdit) {
       if (navKey(e)) return
       const moves = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1], Tab: [0, e.shiftKey ? -1 : 1] }
@@ -580,12 +636,13 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
     let numbers = 0
     let count = 0
     for (const x of cells.values()) {
-      if (x.row < range.r1 || x.row > range.r2 || x.col < range.c1 || x.col > range.c2 || x.display === '') continue
+      if (x.row < range.r1 || x.row > range.r2 || x.col < range.c1 || x.col > range.c2 || x.display === '' || isHidden(x.row)) continue
       count++
       if (x.num !== undefined) { sum += x.num; numbers++ }
     }
     return { sum, average: numbers ? sum / numbers : null, count }
-  }, [cells, range.r1, range.r2, range.c1, range.c2])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cells, range.r1, range.r2, range.c1, range.c2, hidden])
   const shortNumber = (n) => String(Number(n.toPrecision(12)))
 
   const editValue = editing ? editing.value : null
@@ -798,6 +855,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
               {!phone && <li role='menuitem' onClick={() => printTab(view, 'print', printCharts()).catch((err) => onError(err.message))}>Print this tab...</li>}
               {canEdit && <li role='menuitem' onClick={openSort}>Sort...</li>}
               {freezeItems(() => setMore(false))}
+              {filterItems(() => setMore(false))}
               {canEdit && phone && <li role='menuitem' onClick={() => fillSelection('down')}>Fill down</li>}
               {canEdit && phone && <li role='menuitem' onClick={() => fillSelection('right')}>Fill right</li>}
               <li role='menuitem' onClick={() => setDeleting('local')}>Remove from this device</li>
@@ -875,6 +933,9 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
         }}
         onResize={(col, px) => { if (canEdit) run('sheet:setWidth', { col, px }) }}
         onRowResize={(row, px) => { if (canEdit) run('sheet:setHeight', { row, px }) }}
+        hiddenRows={hidden}
+        filterHead={filterHead}
+        onFilterMenu={(col) => setFiltering(col)}
       />
 
       {confirmMerge && (
@@ -970,6 +1031,18 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
           onClose={() => { setSorting(null); afterPanel() }}
         />
       )}
+      {filtering && filter && (
+        <FilterPanel
+          key={filtering}
+          title={(cells.get(filter.r1 + ',' + filtering) || {}).display || 'column ' + colName(filtering)}
+          values={columnValues(cells, filter, filtering, view.rows)}
+          rule={filter.cols[filtering]}
+          canSort={canEdit}
+          onSort={(desc) => { setFiltering(null); sortBy({ r1: filter.r1, c1: filter.c1, r2: filtered.r2, c2: filter.c2 }, [{ col: filtering, desc }], true); afterPanel() }}
+          onApply={(rule) => { setColumnRule(filtering, rule); setFiltering(null); afterPanel() }}
+          onClose={() => { setFiltering(null); afterPanel() }}
+        />
+      )}
       {sharing && <SharePanel sheetId={sheetId} onClose={() => setSharing(false)} onError={onError} />}
       {shownHelp && <FormulaHelp help={shownHelp} selected={helpSel} onPick={pickFunction} anchor={document.activeElement && document.activeElement.tagName === 'INPUT' ? document.activeElement : null} />}
       {deleting && <DeletePanel sheetId={sheetId} title={view.title} kind={deleting} onClose={() => setDeleting(null)} onError={onError} onDone={() => { setDeleting(null); onGone() }} />}
@@ -1002,6 +1075,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
               {canEdit && <li role='menuitem' onClick={() => { setMenu(null); quickSort(true) }}>Sort Z to A</li>}
               {canEdit && <li role='menuitem' onClick={() => { setMenu(null); openSort() }}>Sort...</li>}
               {freezeItems(() => setMenu(null))}
+              {filterItems(() => setMenu(null))}
               {canEdit && <li role='menuitem' className='danger' onClick={() => { setMenu(null); run('sheet:clearRange', range) }}>Clear contents</li>}
             </>
           )}
@@ -1042,6 +1116,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
             </button>
             ))}
         {canEdit && <button className='tab add' title='Add tab' aria-label='Add tab' onClick={async () => { const r = await run('sheet:addTab', {}); if (r) setTabId(r.tabId) }}><Plus size={16} /></button>}
+        {filtered && <span className='filter-status' aria-live='polite'>Showing {filtered.showing} of {filtered.total} rows</span>}
               {totals && (
           <span className='totals' aria-live='polite'>
             {totals.average !== null && <span>Sum <b>{shortNumber(totals.sum)}</b></span>}
