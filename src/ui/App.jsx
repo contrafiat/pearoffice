@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { call, on } from './bridge.js'
 import { SheetView } from './SheetView.jsx'
-import { JoinPanel, WaitingJoinPanel } from './JoinPanel.jsx'
+import { JoinPanel, JoinProgress, JoinPill } from './JoinPanel.jsx'
 import { SeederPanel } from './SeederPanel.jsx'
 import { DevicesPanel } from './DevicesPanel.jsx'
 import { importFile, pickAndImport, isMobile } from './xlsx.js'
@@ -58,7 +58,10 @@ export function App () {
   const [avatar, setAvatar] = useState(null) // { data, mime, hash } or null
   const [myId, setMyId] = useState(null)
   const [settings, setSettings] = useState(false)
-  const [waitingJoin, setWaitingJoin] = useState(null) // sheetId
+  // A short note at the bottom ("Joined ..."), gone after a few seconds.
+  const [toast, setToast] = useState(null)
+  useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(null), 4000); return () => clearTimeout(t) }, [toast])
+  const [waitingJoin, setWaitingJoin] = useState(null) // sheetId of the join shown in a progress panel
   const [seeder, setSeeder] = useState(false)
   const [navOpen, setNavOpen] = useState(false) // phone layout: the sheet list slides in
   const [devices, setDevices] = useState(null) // { link } | { startWith } | {} when open
@@ -70,8 +73,10 @@ export function App () {
 
   const refresh = useCallback(async () => {
     try {
-      setSheets(await call('sheet:list'))
+      const list = await call('sheet:list')
+      setSheets(list)
       call('app:me').then((me) => setNudge(!!me.phraseNudge)).catch(() => {})
+      return list
     } catch (err) {
       setError(err.message)
     }
@@ -94,7 +99,13 @@ export function App () {
     const offs = [
       on('worklet:exit', () => setError('The sync engine stopped. Restart PearSheet.')),
       on('join:progress', refresh),
-      on('sheet:joined', async ({ sheetId }) => { await refresh(); setCurrent(sheetId) }),
+      on('sheet:joined', async ({ sheetId }) => {
+        const list = await refresh()
+        setCurrent(sheetId)
+        setWaitingJoin((w) => (w === sheetId ? null : w))
+        const s = list && list.find((x) => x.sheetId === sheetId)
+        setToast('Joined ' + (s && s.title ? '"' + s.title + '"' : 'the sheet'))
+      }),
       // A sheet moved to fresh keys: follow it if it is the one on screen.
       on('sheet:moved', async ({ from, to }) => { await refresh(); setCurrent((c) => (c === from ? to : c)) }),
       on('sheet:removed', refresh),
@@ -190,7 +201,7 @@ export function App () {
           initialLink={joining}
           onClose={() => setJoining(null)}
           onError={setError}
-          onJoined={async () => { setJoining(null); await refresh() }}
+          onStarted={async (sheetId) => { setJoining(null); await refresh(); setWaitingJoin(sheetId) }}
         />
       )}
       {settings && (
@@ -210,13 +221,16 @@ export function App () {
           onError={setError}
         />
       )}
-      {waitingJoin && sheets && sheets.find((x) => x.sheetId === waitingJoin && x.waiting) && (
-        <WaitingJoinPanel
+      {waitingJoin && sheets && sheets.find((x) => x.sheetId === waitingJoin && x.joining) && (
+        <JoinProgress
           entry={sheets.find((x) => x.sheetId === waitingJoin)}
+          onBackground={() => setWaitingJoin(null)}
           onClose={() => setWaitingJoin(null)}
           onError={setError}
         />
       )}
+      {!waitingJoin && joining === null && sheets && <JoinPill entries={sheets.filter((x) => x.joining)} onOpen={setWaitingJoin} />}
+      {toast && <div className='toast' role='status'>{toast}</div>}
       {devices && <DevicesPanel initialLink={devices.link || ''} startWith={devices.startWith || null} onBack={devices.fromSettings ? () => { setDevices(null); setSettings(true) } : null} onClose={() => setDevices(null)} onError={setError} />}
       {seeder && <SeederPanel initialLink={typeof seeder === 'string' && seeder !== 'fromSettings' ? seeder : ''} onBack={seeder === 'fromSettings' ? () => { setSeeder(false); setSettings(true) } : null} onClose={() => setSeeder(false)} onError={setError} />}
       <main className='main'>

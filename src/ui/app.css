@@ -617,3 +617,16 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 .tab-strip .tab { flex: none; white-space: nowrap; }
 .tabbar .filter-status, .tabbar .totals { flex: none; }
 .tabbar .filter-status { display: flex; align-items: center; font-size: 12px; white-space: nowrap; padding: 0 6px; }
+
+/* Joining (progress panel, background pill, the "Joined" note) */
+@keyframes pearsheet-spin { to { transform: rotate(360deg); } }
+.spin, .join-spinner { animation: pearsheet-spin 1s linear infinite; }
+.join-spinner { align-self: center; color: var(--pear); margin: 4px 0; }
+.join-steps { list-style: none; margin: 0 auto; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.join-steps li { display: flex; align-items: center; gap: 8px; color: var(--muted); }
+.join-steps li.done svg { color: var(--pear); }
+.join-steps li.now { color: var(--ink); font-weight: 600; }
+.join-progress .small { text-align: center; }
+.join-pill { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(46px + env(safe-area-inset-bottom)); z-index: 15; display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 999px; border: 1px solid var(--line-strong); background: var(--panel); color: var(--ink); box-shadow: 0 4px 16px rgb(0 0 0 / 0.18); cursor: pointer; font: inherit; white-space: nowrap; }
+.join-pill svg { color: var(--pear); }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(46px + env(safe-area-inset-bottom)); z-index: 16; padding: 8px 16px; border-radius: 999px; background: var(--ink); color: var(--panel); box-shadow: 0 4px 16px rgb(0 0 0 / 0.18); white-space: nowrap; }
