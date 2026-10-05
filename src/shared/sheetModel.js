@@ -698,7 +698,7 @@ function importTabs (doc, payload) {
       const t = tabMap(doc, id)
       let maxR = 0
       let maxC = 0
-      for (const [r, c] of tab.cells) { if (r > maxR) maxR = r; if (c > maxC) maxC = c }
+      for (const [r, c] of [...tab.cells, ...(tab.styles || [])]) { if (r > maxR) maxR = r; if (c > maxC) maxC = c }
       ctx.extend(id, maxR + 20, Math.max(maxC + 2, DEFAULT_COLS))
       for (const [row, col, input, num] of tab.cells) {
         writeCell(doc, ctx, id, row, col, input)
@@ -706,6 +706,21 @@ function importTabs (doc, payload) {
           const { rowId, colId } = idsAt(doc, id, row, col)
           t.get('fmt').set(cellKey(rowId, colId) + ':num', num)
         }
+      }
+      // Formats read from the file's styles (src/shared/xlsxStyles.js); a
+      // value PearSheet does not allow is left out.
+      for (const [row, col, f] of tab.styles || []) {
+        const { rowId, colId } = idsAt(doc, id, row, col)
+        if (!rowId || !colId) continue
+        for (const [a, v] of Object.entries(f || {})) {
+          if (a === 'num') continue
+          try { checkFormat(a, v) } catch { continue }
+          t.get('fmt').set(cellKey(rowId, colId) + ':' + a, v)
+        }
+      }
+      for (const [row, px] of Object.entries(tab.heights || {})) {
+        const rowId = t.get('rows').get(Number(row) - 1)
+        if (rowId && px > 0) doc.getMap('heights:' + id).set(rowId, Math.max(12, Math.min(600, Math.round(px))))
       }
       if (tab.freeze && (tab.freeze.rows || tab.freeze.cols)) {
         ctx.extend(id, tab.freeze.rows || 0, tab.freeze.cols || 0)

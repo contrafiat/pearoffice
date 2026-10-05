@@ -473,6 +473,13 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
     for (let i = 0; i < 2; i++) await key('Down')
     await key('Right')
     result.importedFormula = await js("document.querySelector('.formula-bar input').value")
+    // Formats come back from the file: M30 underlined and struck through,
+    // M31 at 24pt with borders, row 29's height.
+    await sendMod('Home', ['control'])
+    for (let i = 0; i < 12; i++) await key('Right')
+    for (let i = 0; i < 30; i++) await key('Down')
+    await waitFor('imported formats', cellNode(30, 13) + ".querySelector('.cell-text').style.textDecoration === 'underline line-through' && " + cellNode(31, 13) + ".querySelector('.cell-text').style.fontSize === '32px' && !!" + cellNode(31, 13) + ".querySelector('.cell-borders') && " + rowHead(29) + '.getBoundingClientRect().height > 45')
+    result.importedFormats = true
     step('import')
 
     // The Seeder and Devices panels reach the engine (seeder: and link: calls).
@@ -594,7 +601,7 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
       fs.writeFileSync(shot, image.toPNG())
       step('screenshot', shot)
     }
-    result.ok = result.keepOnline && result.avatar && result.spill && result.quickWins && result.findSort && result.fill && result.charts && result.formats && result.csvPdf && result.tabs && result.suggested === 'SUBSTITUTE,SUBTOTAL,SUM' && result.argHelp === 'number1' && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.importedFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000 && result.pastedFormula === '=SUM(C1:C2)' && result.inviteLink === 'pearsheet://join?s=' + result.inviteLink.slice(19) && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
+    result.ok = result.importedFormats && result.keepOnline && result.avatar && result.spill && result.quickWins && result.findSort && result.fill && result.charts && result.formats && result.csvPdf && result.tabs && result.suggested === 'SUBSTITUTE,SUBTOTAL,SUM' && result.argHelp === 'number1' && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.importedFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000 && result.pastedFormula === '=SUM(C1:C2)' && result.inviteLink === 'pearsheet://join?s=' + result.inviteLink.slice(19) && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
   } catch (err) {
     result.error = err.message
     // What the page showed, to tell a UI failure from a load failure.

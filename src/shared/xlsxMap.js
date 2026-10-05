@@ -147,6 +147,9 @@ function dumpToWorkbook (XLSX, dump) {
     const cols = []
     for (const [col, px] of Object.entries(tab.widths || {})) cols[Number(col) - 1] = { wpx: px }
     if (cols.length) ws['!cols'] = Array.from(cols, (x) => x || {})
+    const rows = []
+    for (const [row, px] of Object.entries(tab.heights || {})) rows[Number(row) - 1] = { hpt: Math.round(px * 0.75 * 100) / 100 }
+    if (rows.length) ws['!rows'] = Array.from(rows, (x) => x || {})
     // Excel sheet names: 31 chars, no []:*?/\ and unique.
     let name = String(tab.name).replace(/[[\]:*?/\\]/g, ' ').slice(0, 31) || 'Sheet'
     for (let n = 2; used.has(name.toUpperCase()); n++) name = name.slice(0, 28) + ' ' + n
