@@ -102,6 +102,15 @@ newline JSON instead; the desktop app uses that for "Run a seeder on this
 computer" (`desktop/seeder-process.js`, a separate process from the member
 worklet).
 
+The Umbrel app (proposals/2026-10-05-umbrel-seeder.md) is the seeder plus
+a web dashboard: `seeder-dist/umbrel/server.js` (login from
+`@peerloom/host/dashboard-auth`, copied from the sibling `../peerloom-host`)
+and `index.html`. `node scripts/stage-umbrel.js` stages it per arch in
+`dist/umbrel/`; `scripts/build-umbrel-image.sh` builds amd64 and arm64 and
+pushes `ghcr.io/peerloomllc/pearsheet-seeder` (`PUSH=0` to only build). It
+must run with host networking: through Docker's bridge, devices cannot pair.
+The store entry is `peerloom-umbrel-app-store/peerloom-pearsheet-seeder/`.
+
 `npm run dist:seeder` builds the headless download for Linux x64 and arm64
 (`dist/seeder-pkg/*.tar.gz`: Bare runtime, seeder bundle, launcher, systemd
 user unit, README from `seeder-dist/`) and checks the x64 one starts.

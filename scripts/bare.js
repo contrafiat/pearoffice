@@ -30,4 +30,25 @@ function pack (entry, out) {
   return out
 }
 
-module.exports = { root, host, barePath, pack }
+// The headless seeder for a Linux arch (x64 or arm64) in dir: the Bare
+// runtime as dir/bare and dir/seeder/seeder.bundle with that arch's addons.
+// Used by the Linux download and the Umbrel image.
+function seederPayload (arch, dir) {
+  const target = 'linux-' + arch
+  const runtimeVersion = require(path.join(root, 'node_modules', 'bare-runtime', 'package.json')).version
+  const runtimeDir = path.join(root, 'node_modules', 'bare-runtime-' + target)
+  if (!fs.existsSync(runtimeDir)) execFileSync('npm', ['install', '--no-save', '--force', 'bare-runtime-' + target + '@' + runtimeVersion], { cwd: root, stdio: 'inherit' })
+  fs.mkdirSync(dir, { recursive: true })
+  fs.copyFileSync(path.join(runtimeDir, 'bin', 'bare'), path.join(dir, 'bare'))
+  fs.chmodSync(path.join(dir, 'bare'), 0o755)
+  if (arch === process.arch) { try { execFileSync('strip', ['--strip-unneeded', path.join(dir, 'bare')]) } catch {} }
+  execFileSync(process.execPath, [
+    path.join(root, 'node_modules', 'bare-pack', 'bin.js'),
+    '--host', target, '--offload-addons',
+    '--imports', path.join(root, 'scripts', 'bare-imports.js'),
+    '-o', path.join(dir, 'seeder', 'seeder.bundle'),
+    path.join(root, 'src', 'seeder', 'bare.js')
+  ], { cwd: root, stdio: 'inherit' })
+}
+
+module.exports = { root, host, barePath, pack, seederPayload }
