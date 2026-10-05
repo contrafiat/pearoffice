@@ -2,6 +2,19 @@
 
 Append-only, newest on top. Per Constitution §4.
 
+## 2026-10-05 - No StartOS seeder for now
+Tier: T1
+Context: proposals/2026-10-05-start9-seeder.md.
+Choice: hold the native StartOS 0.4 package (built in `start9/seeder/`).
+On Tim's Start9 a desktop on the same LAN could not pair (stalled 180 s)
+while the Pixel on cellular paired in about 1 s: StartOS 0.4 puts every
+package behind a second NAT the SDK cannot turn off.
+Alternatives: ship it for away-from-home use (rejected - a home server's
+devices are mostly at home); have the seeder announce the box's LAN address
+and a forwarded port, or a relay (both need their own proposal).
+Consequences: Umbrel, the desktop app and the Linux download are the
+always-on seeders.
+
 ## 2026-10-05 - Umbrel seeder: host networking and its own login
 Tier: T1 (packaging), login as PearTune's approved design
 Context: proposals/2026-10-05-umbrel-seeder.md.
