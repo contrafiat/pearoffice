@@ -37,7 +37,7 @@ test('stop backing up to a seeder', async (t) => {
   const owner = await device('Owner')
   const editor = await device('Editor')
   const seederKey = hex(seeder.seederKey)
-  for (const e of [owner, editor]) await call(e, 'seeder:pair', { link: seeder.openPairing().link })
+  await call(owner, 'seeder:pair', { link: seeder.openPairing().link })
 
   const { sheetId } = await call(owner, 'sheet:create', { title: 'Trip' })
   await call(owner, 'sheet:setCell', { sheetId, row: 1, col: 1, input: 'tent' })
@@ -48,6 +48,9 @@ test('stop backing up to a seeder', async (t) => {
   await waitFor('seeder holds it', async () => seeder.allowedSheets().includes(bootstrap))
   const listed = async (e) => (await call(e, 'seeder:sheet', { sheetId })).listed.map((x) => x.seederKey)
   await waitFor('both see the listing', async () => (await listed(owner)).length === 1 && (await listed(editor)).length === 1)
+  // Paired only now: an editor paired while joining can list the seeder at
+  // the same moment as the owner, and either listing may win.
+  await call(editor, 'seeder:pair', { link: seeder.openPairing().link })
 
   await t.test('only the owner or whoever listed a seeder can take it off', async () => {
     const view = await call(editor, 'seeder:sheet', { sheetId })
