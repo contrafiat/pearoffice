@@ -39,16 +39,16 @@ function titleOf (xml) {
   return cached ? unesc(cached) : null
 }
 
-// One series' references: { name, cats, vals } as range text (or null).
+// One series' references: { name, cats, vals, size } as range text (or null).
 function seriesRefs (ser) {
   const f = (tag) => { const m = new RegExp('<c:' + tag + '>[\\s\\S]*?<c:f>([\\s\\S]*?)</c:f>').exec(ser); return m ? unesc(m[1]).replace(/\$/g, '') : null }
-  return { name: f('tx'), cats: f('cat') || f('xVal'), vals: f('val') || f('yVal') }
+  return { name: f('tx'), cats: f('cat') || f('xVal'), vals: f('val') || f('yVal'), size: f('bubbleSize') }
 }
 
 // Turn a chart part into a PearSheet chart (without anchor and size), or null.
 function chartFrom (xml, sheetName) {
   const plot = first(xml, /<c:plotArea>([\s\S]*?)<\/c:plotArea>/) || ''
-  const groups = [...plot.matchAll(/<c:(bar|bar3D|line|line3D|area|area3D|pie|pie3D|ofPie|doughnut|scatter)Chart>([\s\S]*?)<\/c:\1Chart>/g)]
+  const groups = [...plot.matchAll(/<c:(bar|bar3D|line|line3D|area|area3D|pie|pie3D|ofPie|doughnut|scatter|radar|bubble|bubble3D|stock)Chart>([\s\S]*?)<\/c:\1Chart>/g)]
   if (!groups.length) return null
   const kinds = groups.map((g) => g[1].replace(/3D$/, '').replace('ofPie', 'pie'))
   const series = []
@@ -60,7 +60,10 @@ function chartFrom (xml, sheetName) {
     const onSecond = firstAxes.length && axes.length && axes.join() !== firstAxes.join()
     for (const m of body.matchAll(/<c:ser>([\s\S]*?)<\/c:ser>/g)) {
       const i = series.length
-      series.push(seriesRefs(m[1]))
+      const refs = seriesRefs(m[1])
+      series.push(refs)
+      // A bubble series is Y then its sizes, two columns in PearSheet.
+      if (refs.size) series.push({ name: null, cats: null, vals: refs.size })
       if (/^line/.test(kind) && kinds.some((k) => k === 'bar')) lineSeries.push(i)
       if (onSecond) secondAxis.push(i)
     }
@@ -94,6 +97,7 @@ function chartFrom (xml, sheetName) {
   const head = groups[0][2]
   let type = kinds[0]
   if (type === 'bar') type = val(head, 'barDir') === 'bar' ? 'bar' : 'column'
+  if (type === 'bubble3D') type = 'bubble'
   if (kinds.includes('bar') && kinds.includes('line')) type = 'combo'
   const grouping = val(head, 'grouping')
   const chart = {
@@ -142,6 +146,37 @@ function gridOf (sheetXml) {
   return { col: (c) => cols[c] || defCol, row: (r) => rows[r] || defRow }
 }
 
+// A histogram or waterfall in Excel's newer chart format (chartex).
+// names: the workbook's defined names (Excel's _xlchart.v1.N point at cells).
+function chartexFrom (xml, sheetName, names = {}) {
+  const series = first(xml, /(<cx:series\s[\s\S]*?<\/cx:series>)/)
+  if (!series) return null
+  const layoutId = attr(first(series, /(<cx:series\s[^>]*>)/), 'layoutId')
+  const type = layoutId === 'waterfall' ? 'waterfall' : /<cx:binning/.test(series) ? 'histogram' : null
+  if (!type) return null
+  const f = (re) => { const m = re.exec(xml); if (!m) return null; const t = unesc(m[1]).trim(); return (names[t] || t).replace(/\$/g, '') }
+  const vals = f(/<cx:numDim type="val">\s*<cx:f[^>]*>([\s\S]*?)<\/cx:f>/)
+  if (!vals) return null
+  const cats = f(/<cx:strDim type="cat">\s*<cx:f[^>]*>([\s\S]*?)<\/cx:f>/)
+  const name = f(/<cx:txData>\s*<cx:f[^>]*>([\s\S]*?)<\/cx:f>/)
+  const boxes = [vals, cats, name].filter(Boolean).map(parseRange)
+  if (boxes.some((b) => !b)) return null
+  const sheet = boxes[0].sheet || sheetName
+  if (boxes.some((b) => (b.sheet || sheetName).toUpperCase() !== sheet.toUpperCase())) return null
+  const r1 = Math.min(...boxes.map((b) => b.r1))
+  const c1 = Math.min(...boxes.map((b) => b.c1))
+  const r2 = Math.max(...boxes.map((b) => b.r2))
+  const c2 = Math.max(...boxes.map((b) => b.c2))
+  const prefix = sheet.toUpperCase() !== String(sheetName).toUpperCase() ? "'" + sheet.replace(/'/g, "''") + "'!" : ''
+  const chart = { type, data: prefix + numToCol(c1) + r1 + ':' + numToCol(c2) + r2, seriesIn: 'columns', labels: { row: !!name, col: !!cats }, legend: 'none' }
+  const title = texts(first(xml, /<cx:title[\s\S]*?(<cx:tx>[\s\S]*?<\/cx:tx>)/)) || f(/<cx:title[\s\S]*?<cx:v>([\s\S]*?)<\/cx:v>/)
+  if (title) chart.title = title
+  const bin = Number(attr(first(series, /(<cx:binSize\s[^>]*>)/), 'val'))
+  if (type === 'histogram' && bin > 0) chart.binWidth = bin
+  if (type === 'waterfall') chart.totals = [...series.matchAll(/<cx:subtotals>[\s\S]*?<\/cx:subtotals>/g)].flatMap((m) => [...m[0].matchAll(/<cx:idx val="(\d+)"/g)].map((x) => Number(x[1])))
+  return chart
+}
+
 // Where a drawing anchor puts a chart: { anchor, size } in pixels.
 function placeOf (anchorXml, grid) {
   const pos = (tag) => {
@@ -171,6 +206,11 @@ function chartsFromXlsx (bytes, fflate, sheetNames) {
   try { files = fflate.unzipSync(bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes)) } catch { return [] }
   const read = (p) => (files[p] ? fflate.strFromU8(files[p]) : '')
   const { sheetPaths } = require('./xlsxStyles')
+  const names = {}
+  for (const m of read('xl/workbook.xml').matchAll(/<definedName\s([^>]*)>([\s\S]*?)<\/definedName>/g)) {
+    const n = attr('<x ' + m[1] + '>', 'name')
+    if (n) names[n] = unesc(m[2]).trim()
+  }
   return sheetPaths(files, fflate.strFromU8).map((path, i) => {
     const out = []
     if (!path || !files[path]) return out
@@ -180,11 +220,14 @@ function chartsFromXlsx (bytes, fflate, sheetNames) {
     const drawingRels = relsOf(files, drawing, fflate.strFromU8)
     const grid = gridOf(read(path))
     for (const m of read(drawing).matchAll(/<xdr:(oneCellAnchor|twoCellAnchor|absoluteAnchor)[\s\S]*?<\/xdr:\1>/g)) {
+      // Excel's newer chart format first (histogram, waterfall), then the
+      // classic chart (or the newer one's fallback).
+      const exRid = attr(first(m[0], /(<cx:chart\s[^>]*>)/), 'r:id')
+      const exPart = exRid && drawingRels[exRid]
       const chartRid = attr(first(m[0], /(<c:chart\s[^>]*>)/), 'r:id')
       const part = chartRid && drawingRels[chartRid]
-      if (!part || !files[part]) continue
       try {
-        const chart = chartFrom(read(part), sheetNames[i] || '')
+        const chart = (exPart && files[exPart] && chartexFrom(read(exPart), sheetNames[i] || '', names)) || (part && files[part] && chartFrom(read(part), sheetNames[i] || ''))
         if (chart) out.push({ ...chart, ...placeOf(m[0], grid) })
       } catch {}
     }

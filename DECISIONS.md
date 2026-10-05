@@ -2,6 +2,19 @@
 
 Append-only, newest on top. Per Constitution §4.
 
+## 2026-10-05 - Radar, bubble, stock, histogram and waterfall charts
+Tier: T2
+Context: proposals/2026-10-05-more-chart-types.md.
+Choice: five new values of a chart's shared `type`, plus `binWidth` and
+`totals`. Each reads the chart's one data range (bubble: X then Y and size
+per series; stock: label then Open, High, Low, Close). Histogram bins and
+waterfall running totals are worked out on each device. In .xlsx, radar,
+bubble and stock are classic chart parts; histogram and waterfall use
+Excel's newer chart format with a plain column chart as the fallback.
+Alternatives: plain column charts only in files (rejected - not real
+histograms in Excel).
+Consequences: older builds draw these as column charts.
+
 ## 2026-10-04 - Hiding, conditional formatting, validation, names, comments
 Tier: T2
 Context: the rest of the everyday gaps against Calc

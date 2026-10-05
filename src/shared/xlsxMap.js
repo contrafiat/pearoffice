@@ -131,7 +131,7 @@ function workbookToTabs (XLSX, wb) {
     if (n.Sheet !== undefined && n.Sheet !== null) continue
     const box = require('./charts').parseRange(String(n.Ref || ''))
     const tab = box && box.sheet ? wb.SheetNames.findIndex((x) => x.toUpperCase() === box.sheet.toUpperCase()) : -1
-    if (!box || box.spill || tab < 0 || /^_xlnm\./i.test(n.Name)) continue
+    if (!box || box.spill || tab < 0 || /^_xl/i.test(n.Name) || n.Hidden) continue
     names.push({ name: n.Name, tab, range: numToCol(box.c1) + box.r1 + ':' + numToCol(box.c2) + box.r2 })
   }
   return { tabs, names }

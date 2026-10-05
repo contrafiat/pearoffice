@@ -220,6 +220,13 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
     await js("[...document.querySelectorAll('.chart-panel label')].find((l) => l.textContent.includes('Show values')).querySelector('input').click()")
     await waitFor('values shown', "[...document.querySelectorAll('.chart-frame svg text')].some((t) => t.textContent === '1200')")
     await js("document.querySelector('.chart-types [title=\"Line\"]').click()")
+    // Each newer type draws (proposals/2026-10-05-more-chart-types.md).
+    for (const t of ['Radar', 'Bubble', 'Stock', 'Histogram', 'Waterfall']) {
+      await js("document.querySelector('.chart-types [title=\"" + t + "\"]').click()")
+      await waitFor(t + ' chart', "document.querySelector('.chart-types [title=\"" + t + "\"]').getAttribute('aria-checked') === 'true' && !!document.querySelector('.chart-frame svg')")
+    }
+    result.moreChartTypes = true
+    await js("document.querySelector('.chart-types [title=\"Line\"]').click()")
     await waitFor('line chart', "document.querySelector('.chart-types [title=\"Line\"]').getAttribute('aria-checked') === 'true'")
     await js("document.querySelector('.chart-panel .close').click()")
     await js("document.querySelector('.grid .body').focus()")
@@ -698,7 +705,7 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
       fs.writeFileSync(shot, image.toPNG())
       step('screenshot', shot)
     }
-    result.ok = result.importedFormats && result.keepOnline && result.avatar && result.spill && result.quickWins && result.findSort && result.fill && result.charts && result.formats && result.csvPdf && result.tabs && result.suggested === 'SUBSTITUTE,SUBTOTAL,SUM' && result.argHelp === 'number1' && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.importedFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000 && result.pastedFormula === '=SUM(C1:C2)' && result.inviteLink === 'pearsheet://join?s=' + result.inviteLink.slice(19) && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
+    result.ok = result.moreChartTypes && result.importedFormats && result.keepOnline && result.avatar && result.spill && result.quickWins && result.findSort && result.fill && result.charts && result.formats && result.csvPdf && result.tabs && result.suggested === 'SUBSTITUTE,SUBTOTAL,SUM' && result.argHelp === 'number1' && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.importedFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000 && result.pastedFormula === '=SUM(C1:C2)' && result.inviteLink === 'pearsheet://join?s=' + result.inviteLink.slice(19) && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
   } catch (err) {
     result.error = err.message
     // What the page showed, to tell a UI failure from a load failure.
