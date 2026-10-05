@@ -9,6 +9,7 @@ const model = require('../shared/sheetModel')
 const { displayNumber } = require('../shared/formula')
 const SSF = require('../shared/formula/vendor/fast-formula-parser/ssf/ssf')
 const m = require('./membership')
+const validation = require('../shared/validation')
 const charts = require('../shared/charts')
 
 const hex = (buf) => b4a.toString(buf, 'hex')
@@ -52,6 +53,29 @@ function resolveChart (doc, tabId, chart, allValues) {
   const out = charts.chartData(block, chart)
   if (!out.series.length) return { error: 'There are no numbers to chart in ' + chart.data }
   return out
+}
+
+// A list rule's items from its range (proposals/2026-10-04-sheet-tools.md):
+// what the cells show, without blanks or repeats.
+function listFromRange (doc, tabId, source, allValues) {
+  const range = charts.parseRange(source)
+  if (!range || range.spill) return []
+  let tab = tabId
+  if (range.sheet) {
+    tab = model.tabIds(doc).find((id) => String(model.tabMap(doc, id).get('name')).toUpperCase() === range.sheet.toUpperCase())
+    if (!tab) return []
+  }
+  const values = allValues.get(tab) || new Map()
+  const out = new Set()
+  for (let r = range.r1; r <= Math.min(range.r2, range.r1 + 499); r++) {
+    for (let c = range.c1; c <= range.c2; c++) {
+      const v = values.get(r + ',' + c)
+      if (!v) continue
+      const shown = present(v, model.getFormat(doc, tab, r, c)).display
+      if (shown !== '') out.add(shown)
+    }
+  }
+  return [...out]
 }
 
 function createSheetMethods (sheets, { getJoin, getMoves, getProfiles }) {
@@ -172,6 +196,21 @@ function createSheetMethods (sheets, { getJoin, getMoves, getProfiles }) {
     }
   }
 
+  // A tab's validation rules (list items resolved) and the cells whose
+  // values break them, the same on every device.
+  function validationView (doc, tab, cells, e) {
+    const rules = model.getValidations(doc, tab)
+    if (!rules.length) return { validations: [], invalid: [] }
+    const all = sheets.values(e)
+    for (const r of rules) if (r.kind === 'list' && r.source) r.items = listFromRange(doc, tab, r.source, all)
+    const invalid = []
+    for (const c of cells) {
+      const rule = validation.ruleFor(rules, c.row, c.col)
+      if (rule && !validation.allows(rule, c)) invalid.push([c.row, c.col])
+    }
+    return { validations: rules, invalid }
+  }
+
   methods = {
     'sheet:create': async ({ title = 'Untitled sheet' } = {}, ctx) => {
       const { groupId } = await ctx.createGroup({ name: title })
@@ -243,7 +282,7 @@ function createSheetMethods (sheets, { getJoin, getMoves, getProfiles }) {
         const widths = {}
         for (const [colId, px] of t.get('widths').entries()) if (colIndex.has(colId)) widths[colIndex.get(colId)] = px
         const tabCharts = model.getCharts(doc, id).map((c) => ({ ...c, resolved: resolveChart(doc, id, c, values) }))
-        return { name: t.get('name'), cells, widths, heights: model.getHeights(doc, id), merges: model.getMerges(doc, id), freeze: model.getFreeze(doc, id), hidden: model.getHidden(doc, id), comments: model.getComments(doc, id).map((t) => ({ row: t.row, col: t.col, author: nameOf(t.author), text: noteOf(t) })), charts: tabCharts }
+        return { name: t.get('name'), cells, widths, heights: model.getHeights(doc, id), merges: model.getMerges(doc, id), freeze: model.getFreeze(doc, id), hidden: model.getHidden(doc, id), validations: model.getValidations(doc, id), comments: model.getComments(doc, id).map((t) => ({ row: t.row, col: t.col, author: nameOf(t.author), text: noteOf(t) })), charts: tabCharts }
       })
       return { title: model.title(doc), tabs }
     },
@@ -325,6 +364,7 @@ function createSheetMethods (sheets, { getJoin, getMoves, getProfiles }) {
         freeze: model.getFreeze(doc, tab),
         hidden: model.getHidden(doc, tab),
         comments: model.getComments(doc, tab),
+        ...validationView(doc, tab, cells, e),
         charts: model.getCharts(doc, tab).map((c) => ({ ...c, resolved: resolveChart(doc, tab, c, sheets.values(e)) }))
       }
     },
@@ -365,6 +405,7 @@ function createSheetMethods (sheets, { getJoin, getMoves, getProfiles }) {
       return commit(ctx, a.sheetId, model.deleteComment(doc, firstTab(doc, a.tabId), String(a.id), hex(ctx.identity.publicKey)))
     },
     'sheet:resolveComment': mutate((doc, tab, a) => model.resolveComment(doc, tab, String(a.id), !!a.resolved)),
+    'sheet:setValidation': mutate((doc, tab, a) => model.setValidation(doc, tab, String(a.range || ''), a.rule || null)),
     'sheet:setHidden': mutate((doc, tab, a) => model.setHidden(doc, tab, a.kind === 'col' ? 'col' : 'row', a.from | 0, a.to | 0, !!a.hidden)),
     'sheet:setFreeze': mutate((doc, tab, a) => model.setFreeze(doc, tab, Math.max(0, a.rows | 0), Math.max(0, a.cols | 0))),
     'sheet:merge': mutate((doc, tab, a) => model.mergeCells(doc, tab, a.r1, a.c1, a.r2, a.c2)),

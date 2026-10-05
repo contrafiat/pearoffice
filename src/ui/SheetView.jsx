@@ -11,6 +11,8 @@ import { FindPanel } from './FindPanel.jsx'
 import { SortPanel } from './SortPanel.jsx'
 import { FilterPanel } from './FilterPanel.jsx'
 import { CommentPanel, CommentsList } from './CommentPanel.jsx'
+import { ValidationPanel } from './ValidationPanel.jsx'
+import { typed, allows, explain, ruleFor } from '../shared/validation.js'
 import { filterRows, columnValues, isActive } from '../shared/filter.js'
 import { ChartPanel } from './ChartPanel.jsx'
 import { ChartView, downloadChart, chartSvg } from './Chart.jsx'
@@ -143,6 +145,9 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
   const [filtering, setFiltering] = useState(null) // the column whose filter panel is open
   const [commenting, setCommenting] = useState(null) // { row, col } whose thread is open
   const [listingComments, setListingComments] = useState(false)
+  const [validating, setValidating] = useState(null) // the range whose rules are being set
+  const [badEntry, setBadEntry] = useState(null) // { row, col, value, move, rule } refused or warned
+  const [picking, setPicking] = useState(null) // { row, col, x, y } list dropdown open
   const [selectedChart, setSelectedChart] = useState(null) // chart id (desktop)
   const [editingChart, setEditingChart] = useState(null) // chart id in the editor
   const [viewingChart, setViewingChart] = useState(null) // chart id full screen (phones)
@@ -229,6 +234,11 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
   const openThreads = threads.filter((t) => !t.resolved).length
   const commentAct = (what, args) => run('sheet:' + what, { ...args, ...(what === 'addComment' && commenting ? { row: commenting.row, col: commenting.col } : {}) })
 
+  // Data validation (proposals/2026-10-04-sheet-tools.md).
+  const validations = (view && view.validations) || []
+  const invalidCells = useMemo(() => (view && view.invalid && view.invalid.length ? new Set(view.invalid.map(([r, c]) => r + ',' + c)) : null), [view])
+  const selRule = ruleFor(validations, sel.row, sel.col)
+
   const selected = cells.get(sel.row + ',' + sel.col)
   // Spilling (proposals/2026-10-04-spilling-formulas.md): the formula a
   // selected cell's value comes from, and the block it fills.
@@ -259,6 +269,13 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
     if (!current) return
     const { row, col, value } = current
     setEditing(null)
+    // A typed value (not a formula) a validation rule does not allow.
+    const rule = value[0] !== '=' && ruleFor(validations, row, col)
+    if (rule && !allows(rule, typed(value))) { setBadEntry({ row, col, value, move, rule }); return }
+    await writeEntry(row, col, value, move)
+  }
+
+  async function writeEntry (row, col, value, move) {
     const before = cells.get(row + ',' + col)
     if ((before ? before.input : '') !== value) {
       // Show what was typed until the worklet sends the computed value.
@@ -750,7 +767,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
   const barValue = editing && editing.row === sel.row && editing.col === sel.col ? editing.value : spilled ? (anchor ? anchor.input : '') : (selected ? selected.input : '')
 
   return (
-    <div className='sheet' onClick={() => menu && setMenu(null)}>
+    <div className='sheet' onClick={() => { if (menu) setMenu(null); if (picking && !phone) setPicking(null) }}>
       <header className='toolbar'>
         <input
           className='title'
@@ -906,6 +923,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
               {canEdit && <li role='menuitem' onClick={openSort}>Sort...</li>}
               {freezeItems(() => setMore(false))}
               {filterItems(() => setMore(false))}
+              {canEdit && <li role='menuitem' onClick={() => setValidating({ ...range })}>Validation...</li>}
               {threads.length > 0 && <li role='menuitem' onClick={() => setListingComments(true)}>Comments{openThreads ? ' (' + openThreads + ' open)' : ''}</li>}
               {canEdit && phone && <li role='menuitem' onClick={() => fillSelection('down')}>Fill down</li>}
               {canEdit && phone && <li role='menuitem' onClick={() => fillSelection('right')}>Fill right</li>}
@@ -986,6 +1004,9 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
         onRowResize={(row, px) => { if (canEdit) run('sheet:setHeight', { row, px }) }}
         hiddenRows={hidden}
         commentMarks={threadAt.size ? threadAt : null}
+        invalidCells={invalidCells}
+        dropdownAt={canEdit && selRule && selRule.kind === 'list' && selRule.dropdown !== false && (selRule.items || []).length ? sel : null}
+        onDropdown={(x, y) => setPicking({ row: sel.row, col: sel.col, x, y })}
         onComment={(row, col) => setCommenting({ row, col })}
         hiddenCols={hiddenCols}
         unhideMarks={canEdit ? unhideMarks : null}
@@ -1088,6 +1109,61 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
           onClose={() => { setSorting(null); afterPanel() }}
         />
       )}
+      {validating && (() => {
+        const text = colName(validating.c1) + validating.r1 + (validating.r1 === validating.r2 && validating.c1 === validating.c2 ? '' : ':' + colName(validating.c2) + validating.r2)
+        const rule = ruleFor(validations, validating.r1, validating.c1)
+        const close = () => { setValidating(null); afterPanel() }
+        return (
+          <ValidationPanel
+            range={text}
+            rule={rule}
+            onSave={async (r) => { if (await run('sheet:setValidation', { range: text, rule: r }) !== undefined) close() }}
+            onRemove={() => { run('sheet:setValidation', { range: text, rule: null }); close() }}
+            onClose={close}
+          />
+        )
+      })()}
+      {badEntry && (
+        <div className='panel-backdrop' onMouseDown={(e) => { if (e.target === e.currentTarget) setBadEntry(null) }}>
+          <section className='panel' role='alertdialog' aria-label='Not allowed'>
+            <header>
+              <h2>{badEntry.rule.onBad === 'warn' ? 'Keep this value?' : 'That value is not allowed'}</h2>
+              <button className='close' aria-label='Close' onClick={() => { setBadEntry(null); focusGrid() }}><X size={18} /></button>
+            </header>
+            <p>{explain(badEntry.rule)}</p>
+            <div className='row end'>
+              {badEntry.rule.onBad === 'warn'
+                ? <button onClick={() => { const b = badEntry; setBadEntry(null); writeEntry(b.row, b.col, b.value, b.move) }}>Keep it</button>
+                : <button onClick={() => { setBadEntry(null); focusGrid() }}>Cancel</button>}
+              <button className='primary' onClick={() => { const b = badEntry; setBadEntry(null); setEditing({ row: b.row, col: b.col, value: b.value, source: 'grid' }) }}>Change it</button>
+            </div>
+          </section>
+        </div>
+      )}
+      {picking && selRule && (() => {
+        // An item that looks like a formula is entered as text.
+        const pick = (item) => { setPicking(null); writeEntry(picking.row, picking.col, /^[='"]/.test(item) ? "'" + item : item, null) }
+        const items = selRule.items || []
+        return phone
+          ? (
+            <div className='panel-backdrop' onMouseDown={(e) => { if (e.target === e.currentTarget) setPicking(null) }}>
+              <section className='panel' role='dialog' aria-label='Pick a value'>
+                <header>
+                  <h2>{colName(picking.col) + picking.row}</h2>
+                  <button className='close' aria-label='Close' onClick={() => setPicking(null)}><X size={18} /></button>
+                </header>
+                <ul className='pick-list' role='listbox'>
+                  {items.map((it) => <li key={it} role='option' aria-selected={(selected && selected.display) === it} onClick={() => pick(it)}>{it}</li>)}
+                </ul>
+              </section>
+            </div>
+            )
+          : (
+            <ul className='menu pick-menu' role='listbox' style={{ left: Math.max(8, picking.x - 200), top: picking.y + 2 }}>
+              {items.map((it) => <li key={it} role='option' aria-selected={(selected && selected.display) === it} onClick={() => pick(it)}>{it}</li>)}
+            </ul>
+            )
+      })()}
       {commenting && (
         <CommentPanel
           sheetId={sheetId}
@@ -1154,6 +1230,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
               {canEdit && <li role='menuitem' onClick={() => { setMenu(null); openSort() }}>Sort...</li>}
               {freezeItems(() => setMenu(null))}
               {filterItems(() => setMenu(null))}
+              {canEdit && <li role='menuitem' onClick={() => { setMenu(null); setValidating({ ...range }) }}>Validation...</li>}
               {(canEdit || threadAt.has(sel.row + ',' + sel.col)) && <li role='menuitem' onClick={() => { setMenu(null); setCommenting({ row: sel.row, col: sel.col }) }}>{threadAt.has(sel.row + ',' + sel.col) ? 'Show comments' : 'Comment'}</li>}
               {canEdit && <li role='menuitem' className='danger' onClick={() => { setMenu(null); run('sheet:clearRange', range) }}>Clear contents</li>}
             </>

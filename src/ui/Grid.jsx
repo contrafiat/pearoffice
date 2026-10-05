@@ -16,7 +16,7 @@ export const MAX_ZOOM = 2.5
 // sheets stay fast. Headers are drawn outside the scroll area and moved with
 // the scroll position.
 export const Grid = forwardRef(function Grid (props, ref) {
-  const { view, cells, sel, ext = sel, range, spillBox, editing, onSelect, onEdit, onEditChange, onEditKey, onEditBlur, onEditCaret = () => {}, onKeyDown, onHeaderMenu, onCellMenu = () => {}, onFill = null, charts = [], selectedChart = null, chartActions = null, onResize, onRowResize = () => {}, onCopy, onPaste, zoom = 1, onZoom, inputMode, hiddenRows = null, hiddenCols = null, unhideMarks = null, onUnhide = () => {}, onAutoFit = () => {}, filterHead = null, onFilterMenu = () => {}, commentMarks = null, onComment = () => {} } = props
+  const { view, cells, sel, ext = sel, range, spillBox, editing, onSelect, onEdit, onEditChange, onEditKey, onEditBlur, onEditCaret = () => {}, onKeyDown, onHeaderMenu, onCellMenu = () => {}, onFill = null, charts = [], selectedChart = null, chartActions = null, onResize, onRowResize = () => {}, onCopy, onPaste, zoom = 1, onZoom, inputMode, hiddenRows = null, hiddenCols = null, unhideMarks = null, onUnhide = () => {}, onAutoFit = () => {}, filterHead = null, onFilterMenu = () => {}, commentMarks = null, onComment = () => {}, invalidCells = null, dropdownAt = null, onDropdown = () => {} } = props
   // Row height and column widths scale with the zoom (pinch on a phone);
   // stored widths stay unzoomed.
   const ROW_H = Math.round(BASE_ROW_H * zoom)
@@ -303,7 +303,7 @@ export const Grid = forwardRef(function Grid (props, ref) {
         const cell = cells.get(r + ',' + c)
         const fmt = (cell && cell.fmt) || {}
         const head = filterHead && r === filterHead.row && c >= filterHead.c1 && c <= filterHead.c2
-        const cls = 'cell' + (cell ? ' k-' + cell.kind : '') + (fmt.b ? ' b' : '') + (fmt.i ? ' i' : '') + (fmt.wrap ? ' wrap' : '') + (fmt.valign ? ' v-' + fmt.valign : '') + (head ? ' filter-head' : '')
+        const cls = 'cell' + (cell ? ' k-' + cell.kind : '') + (fmt.b ? ' b' : '') + (fmt.i ? ' i' : '') + (fmt.wrap ? ' wrap' : '') + (fmt.valign ? ' v-' + fmt.valign : '') + (head ? ' filter-head' : '') + (invalidCells && invalidCells.has(r + ',' + c) ? ' invalid' : '')
         return (
           <div
             key={r + ',' + c}
@@ -510,6 +510,18 @@ export const Grid = forwardRef(function Grid (props, ref) {
             }}
           />
           {isEditingHere && !inFrozen(editing.row, editing.col) && editorAt()}
+          {dropdownAt && !editing && !inFrozen(dropdownAt.row, dropdownAt.col) && rowH[dropdownAt.row] > 0 && (
+            <button
+              className='list-button'
+              aria-label='Pick from the list'
+              style={{ top: rowY[dropdownAt.row] + (rowH[dropdownAt.row] - 22) / 2, left: colX[dropdownAt.col] + widths[dropdownAt.col] - 26 }}
+              onMouseDown={(e) => e.stopPropagation()}
+              onTouchEnd={(e) => e.stopPropagation()}
+              onClick={(e) => { e.stopPropagation(); const b = e.currentTarget.getBoundingClientRect(); onDropdown(b.right, b.bottom) }}
+            >
+              <CaretDown size={12} weight='bold' />
+            </button>
+          )}
         </div>
       </div>
     </div>

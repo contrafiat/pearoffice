@@ -18,6 +18,7 @@
 const Y = require('yjs')
 const { newId } = require('./ids')
 const refs = require('./refs')
+const { numToCol } = require('./a1')
 const { fillLine } = require('./fill')
 
 const VERSION = 1
@@ -776,6 +777,61 @@ function getComments (doc, tabId) {
     .sort((a, b) => a.row - b.row || a.col - b.col || order(a, b))
 }
 
+// Data validation (proposals/2026-10-04-sheet-tools.md), in the root map
+// valid:<tabId>: rule id -> { range, source (stored like formula
+// references, so they follow inserts and deletes), n (order: the newest
+// rule wins where two cover a cell), kind, op, a, b, items, dropdown,
+// onBad, message }. A new rule replaces the ones wholly inside its range;
+// clearing (rule null) removes every rule that touches the range.
+const validation = require('./validation')
+
+function setValidation (doc, tabId, rangeText, rule) {
+  const box = require('./charts').parseRange(rangeText)
+  if (!box || box.sheet || box.spill) throw new Error('Pick a range on this tab')
+  const clean = rule ? validation.normalize(rule) : null
+  if (clean && clean.source) {
+    const src = require('./charts').parseRange(clean.source)
+    if (!src || src.spill) throw new Error('The list range is not a range')
+  }
+  return capture(doc, () => {
+    const ctx = makeCtx(doc, tabId)
+    ctx.extend(tabId, box.r2, box.c2)
+    const map = doc.getMap('valid:' + tabId)
+    let n = 0
+    for (const v of getValidations(doc, tabId)) {
+      const inside = v.r1 >= box.r1 && v.r2 <= box.r2 && v.c1 >= box.c1 && v.c2 <= box.c2
+      const touches = !(v.r1 > box.r2 || v.r2 < box.r1 || v.c1 > box.c2 || v.c2 < box.c1)
+      if (clean ? inside : touches) map.delete(v.id)
+    }
+    if (!clean) return
+    for (const x of map.values()) n = Math.max(n, (x && x.n) || 0)
+    const text = numToCol(box.c1) + box.r1 + ':' + numToCol(box.c2) + box.r2
+    const stored = { ...clean, n: n + 1, range: refs.toStored(text, makeCtx(doc, tabId)) }
+    if (clean.source) stored.source = refs.toStored(clean.source, makeCtx(doc, tabId))
+    map.set(newId(), stored)
+  })
+}
+
+// The tab's rules in order (oldest first), with their ranges as numbers.
+// A rule whose range was deleted is left out.
+function getValidations (doc, tabId) {
+  const map = doc.getMap('valid:' + tabId)
+  if (!map.size) return []
+  const where = { tabId, tabs: tabsContext(doc) }
+  const out = []
+  for (const [id, v] of map.entries()) {
+    if (!v || typeof v !== 'object') continue
+    const range = refs.toDisplay(v.range || '', where)
+    const box = require('./charts').parseRange(range)
+    if (!box || box.sheet) continue
+    const rule = { id, range, r1: box.r1, c1: box.c1, r2: box.r2, c2: box.c2, n: v.n || 0 }
+    for (const k of ['kind', 'op', 'a', 'b', 'items', 'dropdown', 'onBad', 'message']) if (v[k] !== undefined) rule[k] = v[k]
+    if (v.source) rule.source = refs.toDisplay(v.source, where)
+    out.push(rule)
+  }
+  return out.sort((a, b) => a.n - b.n || (a.id < b.id ? -1 : 1))
+}
+
 // Row heights (pixels at 100%), in the root map heights:<tabId> by row id.
 // A row without one is the default height, or taller to fit wrapped or
 // larger text on each device.
@@ -839,6 +895,9 @@ function importTabs (doc, payload) {
       for (const [row, px] of Object.entries(tab.heights || {})) {
         const rowId = t.get('rows').get(Number(row) - 1)
         if (rowId && px > 0) doc.getMap('heights:' + id).set(rowId, Math.max(12, Math.min(600, Math.round(px))))
+      }
+      for (const v of tab.validations || []) {
+        try { setValidation(doc, id, v.range, v) } catch {}
       }
       for (const note of tab.comments || []) {
         try { addComment(doc, id, { row: note.row, col: note.col, author: String(note.author || 'xlsx:Imported'), text: note.text, at: 0 }) } catch {}
@@ -975,6 +1034,8 @@ module.exports = {
   getFormat,
   setHidden,
   getHidden,
+  setValidation,
+  getValidations,
   addComment,
   editComment,
   deleteComment,
