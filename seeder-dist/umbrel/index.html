@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PearSheet Seeder</title>
+<link rel="stylesheet" href="fonts.css">
+<style>
+  :root {
+    --paper: #f7f7f4; --panel: #ffffff; --ink: #1f2420; --muted: #6b716b;
+    --line: #e2e3dd; --pear: #5b8c3a; --pear-dark: #44702a; --pear-soft: #edf4e6;
+    --danger: #b3261e;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper: #171a17; --panel: #1e221e; --ink: #e6e8e3; --muted: #9aa198;
+      --line: #2d322c; --pear: #8bc061; --pear-dark: #a6d47f; --pear-soft: #26331f;
+      --danger: #ff8a80;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font: 400 15px/1.5 'Manrope', system-ui, sans-serif; }
+  main { max-width: 480px; margin: 0 auto; padding: 32px 16px 48px; }
+  h1, h2 { text-align: center; font-weight: 500; margin: 0 0 8px; }
+  h1 { font-size: 24px; }
+  h2 { font-size: 17px; margin-top: 28px; }
+  p { margin: 0 0 12px; }
+  .muted { color: var(--muted); }
+  .small { font-size: 13px; }
+  .center { text-align: center; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 20px; margin-top: 20px; }
+  .stats { display: flex; gap: 12px; }
+  .stat { flex: 1; text-align: center; }
+  .stat b { display: block; font-size: 28px; font-weight: 500; color: var(--pear); }
+  button { font: inherit; font-weight: 500; display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; padding: 8px 16px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; }
+  button.primary { background: var(--pear); border-color: var(--pear); color: #fff; }
+  button.danger { color: var(--danger); }
+  button:disabled { opacity: .6; cursor: default; }
+  .actions { display: flex; justify-content: center; margin-top: 16px; }
+  .row { display: flex; gap: 8px; }
+  .row > button { flex: 1; }
+  svg.icon { width: 18px; height: 18px; fill: currentColor; }
+  .qr { display: flex; justify-content: center; margin: 4px 0 12px; }
+  .qr svg { border-radius: 8px; max-width: 100%; height: auto; }
+  .link { display: flex; gap: 8px; }
+  .link input { flex: 1; min-width: 0; font: 13px ui-monospace, monospace; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); color: var(--ink); }
+  ul { list-style: none; padding: 0; margin: 0; }
+  li { padding: 12px 0; border-top: 1px solid var(--line); }
+  li:first-child { border-top: 0; }
+  .device { display: flex; align-items: center; gap: 12px; }
+  .device .who { flex: 1; min-width: 0; }
+  .mono { font-family: ui-monospace, monospace; font-size: 13px; overflow-wrap: anywhere; }
+  .confirm { margin-top: 10px; }
+  .error { color: var(--danger); text-align: center; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <h1>PearSheet Seeder</h1>
+  <p class="muted center">Keeps your shared sheets online when every device is off. It stores them encrypted and cannot read them.</p>
+
+  <form class="card" id="login" hidden>
+    <h2 style="margin-top:0">Enter the password</h2>
+    <p class="muted small center">On Umbrel it is shown next to PearSheet Seeder in your apps. Elsewhere it is in the seeder's log and in its data folder.</p>
+    <div class="link">
+      <input id="password" type="password" autocomplete="current-password" aria-label="Password">
+      <button class="primary" id="unlock" type="submit">Unlock</button>
+    </div>
+  </form>
+
+  <div id="dashboard" hidden>
+  <div class="card">
+    <div class="stats">
+      <div class="stat"><b id="sheets">-</b><span class="muted small" id="sheets-label">Sheets held</span></div>
+      <div class="stat"><b id="devices-count">-</b><span class="muted small" id="devices-label">Paired devices</span></div>
+    </div>
+    <div class="actions">
+      <button class="primary" id="pair"><svg class="icon" viewBox="0 0 256 256"><path d="M104,40H56A16,16,0,0,0,40,56v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V56A16,16,0,0,0,104,40Zm0,64H56V56h48v48Zm0,32H56a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V152A16,16,0,0,0,104,136Zm0,64H56V152h48v48ZM200,40H152a16,16,0,0,0-16,16v48a16,16,0,0,0,16,16h48a16,16,0,0,0,16-16V56A16,16,0,0,0,200,40Zm0,64H152V56h48v48Zm-64,72V144a8,8,0,0,1,16,0v32a8,8,0,0,1-16,0Zm80-16a8,8,0,0,1-8,8H184v40a8,8,0,0,1-8,8H144a8,8,0,0,1,0-16h24V144a8,8,0,0,1,16,0v8h24A8,8,0,0,1,216,160Zm0,32v16a8,8,0,0,1-16,0V192a8,8,0,0,1,16,0Z"/></svg>Pair a device</button>
+    </div>
+  </div>
+
+  <div class="card" id="pairing" hidden>
+    <h2 style="margin-top:0">Pair a device</h2>
+    <div class="qr" id="qr"></div>
+    <p class="muted small center">In PearSheet, open Seeder and scan this code, or paste the link. <span id="left"></span></p>
+    <div class="link">
+      <input id="link" readonly aria-label="Pairing link">
+      <button id="copy" aria-label="Copy link"><svg class="icon" viewBox="0 0 256 256"><path id="copy-icon" d="M216,32H88a8,8,0,0,0-8,8V80H40a8,8,0,0,0-8,8V216a8,8,0,0,0,8,8H168a8,8,0,0,0,8-8V176h40a8,8,0,0,0,8-8V40A8,8,0,0,0,216,32ZM160,208H48V96H160Zm48-48H176V88a8,8,0,0,0-8-8H96V48H208Z"/></svg></button>
+    </div>
+  </div>
+
+  <h2>Paired devices</h2>
+  <div class="card" style="margin-top:8px">
+    <p class="muted small center" id="no-devices">No devices yet. Pair one to start backing up its sheets.</p>
+    <ul id="device-list"></ul>
+  </div>
+
+  <p class="muted small center" style="margin-top:24px">Seeder key <span class="mono" id="key">-</span></p>
+  </div>
+  <p class="error" id="error" hidden></p>
+</main>
+<script>
+  const $ = (id) => document.getElementById(id)
+  const COPY = $('copy-icon').getAttribute('d')
+  const CHECK = 'M229.66,77.66l-128,128a8,8,0,0,1-11.32,0l-56-56a8,8,0,0,1,11.32-11.32L96,188.69,218.34,66.34a8,8,0,0,1,11.32,11.32Z'
+  let pairing = null
+  let confirming = null
+
+  const LOCKED = new Error('locked')
+  async function api (method, url, body) {
+    const res = await fetch(url, { method, headers: { 'content-type': 'application/json' }, body: body ? JSON.stringify(body) : undefined })
+    const data = await res.json()
+    if (res.status === 401 && url !== 'api/login') { showLogin(true); throw LOCKED }
+    if (!res.ok) throw new Error(data.error || 'Something went wrong.')
+    return data
+  }
+  function showLogin (on) {
+    $('login').hidden = !on
+    $('dashboard').hidden = on
+    if (on) $('password').focus()
+  }
+  $('login').onsubmit = async (e) => {
+    e.preventDefault()
+    $('unlock').disabled = true
+    try {
+      await api('POST', 'api/login', { password: $('password').value })
+      $('password').value = ''
+      showError(null)
+      showLogin(false)
+      refresh()
+    } catch (err) { showError(new Error(err.message === 'wrong password' ? 'That password is not right.' : /too many/.test(err.message) ? 'Too many tries. Wait a minute and try again.' : err.message)) }
+    $('unlock').disabled = false
+  }
+  function showError (err) {
+    if (err === LOCKED) return $('error').textContent = err ? err.message : ''; $('error').hidden = !err }
+  const plural = (n, one, many) => n === 1 ? one : many
+
+  async function refresh () {
+    try {
+      const [s, devices] = await Promise.all([api('GET', 'api/status'), api('GET', 'api/devices')])
+      $('sheets').textContent = s.sheets
+      $('sheets-label').textContent = plural(s.sheets, 'Sheet held', 'Sheets held')
+      $('devices-count').textContent = s.pairedDevices
+      $('devices-label').textContent = plural(s.pairedDevices, 'Paired device', 'Paired devices')
+      $('key').textContent = s.seederKey.slice(0, 16) + '...'
+      renderDevices(devices)
+      showLogin(false)
+      showError(null)
+    } catch (err) { showError(err) }
+  }
+
+  function renderDevices (devices) {
+    $('no-devices').hidden = devices.length > 0
+    const list = $('device-list')
+    list.textContent = ''
+    for (const d of devices) {
+      const li = document.createElement('li')
+      const row = document.createElement('div')
+      row.className = 'device'
+      const who = document.createElement('div')
+      who.className = 'who'
+      const key = document.createElement('div')
+      key.className = 'mono'
+      key.textContent = d.deviceKey.slice(0, 16) + '...'
+      const info = document.createElement('div')
+      info.className = 'muted small'
+      info.textContent = d.sheets + ' ' + plural(d.sheets, 'sheet', 'sheets') + (d.pairedAt ? ', paired ' + new Date(d.pairedAt).toLocaleDateString() : '')
+      who.append(key, info)
+      row.append(who)
+      if (confirming !== d.deviceKey) {
+        const forget = document.createElement('button')
+        forget.className = 'danger'
+        forget.textContent = 'Forget'
+        forget.onclick = () => { confirming = d.deviceKey; renderDevices(devices) }
+        row.append(forget)
+      }
+      li.append(row)
+      if (confirming === d.deviceKey) {
+        const box = document.createElement('div')
+        box.className = 'confirm'
+        const p = document.createElement('p')
+        p.className = 'muted small'
+        p.textContent = 'The seeder stops accepting this device. Sheets no other paired device backs up are deleted from it after 7 days.'
+        const buttons = document.createElement('div')
+        buttons.className = 'row'
+        const yes = document.createElement('button')
+        yes.className = 'danger'
+        yes.textContent = 'Forget'
+        yes.onclick = async () => {
+          yes.disabled = true
+          try { await api('POST', 'api/forget', { deviceKey: d.deviceKey }) } catch (err) { showError(err) }
+          confirming = null
+          refresh()
+        }
+        const no = document.createElement('button')
+        no.textContent = 'Keep'
+        no.onclick = () => { confirming = null; renderDevices(devices) }
+        buttons.append(yes, no)
+        box.append(p, buttons)
+        li.append(box)
+      }
+      list.append(li)
+    }
+  }
+
+  $('pair').onclick = async () => {
+    $('pair').disabled = true
+    try {
+      const p = await api('POST', 'api/pair')
+      // Count down by this browser's clock, from the server's window length.
+      pairing = { ...p, until: Date.now() + (p.expiresAt - p.now) }
+      $('qr').innerHTML = p.svg
+      $('link').value = p.link
+      $('pairing').hidden = false
+      tick()
+      $('pairing').scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    } catch (err) { showError(err) }
+    $('pair').disabled = false
+  }
+
+  $('copy').onclick = async () => {
+    try { await navigator.clipboard.writeText($('link').value) } catch { $('link').select(); document.execCommand('copy') }
+    $('copy-icon').setAttribute('d', CHECK)
+    setTimeout(() => $('copy-icon').setAttribute('d', COPY), 1500)
+  }
+
+  function tick () {
+    if (!pairing) return
+    const ms = pairing.until - Date.now()
+    if (ms <= 0) {
+      pairing = null
+      $('pairing').hidden = true
+      return
+    }
+    const s = Math.ceil(ms / 1000)
+    $('left').textContent = 'Works for ' + Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0') + '.'
+  }
+
+  refresh()
+  setInterval(() => { if ($('login').hidden) refresh() }, 5000)
+  setInterval(tick, 1000)
+</script>
+</body>
+</html>

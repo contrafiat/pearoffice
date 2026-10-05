@@ -2,6 +2,19 @@
 
 Append-only, newest on top. Per Constitution §4.
 
+## 2026-10-05 - Umbrel seeder: host networking and its own login
+Tier: T1 (packaging), login as PearTune's approved design
+Context: proposals/2026-10-05-umbrel-seeder.md.
+Choice: the Umbrel app runs the seeder with `network_mode: host`. On Tim's
+Umbrel a member could not pair through Docker's bridge (stalled 150 s);
+with host networking it paired in 955 ms. Umbrel's app proxy cannot front
+a host-networked app, so the dashboard uses `@peerloom/host/dashboard-auth`
+with the app password umbrelOS shows (`deterministicPassword`).
+Alternatives: bridge plus app proxy, as the PearCal and PearCircle seeders
+(rejected - devices could not reach the seeder).
+Consequences: the dashboard port (8761) is open on the Umbrel's LAN and
+tailnet, behind the password.
+
 ## 2026-10-05 - Formula rules and icon sets in colour rules
 Tier: T2
 Context: proposals/2026-10-05-formula-rules-icon-sets.md.
