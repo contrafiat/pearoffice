@@ -156,15 +156,7 @@ const EXCEL_OVERRIDES = {
   '=DGET(V1:X7, "Profit", Z4:Z5)': [{ error: '#NUM!' }, 'Excel\'s DGET gives #NUM! for more than one match; LibreOffice uses its own Err:502']
 }
 
-// PearSheet's distribution and gamma functions (jStat, through
-// fast-formula-parser and formulajs) agree with Excel to about 8 digits,
-// not 15. Checked at that looser tolerance; see TODO.md.
-const LOWER_PRECISION = new Set([
-  '=CONFIDENCE.T(0.05, 2.5, 50)', '=F.DIST(2, 3, 4, TRUE)', '=F.DIST.RT(2, 3, 4)', '=GAMMA(5.5)', '=T.INV.2T(0.1, 10)',
-  '=T.TEST(A1:A10, B1:B10, 2, 2)', '=T.TEST(A1:A10, B1:B10, 1, 3)'
-])
-
 // Laid out in column H, one per row.
 const cases = formulas.map((f, i) => ['H' + (i + 1), f])
 
-module.exports = { inputs, cases, EXCEL_OVERRIDES, LOWER_PRECISION }
+module.exports = { inputs, cases, EXCEL_OVERRIDES }
