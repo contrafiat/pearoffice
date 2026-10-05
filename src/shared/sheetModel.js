@@ -1189,6 +1189,45 @@ function duplicateTab (doc, tabId) {
       copy.get('fmt').set(cellKey(newRows[rowAt.get(rowId)], newCols[colAt.get(colId)]) + ':' + attr, value)
     }
     for (const [colId, px] of src.get('widths').entries()) if (colAt.has(colId)) copy.get('widths').set(newCols[colAt.get(colId)], px)
+    // Everything else kept per tab, as Excel copies it. A row or column id
+    // of the original maps to the copy's at the same place.
+    const newRow = (rowId) => (rowAt.has(rowId) ? newRows[rowAt.get(rowId)] : null)
+    const newCol = (colId) => (colAt.has(colId) ? newCols[colAt.get(colId)] : null)
+    for (const [rowId, px] of doc.getMap('heights:' + tabId).entries()) if (newRow(rowId)) doc.getMap('heights:' + id).set(newRow(rowId), px)
+    for (const [lineId, v] of doc.getMap('hidden:' + tabId).entries()) { const to = newRow(lineId) || newCol(lineId); if (to) doc.getMap('hidden:' + id).set(to, v) }
+    const view = doc.getMap('view:' + tabId)
+    if (newRow(view.get('freezeRow'))) doc.getMap('view:' + id).set('freezeRow', newRow(view.get('freezeRow')))
+    if (newCol(view.get('freezeCol'))) doc.getMap('view:' + id).set('freezeCol', newCol(view.get('freezeCol')))
+    for (const [key, m] of mergesMap(doc, tabId).entries()) {
+      const [rowId, colId] = key.split(':')
+      if (newRow(rowId) && newCol(colId) && newRow(m.toRow) && newCol(m.toCol)) mergesMap(doc, id).set(cellKey(newRow(rowId), newCol(colId)), { toRow: newRow(m.toRow), toCol: newCol(m.toCol) })
+    }
+    // Ranges are copied in their A1 form, so ones on this tab point at the copy.
+    for (const c of getCharts(doc, tabId)) {
+      const chart = new Y.Map()
+      chartsMap(doc, id).set(newId(), chart)
+      const settings = {}
+      for (const k of CHART_SETTINGS) if (c[k] !== undefined) settings[k] = c[k]
+      writeChart(doc, id, chart, { ...settings, data: c.data, anchor: c.anchor, size: c.size })
+    }
+    for (const r of getCondFormats(doc, tabId)) {
+      const { id: _i, range, r1, c1, r2, c2, ...rule } = r
+      doc.getMap('cf:' + id).set(newId(), { ...rule, range: cfRange(doc, id, range) })
+    }
+    for (const r of getValidations(doc, tabId)) {
+      const { id: _i, range, r1, c1, r2, c2, source, ...rule } = r
+      const stored = { ...rule, range: cfRange(doc, id, range) }
+      if (source) stored.source = refs.toStored(source, makeCtx(doc, id))
+      doc.getMap('valid:' + id).set(newId(), stored)
+    }
+    const comments = doc.getMap('comments:' + tabId)
+    const newIds = new Map()
+    for (const [cid, v] of comments.entries()) if (!cid.includes(':')) newIds.set(cid, newId())
+    for (const [cid, v] of comments.entries()) {
+      if (cid.includes(':')) { const [root, flag] = cid.split(':'); if (newIds.has(root)) doc.getMap('comments:' + id).set(newIds.get(root) + ':' + flag, v); continue }
+      if (!v || !newRow(v.row) || !newCol(v.col)) continue
+      doc.getMap('comments:' + id).set(newIds.get(cid), { ...v, row: newRow(v.row), col: newCol(v.col), parent: v.parent ? newIds.get(v.parent) || null : null })
+    }
   })
   return { id, update }
 }
