@@ -37,7 +37,7 @@ export function DeletePanel ({ sheetId, title, kind, onDone, onClose, onError })
         <div className='row end'>
           <button onClick={onClose}>Keep it</button>
           <button className={everyone ? 'danger' : 'primary'} disabled={busy} onClick={go}>
-            {busy ? 'Working...' : everyone ? 'Delete for everyone' : 'Remove from this device'}
+            {busy ? 'Working...' : everyone ? 'Delete' : 'Remove'}
           </button>
         </div>
       </section>
