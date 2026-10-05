@@ -7,6 +7,7 @@ import { workbookToTabs, workbookBytes, freezeFromXlsx, validationsFromXlsx, con
 import { stylesFromXlsx } from '../shared/xlsxStyles.js'
 import { chartsFromXlsx } from '../shared/xlsxChartsRead.js'
 import { jsonFileToTabs } from '../shared/jsonImport.js'
+import { csvBytesToTabs } from '../shared/csvImport.js'
 import { call } from './bridge.js'
 import { writePref } from './prefs.js'
 import { borderCss, fontPx, FONTS } from './cellStyle.js'
@@ -42,9 +43,12 @@ function importWorkbook (wb, name, bytes) {
 
 // A .json file becomes one tab per list of records plus a Summary tab
 // (src/shared/jsonImport.js).
+// CSV and tab-separated files have their own reader (src/shared/csvImport.js):
+// UTF-8, leading zeros kept, dates shown as dates.
 const isJson = (name) => /\.json$/i.test(String(name || ''))
-function importJson (bytes, name) {
-  const { tabs, names } = jsonFileToTabs(new TextDecoder().decode(bytes))
+const isCsv = (name) => /\.(csv|tsv|txt)$/i.test(String(name || ''))
+function importText (bytes, name) {
+  const { tabs, names } = isJson(name) ? jsonFileToTabs(new TextDecoder().decode(bytes)) : csvBytesToTabs(bytes)
   const title = String(name || '').replace(/\.[^.]+$/, '') || 'Imported sheet'
   return call('sheet:import', { title, tabs, names })
 }
@@ -52,7 +56,7 @@ function importJson (bytes, name) {
 // Desktop: a File from an <input type=file>.
 export async function importFile (file) {
   const data = new Uint8Array(await file.arrayBuffer())
-  if (isJson(file.name)) return importJson(data, file.name)
+  if (isJson(file.name) || isCsv(file.name)) return importText(data, file.name)
   return importWorkbook(XLSX.read(data, { type: 'array', ...READ_OPTIONS }), file.name, data)
 }
 
@@ -61,7 +65,7 @@ export async function pickAndImport () {
   const picked = await call('app:pickFile')
   if (!picked || picked.canceled) return null
   const bytes = Uint8Array.from(atob(picked.base64), (ch) => ch.charCodeAt(0))
-  if (isJson(picked.name)) return importJson(bytes, picked.name)
+  if (isJson(picked.name) || isCsv(picked.name)) return importText(bytes, picked.name)
   return importWorkbook(XLSX.read(bytes, { type: 'array', ...READ_OPTIONS }), picked.name, bytes)
 }
 

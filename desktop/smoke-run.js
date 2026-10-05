@@ -619,6 +619,20 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
     result.jsonImport = true
     step('json import')
 
+    // A .csv file: UTF-8 text, leading zeros kept, dates shown as dates
+    // (src/shared/csvImport.js).
+    await js(`(() => {
+      const dt = new DataTransfer()
+      dt.items.add(new File([${JSON.stringify('Name,Code,Due\nCafé,007,11/15/2026\n')}], 'Codes.csv'))
+      const input = document.querySelector('.import input[type=file]')
+      input.files = dt.files
+      input.dispatchEvent(new Event('change', { bubbles: true }))
+    })()`)
+    await waitFor('csv sheet open', "document.querySelector('.title').value === 'Codes'")
+    await waitFor('csv values', "['Café', '007', '2026-11-15'].every((t) => [...document.querySelectorAll('.cell')].some((c) => c.textContent === t))")
+    result.csvImport = true
+    step('csv import')
+
     const b64 = fs.readFileSync(file).toString('base64')
     await js(`(() => {
       const bytes = Uint8Array.from(atob(${JSON.stringify(b64)}), (c) => c.charCodeAt(0))
@@ -762,7 +776,7 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
       fs.writeFileSync(shot, image.toPNG())
       step('screenshot', shot)
     }
-    result.ok = result.moreChartTypes && result.importedFormats && result.keepOnline && result.avatar && result.spill && result.quickWins && result.findSort && result.fill && result.charts && result.formats && result.csvPdf && result.tabs && result.tidied && result.jsonImport && result.suggested === 'SUBSTITUTE,SUBTOTAL,SUM' && result.argHelp === 'number1' && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.importedFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000 && result.pastedFormula === '=SUM(C1:C2)' && result.inviteLink === 'pearsheet://join?s=' + result.inviteLink.slice(19) && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
+    result.ok = result.moreChartTypes && result.importedFormats && result.keepOnline && result.avatar && result.spill && result.quickWins && result.findSort && result.fill && result.charts && result.formats && result.csvPdf && result.tabs && result.tidied && result.jsonImport && result.csvImport && result.suggested === 'SUBSTITUTE,SUBTOTAL,SUM' && result.argHelp === 'number1' && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.importedFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000 && result.pastedFormula === '=SUM(C1:C2)' && result.inviteLink === 'pearsheet://join?s=' + result.inviteLink.slice(19) && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
   } catch (err) {
     result.error = err.message
     // What the page showed, to tell a UI failure from a load failure.
