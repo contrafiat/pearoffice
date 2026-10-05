@@ -4,7 +4,7 @@
 // {x;x}. The answer must be two cells, checked against LibreOffice
 // (scripts/spill-expectations.js lift writes test/fixtures/lift-expected.json).
 
-const { inputs, cases: functionCases, EXCEL_OVERRIDES: FUNCTION_OVERRIDES, LOWER_PRECISION: FUNCTION_LOWER } = require('./function-corpus')
+const { inputs, cases: functionCases, EXCEL_OVERRIDES: FUNCTION_OVERRIDES } = require('./function-corpus')
 const { LIFT } = require('../../src/shared/formula/lift')
 
 // Top-level arguments of the outermost call, as text.
@@ -48,7 +48,5 @@ const cases = formulas.map((f, i) => ['AH' + (1 + i * SPACING), f])
 const EXCEL_OVERRIDES = {}
 for (const f of formulas) if (origin[f] in FUNCTION_OVERRIDES) EXCEL_OVERRIDES[f] = [[FUNCTION_OVERRIDES[origin[f]][0]], [FUNCTION_OVERRIDES[origin[f]][0]]]
 EXCEL_OVERRIDES['=YEARFRAC(E1, E5, {1;1})'] = [[0.9972677595628415], [0.9972677595628415]]
-// Agree with Excel to about 8 digits (see the function corpus).
-const LOWER_PRECISION = new Set(formulas.filter((f) => FUNCTION_LOWER.has(origin[f])))
 
-module.exports = { inputs, cases, EXCEL_OVERRIDES, LOWER_PRECISION, SPACING }
+module.exports = { inputs, cases, EXCEL_OVERRIDES, SPACING }

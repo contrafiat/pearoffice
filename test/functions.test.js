@@ -6,7 +6,7 @@ const test = require('node:test')
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const path = require('node:path')
-const { cases, EXCEL_OVERRIDES, LOWER_PRECISION } = require('./fixtures/function-corpus')
+const { cases, EXCEL_OVERRIDES } = require('./fixtures/function-corpus')
 const { runFunctionCorpus } = require('./fixtures/function-run')
 
 const GOLDEN = path.join(__dirname, 'fixtures', 'function-golden.json')
@@ -19,11 +19,24 @@ test('every function matches LibreOffice or Excel', () => {
     const want = f in EXCEL_OVERRIDES ? EXCEL_OVERRIDES[f][0] : expected[a1] && expected[a1].formula === f ? expected[a1].libreoffice : undefined
     assert.notEqual(want, undefined, a1 + ' ' + f + ' has no expected value: run node scripts/function-expectations.js')
     const v = got[a1]
-    const tol = LOWER_PRECISION.has(f) ? 1e-7 : 1e-9
     const ok = typeof want === 'number' && typeof v === 'number'
-      ? Math.abs(v - want) <= tol * Math.max(1, Math.abs(want))
+      ? Math.abs(v - want) <= 1e-9 * Math.max(1, Math.abs(want))
       : JSON.stringify(v) === JSON.stringify(want)
     if (!ok) wrong.push(a1 + ' ' + f + ' gave ' + JSON.stringify(v) + ', expected ' + JSON.stringify(want))
+  }
+  assert.deepEqual(wrong, [])
+})
+
+// The distributions and the gamma and beta functions under them
+// (src/shared/formula/precise.js) are held to 13 digits.
+test('statistics functions match to 13 digits', () => {
+  const got = runFunctionCorpus()
+  const stats = /^=(GAMMA|BETA|CHISQ|F\.|T\.|CONFIDENCE|LOGNORM|NORM|EXPON|POISSON|BINOM|NEGBINOM|HYPGEOM|WEIBULL|GAUSS|PHI|FISHER|ERF)/
+  const wrong = []
+  for (const [a1, f] of cases.filter(([, f]) => stats.test(f))) {
+    const want = f in EXCEL_OVERRIDES ? EXCEL_OVERRIDES[f][0] : expected[a1].libreoffice
+    const v = got[a1]
+    if (typeof want === 'number' && !(Math.abs(v - want) <= 1e-13 * Math.max(1, Math.abs(want)))) wrong.push(f + ' gave ' + v + ', expected ' + want)
   }
   assert.deepEqual(wrong, [])
 })

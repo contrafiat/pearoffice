@@ -230,6 +230,12 @@ fails if a function is added to the engine without an entry.
 After a deliberate formula change, regenerate the golden file with
 `UPDATE_GOLDEN=1 node --test test/formula.test.js test/functions.test.js test/spill-corpus.test.js test/lift-corpus.test.js` and say why in the commit.
 
+jstat's gamma, log-gamma and incomplete beta functions are replaced at
+start-up by @stdlib's (`src/shared/formula/precise.js`), so the distributions
+match Excel to about 15 digits; `test/functions.test.js` holds them to 13.
+Under Bare, `debug` (pulled in by @stdlib) is swapped for a no-op
+(`scripts/bare-imports.js`).
+
 Formula code must never use `**`, and `Math.pow`, `Math.sin` and `Math.cos`
 are replaced at start-up (`src/shared/formula/detmath.js`). A test fails if a
 `**` appears under `src/shared/formula/`.

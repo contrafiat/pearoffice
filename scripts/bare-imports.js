@@ -9,5 +9,8 @@ const { pathToFileURL } = require('url')
 module.exports = {
   // lib0 (used by Yjs) requires node:crypto for getRandomValues. Bare has no
   // node:crypto.
-  'node:crypto': pathToFileURL(path.join(__dirname, '..', 'src', 'shared', 'shims', 'node-crypto.js')).href
+  'node:crypto': pathToFileURL(path.join(__dirname, '..', 'src', 'shared', 'shims', 'node-crypto.js')).href,
+  // @stdlib's inverse incomplete gamma logs through debug, whose Node build
+  // needs tty. Nothing else in the worklet uses debug.
+  debug: pathToFileURL(path.join(__dirname, '..', 'src', 'shared', 'shims', 'debug.js')).href
 }

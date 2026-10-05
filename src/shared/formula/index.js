@@ -9,6 +9,7 @@
 const FormulaParser = require('./vendor/fast-formula-parser')
 const FormulaError = require('./vendor/fast-formula-parser/formulas/error')
 const { installDeterministicMath } = require('./detmath')
+const { installPreciseStatistics } = require('./precise')
 const { fillFunctions } = require('./fills')
 const { makeRef } = require('./newer')
 const { LIFT } = require('./lift')
@@ -16,6 +17,7 @@ const refs = require('../refs')
 const model = require('../sheetModel')
 
 installDeterministicMath()
+installPreciseStatistics()
 
 const CIRCULAR = '#CIRCULAR!'
 const VOLATILE = /\b(NOW|TODAY|RAND|RANDBETWEEN|RANDARRAY)\s*\(/i
