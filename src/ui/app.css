@@ -425,6 +425,7 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 
 .panel button:where(:not(.close):not(.link-button):not(.swatch):not(.me-picture)),
 .new-sheet, .join-sheet { display: inline-flex; align-items: center; justify-content: center; gap: 6px; text-align: center; }
+.panel .row:not(:has(input, select, textarea)) { align-items: stretch; }
 .panel .row:not(:has(input, select, textarea)) > button:not(.link-button) { flex: 1 1 0; min-width: 0; }
 .panel .row.end { justify-content: stretch; align-items: stretch; }
 .panel .scan-button { align-self: stretch; }
