@@ -516,7 +516,7 @@ function rewriteRangeEnds (doc, tabId, kind, gone, before, after) {
     }
     // Ranges kept outside cells: colour rules, validation (range and list
     // source) and chart data.
-    for (const [name, fields] of [['cf:', ['range']], ['valid:', ['range', 'source']]]) {
+    for (const [name, fields] of [['cf:', ['range', 'formula']], ['valid:', ['range', 'source']]]) {
       const map = doc.getMap(name + otherTab)
       for (const [id, v] of [...map.entries()]) {
         if (!v || typeof v !== 'object') continue
@@ -870,6 +870,11 @@ function cfRange (doc, tabId, rangeText) {
   return refs.toStored(numToCol(box.c1) + box.r1 + ':' + numToCol(box.c2) + box.r2, makeCtx(doc, tabId))
 }
 
+// A formula rule's formula is stored like a cell's, so it follows inserts.
+function cfStored (doc, tabId, rule) {
+  return rule.formula ? { ...rule, formula: refs.toStored(rule.formula, makeCtx(doc, tabId)) } : rule
+}
+
 function addCondFormat (doc, tabId, rangeText, rule) {
   const clean = condFormat.normalize(rule)
   const id = newId()
@@ -877,7 +882,7 @@ function addCondFormat (doc, tabId, rangeText, rule) {
     const map = doc.getMap('cf:' + tabId)
     let order = 0
     for (const v of map.values()) if (v && typeof v.order === 'number') order = Math.min(order, v.order)
-    map.set(id, { ...clean, range: cfRange(doc, tabId, rangeText), order: order - 1 })
+    map.set(id, { ...cfStored(doc, tabId, clean), range: cfRange(doc, tabId, rangeText), order: order - 1 })
   })
   return { id, update }
 }
@@ -887,7 +892,7 @@ function setCondFormat (doc, tabId, id, rangeText, rule) {
   const old = map.get(id)
   if (!old) throw new Error('That rule was deleted')
   const clean = condFormat.normalize(rule)
-  return capture(doc, () => map.set(id, { ...clean, range: cfRange(doc, tabId, rangeText), order: old.order }))
+  return capture(doc, () => map.set(id, { ...cfStored(doc, tabId, clean), range: cfRange(doc, tabId, rangeText), order: old.order }))
 }
 
 function deleteCondFormat (doc, tabId, id) {
@@ -924,6 +929,7 @@ function getCondFormats (doc, tabId) {
     const box = require('./charts').parseRange(range)
     if (!box || box.sheet) continue
     const { range: _r, ...rule } = v
+    if (typeof rule.formula === 'string') rule.formula = refs.toDisplay(rule.formula, where)
     out.push({ id, ...rule, range: oneCell(box) || range, r1: box.r1, c1: box.c1, r2: box.r2, c2: box.c2 })
   }
   return out.sort((a, b) => a.order - b.order || (a.id < b.id ? -1 : 1))
@@ -1219,7 +1225,7 @@ function duplicateTab (doc, tabId) {
     }
     for (const r of getCondFormats(doc, tabId)) {
       const { id: _i, range, r1, c1, r2, c2, ...rule } = r
-      doc.getMap('cf:' + id).set(newId(), { ...rule, range: cfRange(doc, id, range) })
+      doc.getMap('cf:' + id).set(newId(), { ...cfStored(doc, id, rule), range: cfRange(doc, id, range) })
     }
     for (const r of getValidations(doc, tabId)) {
       const { id: _i, range, r1, c1, r2, c2, source, ...rule } = r

@@ -241,7 +241,8 @@ function workbookBytes (XLSX, fflate, dump) {
   // Colour rules and data validation (proposals/2026-10-04-sheet-tools.md).
   dump.tabs.forEach((t, i) => {
     const path = 'xl/worksheets/sheet' + (i + 1) + '.xml'
-    const xml = (t.condFormats || []).length && files[path] ? require('./condFormat').toXlsx(t.condFormats, dxfId) : ''
+    const rules = (t.condFormats || []).map((r) => (r.formula ? { ...r, formula: toFile(r.formula) } : r))
+    const xml = rules.length && files[path] ? require('./condFormat').toXlsx(rules, dxfId) : ''
     if (xml) files[path] = fflate.strToU8(insertBefore(fflate.strFromU8(files[path]), xml, ['dataValidations', ...AFTER_VALIDATION]))
   })
   dump.tabs.forEach((t, i) => {
@@ -258,7 +259,8 @@ function condFormatsFromXlsx (bytes, fflate) {
   try { files = fflate.unzipSync(bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes)) } catch { return [] }
   const { sheetPaths, dxfStyles } = require('./xlsxStyles')
   const dxfs = dxfStyles(files, fflate.strFromU8)
-  return sheetPaths(files, fflate.strFromU8).map((p) => (p && files[p] ? require('./condFormat').fromXlsx(fflate.strFromU8(files[p]), dxfs) : []))
+  return sheetPaths(files, fflate.strFromU8).map((p) => (p && files[p] ? require('./condFormat').fromXlsx(fflate.strFromU8(files[p]), dxfs) : [])
+    .map((r) => (r.formula ? { ...r, formula: fromFile(r.formula) } : r)))
 }
 
 // Each tab's validation rules from an .xlsx file, in tab order.

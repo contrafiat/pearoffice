@@ -7,7 +7,18 @@
 // kind 'bar' { color }. Rules come in priority order (first wins, attribute
 // by attribute, as in Excel).
 
-const KINDS = ['gt', 'lt', 'between', 'eq', 'text', 'date', 'dup', 'unique', 'top', 'bottom', 'above', 'below', 'blank', 'notBlank', 'scale', 'bar']
+const KINDS = ['gt', 'lt', 'between', 'eq', 'text', 'date', 'dup', 'unique', 'top', 'bottom', 'above', 'below', 'blank', 'notBlank', 'scale', 'bar', 'formula', 'icons']
+// Icon sets (proposals/2026-10-05-formula-rules-icon-sets.md): name -> how
+// many icons, Excel's name and its percent thresholds (lowest first).
+const ICON_SETS = {
+  '3arrows': { n: 3, xlsx: '3Arrows', cuts: [33, 67] },
+  '3traffic': { n: 3, xlsx: '3TrafficLights1', cuts: [33, 67] },
+  '3symbols': { n: 3, xlsx: '3Symbols', cuts: [33, 67] },
+  '4arrows': { n: 4, xlsx: '4Arrows', cuts: [25, 50, 75] },
+  '5ratings': { n: 5, xlsx: '5Rating', cuts: [20, 40, 60, 80] }
+}
+// Most cells one formula rule is worked out for.
+const MAX_FORMULA_CELLS = 20000
 const TEXT_OPS = ['contains', 'notContains', 'begins', 'ends']
 const PERIODS = ['yesterday', 'today', 'tomorrow', 'last7', 'lastWeek', 'thisWeek', 'nextWeek', 'lastMonth', 'thisMonth', 'nextMonth']
 const HEX = /^#[0-9a-f]{6}$/i
@@ -39,6 +50,16 @@ function normalize (rule) {
       return out
     }
     case 'bar': if (!HEX.test(rule.color || '')) throw new Error('Pick a colour for the bars'); out.color = rule.color.toLowerCase(); return out
+    case 'icons':
+      out.set = ICON_SETS[rule.set] ? rule.set : '3arrows'
+      if (rule.reverse === true) out.reverse = true
+      if (rule.iconOnly === true) out.iconOnly = true
+      return out
+    case 'formula':
+      // Written for the range's top-left cell; kept without the "=".
+      out.formula = String(rule.formula || '').trim().replace(/^=/, '').slice(0, 1000)
+      if (!out.formula) throw new Error('Enter a formula, for example =B2>100')
+      break
   }
   out.style = cleanStyle(rule.style)
   if (!Object.keys(out.style).length) throw new Error('Pick how matching cells look')
@@ -158,7 +179,9 @@ const mix = (a, b, t) => '#' + [1, 3, 5].map((i) => Math.round(parseInt(a.slice(
 // rules: in priority order, each with r1, c1, r2, c2. cells: Map "row,col"
 // -> { row, col, kind, num, display }. today: today's date serial.
 // Returns Map "row,col" -> { color, fill, b, i, s, bar: { from, to, color } }.
-function evaluate (rules, cells, today) {
+// formulaHits: rule id -> Set of "row,col" a formula rule matched (worked
+// out by the formula engine in the worklet).
+function evaluate (rules, cells, today, formulaHits = {}) {
   const out = new Map()
   const put = (key, k, v) => {
     let s = out.get(key)
@@ -167,6 +190,27 @@ function evaluate (rules, cells, today) {
   }
   for (const rule of rules) {
     const items = cellsIn(rule, cells, rule.kind === 'blank' || (rule.kind === 'text' && rule.op === 'notContains'))
+    if (rule.kind === 'formula') {
+      for (const key of formulaHits[rule.id] || []) for (const k of STYLE_KEYS) if (rule.style[k] !== undefined) put(key, k, rule.style[k])
+      continue
+    }
+    if (rule.kind === 'icons') {
+      const set = ICON_SETS[rule.set] || ICON_SETS['3arrows']
+      const withNum = cellsIn(rule, cells, false).filter((x) => numOf(x.cell) !== null)
+      if (!withNum.length) continue
+      let lo = Infinity
+      let hi = -Infinity
+      for (const x of withNum) { const n = numOf(x.cell); if (n < lo) lo = n; if (n > hi) hi = n }
+      for (const x of withNum) {
+        const pct = hi === lo ? 100 : (numOf(x.cell) - lo) / (hi - lo) * 100
+        // 0 is the top icon: at or above the highest cut.
+        const level = set.cuts.filter((c) => pct >= c).length
+        let index = set.n - 1 - level
+        if (rule.reverse) index = set.n - 1 - index
+        put(x.row + ',' + x.col, 'icon', { set: rule.set, index, iconOnly: !!rule.iconOnly })
+      }
+      continue
+    }
     if (rule.kind === 'scale' || rule.kind === 'bar') {
       const withNum = items.filter((x) => numOf(x.cell) !== null)
       if (!withNum.length) continue
@@ -215,6 +259,8 @@ function describe (rule) {
     case 'notBlank': return 'Not blank'
     case 'scale': return 'Colour scale'
     case 'bar': return 'Data bars'
+    case 'formula': return 'Formula: =' + rule.formula
+    case 'icons': return { '3arrows': 'Arrows', '3traffic': 'Traffic lights', '3symbols': 'Symbols', '4arrows': 'Four arrows', '5ratings': 'Ratings' }[rule.set] + ' icons'
     default: return rule.kind
   }
 }
@@ -288,6 +334,13 @@ function toXlsx (rules, dxfId) {
         break
       }
       case 'bar': rule = '<cfRule type="dataBar"' + pri + '><dataBar><cfvo type="min"/><cfvo type="max"/><color rgb="' + argb(r.color) + '"/></dataBar></cfRule>'; break
+      case 'formula': rule = '<cfRule type="expression"' + dxf + pri + '><formula>' + esc(r.formula) + '</formula></cfRule>'; break
+      case 'icons': {
+        const set = ICON_SETS[r.set] || ICON_SETS['3arrows']
+        rule = '<cfRule type="iconSet"' + pri + '><iconSet iconSet="' + set.xlsx + '"' + (r.reverse ? ' reverse="1"' : '') + (r.iconOnly ? ' showValue="0"' : '') + '>' +
+          [0, ...set.cuts].map((c) => '<cfvo type="percent" val="' + c + '"/>').join('') + '</iconSet></cfRule>'
+        break
+      }
       default: return ''
     }
     return '<conditionalFormatting sqref="' + r.range.replace(/\$/g, '') + '">' + rule + '</conditionalFormatting>'
@@ -328,6 +381,14 @@ function fromXlsx (xml, dxfs) {
           const f = (formulas[0] || '').replace(/\s+/g, '').replace(/\$/g, '')
           if (/^LEN\(TRIM\([A-Z]+\d+\)\)=0$/i.test(f)) rule = { kind: 'blank' }
           else if (/^LEN\(TRIM\([A-Z]+\d+\)\)>0$/i.test(f)) rule = { kind: 'notBlank' }
+          else if (formulas[0]) rule = { kind: 'formula', formula: formulas[0] }
+          break
+        }
+        case 'iconSet': {
+          const tag = (/<iconSet\b[^>]*>/.exec(body) || [''])[0]
+          const name = (/iconSet="([^"]*)"/.exec(tag) || [])[1] || '3Arrows'
+          const set = Object.keys(ICON_SETS).find((k) => ICON_SETS[k].xlsx === name)
+          if (set) rule = { kind: 'icons', set, reverse: /reverse="(1|true)"/.test(tag), iconOnly: /showValue="(0|false)"/.test(tag) }
           break
         }
         case 'containsBlanks': rule = { kind: 'blank' }; break
@@ -336,7 +397,7 @@ function fromXlsx (xml, dxfs) {
         case 'dataBar': rule = { kind: 'bar', color: rgbs[0] }; break
       }
       if (!rule) continue
-      if (rule.kind !== 'scale' && rule.kind !== 'bar') rule.style = style
+      if (!['scale', 'bar', 'icons'].includes(rule.kind)) rule.style = style
       const priority = Number(attr('priority')) || 0
       for (const range of m[1].split(/\s+/).filter(Boolean)) {
         try { found.push({ priority, rule: { range, ...normalize(rule) } }) } catch {}
@@ -346,4 +407,4 @@ function fromXlsx (xml, dxfs) {
   return found.sort((x, y) => x.priority - y.priority).map((x) => x.rule)
 }
 
-module.exports = { KINDS, TEXT_OPS, PERIODS, normalize, evaluate, describe, inPeriod, dxfXml, toXlsx, fromXlsx }
+module.exports = { KINDS, TEXT_OPS, PERIODS, ICON_SETS, MAX_FORMULA_CELLS, normalize, evaluate, describe, inPeriod, dxfXml, toXlsx, fromXlsx }

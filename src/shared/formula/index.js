@@ -464,6 +464,21 @@ function evaluateSheet (doc) {
     }
     result.set(tab.id, out)
   }
+  // A formula that is in no cell, worked out as if it sat in (row, col) of a
+  // tab: conditional formatting's formula rules. text: A1 form, no "=".
+  result.evaluateAt = (tabId, row, col, text) => {
+    const tab = tabs.find((t) => t.id === tabId)
+    if (!tab) return null
+    parseDepth++
+    try {
+      const v = parserFor(tab).parse(spillRefs(text), { row, col, sheet: tab.name }, true)
+      return isBlock(v) ? (v[0] && v[0][0]) : v
+    } catch (err) {
+      return new FormulaError(errorCode(err))
+    } finally {
+      parseDepth--
+    }
+  }
   return result
 }
 

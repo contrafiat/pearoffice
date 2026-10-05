@@ -1,9 +1,11 @@
-// Conditional formatting (proposals/2026-10-04-sheet-tools.md): the tab's
-// colour rules, in priority order, and a form to add or change one.
+// Conditional formatting (proposals/2026-10-04-sheet-tools.md and
+// 2026-10-05-formula-rules-icon-sets.md): the tab's rules, in priority
+// order, and a form to add or change one.
 
 import React, { useState } from 'react'
 import { X, ArrowUp, ArrowDown, PencilSimple, Trash, Plus } from '@phosphor-icons/react'
 import { describe } from '../shared/condFormat.js'
+import { CfIcon, ICON_SETS } from './cfIcons.jsx'
 
 // Excel's own presets, so files look the same there.
 export const STYLES = [
@@ -27,7 +29,8 @@ const KINDS = [
   ['gt', 'Greater than'], ['lt', 'Less than'], ['between', 'Between'], ['eq', 'Equal to'],
   ['text', 'Text that'], ['date', 'A date'], ['dup', 'Duplicate values'], ['unique', 'Unique values'],
   ['top', 'Top'], ['bottom', 'Bottom'], ['above', 'Above average'], ['below', 'Below average'],
-  ['blank', 'Blank'], ['notBlank', 'Not blank'], ['scale', 'Colour scale'], ['bar', 'Data bars']
+  ['blank', 'Blank'], ['notBlank', 'Not blank'], ['scale', 'Colour scale'], ['bar', 'Data bars'],
+  ['icons', 'Icon set'], ['formula', 'A formula is true']
 ]
 const TEXT_OPS = [['contains', 'contains'], ['notContains', 'does not contain'], ['begins', 'starts with'], ['ends', 'ends with']]
 const PERIODS = [['yesterday', 'yesterday'], ['today', 'today'], ['tomorrow', 'tomorrow'], ['last7', 'in the last 7 days'], ['lastWeek', 'last week'], ['thisWeek', 'this week'], ['nextWeek', 'next week'], ['lastMonth', 'last month'], ['thisMonth', 'this month'], ['nextMonth', 'next month']]
@@ -36,6 +39,7 @@ const same = (a, b) => JSON.stringify(a) === JSON.stringify(b)
 
 // How a rule's matching cells look, as a small sample.
 export function Sample ({ rule }) {
+  if (rule.kind === 'icons') return <span className='cf-sample icons'>{(ICON_SETS[rule.set] || ICON_SETS['3arrows'])[1].map((_, i) => <CfIcon key={i} set={rule.set} index={rule.reverse ? (ICON_SETS[rule.set] || ICON_SETS['3arrows'])[1].length - 1 - i : i} size={12} />)}</span>
   if (rule.kind === 'scale') return <span className='cf-sample' style={{ background: 'linear-gradient(90deg, ' + rule.colors.join(', ') + ')' }} />
   if (rule.kind === 'bar') return <span className='cf-sample' style={{ background: 'linear-gradient(90deg, ' + rule.color + ' 60%, transparent 60%)' }} />
   const s = rule.style || {}
@@ -57,6 +61,10 @@ function RuleForm ({ start, onSave, onCancel }) {
   const scaleKnown = SCALES.findIndex(([, c]) => same(c, start.colors))
   const [scaleAt, setScaleAt] = useState(start.colors ? scaleKnown : 0)
   const [bar, setBar] = useState(start.color || BARS[0][1])
+  const [formula, setFormula] = useState(start.formula ? '=' + start.formula : '')
+  const [iconSet, setIconSet] = useState(start.set || '3arrows')
+  const [reverse, setReverse] = useState(!!start.reverse)
+  const [iconOnly, setIconOnly] = useState(!!start.iconOnly)
 
   function save () {
     const rule = { kind }
@@ -65,9 +73,11 @@ function RuleForm ({ start, onSave, onCancel }) {
     if (kind === 'text') { rule.op = op; rule.text = text }
     if (kind === 'date') rule.period = period
     if (kind === 'top' || kind === 'bottom') { rule.n = n; rule.percent = percent }
+    if (kind === 'formula') rule.formula = formula
+    if (kind === 'icons') { rule.set = iconSet; rule.reverse = reverse; rule.iconOnly = iconOnly }
     if (kind === 'scale') rule.colors = scaleAt >= 0 ? SCALES[scaleAt][1] : start.colors
     else if (kind === 'bar') rule.color = bar
-    else rule.style = styleAt >= 0 ? STYLES[styleAt][1] : start.style
+    else if (kind !== 'icons') rule.style = styleAt >= 0 ? STYLES[styleAt][1] : start.style
     onSave(range, rule)
   }
   const numeric = kind === 'gt' || kind === 'lt' || kind === 'eq' || kind === 'between'
@@ -106,8 +116,24 @@ function RuleForm ({ start, onSave, onCancel }) {
           {SCALES.map(([l], i) => <option key={l} value={i}>{l}</option>)}
         </select>
       )}
+      {kind === 'formula' && (
+        <>
+          <input aria-label='Formula' placeholder='For example =B2>AVERAGE($B$2:$B$20)' value={formula} onChange={(e) => setFormula(e.target.value)} />
+          <p className='small'>Write it for the first cell of the range. References without $ move with each cell.</p>
+        </>
+      )}
+      {kind === 'icons' && (
+        <>
+          <select aria-label='Icons' value={iconSet} onChange={(e) => setIconSet(e.target.value)}>
+            {Object.entries(ICON_SETS).map(([k, [label]]) => <option key={k} value={k}>{label}</option>)}
+          </select>
+          <p className='small'>Highest third of the values gets the first icon, the lowest third the last{iconSet === '4arrows' || iconSet === '5ratings' ? ' (split evenly for this set)' : ''}.</p>
+          <label className='check'><input type='checkbox' checked={reverse} onChange={(e) => setReverse(e.target.checked)} /> Reverse the order</label>
+          <label className='check'><input type='checkbox' checked={iconOnly} onChange={(e) => setIconOnly(e.target.checked)} /> Show the icon only</label>
+        </>
+      )}
       {kind === 'bar' && <select aria-label='Bar colour' value={bar} onChange={(e) => setBar(e.target.value)}>{!BARS.some(([, c]) => c === bar) && <option value={bar}>From the file</option>}{BARS.map(([l, c]) => <option key={c} value={c}>{l}</option>)}</select>}
-      {kind !== 'scale' && kind !== 'bar' && (
+      {kind !== 'scale' && kind !== 'bar' && kind !== 'icons' && (
         <select aria-label='Look' value={styleAt} onChange={(e) => setStyleAt(Number(e.target.value))}>
           {styleAt < 0 && <option value={-1}>From the file</option>}
           {STYLES.map(([l], i) => <option key={l} value={i}>{l}</option>)}
@@ -121,7 +147,7 @@ function RuleForm ({ start, onSave, onCancel }) {
   )
 }
 
-export function CondFormatPanel ({ rules, selection, canEdit, act, onClose }) {
+export function CondFormatPanel ({ rules, matches = {}, selection, canEdit, act, onClose }) {
   const [editing, setEditing] = useState(rules.length ? null : { range: selection })
   const [error, setError] = useState('')
   async function saveRule (range, rule) {
@@ -132,21 +158,21 @@ export function CondFormatPanel ({ rules, selection, canEdit, act, onClose }) {
   }
   return (
     <div className='panel-backdrop' onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
-      <section className='panel cf-panel' role='dialog' aria-label='Colour rules'>
+      <section className='panel cf-panel' role='dialog' aria-label='Conditional formatting'>
         <header>
-          <h2>{editing ? (editing.id ? 'Change rule' : 'New colour rule') : 'Colour rules'}</h2>
+          <h2>{editing ? (editing.id ? 'Change rule' : 'New rule') : 'Conditional formatting'}</h2>
           <button className='close' aria-label='Close' onClick={onClose}><X size={18} /></button>
         </header>
         {editing
           ? <RuleForm start={editing} onSave={saveRule} onCancel={() => { setError(''); if (rules.length) setEditing(null); else onClose() }} />
           : (
             <>
-              {!rules.length && <p className='muted'>No colour rules on this tab.</p>}
+              {!rules.length && <p className='muted'>No conditional formatting on this tab.</p>}
               <ul className='cf-list'>
                 {rules.map((r, i) => (
                   <li key={r.id}>
                     <Sample rule={r} />
-                    <span className='cf-what'><b>{describe(r)}</b><span className='muted'>{r.range}</span></span>
+                    <span className='cf-what'><b>{describe(r)}</b><span className='muted'>{r.range}{r.kind === 'formula' && matches[r.id] === null ? ', too many cells: not applied' : ''}</span></span>
                     {canEdit && (
                       <span className='cf-tools'>
                         <button className='icon-button' aria-label='Move up' title='Move up' disabled={i === 0} onClick={() => act('moveCondFormat', { id: r.id, dir: -1 })}><ArrowUp size={16} /></button>
@@ -158,7 +184,7 @@ export function CondFormatPanel ({ rules, selection, canEdit, act, onClose }) {
                   </li>
                 ))}
               </ul>
-              {rules.length > 1 && <p className='muted small'>Rules higher in the list win where two colour the same cell.</p>}
+              {rules.length > 1 && <p className='muted small'>Rules higher in the list win where two set the same thing on a cell.</p>}
               {canEdit && <div className='row'><button onClick={() => setEditing({ range: selection })}><Plus size={16} /> Add a rule</button></div>}
             </>
             )}
