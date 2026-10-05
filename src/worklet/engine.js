@@ -63,6 +63,24 @@ function createSheetEngine (opts = {}) {
     }
   }
 
+  // Run a handler that reads what this apply batch wrote. The view shows it
+  // only once the batch is done, which can take seconds on a busy device, so
+  // call again until the handler says it saw it (true), for about 30 s. An op
+  // that never shows (a forged delete, say) just stops being checked. One
+  // round per sheet and kind at a time: a later call while one is running
+  // is covered by it.
+  const pendingShown = new Set()
+  function untilShown (key, handler, waits = [0, 200, 500, 1000, 2000, 4000, 8000, 15000]) {
+    if (pendingShown.has(key)) return
+    pendingShown.add(key)
+    let i = 0
+    const attempt = () => handler().then((seen) => {
+      if (!seen && ++i < waits.length) setTimeout(attempt, waits[i])
+      else pendingShown.delete(key)
+    }, (e) => { pendingShown.delete(key); log(key + ' failed: ' + e.message) })
+    setTimeout(attempt, waits[0])
+  }
+
   engine = createGroupEngine({
     appId: 'pearsheet',
     applyOps: createApplyOps({
@@ -71,8 +89,8 @@ function createSheetEngine (opts = {}) {
         emit('sheet:members', { sheetId })
         // The view shows the change only once this apply batch is done.
         if ((type === 'seeder' || type === 'seederOff') && seeding) setTimeout(() => seeding.sweep().catch(() => {}), 200)
-        if (type === 'move' && moves) moves.onMoved(sheetId).catch((e) => log('move failed: ' + e.message))
-        if (type === 'delete' && deleting) deleting.onDeleted(sheetId).catch((e) => log('delete failed: ' + e.message))
+        if (type === 'move' && moves) untilShown('move:' + sheetId, () => moves.onMoved(sheetId))
+        if (type === 'delete' && deleting) untilShown('delete:' + sheetId, () => deleting.onDeleted(sheetId))
         // Bring this person's name and picture in step with the sheet.
         if (profiles) setTimeout(() => profiles.reconcile(sheetId).catch(() => {}), 200)
       },

@@ -68,12 +68,13 @@ function createDeleting ({ engine, sheets, getSeeding, emit, log = () => {}, now
     return { ok: true }
   }
 
-  // Apply recorded `deleted` (here or on another device).
+  // Apply recorded `deleted` (here or on another device). False while the
+  // view does not show it yet: the engine calls again until it does.
   async function onDeleted (sheetId) {
     const base = engine.bases.get(sheetId)
-    if (!base) return
+    if (!base) return true
     const deleted = await viewGet(base, 'deleted')
-    if (!deleted) return
+    if (!deleted) return false
     const title = (await engine.localDb.get('groups:joined:' + sheetId))?.value?.name || ''
     const seeding = getSeeding()
     if (seeding) {
@@ -82,6 +83,7 @@ function createDeleting ({ engine, sheets, getSeeding, emit, log = () => {}, now
     await engine.localDb.put('deleted:' + sheetId, { by: deleted.by, title, at: now() })
     emit('sheet:deleted', { sheetId, title })
     await removeLocal(sheetId, { reason: 'deleted' })
+    return true
   }
 
   // After a key move: ask the seeder to drop the old copy a week on, and

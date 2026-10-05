@@ -62,8 +62,8 @@ test('profiles with avatars', async (t) => {
     await call(owner, 'app:setAvatar', { data: olivePic.data, mime: olivePic.mime })
     assert.equal((await call(owner, 'app:me')).avatar.hash, olivePic.hash)
     await waitFor('editor sees it', async () => (await memberOf(editor, sheetId, O)).avatarHash === olivePic.hash)
-    const pic = await call(viewer, 'sheet:avatar', { sheetId, identity: O })
-    assert.equal(pic.data, olivePic.data)
+    // The viewer can be a moment behind the editor.
+    await waitFor('viewer has the picture', async () => (await call(viewer, 'sheet:avatar', { sheetId, identity: O }))?.data === olivePic.data)
   })
 
   await t.test('a viewer changes their name and picture through a writer', async () => {

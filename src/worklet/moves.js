@@ -98,14 +98,16 @@ function createMoves ({ engine, sheets, getJoin, getDeleting = () => null, emit,
 
   // Called after apply records `moved` in a sheet, and on start for sheets
   // that moved while this device was off.
+  // False while the view does not show the move yet: the engine calls again
+  // until it does.
   async function onMoved (oldId) {
     const done = await engine.localDb.get('moves:' + oldId)
     if (done && (done.value.removed || engine.bases.get(done.value.to))) {
       if (done.value.to) followDevice(done.value.to)
-      return
+      return true
     }
     const moved = await viewGet(oldId, 'moved')
-    if (!moved) return
+    if (!moved) return false
     const me = hex(engine.identity.publicKey)
     const sealed = moved.sealed && moved.sealed[me]
     const target = sealed ? m.unseal(sealed, engine.identity) : null
@@ -113,7 +115,7 @@ function createMoves ({ engine, sheets, getJoin, getDeleting = () => null, emit,
       await engine.localDb.put('moves:' + oldId, { to: null, removed: true, at: Date.now() })
       emit('sheet:removed', { sheetId: oldId })
       log('removed from ' + oldId.slice(0, 8))
-      return
+      return true
     }
     if (!engine.bases.get(target.sheetId)) {
       await engine.joinGroup({ inviteKey: defaultEncodeInvite({ groupId: target.sheetId, groupKey: target.groupKey, encryptionKey: target.encryptionKey, bootstrap: target.bootstrap, name: target.name }) })
@@ -123,6 +125,7 @@ function createMoves ({ engine, sheets, getJoin, getDeleting = () => null, emit,
     emit('sheet:moved', { from: oldId, to: target.sheetId })
     followDevice(target.sheetId)
     if (getDeleting()) getDeleting().afterMove(oldId).catch(() => {})
+    return true
   }
 
   // Get this device admitted in the new sheet: send its proof on the join

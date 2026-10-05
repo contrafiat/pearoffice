@@ -82,7 +82,8 @@ test('deleting sheets', async (t) => {
     assert.ok(viewer.bases.get(sheetId), 'still there after a forged delete')
 
     await call(owner, 'sheet:deleteForEveryone', { sheetId })
-    await waitFor('editor and viewer removed it', async () => !editor.bases.get(sheetId) && !viewer.bases.get(sheetId) && !owner.bases.get(sheetId))
+    const still = () => Object.entries({ owner, editor, viewer }).filter(([, e]) => e.bases.get(sheetId)).map(([n]) => n)
+    await waitFor('editor and viewer removed it', async () => !still().length).catch((err) => { throw new Error(err.message + ' (still on: ' + still().join(', ') + ')') })
     assert.ok(await viewer.localDb.get('deleted:' + sheetId), 'the viewer knows it was deleted by the owner')
 
     // The seeder scheduled the drop about a week out, and runs it when due.
