@@ -356,8 +356,28 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
     await js("document.querySelector('.grid .body').focus()")
     await sendMod('Home', ['control'])
     await key('Right'); for (let i = 0; i < 3; i++) await key('Down')
-    result.formats = result.frozenStays === true && /^Showing 1 of \d+ rows$/.test(result.filterStatus) && result.skipsHidden
-    step('cell formats, row heights, freeze, filter and hiding')
+    // Comment on A1 from the cell menu, reply, resolve.
+    const typeInto = (sel, text) => js(`(() => { const t = document.querySelector(${JSON.stringify(sel)}); const set = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set; set.call(t, ${JSON.stringify(text)}); t.dispatchEvent(new Event('input', { bubbles: true })) })()`)
+    const panelButton = (label) => js("[...document.querySelectorAll('.comments-panel button')].find((b) => b.textContent.trim() === " + JSON.stringify(label) + ').click()')
+    await js(cellNode(1, 1) + ".dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 120, clientY: 160 }))")
+    await waitFor('cell menu comment', "[...document.querySelectorAll('.menu li')].some((l) => l.textContent === 'Comment')")
+    await js("[...document.querySelectorAll('.menu li')].find((l) => l.textContent === 'Comment').click()")
+    await waitFor('comment panel', "!!document.querySelector('.comments-panel textarea')")
+    await typeInto('.comments-panel textarea', 'Check the rent')
+    await panelButton('Comment')
+    await waitFor('commented', "!!" + cellNode(1, 1) + ".querySelector('.comment-mark') && [...document.querySelectorAll('.comment-text')].some((p) => p.textContent === 'Check the rent')")
+    await typeInto('.comments-panel textarea', 'Checked')
+    await panelButton('Reply')
+    await waitFor('replied', "document.querySelectorAll('.comments-panel .comment-text').length === 2")
+    await panelButton('Resolve')
+    await waitFor('resolved', "!!" + cellNode(1, 1) + ".querySelector('.comment-mark.resolved')")
+    await js("document.querySelector('.comments-panel .close').click()")
+    result.comments = true
+    await js("document.querySelector('.grid .body').focus()")
+    await sendMod('Home', ['control'])
+    await key('Right'); for (let i = 0; i < 3; i++) await key('Down')
+    result.formats = result.frozenStays === true && /^Showing 1 of \d+ rows$/.test(result.filterStatus) && result.skipsHidden && result.comments
+    step('cell formats, row heights, freeze, filter, hiding and comments')
 
     // Ranges, copy and paste: select B1:B3, copy, paste into C1. The formula
     // moves with it, as in Excel.
