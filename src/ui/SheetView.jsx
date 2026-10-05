@@ -185,12 +185,16 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
   useEffect(() => { loadMembers() }, [loadMembers])
   useEffect(() => on('sheet:members', (d) => { if (d.sheetId === sheetId) loadMembers() }), [sheetId, loadMembers])
 
+  const goneRef = useRef(onGone)
+  goneRef.current = onGone
   const load = useCallback(async () => {
     try {
       const v = await call('sheet:view', { sheetId, tabId })
       setView(v)
       if (!tabId) setTabId(v.tabId)
     } catch (err) {
+      // The sheet left this device (removed, deleted, moved): go back.
+      if (/^unknown sheet/.test(err.message)) { goneRef.current(); return }
       onError(err.message)
     }
   }, [sheetId, tabId, onError])

@@ -84,6 +84,13 @@ export function App () {
 
   const loadMe = useCallback(() => call('app:me').then((me) => { setName(me.name); setAvatar(me.avatar || null); setMyId(me.identity); setNudge(!!me.phraseNudge) }).catch(() => {}), [])
 
+  // A sheet that left this device: drop it from the list before anything
+  // else, or the "open the most recent sheet" step below picks it again.
+  const forget = useCallback((sheetId) => {
+    setSheets((list) => (list ? list.filter((x) => x.sheetId !== sheetId) : list))
+    setCurrent((c) => (c === sheetId ? null : c))
+  }, [])
+
   const opened = useCallback(async (sheetId) => { await refresh(); setCurrent(sheetId) }, [refresh])
 
   const soon = useRef(null)
@@ -117,7 +124,7 @@ export function App () {
       on('profile:changed', loadMe),
       // A sheet left this device (removed here, deleted by its owner, or an
       // old copy after a move).
-      on('sheet:gone', async ({ sheetId }) => { setCurrent((c) => (c === sheetId ? null : c)); await refresh() }),
+      on('sheet:gone', async ({ sheetId }) => { forget(sheetId); await refresh() }),
       on('join:gaveUp', async () => { setNotice('PearSheet stopped waiting to join a sheet after 7 days. Ask for a new invite.'); await refresh() }),
       on('sheet:deleted', ({ title }) => setNotice('"' + (title || 'A sheet') + '" was deleted by its owner.')),
       on('app:deeplink', ({ url }) => { call('app:takeLink').catch(() => {}); openLink(url) })
@@ -244,7 +251,7 @@ export function App () {
         )}
         {error && <div className='banner' role='alert'>{error} <button className='link-button' onClick={() => setError(null)}>Dismiss</button></div>}
         {current
-          ? <SheetView key={current} sheetId={current} onTitleChange={refresh} onError={setError} onGone={async () => { setCurrent(null); await refresh() }} />
+          ? <SheetView key={current} sheetId={current} onTitleChange={refresh} onError={setError} onGone={async () => { forget(current); await refresh() }} />
           : (
             <div className='empty'>
               <h1>Shared spreadsheets, device to device.</h1>
