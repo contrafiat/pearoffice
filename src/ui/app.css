@@ -204,6 +204,8 @@ button, input, select { font: inherit; color: inherit; }
   border-radius: 8px;
   box-shadow: 0 6px 24px rgb(0 0 0 / 0.16);
   min-width: 180px;
+  max-height: calc(100vh - 8px);
+  overflow-y: auto;
 }
 .menu li { padding: 7px 10px; border-radius: 5px; cursor: pointer; }
 .menu li:hover { background: var(--head); }
@@ -604,3 +606,7 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 .formula-bar input.address { box-sizing: border-box; border: 0; border-right: 1px solid var(--line); background: var(--paper); color: var(--ink); font: inherit; outline: none; padding: 0 4px; }
 .names-panel .name-go { flex: 1; min-width: 0; text-align: left; text-decoration: none; color: var(--ink); display: flex; gap: 8px; align-items: baseline; padding: 4px 0; overflow: hidden; }
 .names-panel .name-go .muted { margin: 0; font-size: 12px; }
+
+/* Long press opens PearSheet's menus, not the system's text callout. */
+.grid { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+.grid .editor { -webkit-user-select: text; user-select: text; }

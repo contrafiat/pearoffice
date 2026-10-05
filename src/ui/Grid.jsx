@@ -151,6 +151,32 @@ export const Grid = forwardRef(function Grid (props, ref) {
   // Pinch to zoom, keeping the point between the fingers in place.
   const pinch = useRef(null) // { d0, z0 } while two fingers are down
   const pinched = useRef(false) // a pinch happened since the last touch start
+  // Long press opens a menu. Android fires contextmenu for it; iOS does not,
+  // so a held, unmoved touch of half a second opens it here.
+  const press = useRef(null) // { timer, x, y, fired }
+  const longPress = (open) => ({
+    onTouchStart: (e) => {
+      if (e.touches.length !== 1) return
+      const t = e.touches[0]
+      const p = { x: t.clientX, y: t.clientY, fired: false }
+      p.timer = setTimeout(() => { p.fired = true; open(p.x, p.y) }, 500)
+      if (press.current) clearTimeout(press.current.timer)
+      press.current = p
+    },
+    onTouchMove: (e) => {
+      const p = press.current
+      const t = e.touches[0]
+      if (p && t && Math.hypot(t.clientX - p.x, t.clientY - p.y) > 8) clearTimeout(p.timer)
+    }
+  })
+  // Ends a press; true if it opened a menu (so the tap does nothing else).
+  const endPress = () => {
+    const p = press.current
+    press.current = null
+    if (!p) return false
+    clearTimeout(p.timer)
+    return p.fired
+  }
   const anchor = useRef(null) // { x, y, from } to restore after a zoom
   const dist = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY)
   function onTouchStart (e) {
@@ -272,10 +298,12 @@ export const Grid = forwardRef(function Grid (props, ref) {
         style={{ left: colX[c], width: widths[c] }}
         onClick={(e) => { if (e.shiftKey) onSelect(view.rows, c, true); else { onSelect(1, c); onSelect(view.rows, c, true) } }}
         onContextMenu={(e) => { e.preventDefault(); onHeaderMenu('col', c, e.clientX, e.clientY) }}
+        {...longPress((x, y) => onHeaderMenu('col', c, x, y))}
+        onTouchEnd={(e) => { if (endPress()) e.preventDefault() }}
       >
         {colName(c)}
         <span className='resize' title='Drag to resize; double-click to fit' onMouseDown={(e) => startResize(e, c)} onDoubleClick={(e) => { e.stopPropagation(); onAutoFit(c) }} onClick={(e) => e.stopPropagation()} />
-        {unhideMarks && unhideMarks.cols.has(c - 1) && <button className='unhide-mark col' title='Show hidden columns' aria-label={'Show columns hidden before ' + colName(c)} onMouseDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onUnhide('col', c - 1) }} />}
+        {unhideMarks && unhideMarks.cols.has(c) && <button className='unhide-mark col' title='Show hidden columns' aria-label={'Show columns hidden before ' + colName(c)} onMouseDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onUnhide('col', unhideMarks.cols.get(c)) }} />}
       </div>
     )
   }
@@ -288,9 +316,11 @@ export const Grid = forwardRef(function Grid (props, ref) {
         style={{ top: rowY[r], height: rowH[r] }}
         onClick={(e) => { if (e.shiftKey) onSelect(r, view.cols, true); else { onSelect(r, 1); onSelect(r, view.cols, true) } }}
         onContextMenu={(e) => { e.preventDefault(); onHeaderMenu('row', r, e.clientX, e.clientY) }}
+        {...longPress((x, y) => onHeaderMenu('row', r, x, y))}
+        onTouchEnd={(e) => { if (endPress()) e.preventDefault() }}
       >
         {r}
-        {unhideMarks && unhideMarks.rows.has(r - 1) && <button className='unhide-mark row' title='Show hidden rows' aria-label={'Show rows hidden above ' + r} onMouseDown={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onUnhide('row', r - 1) }} />}
+        {unhideMarks && unhideMarks.rows.has(r) && <button className='unhide-mark row' title='Show hidden rows' aria-label={'Show rows hidden above ' + r} onMouseDown={(e) => e.stopPropagation()} onTouchEnd={(e) => e.stopPropagation()} onClick={(e) => { e.stopPropagation(); onUnhide('row', unhideMarks.rows.get(r)) }} />}
         <span className='row-resize' title='Drag to resize; double-click to fit' onMouseDown={(e) => startRowResize(e, r)} onDoubleClick={(e) => { e.stopPropagation(); onRowResize(r, null) }} onClick={(e) => e.stopPropagation()} />
       </div>
     )
@@ -318,7 +348,8 @@ export const Grid = forwardRef(function Grid (props, ref) {
             onDoubleClick={() => onEdit(r, c)}
             onContextMenu={(e) => { e.preventDefault(); onCellMenu(r, c, e.clientX, e.clientY) }}
             // Touch screens: tapping the cell that is already selected edits it.
-            onTouchEnd={(e) => { if (!pinched.current && e.touches.length === 0 && sel.row === r && sel.col === c) { e.preventDefault(); onEdit(r, c) } }}
+            {...longPress((x, y) => onCellMenu(r, c, x, y))}
+            onTouchEnd={(e) => { if (endPress()) { e.preventDefault(); return } if (!pinched.current && e.touches.length === 0 && sel.row === r && sel.col === c) { e.preventDefault(); onEdit(r, c) } }}
             title={cell && cell.volatile ? 'Changes on each device (time or random)' : cell && cell.blocked ? 'This answer cannot fill in. Select the cell to see why.' : undefined}
           >
             {cf && cf.bar && <span className='cf-bar' style={{ left: cf.bar.from * 100 + '%', width: Math.max(0, cf.bar.to - cf.bar.from) * 100 + '%', background: cf.bar.color }} />}
