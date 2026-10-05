@@ -155,6 +155,17 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
   const [colouring, setColouring] = useState(false) // the colour rules panel
   const [naming, setNaming] = useState(null) // { adding } while the names panel is open
   const [goingTo, setGoingTo] = useState(null) // text typed in the name box
+  // A menu opened near an edge (a long press on a phone) moves to fit on screen.
+  const menuRef = useRef(null)
+  useLayoutEffect(() => {
+    const el = menuRef.current
+    if (!el) return
+    const r = el.getBoundingClientRect()
+    const vw = window.innerWidth
+    const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight
+    if (r.right > vw - 4) el.style.left = Math.max(4, vw - r.width - 4) + 'px'
+    if (r.bottom > vh - 4 && !el.style.bottom) el.style.top = Math.max(4, vh - r.height - 4) + 'px'
+  }, [menu])
   const [selectedChart, setSelectedChart] = useState(null) // chart id (desktop)
   const [editingChart, setEditingChart] = useState(null) // chart id in the editor
   const [viewingChart, setViewingChart] = useState(null) // chart id full screen (phones)
@@ -223,11 +234,22 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
   const hiddenCols = manual.cols.size ? manual.cols : null
   const isHidden = (r) => !!(hidden && hidden.has(r))
   const isHiddenCol = (c) => manual.cols.has(c)
-  // The last hidden row or column of each run, where a mark shows them again.
+  // Where a mark shows hidden rows or columns again: the next row or column
+  // that is showing (rows a filter hides are skipped too) -> the last hidden
+  // one before it.
   const unhideMarks = useMemo(() => {
-    const ends = (set) => new Set([...set].filter((n) => !set.has(n + 1)))
-    return manual.rows.size || manual.cols.size ? { rows: ends(manual.rows), cols: ends(manual.cols) } : null
-  }, [manual])
+    if (!manual.rows.size && !manual.cols.size) return null
+    const marks = (set, gone, max) => {
+      const out = new Map()
+      for (const n of set) {
+        let next = n + 1
+        while (next <= max && gone(next)) next++
+        if (next <= max && !(out.get(next) > n)) out.set(next, n)
+      }
+      return out
+    }
+    return { rows: marks(manual.rows, (r) => !!(hidden && hidden.has(r)), view.rows), cols: marks(manual.cols, (c) => manual.cols.has(c), view.cols) }
+  }, [manual, hidden, view])
   const filterHead = useMemo(() => {
     if (!filter) return null
     const active = new Set()
@@ -776,8 +798,9 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
   }
   function unhideRun (kind, last) {
     const set = kind === 'row' ? manual.rows : manual.cols
+    // Back over every hidden row (or column) in the gap, filtered ones too.
     let first = last
-    while (first > 1 && set.has(first - 1)) first--
+    while (first > 1 && (set.has(first - 1) || (kind === 'row' && hidden && hidden.has(first - 1)))) first--
     run('sheet:setHidden', { kind, from: first, to: last, hidden: false })
   }
 
@@ -1262,7 +1285,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
       {deleting && <DeletePanel sheetId={sheetId} title={view.title} kind={deleting} onClose={() => setDeleting(null)} onError={onError} onDone={() => { setDeleting(null); onGone() }} />}
 
       {menu && (
-        <ul className='menu' style={menu.kind === 'tab' ? { left: menu.x, bottom: window.innerHeight - menu.y } : { left: menu.x, top: menu.y }} role='menu'>
+        <ul className='menu' ref={menuRef} style={menu.kind === 'tab' ? { left: menu.x, bottom: window.innerHeight - menu.y } : { left: menu.x, top: menu.y }} role='menu'>
           {menu.kind === 'tab' && (() => {
             const i = view.tabs.findIndex((x) => x.id === menu.tabId)
             const tab = view.tabs[i]
