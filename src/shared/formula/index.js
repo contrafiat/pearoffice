@@ -34,6 +34,9 @@ function literal (raw) {
 }
 
 function errorCode (err) {
+  // The parser wraps an error thrown inside a function (a #REF! from a
+  // deleted range, say) as #ERROR! with the real one as its details.
+  if (err instanceof FormulaError && err.error === '#ERROR!' && err.details instanceof FormulaError) return err.details.error
   if (err instanceof FormulaError) return err.error
   if (err && typeof err.error === 'string') return err.error
   return '#ERROR!'
@@ -90,6 +93,13 @@ function evaluateSheet (doc) {
 
   const isFormula = (raw) => typeof raw === 'string' && raw[0] === '='
   const hasInput = (raw) => raw !== undefined && raw !== null && raw !== ''
+
+  // The sheet's named ranges, upper-cased name -> { tab, r1, c1, r2, c2 }.
+  let names = null
+  const namesOf = () => {
+    if (!names) names = new Map(model.getNames(doc).map((n) => [n.name.toUpperCase(), n]))
+    return names
+  }
 
   // Row ids hidden in each tab (hidden:<tabId>).
   const hiddenByTab = new Map()
@@ -320,6 +330,17 @@ function evaluateSheet (doc) {
         const t = sheet ? tabByName(sheet) : tab
         if (!t) throw FormulaError.REF
         return valueAt(t, row, col)
+      },
+      // Named ranges (proposals/2026-10-04-sheet-tools.md).
+      onVariable: (name) => {
+        const n = namesOf().get(String(name).toUpperCase())
+        if (!n) return null
+        // Its cells are gone: a reference to no tab, which gives #REF! when
+        // it is read (a throw here, while parsing, would give #ERROR!).
+        if (!n.r1 || !n.tab) return { sheet: '\u0000', from: { row: 1, col: 1 }, to: { row: 1, col: 1 } }
+        return n.r1 === n.r2 && n.c1 === n.c2
+          ? { sheet: n.tab, row: n.r1, col: n.c1 }
+          : { sheet: n.tab, from: { row: n.r1, col: n.c1 }, to: { row: n.r2, col: n.c2 } }
       },
       onRange: (ref) => {
         const t = ref.sheet ? tabByName(ref.sheet) : tab

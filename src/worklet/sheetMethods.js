@@ -230,11 +230,11 @@ function createSheetMethods (sheets, { getJoin, getMoves, getProfiles }) {
     },
 
     // A new sheet from an imported file (the UI converts the file with SheetJS).
-    'sheet:import': async ({ title = 'Imported sheet', tabs } = {}, ctx) => {
+    'sheet:import': async ({ title = 'Imported sheet', tabs, names } = {}, ctx) => {
       if (!Array.isArray(tabs) || !tabs.length) throw new Error('Nothing to import')
       const { sheetId } = await methods['sheet:create']({ title }, ctx)
       const { doc } = await docFor(sheetId)
-      await commit(ctx, sheetId, model.importTabs(doc, { tabs }))
+      await commit(ctx, sheetId, model.importTabs(doc, { tabs, names: Array.isArray(names) ? names : [] }))
       return { sheetId }
     },
 
@@ -284,7 +284,7 @@ function createSheetMethods (sheets, { getJoin, getMoves, getProfiles }) {
         const tabCharts = model.getCharts(doc, id).map((c) => ({ ...c, resolved: resolveChart(doc, id, c, values) }))
         return { name: t.get('name'), cells, widths, heights: model.getHeights(doc, id), merges: model.getMerges(doc, id), freeze: model.getFreeze(doc, id), hidden: model.getHidden(doc, id), validations: model.getValidations(doc, id), condFormats: model.getCondFormats(doc, id), comments: model.getComments(doc, id).map((t) => ({ row: t.row, col: t.col, author: nameOf(t.author), text: noteOf(t) })), charts: tabCharts }
       })
-      return { title: model.title(doc), tabs }
+      return { title: model.title(doc), tabs, names: model.getNames(doc).filter((n) => n.r1).map((n) => ({ name: n.name, tab: n.tab, range: n.range })) }
     },
 
     'sheet:list': async (args, ctx) => {
@@ -365,6 +365,7 @@ function createSheetMethods (sheets, { getJoin, getMoves, getProfiles }) {
         hidden: model.getHidden(doc, tab),
         comments: model.getComments(doc, tab),
         condFormats: model.getCondFormats(doc, tab),
+        names: model.getNames(doc),
         ...validationView(doc, tab, cells, e),
         charts: model.getCharts(doc, tab).map((c) => ({ ...c, resolved: resolveChart(doc, tab, c, sheets.values(e)) }))
       }
@@ -406,6 +407,10 @@ function createSheetMethods (sheets, { getJoin, getMoves, getProfiles }) {
       return commit(ctx, a.sheetId, model.deleteComment(doc, firstTab(doc, a.tabId), String(a.id), hex(ctx.identity.publicKey)))
     },
     'sheet:resolveComment': mutate((doc, tab, a) => model.resolveComment(doc, tab, String(a.id), !!a.resolved)),
+    // Named ranges (proposals/2026-10-04-sheet-tools.md), for the whole sheet.
+    'sheet:setName': mutate((doc, tab, a) => model.setName(doc, a.name, tab, String(a.range || ''))),
+    'sheet:renameName': mutate((doc, tab, a) => model.renameName(doc, a.from, a.to)),
+    'sheet:deleteName': mutate((doc, tab, a) => model.deleteName(doc, a.name)),
     'sheet:addCondFormat': async (a, ctx) => {
       await requireEdit(ctx, a.sheetId)
       const { doc } = await docFor(a.sheetId)

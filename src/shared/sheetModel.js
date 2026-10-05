@@ -525,6 +525,12 @@ function rewriteRangeEnds (doc, tabId, kind, gone, before, after) {
         if (Object.keys(patch).length) map.set(id, { ...v, ...patch })
       }
     }
+    const names = doc.getMap('names')
+    for (const [key, v] of [...names.entries()]) {
+      if (!v || v.tab !== otherTab || typeof v.range !== 'string') continue
+      const next = shrink(v.range, otherTab)
+      if (next !== v.range) names.set(key, { ...v, range: next })
+    }
     for (const chart of doc.getMap('charts:' + otherTab).values()) {
       const data = chart && typeof chart.get === 'function' ? chart.get('data') : null
       if (typeof data === 'string') { const next = shrink(data, otherTab); if (next !== data) chart.set('data', next) }
@@ -923,6 +929,91 @@ function getCondFormats (doc, tabId) {
   return out.sort((a, b) => a.order - b.order || (a.id < b.id ? -1 : 1))
 }
 
+// Named ranges (proposals/2026-10-04-sheet-tools.md), in the root map
+// names: upper-cased name -> { name, tab, range (stored like a formula
+// reference on that tab) }. Formulas keep the name as typed; the engine
+// looks it up when it computes.
+const NAME_RE = /^[A-Za-z_\\][A-Za-z0-9_.\\]*$/
+function checkName (name) {
+  const n = String(name || '').trim()
+  if (!n) throw new Error('Give the range a name')
+  if (n.length > 255 || !NAME_RE.test(n)) throw new Error('A name starts with a letter or _ and has only letters, numbers, _ and .')
+  if (/^[A-Za-z]{1,3}\d+$/.test(n) || /^R\d*C\d*$/i.test(n) || /^(TRUE|FALSE)$/i.test(n)) throw new Error('A name cannot look like a cell reference')
+  return n
+}
+
+function setName (doc, name, tabId, rangeText) {
+  const n = checkName(name)
+  const box = require('./charts').parseRange(rangeText)
+  if (!box || box.spill) throw new Error('Pick a range for the name')
+  let tab = tabId
+  if (box.sheet) {
+    tab = tabIds(doc).find((id) => String(tabMap(doc, id).get('name')).toUpperCase() === box.sheet.toUpperCase())
+    if (!tab) throw new Error('There is no tab called ' + box.sheet)
+  }
+  if (!tabIds(doc).includes(tab)) throw new Error('That tab is gone')
+  return capture(doc, () => {
+    makeCtx(doc, tab).extend(tab, box.r2, box.c2)
+    const text = numToCol(box.c1) + box.r1 + (box.r1 === box.r2 && box.c1 === box.c2 ? '' : ':' + numToCol(box.c2) + box.r2)
+    doc.getMap('names').set(n.toUpperCase(), { name: n, tab, range: refs.toStored(text, makeCtx(doc, tab)) })
+  })
+}
+
+function deleteName (doc, name) {
+  return capture(doc, () => { const k = String(name || '').trim().toUpperCase(); if (doc.getMap('names').has(k)) doc.getMap('names').delete(k) })
+}
+
+// A name in formula text (outside strings and stored references), not
+// followed by "(" (a function) and not after "!" (a tab's name).
+const NAME_TOKEN = /"(?:[^"]|"")*"|\{[^}]*\}|[A-Za-z_\\][A-Za-z0-9_.\\]*/g
+function replaceNameIn (formula, from, to) {
+  const want = from.toUpperCase()
+  return formula.replace(NAME_TOKEN, (tok, at, all) => {
+    if (tok[0] === '"' || tok[0] === '{' || tok.toUpperCase() !== want) return tok
+    if (all[at - 1] === '!' || /^\s*\(/.test(all.slice(at + tok.length))) return tok
+    return to
+  })
+}
+
+// Rename a name, and every formula that uses it.
+function renameName (doc, from, to) {
+  const n = checkName(to)
+  const map = doc.getMap('names')
+  const old = map.get(String(from || '').trim().toUpperCase())
+  if (!old) throw new Error('That name was deleted')
+  if (n.toUpperCase() !== old.name.toUpperCase() && map.has(n.toUpperCase())) throw new Error('There is already a range called ' + n)
+  return capture(doc, () => {
+    map.delete(old.name.toUpperCase())
+    map.set(n.toUpperCase(), { ...old, name: n })
+    for (const tab of tabIds(doc)) {
+      const cells = doc.getMap('tab:' + tab).get('cells')
+      for (const [key, raw] of [...cells.entries()]) {
+        if (typeof raw !== 'string' || raw[0] !== '=') continue
+        const next = replaceNameIn(raw, old.name, n)
+        if (next !== raw) cells.set(key, next)
+      }
+    }
+  })
+}
+
+// Every name: [{ name, tabId, tab (its name), range, r1, c1, r2, c2 }],
+// A to Z. A name whose tab or cells were deleted has range '#REF!'.
+function getNames (doc) {
+  const out = []
+  const ctxTabs = tabsContext(doc)
+  for (const v of doc.getMap('names').values()) {
+    if (!v || typeof v !== 'object') continue
+    const t = ctxTabs.find((x) => x.id === v.tab)
+    const range = t ? refs.toDisplay(v.range || '', { tabId: v.tab, tabs: ctxTabs }) : '#REF!'
+    const box = require('./charts').parseRange(range)
+    const item = { name: v.name, tabId: v.tab, tab: t ? t.name : null, range: box ? range : '#REF!' }
+    if (box && !box.sheet) Object.assign(item, { r1: box.r1, c1: box.c1, r2: box.r2, c2: box.c2 })
+    else item.range = '#REF!'
+    out.push(item)
+  }
+  return out.sort((a, b) => (a.name.toUpperCase() < b.name.toUpperCase() ? -1 : 1))
+}
+
 // Row heights (pixels at 100%), in the root map heights:<tabId> by row id.
 // A row without one is the default height, or taller to fit wrapped or
 // larger text on each device.
@@ -1019,6 +1110,10 @@ function importTabs (doc, payload) {
         if (colId) t.get('widths').set(colId, Math.max(24, Math.min(1000, Math.round(px))))
       }
     })
+    // Named ranges from the file: { name, tab (index), range }.
+    for (const n of payload.names || []) {
+      try { if (ids[n.tab]) setName(doc, n.name, ids[n.tab], n.range) } catch {}
+    }
   })
 }
 
@@ -1129,6 +1224,12 @@ module.exports = {
   getFormat,
   setHidden,
   getHidden,
+  setName,
+  deleteName,
+  renameName,
+  getNames,
+  checkName,
+  replaceNameIn,
   addCondFormat,
   setCondFormat,
   deleteCondFormat,

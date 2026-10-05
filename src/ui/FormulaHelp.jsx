@@ -38,7 +38,7 @@ export function FormulaHelp ({ help, selected, onPick, anchor }) {
           className={'fh-item' + (i === selected ? ' on' : '')}
           onClick={() => onPick(f.name)}
         >
-          <div><span className='fname'>{f.name}</span><Args args={f.args} current={-1} /></div>
+          <div><span className='fname'>{f.name}</span>{!f.isName && <Args args={f.args} current={-1} />}</div>
           <div className='about'>{f.about}</div>
         </div>
       ))}
