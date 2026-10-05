@@ -1,6 +1,7 @@
 // Builds the PearSheet engine on @peerloom/core. Split from bare.js so tests
 // can build it in Node with an injected corestore and swarm.
 
+const b4a = require('b4a')
 const { createGroupEngine } = require('@peerloom/core/engine')
 const { createSheets } = require('./sheets')
 const { createApplyOps } = require('./sheetWire')
@@ -27,8 +28,30 @@ function createSheetEngine (opts = {}) {
     emit,
     getBase: (sheetId) => engine && engine.bases.get(sheetId),
     getLocalDb: () => engine && engine.localDb,
-    getStore: () => engine && engine.store
+    getStore: () => engine && engine.store,
+    onSnapshot: (sheetId) => autoCompact(sheetId).catch((e) => log('tidy-up failed: ' + e.message))
   })
+
+  // The owner's device tidies up a sheet by itself once its history passes
+  // COMPACT_AT updates (proposals/2026-10-05-shared-compaction.md), unless an
+  // invite link is out. Checked each time the sheet saves a local snapshot.
+  const COMPACT_AT = Number(opts.compactAt) || 50000
+  const compacting = new Set()
+  async function autoCompact (sheetId) {
+    const base = engine && engine.bases.get(sheetId)
+    if (!moves || !base || compacting.has(sheetId) || base.view.core.length < COMPACT_AT) return
+    const sheet = (await base.view.get('sheet'))?.value
+    if (!sheet || sheet.owner !== b4a.toString(engine.identity.publicKey, 'hex')) return
+    if ((await base.view.get('moved')) || (await base.view.get('deleted'))) return
+    if (await moves.openInvites(sheetId)) return
+    compacting.add(sheetId)
+    try {
+      const r = await moves.compact(sheetId)
+      emit('sheet:tidied', { from: sheetId, to: r.sheetId, updates: base.view.core.length })
+    } finally {
+      compacting.delete(sheetId)
+    }
+  }
 
   const methods = {
     ...createSheetMethods(sheets, { getJoin: () => join, getMoves: () => moves, getProfiles: () => profiles }),
@@ -138,11 +161,14 @@ function createSheetEngine (opts = {}) {
     if (join) join.close()
     if (seeding) await seeding.close()
     if (moves) moves.close()
+    if (deleting) deleting.close()
     if (linking) linking.close()
     if (profiles) profiles.close()
     return coreClose()
   }
   engine.sheets = sheets
+  engine.autoCompact = autoCompact // for tests
+  engine.checkTidied = (sheetId) => deleting.checkTidied(sheetId) // for tests
   engine.methods = methods
   Object.defineProperty(engine, 'join', { get: () => join })
   Object.defineProperty(engine, 'seeding', { get: () => seeding })

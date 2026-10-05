@@ -117,6 +117,7 @@ export function App () {
       // A sheet moved to fresh keys: follow it if it is the one on screen.
       on('sheet:moved', async ({ from, to }) => { await refresh(); setCurrent((c) => (c === from ? to : c)) }),
       on('sheet:removed', refresh),
+      on('sheet:tidied', () => setNotice('PearSheet tidied up a long sheet: devices now keep it as it is, not every change ever made.')),
       // Any edit or membership change anywhere: titles, roles and people in
       // the sidebar stay live. Batched, since edits arrive in bursts.
       on('sheet:changed', refreshSoon),

@@ -43,3 +43,16 @@ every old copy stayed on disk and the 100,000-edit sheet took 343 MB.
 - **Yjs state grows with overwrites** (2.6 MB at 100,000 edits on ~700
   cells): Yjs keeps a small record of every overwritten value. Same
   compaction would reset it.
+
+## After shared compaction (proposals/2026-10-05-shared-compaction.md)
+
+`bench/compaction.js`: a sheet gets N edits, a new device joins it; then the
+owner tidies up and another new device joins the tidied copy. Measured
+2026-10-05, same box.
+
+| Edits | Tidy-up | New device joins: before | after | Its disk: before | after |
+| --- | --- | --- | --- | --- | --- |
+| 10,000 | 0.15 s | 2.3 s | 0.26 s | 7.5 MB | 1.2 MB |
+| 50,000 | 0.83 s | 19.3 s | 0.70 s | 69.7 MB | 5.2 MB |
+
+The owner's device tidies up by itself at 50,000 updates.

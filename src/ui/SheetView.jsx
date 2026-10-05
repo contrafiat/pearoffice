@@ -24,6 +24,7 @@ import { guessChart } from '../shared/charts.js'
 import { readPref, writePref } from './prefs.js'
 import { ArrowCounterClockwise, ArrowClockwise, TextB, TextItalic, TextAUnderline, PaintBucket, Copy, Scissors, ClipboardText, Eraser, Numpad, FileXls, DotsThree, Plus, MagnifyingGlass, X, ChartBar, PencilSimple, DownloadSimple, Trash, TextUnderline, TextStrikethrough, TextAlignLeft, TextAlignCenter, TextAlignRight, ArrowUDownLeft, FrameCorners, AlignTop, AlignCenterVertical, AlignBottom, ArrowsOutLineHorizontal, UserPlus } from '@phosphor-icons/react'
 import { DeletePanel } from './DeletePanel.jsx'
+import { TidyPanel } from './TidyPanel.jsx'
 import { FormulaHelp, helpFor, insertFunction } from './FormulaHelp.jsx'
 import { exportSheet, exportCsv, printTab, isMobile } from './xlsx.js'
 
@@ -142,6 +143,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
     return () => window.removeEventListener('pearsheet:pref', onPref)
   }, [])
   const [deleting, setDeleting] = useState(null) // 'local' | 'everyone' | null
+  const [tidying, setTidying] = useState(false)
   const [finding, setFinding] = useState(null) // { replace } while Find is open
   const [sorting, setSorting] = useState(null) // what the Sort panel sorts
   const [droppingTab, setDroppingTab] = useState(null) // a tab waiting for "Delete"
@@ -828,7 +830,9 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
   if (view.loading) return <div className='loading'>Waiting for the sheet to arrive from the people in it...</div>
   const frozenNote = view.frozen && (view.frozen.removed
     ? 'The owner removed you from this sheet. This is a read-only copy of what you had.'
-    : 'This sheet moved to new keys. Opening the new copy...')
+    : view.frozen.tidied
+      ? 'Updating this sheet...'
+      : 'This sheet moved to new keys. Opening the new copy...')
 
   const fmt = (selected && selected.fmt) || {}
   const barValue = editing && editing.row === sel.row && editing.col === sel.col ? editing.value : spilled ? (anchor ? anchor.input : '') : (selected ? selected.input : '')
@@ -1001,6 +1005,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
               {canEdit && phone && <li role='menuitem' onClick={() => fillSelection('down')}>Fill down</li>}
               {canEdit && phone && <li role='menuitem' onClick={() => fillSelection('right')}>Fill right</li>}
               <li role='menuitem' onClick={() => setDeleting('local')}>Remove from this device</li>
+              {view.myRole === 'owner' && !view.frozen && <li role='menuitem' onClick={() => setTidying(true)}>Tidy up this sheet...</li>}
               {view.myRole === 'owner' && <li role='menuitem' className='danger' onClick={() => setDeleting('everyone')}>Delete for everyone</li>}
             </ul>
           )}
@@ -1297,6 +1302,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
       )}
       {sharing && <SharePanel sheetId={sheetId} onClose={() => setSharing(false)} onError={onError} />}
       {shownHelp && <FormulaHelp help={shownHelp} selected={helpSel} onPick={pickFunction} anchor={document.activeElement && document.activeElement.tagName === 'INPUT' ? document.activeElement : null} />}
+      {tidying && <TidyPanel sheetId={sheetId} title={view.title} onClose={() => setTidying(false)} onError={onError} onDone={() => setTidying(false)} />}
       {deleting && <DeletePanel sheetId={sheetId} title={view.title} kind={deleting} onClose={() => setDeleting(null)} onError={onError} onDone={() => { setDeleting(null); onGone() }} />}
 
       {menu && (

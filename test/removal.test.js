@@ -48,7 +48,10 @@ test('removal moves the sheet to fresh keys', async (t) => {
   await call(gone, 'sheet:setCell', { sheetId: oldId, row: 2, col: 1, input: '=A1*2' })
   await waitFor('owner has the edit', async () => (await grid(owner, oldId))['2,1'] === '=A1*2 -> 200')
 
-  // Late is offline while the owner removes someone.
+  // Late is offline while the owner removes someone, and edits while away:
+  // the edit exists only on Late's device.
+  await late.swarm.destroy()
+  await call(late, 'sheet:setCell', { sheetId: oldId, row: 5, col: 1, input: 'typed offline' })
   await late.close()
   const { sheetId: newId } = await call(owner, 'sheet:removeMember', { sheetId: oldId, identity: hex(gone.identity.publicKey) })
   assert.notEqual(newId, oldId)
@@ -90,6 +93,7 @@ test('removal moves the sheet to fresh keys', async (t) => {
     late = await device('Late', lateDir)
     await waitFor('late follows', async () => late.bases.get(newId) && (await call(late, 'sheet:view', { sheetId: newId })).myRole === 'editor' && late.bases.get(newId).writable, { timeout: 40000 })
     assert.equal((await grid(late, newId))['3,1'], 'after the move')
+    await waitFor('the owner gets what Late typed offline', async () => (await grid(owner, newId))['5,1'] === 'typed offline', { timeout: 30000 })
   })
 
   await t.test('the old sheet is frozen: ops appended after the move are ignored', async () => {

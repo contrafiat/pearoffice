@@ -39,7 +39,9 @@ phrase (proposals/2026-10-03-device-linking.md). The seeder ships inside the
 desktop app and as a Linux server download. iOS runs on the Simulator and
 the iPhone SE. Mac builds are signed and notarized. Anyone can remove a sheet
 from their device and the owner can delete it for everyone, seeder included
-(proposals/2026-10-04-deleting-sheets.md). A seeder can be taken off a sheet,
+(proposals/2026-10-04-deleting-sheets.md). The owner's device tidies up a long sheet by moving it to a fresh copy
+(proposals/2026-10-05-shared-compaction.md), and any move now carries
+edits made offline. A seeder can be taken off a sheet,
 a device can stop using one and a seeder can forget a device
 (proposals/2026-10-04-stop-backing-up.md). People have profile pictures,
 stored inside each sheet (proposals/2026-10-04-profiles-with-avatars.md).
