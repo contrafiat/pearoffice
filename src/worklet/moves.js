@@ -206,7 +206,14 @@ function createMoves ({ engine, sheets, getJoin, getDeleting = () => null, emit,
     if (writer) {
       const from = await sheets.load(oldId)
       const into = await sheets.load(newId)
-      const missing = model.missingFrom(from.guarded.doc, into.guarded.doc)
+      // The old sheet as loaded, plus its last saved copy: an edit made
+      // offline can be missing from the first if the move rewound the view.
+      const source = model.createDoc()
+      model.applyUpdate(source, model.encodeState(from.guarded.doc))
+      const saved = await sheets.savedState(oldId)
+      if (saved) { try { model.applyUpdate(source, saved) } catch {} }
+      const missing = model.missingFrom(source, into.guarded.doc)
+      source.destroy()
       if (missing) {
         model.applyUpdate(into.guarded.doc, missing)
         sheets.noteLocal(newId, missing)
