@@ -10,7 +10,8 @@ import { SettingsPanel } from './SettingsPanel.jsx'
 import { UpdateBar } from './UpdateBar.jsx'
 import { FileArrowUp, GearSix, LinkSimple, List, Plus } from '@phosphor-icons/react'
 
-// Import .xlsx: a file input on desktop, the shell's file picker on phones.
+// Import a file (.xlsx, .csv or .json): a file input on desktop, the shell's
+// file picker on phones.
 function ImportButton ({ className, onImported, onError }) {
   if (isMobile()) {
     return (
@@ -23,16 +24,16 @@ function ImportButton ({ className, onImported, onError }) {
           } catch (err) { onError('Could not import: ' + err.message) }
         }}
       >
-        <FileArrowUp size={16} /> Import .xlsx
+        <FileArrowUp size={16} /> Import a file
       </button>
     )
   }
   return (
     <label className={className + ' import'}>
-      <FileArrowUp size={16} /> Import .xlsx
+      <FileArrowUp size={16} /> Import a file
       <input
         type='file'
-        accept='.xlsx,.csv'
+        accept='.xlsx,.csv,.json'
         hidden
         onChange={async (e) => {
           const file = e.target.files && e.target.files[0]

@@ -32,7 +32,7 @@ async function shellMethod (method, args) {
   }
   if (method === 'app:pickFile') {
     const res = await DocumentPicker.getDocumentAsync({
-      type: ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'text/csv', 'text/comma-separated-values', 'application/octet-stream'],
+      type: ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'text/csv', 'text/comma-separated-values', 'application/json', 'text/json', 'application/octet-stream'],
       copyToCacheDirectory: true
     })
     if (res.canceled || !res.assets || !res.assets[0]) return { canceled: true }
