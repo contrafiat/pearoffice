@@ -30,7 +30,7 @@ rsync -a --delete --rsync-path="$RSYNC_PATH" "${EXCLUDES[@]}" "$ROOT/" "$MAC:$RE
 rsync -a --delete --rsync-path="$RSYNC_PATH" --exclude node_modules --exclude .git "$ROOT/../peerloom-core/" "$MAC:$REMOTE/peerloom-core/"
 
 echo "==> install, stage, build on the Mac ($ARCH, SIGN=${SIGN:-0})"
-ssh -o BatchMode=yes "$MAC" "zsh -lc 'cd ~/$REMOTE/pearsheet && ARCH=$ARCH SIGN=${SIGN:-0} NOTARY_PROFILE=${NOTARY_PROFILE:-pearcircle-seeder-notary} ./scripts/mac-build-desktop.sh'"
+ssh -o BatchMode=yes "$MAC" "zsh -lc 'cd ~/$REMOTE/pearsheet && ARCH=$ARCH BUILD_VERSION=${BUILD_VERSION:-} SIGN=${SIGN:-0} NOTARY_PROFILE=${NOTARY_PROFILE:-pearcircle-seeder-notary} ./scripts/mac-build-desktop.sh'"
 
 echo "==> packaged smoke on the Mac"
 APP_DIR=$([ "$ARCH" = "arm64" ] && echo mac-arm64 || echo mac)

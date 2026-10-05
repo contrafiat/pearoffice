@@ -246,8 +246,12 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
     const chartXlsx = require('node:path').join(dataDir, 'downloads', 'Untitled sheet.xlsx')
     for (const t0 = Date.now(); !fs.existsSync(chartXlsx) && Date.now() - t0 < 10000;) await sleep(200)
     await sleep(500)
-    const zipped = fs.existsSync(chartXlsx) ? require('fflate').unzipSync(fs.readFileSync(chartXlsx)) : {}
-    result.chartInXlsx = !!zipped['xl/charts/chart1.xml'] && require('fflate').strFromU8(zipped['xl/worksheets/sheet1.xml']).includes('<drawing r:id=')
+    // fflate is only in the checkout; a packaged app checks the file was saved.
+    const fflate = (() => { try { return require('fflate') } catch { return null } })()
+    if (fflate) {
+      const zipped = fs.existsSync(chartXlsx) ? fflate.unzipSync(fs.readFileSync(chartXlsx)) : {}
+      result.chartInXlsx = !!zipped['xl/charts/chart1.xml'] && fflate.strFromU8(zipped['xl/worksheets/sheet1.xml']).includes('<drawing r:id=')
+    } else result.chartInXlsx = fs.existsSync(chartXlsx)
     await js("document.querySelector('.chart-frame').click()")
     await waitFor('chart tools again', "!!document.querySelector('.chart-tools')")
     await js("document.querySelector('.chart-tools [aria-label=\"Delete chart\"]').click()")

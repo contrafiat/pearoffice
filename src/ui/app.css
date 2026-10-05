@@ -316,6 +316,9 @@ button, input, select { font: inherit; color: inherit; }
 .people select { border: 1px solid var(--line); border-radius: 6px; padding: 4px 8px; background: var(--panel); }
 
 .banner.info { background: var(--pear-soft); color: var(--pear-dark); }
+.update-bar { display: flex; align-items: center; gap: 8px; }
+.update-bar > span { flex: 1; }
+.update-bar .icon-button { border: 0; background: none; padding: 4px; color: inherit; display: inline-flex; }
 .member-actions, .confirm { display: flex; align-items: center; gap: 6px; }
 .panel button.danger { border-color: var(--danger); color: var(--danger); }
 .panel .warn { color: var(--danger); font-size: 13px; }

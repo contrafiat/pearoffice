@@ -25,6 +25,18 @@ See the comments at the top of `pearsheet-seeder.service` for a systemd user
 service. Data lives in `~/.pearsheet-seeder` unless `PEARSHEET_SEEDER_DATA`
 says otherwise.
 
+## Updates
+
+A minute after it starts, and then once a day, it checks for a newer
+release and prints a line when there is one. To install it:
+
+    ~/pearsheet-seeder/pearsheet-seeder update
+
+That downloads the release for this machine, checks it against its
+published checksum, replaces the program and restarts the
+`pearsheet-seeder` service if it is running. Your data is not touched. Set
+`PEARSHEET_NO_UPDATE_CHECK=1` to turn the check off.
+
 ## What it stores
 
 Only sheets that a device paired with this seeder has registered, plus the

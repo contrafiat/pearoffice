@@ -111,6 +111,18 @@ pushes `ghcr.io/peerloomllc/pearsheet-seeder` (`PUSH=0` to only build). It
 must run with host networking: through Docker's bridge, devices cannot pair.
 The store entry is `peerloom-umbrel-app-store/peerloom-pearsheet-seeder/`.
 
+Updates (proposals/2026-10-05-update-checker.md): releases go to the public
+`peerloomllc/pearsheet-releases` with `scripts/release.sh <notes> [version]`
+(after the dist scripts; writes a `.sha256` for every file). The desktop
+app checks it through `desktop/updates.js` and shows `src/ui/UpdateBar.jsx`;
+the checking and installing code is `@peerloom/host`'s, copied into
+`desktop/vendor/peerloom-host/` by `node scripts/vendor-peerloom-host.js`.
+The seeder download's launcher checks daily and has `pearsheet-seeder
+update`. Test against a fake release with `scripts/serve-local-release.js`
+and `PEARSHEET_UPDATE_LATEST_URL`; `node scripts/check-update.js`
+runs Update now on a real AppImage. `PEARSHEET_NO_UPDATE_CHECK=1` turns it
+off.
+
 `npm run dist:seeder` builds the headless download for Linux x64 and arm64
 (`dist/seeder-pkg/*.tar.gz`: Bare runtime, seeder bundle, launcher, systemd
 user unit, README from `seeder-dist/`) and checks the x64 one starts.

@@ -5,9 +5,9 @@
 // as in this repo so the server's relative requires work. No npm runs inside
 // the image. See proposals/2026-10-05-umbrel-seeder.md.
 //
-// The login is @peerloom/host's dashboard-auth, copied from the sibling
-// checkout ../peerloom-host with the one module it needs (z32, and b4a under
-// it), so the image does not carry the rest of that package.
+// The login is @peerloom/host's dashboard-auth, from the copy in
+// desktop/vendor/peerloom-host (scripts/vendor-peerloom-host.js), with the
+// one module it needs (z32, and b4a under it).
 //
 // Usage: node scripts/stage-umbrel.js [amd64|arm64]   (default both)
 const fs = require('fs')
@@ -29,11 +29,8 @@ const files = [
   'node_modules/b4a/index.js',
   'node_modules/b4a/package.json'
 ]
-const host = path.join(root, '..', 'peerloom-host')
-const hostFiles = ['src/dashboard-auth.js', 'src/tighten.js', 'LICENSE']
-for (const f of hostFiles) {
-  if (!fs.existsSync(path.join(host, f))) throw new Error('missing ../peerloom-host/' + f + ': update that checkout (dashboard-auth must load without identity.js)')
-}
+const host = path.join(root, 'desktop', 'vendor', 'peerloom-host')
+const hostFiles = ['dashboard-auth.js', 'tighten.js', 'LICENSE']
 const only = process.argv[2]
 for (const [arch, dockerArch] of [['x64', 'amd64'], ['arm64', 'arm64']]) {
   if (only && only !== dockerArch) continue
@@ -45,8 +42,8 @@ for (const [arch, dockerArch] of [['x64', 'amd64'], ['arm64', 'arm64']]) {
   }
   const hostDir = path.join(dir, 'node_modules', '@peerloom', 'host')
   for (const f of hostFiles) {
-    fs.mkdirSync(path.dirname(path.join(hostDir, f)), { recursive: true })
-    fs.copyFileSync(path.join(host, f), path.join(hostDir, f))
+    fs.mkdirSync(path.join(hostDir, 'src'), { recursive: true })
+    fs.copyFileSync(path.join(host, f), path.join(hostDir, f === 'LICENSE' ? f : path.join('src', f)))
   }
   fs.writeFileSync(path.join(hostDir, 'package.json'), JSON.stringify({ name: '@peerloom/host', exports: { './dashboard-auth': './src/dashboard-auth.js' } }, null, 2) + '\n')
   console.log('staged ' + path.relative(root, dir))
