@@ -7,6 +7,7 @@
 # Pattern from pearcircle/seeder-launcher/scripts/build-windows.sh.
 #
 # Usage: scripts/build-desktop-windows.sh
+# BUILD_VERSION=<x.y.z> labels the build as another version (testing updates).
 # Env: WINDOWS_VM_HOST (default ben@192.168.50.157). The VM is the local
 # libvirt domain win11-pearguard; start it with
 #   virsh -c qemu:///system start win11-pearguard
@@ -15,6 +16,8 @@ set -euo pipefail
 WIN="${WINDOWS_VM_HOST:-ben@192.168.50.157}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DIR="pearsheet-build"
+VERSION_ARG=""
+[ -n "${BUILD_VERSION:-}" ] && VERSION_ARG="'-c.extraMetadata.version=$BUILD_VERSION'"  # quoted, or PowerShell splits it at -c
 
 ssh -o BatchMode=yes -o ConnectTimeout=6 "$WIN" exit || { echo "cannot reach $WIN (is the VM running?)" >&2; exit 1; }
 
@@ -45,7 +48,7 @@ Set-Location (Join-Path \$target 'pearsheet'); npm install --no-audit --no-fund 
 npm install --prefix desktop --no-audit --no-fund --loglevel=error; if (\$LASTEXITCODE) { exit 1 }
 node scripts/stage-desktop.js --platform win32 --arch x64; if (\$LASTEXITCODE) { exit 1 }
 Set-Location desktop
-npx electron-builder --win --x64 --publish never; if (\$LASTEXITCODE) { exit 1 }
+npx electron-builder --win --x64 --publish never $VERSION_ARG; if (\$LASTEXITCODE) { exit 1 }
 Set-Location ..
 node scripts/smoke-packaged.js desktop\\dist\\win-unpacked\\PearSheet.exe; if (\$LASTEXITCODE) { exit 1 }
 PSEOF

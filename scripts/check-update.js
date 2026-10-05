@@ -4,7 +4,12 @@
 // the window's own bridge (over the DevTools protocol), and checks the app
 // was replaced and came back on the new version.
 //
-//   node scripts/check-update.js <old.AppImage | old PearSheet.app> <release folder> <new version>
+//   node scripts/check-update.js <old.AppImage | old PearSheet.app | installed PearSheet.exe> <release folder> <new version>
+//
+// On Windows the installed copy itself is updated (the installer has one
+// place to put it), and the installer starts the new version without the
+// debugging port, so the check reads the installed file's version and looks
+// for the new process instead.
 //
 // The release folder holds the new build and its .sha256: on Linux
 // pearsheet-<new>-linux-x86_64.AppImage, built with
@@ -62,11 +67,12 @@ async function until (what, fn, ms = 60000) {
 async function main () {
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'pearsheet-update-check-'))
   const mac = /\.app\/?$/.test(oldImage)
-  const image = path.join(scratch, mac ? 'PearSheet.app' : 'PearSheet.AppImage')
+  const win = /\.exe$/i.test(oldImage)
+  const image = win ? oldImage : path.join(scratch, mac ? 'PearSheet.app' : 'PearSheet.AppImage')
   if (mac) execFileSync('ditto', [oldImage, image])
-  else { fs.copyFileSync(oldImage, image); fs.chmodSync(image, 0o755) }
+  else if (!win) { fs.copyFileSync(oldImage, image); fs.chmodSync(image, 0o755) }
   const exe = mac ? path.join(image, 'Contents', 'MacOS', 'PearSheet') : image
-  const args = mac ? [] : ['--no-sandbox', '--disable-gpu']
+  const args = mac || win ? [] : ['--no-sandbox', '--disable-gpu']
   const server = await serveRelease({ version: next, dir: path.resolve(releaseDir) })
   const port = 9300 + Math.floor(Math.random() * 500)
   const env = {
@@ -88,6 +94,15 @@ async function main () {
     const started = await bridge(port, 'app:updateApply')
     if (started.status !== 'running') throw new Error('apply did not start: ' + JSON.stringify(started))
     await until('the old copy to exit', () => proc.exitCode !== null || proc.signalCode !== null, 120000)
+    if (win) {
+      // While the installer runs, the file is briefly missing.
+      const ps = (cmd) => execFileSync('powershell', ['-NoProfile', '-Command', cmd], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
+      await until('the installed PearSheet to be ' + next, () => ps("(Get-Item -LiteralPath '" + image + "').VersionInfo.ProductVersion").startsWith(next), 180000)
+      console.log('ok - the installer replaced PearSheet.exe with ' + next)
+      await until('the new copy to start', () => /PearSheet\.exe/i.test(ps('tasklist /FI "IMAGENAME eq PearSheet.exe"')), 60000)
+      console.log('ok - the installer started PearSheet ' + next)
+      return
+    }
     if (mac) {
       const plist = execFileSync('plutil', ['-extract', 'CFBundleShortVersionString', 'raw', path.join(image, 'Contents', 'Info.plist')], { encoding: 'utf8' }).trim()
       if (plist !== next) throw new Error('the app on disk is still ' + plist)
@@ -106,7 +121,7 @@ async function main () {
     console.error(out.split('\n').filter((l) => /update|pearsheet\]/.test(l)).slice(-15).join('\n'))
     throw err
   } finally {
-    try { execFileSync('pkill', ['-f', scratch]) } catch {}
+    try { execFileSync(process.platform === 'win32' ? 'taskkill' : 'pkill', process.platform === 'win32' ? ['/IM', 'PearSheet.exe', '/F'] : ['-f', scratch]) } catch {}
     server.close()
     await sleep(1000)
     fs.rmSync(scratch, { recursive: true, force: true })
