@@ -641,3 +641,8 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 .my-name .name-row { display: flex; gap: 8px; align-items: stretch; }
 .panel .me .my-name .name-row input { flex: 1 1 auto; min-width: 0; }
 .panel .me .my-name .name-row button { flex: none; }
+
+/* Conditional formatting icons (proposals/2026-10-05-formula-rules-icon-sets.md) */
+.cell .cf-icon { position: absolute; left: 4px; top: 50%; transform: translateY(-50%); display: flex; pointer-events: none; }
+.cell.has-icon { padding-left: 22px; }
+.cf-sample.icons { gap: 1px; }

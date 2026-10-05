@@ -10,6 +10,8 @@ const { displayNumber } = require('../shared/formula')
 const SSF = require('../shared/formula/vendor/fast-formula-parser/ssf/ssf')
 const m = require('./membership')
 const validation = require('../shared/validation')
+const condFormat = require('../shared/condFormat')
+const refs = require('../shared/refs')
 const charts = require('../shared/charts')
 
 const hex = (buf) => b4a.toString(buf, 'hex')
@@ -76,6 +78,27 @@ function listFromRange (doc, tabId, source, allValues) {
     }
   }
   return [...out]
+}
+
+// Conditional formatting's formula rules (proposals/2026-10-05-formula-
+// rules-icon-sets.md): the cells each one matches, "row,col", worked out
+// by the formula engine with the rule's formula moved to each cell. A rule
+// over too many cells gets null (not applied).
+function formulaMatches (tabId, rules, all) {
+  const out = {}
+  for (const r of rules) {
+    if (r.kind !== 'formula' || !all || typeof all.evaluateAt !== 'function') continue
+    if ((r.r2 - r.r1 + 1) * (r.c2 - r.c1 + 1) > condFormat.MAX_FORMULA_CELLS) { out[r.id] = null; continue }
+    const hits = []
+    for (let row = r.r1; row <= r.r2; row++) {
+      for (let col = r.c1; col <= r.c2; col++) {
+        const v = all.evaluateAt(tabId, row, col, refs.shiftA1(r.formula, row - r.r1, col - r.c1))
+        if (v === true || (typeof v === 'number' && v !== 0)) hits.push(row + ',' + col)
+      }
+    }
+    out[r.id] = hits
+  }
+  return out
 }
 
 function createSheetMethods (sheets, { getJoin, getMoves, getProfiles }) {
@@ -364,7 +387,7 @@ function createSheetMethods (sheets, { getJoin, getMoves, getProfiles }) {
         freeze: model.getFreeze(doc, tab),
         hidden: model.getHidden(doc, tab),
         comments: model.getComments(doc, tab),
-        condFormats: model.getCondFormats(doc, tab),
+        ...((cfs) => ({ condFormats: cfs, cfMatches: formulaMatches(tab, cfs, sheets.values(e)) }))(model.getCondFormats(doc, tab)),
         names: model.getNames(doc),
         ...validationView(doc, tab, cells, e),
         charts: model.getCharts(doc, tab).map((c) => ({ ...c, resolved: resolveChart(doc, tab, c, sheets.values(e)) }))
@@ -679,4 +702,4 @@ function createSheetMethods (sheets, { getJoin, getMoves, getProfiles }) {
   }
 }
 
-module.exports = { createSheetMethods }
+module.exports = { createSheetMethods, formulaMatches }

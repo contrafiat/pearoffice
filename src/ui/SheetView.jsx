@@ -152,7 +152,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
   const [validating, setValidating] = useState(null) // the range whose rules are being set
   const [badEntry, setBadEntry] = useState(null) // { row, col, value, move, rule } refused or warned
   const [picking, setPicking] = useState(null) // { row, col, x, y } list dropdown open
-  const [colouring, setColouring] = useState(false) // the colour rules panel
+  const [colouring, setColouring] = useState(false) // the conditional formatting panel
   const [naming, setNaming] = useState(null) // { adding } while the names panel is open
   const [goingTo, setGoingTo] = useState(null) // text typed in the name box
   // A menu opened near an edge (a long press on a phone) moves to fit on screen.
@@ -278,7 +278,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
   const invalidCells = useMemo(() => (view && view.invalid && view.invalid.length ? new Set(view.invalid.map(([r, c]) => r + ',' + c)) : null), [view])
   const selRule = ruleFor(validations, sel.row, sel.col)
   // Conditional formatting: worked out here from the merged values.
-  const cfStyles = useMemo(() => (view && view.condFormats && view.condFormats.length ? evaluateColours(view.condFormats, cells, todaySerial()) : null), [view, cells])
+  const cfStyles = useMemo(() => (view && view.condFormats && view.condFormats.length ? evaluateColours(view.condFormats, cells, todaySerial(), view.cfMatches || {}) : null), [view, cells])
 
   const selected = cells.get(sel.row + ',' + sel.col)
   // Spilling (proposals/2026-10-04-spilling-formulas.md): the formula a
@@ -995,7 +995,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
               {freezeItems(() => setMore(false))}
               {filterItems(() => setMore(false))}
               {canEdit && <li role='menuitem' onClick={() => setValidating({ ...range })}>Validation...</li>}
-              {(canEdit || (view.condFormats || []).length > 0) && <li role='menuitem' onClick={() => setColouring(true)}>Colour rules...</li>}
+              {(canEdit || (view.condFormats || []).length > 0) && <li role='menuitem' onClick={() => setColouring(true)}>Conditional formatting...</li>}
               {(canEdit || (view.names || []).length > 0) && <li role='menuitem' onClick={() => setNaming({ adding: false })}>Named ranges...</li>}
               {threads.length > 0 && <li role='menuitem' onClick={() => setListingComments(true)}>Comments{openThreads ? ' (' + openThreads + ' open)' : ''}</li>}
               {canEdit && phone && <li role='menuitem' onClick={() => fillSelection('down')}>Fill down</li>}
@@ -1200,6 +1200,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
       {colouring && (
         <CondFormatPanel
           rules={view.condFormats || []}
+          matches={view.cfMatches || {}}
           selection={colName(range.c1) + range.r1 + (range.r1 === range.r2 && range.c1 === range.c2 ? '' : ':' + colName(range.c2) + range.r2)}
           canEdit={canEdit}
           act={async (what, args) => { try { return await call('sheet:' + what, { sheetId, tabId, ...args }) } catch (err) { return { error: err.message } } }}
@@ -1328,7 +1329,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
               {freezeItems(() => setMenu(null))}
               {filterItems(() => setMenu(null))}
               {canEdit && <li role='menuitem' onClick={() => { setMenu(null); setValidating({ ...range }) }}>Validation...</li>}
-              {canEdit && <li role='menuitem' onClick={() => { setMenu(null); setColouring(true) }}>Colour rules...</li>}
+              {canEdit && <li role='menuitem' onClick={() => { setMenu(null); setColouring(true) }}>Conditional formatting...</li>}
               {canEdit && <li role='menuitem' onClick={() => { setMenu(null); setNaming({ adding: true }) }}>Name this range...</li>}
               {(canEdit || threadAt.has(sel.row + ',' + sel.col)) && <li role='menuitem' onClick={() => { setMenu(null); setCommenting({ row: sel.row, col: sel.col }) }}>{threadAt.has(sel.row + ',' + sel.col) ? 'Show comments' : 'Comment'}</li>}
               {canEdit && <li role='menuitem' className='danger' onClick={() => { setMenu(null); run('sheet:clearRange', range) }}>Clear contents</li>}

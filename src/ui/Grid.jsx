@@ -3,6 +3,7 @@ import React, { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, use
 import { colName } from './a1.js'
 import { textStyle, borderCss, hasBorder, neededHeight } from './cellStyle.js'
 import { Funnel, CaretDown } from '@phosphor-icons/react'
+import { CfIcon } from './cfIcons.jsx'
 
 const BASE_ROW_H = 24
 const HEAD_H = 26
@@ -331,11 +332,11 @@ export const Grid = forwardRef(function Grid (props, ref) {
         if (merged.hidden.has(r + ',' + c)) return null
         const m = merged.top.get(r + ',' + c)
         const cell = cells.get(r + ',' + c)
-        // Colour rules (src/shared/condFormat.js) go over the cell's own format.
+        // Conditional formatting (src/shared/condFormat.js) go over the cell's own format.
         const cf = cfStyles && cfStyles.get(r + ',' + c)
         const fmt = cf ? { ...((cell && cell.fmt) || {}), ...cf } : (cell && cell.fmt) || {}
         const head = filterHead && r === filterHead.row && c >= filterHead.c1 && c <= filterHead.c2
-        const cls = 'cell' + (cell ? ' k-' + cell.kind : '') + (fmt.b ? ' b' : '') + (fmt.i ? ' i' : '') + (fmt.wrap ? ' wrap' : '') + (fmt.valign ? ' v-' + fmt.valign : '') + (head ? ' filter-head' : '') + (invalidCells && invalidCells.has(r + ',' + c) ? ' invalid' : '')
+        const cls = 'cell' + (cf && cf.icon ? ' has-icon' : '') + (cell ? ' k-' + cell.kind : '') + (fmt.b ? ' b' : '') + (fmt.i ? ' i' : '') + (fmt.wrap ? ' wrap' : '') + (fmt.valign ? ' v-' + fmt.valign : '') + (head ? ' filter-head' : '') + (invalidCells && invalidCells.has(r + ',' + c) ? ' invalid' : '')
         return (
           <div
             key={r + ',' + c}
@@ -353,7 +354,8 @@ export const Grid = forwardRef(function Grid (props, ref) {
             title={cell && cell.volatile ? 'Changes on each device (time or random)' : cell && cell.blocked ? 'This answer cannot fill in. Select the cell to see why.' : undefined}
           >
             {cf && cf.bar && <span className='cf-bar' style={{ left: cf.bar.from * 100 + '%', width: Math.max(0, cf.bar.to - cf.bar.from) * 100 + '%', background: cf.bar.color }} />}
-            <span className='cell-text' style={textStyle(fmt, zoom)}>{cell ? cell.display : ''}</span>
+            {cf && cf.icon && <span className='cf-icon'><CfIcon set={cf.icon.set} index={cf.icon.index} size={Math.round(14 * zoom)} /></span>}
+            <span className='cell-text' style={textStyle(fmt, zoom)}>{cell && !(cf && cf.icon && cf.icon.iconOnly) ? cell.display : ''}</span>
             {hasBorder(fmt) && <span className='cell-borders' style={{ borderTop: borderCss(fmt.bt), borderRight: borderCss(fmt.br), borderBottom: borderCss(fmt.bb), borderLeft: borderCss(fmt.bl) }} />}
             {commentMarks && commentMarks.has(r + ',' + c) && (() => {
               const t = commentMarks.get(r + ',' + c)

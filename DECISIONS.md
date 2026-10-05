@@ -2,6 +2,17 @@
 
 Append-only, newest on top. Per Constitution §4.
 
+## 2026-10-05 - Formula rules and icon sets in colour rules
+Tier: T2
+Context: proposals/2026-10-05-formula-rules-icon-sets.md.
+Choice: two more kinds in `cf:<tabId>`. A formula rule's formula is stored
+like a formula reference, written for the range's top-left cell and moved
+for each cell; the worklet's formula engine works out the matches from the
+merged values and sends them with the sheet view. Icon sets use Excel's
+percent thresholds (67/33, or even splits for 4 and 5 icons).
+Alternatives: editable thresholds (deferred).
+Consequences: older builds show no colours or icons from these rules.
+
 ## 2026-10-05 - Radar, bubble, stock, histogram and waterfall charts
 Tier: T2
 Context: proposals/2026-10-05-more-chart-types.md.
