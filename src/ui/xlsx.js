@@ -3,7 +3,8 @@
 // On phones the shell does the file handling (share sheet, file picker).
 import * as XLSX from 'xlsx/dist/xlsx.mini.min.js'
 import * as fflate from 'fflate'
-import { workbookToTabs, workbookBytes, freezeFromXlsx, READ_OPTIONS } from '../shared/xlsxMap.js'
+import { workbookToTabs, workbookBytes, freezeFromXlsx, READ_OPTIONS, MAX_IMPORT_CELLS } from '../shared/xlsxMap.js'
+import { stylesFromXlsx } from '../shared/xlsxStyles.js'
 import { call } from './bridge.js'
 import { writePref } from './prefs.js'
 import { borderCss, fontPx, FONTS } from './cellStyle.js'
@@ -15,6 +16,8 @@ function importWorkbook (wb, name, bytes) {
   const { tabs } = workbookToTabs(XLSX, wb)
   // Frozen panes come from the raw file (SheetJS does not report them).
   if (bytes) freezeFromXlsx(bytes, fflate).forEach((f, i) => { if (f && tabs[i]) tabs[i].freeze = f })
+  // So are cell styles and row heights.
+  if (bytes) stylesFromXlsx(bytes, fflate, MAX_IMPORT_CELLS).forEach((x, i) => { if (tabs[i]) { tabs[i].styles = x.styles; tabs[i].heights = x.heights } })
   const title = String(name || '').replace(/\.[^.]+$/, '') || 'Imported sheet'
   return call('sheet:import', { title, tabs }).then(async (r) => {
     // A filter in the file becomes this device's filter, with nothing hidden
