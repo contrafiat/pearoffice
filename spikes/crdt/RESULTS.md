@@ -55,8 +55,11 @@ other (`from-b` won in both). Automerge can list the losing value through
   generate code at run time, so V8 runs with `--jitless` there, and jitless V8
   has no WebAssembly unless it is built with the DrumBrake interpreter. The
   iOS BareKit binary in `pearpetal/node_modules/react-native-bare-kit` has the
-  `--jitless` flag string and no DrumBrake symbols. Not yet confirmed on a
-  device, but it is the expected outcome and would block iOS outright.
+  `--jitless` flag string and no DrumBrake symbols. Confirmed on the iPhone
+  SE on 2026-10-05 (iOS 27.0.1, react-native-bare-kit 0.12.3): inside the
+  PearSheet worklet `typeof WebAssembly` is `"undefined"`, so a tiny module
+  cannot even be compiled. The same check under Node gives `add(2,3)=5`.
+  Automerge cannot run in PearSheet on iOS.
 - Yjs is far smaller (0.3 MB plus the parts of lib0 it uses, against 5 MB),
   its updates are 4.5x smaller and it was about 20% faster.
 - The one Automerge advantage (seeing conflicting values) is not needed for v1.
