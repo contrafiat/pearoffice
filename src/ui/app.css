@@ -585,3 +585,16 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 .pick-menu li[aria-selected='true'], .pick-list li[aria-selected='true'] { font-weight: 600; color: var(--pear-dark); }
 .pick-list { list-style: none; margin: 0; padding: 0; max-height: 50vh; overflow-y: auto; }
 .pick-list li { padding: 12px 6px; border-bottom: 1px solid var(--line); text-align: center; cursor: pointer; }
+
+/* Colour rules (proposals/2026-10-04-sheet-tools.md) */
+.cf-bar { position: absolute; top: 3px; bottom: 3px; opacity: 0.55; border-radius: 2px; pointer-events: none; }
+.cell .cell-text { position: relative; }
+.cf-sample { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 24px; border: 1px solid var(--line); border-radius: 4px; font-size: 12px; }
+.cf-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; max-height: 50vh; overflow-y: auto; }
+.cf-list li { display: flex; align-items: center; gap: 10px; }
+.cf-what { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.cf-what .muted { margin: 0; font-size: 12px; }
+.cf-tools { display: flex; gap: 2px; }
+.panel .cf-tools .icon-button { border: 0; background: none; padding: 4px; width: auto; height: auto; color: var(--muted); }
+.panel .cf-tools .icon-button:disabled { opacity: 0.3; cursor: default; }
+.panel .error { color: var(--error); margin: 0; }

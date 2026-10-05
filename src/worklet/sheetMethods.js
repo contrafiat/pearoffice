@@ -282,7 +282,7 @@ function createSheetMethods (sheets, { getJoin, getMoves, getProfiles }) {
         const widths = {}
         for (const [colId, px] of t.get('widths').entries()) if (colIndex.has(colId)) widths[colIndex.get(colId)] = px
         const tabCharts = model.getCharts(doc, id).map((c) => ({ ...c, resolved: resolveChart(doc, id, c, values) }))
-        return { name: t.get('name'), cells, widths, heights: model.getHeights(doc, id), merges: model.getMerges(doc, id), freeze: model.getFreeze(doc, id), hidden: model.getHidden(doc, id), validations: model.getValidations(doc, id), comments: model.getComments(doc, id).map((t) => ({ row: t.row, col: t.col, author: nameOf(t.author), text: noteOf(t) })), charts: tabCharts }
+        return { name: t.get('name'), cells, widths, heights: model.getHeights(doc, id), merges: model.getMerges(doc, id), freeze: model.getFreeze(doc, id), hidden: model.getHidden(doc, id), validations: model.getValidations(doc, id), condFormats: model.getCondFormats(doc, id), comments: model.getComments(doc, id).map((t) => ({ row: t.row, col: t.col, author: nameOf(t.author), text: noteOf(t) })), charts: tabCharts }
       })
       return { title: model.title(doc), tabs }
     },
@@ -364,6 +364,7 @@ function createSheetMethods (sheets, { getJoin, getMoves, getProfiles }) {
         freeze: model.getFreeze(doc, tab),
         hidden: model.getHidden(doc, tab),
         comments: model.getComments(doc, tab),
+        condFormats: model.getCondFormats(doc, tab),
         ...validationView(doc, tab, cells, e),
         charts: model.getCharts(doc, tab).map((c) => ({ ...c, resolved: resolveChart(doc, tab, c, sheets.values(e)) }))
       }
@@ -405,6 +406,16 @@ function createSheetMethods (sheets, { getJoin, getMoves, getProfiles }) {
       return commit(ctx, a.sheetId, model.deleteComment(doc, firstTab(doc, a.tabId), String(a.id), hex(ctx.identity.publicKey)))
     },
     'sheet:resolveComment': mutate((doc, tab, a) => model.resolveComment(doc, tab, String(a.id), !!a.resolved)),
+    'sheet:addCondFormat': async (a, ctx) => {
+      await requireEdit(ctx, a.sheetId)
+      const { doc } = await docFor(a.sheetId)
+      const { id, update } = model.addCondFormat(doc, firstTab(doc, a.tabId), String(a.range || ''), a.rule)
+      await commit(ctx, a.sheetId, update)
+      return { ruleId: id }
+    },
+    'sheet:setCondFormat': mutate((doc, tab, a) => model.setCondFormat(doc, tab, String(a.id), String(a.range || ''), a.rule)),
+    'sheet:deleteCondFormat': mutate((doc, tab, a) => model.deleteCondFormat(doc, tab, String(a.id))),
+    'sheet:moveCondFormat': mutate((doc, tab, a) => model.moveCondFormat(doc, tab, String(a.id), a.dir < 0 ? -1 : 1)),
     'sheet:setValidation': mutate((doc, tab, a) => model.setValidation(doc, tab, String(a.range || ''), a.rule || null)),
     'sheet:setHidden': mutate((doc, tab, a) => model.setHidden(doc, tab, a.kind === 'col' ? 'col' : 'row', a.from | 0, a.to | 0, !!a.hidden)),
     'sheet:setFreeze': mutate((doc, tab, a) => model.setFreeze(doc, tab, Math.max(0, a.rows | 0), Math.max(0, a.cols | 0))),

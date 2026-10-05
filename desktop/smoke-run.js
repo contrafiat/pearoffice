@@ -400,8 +400,21 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
     await js("document.querySelector('.grid .body').focus()")
     await sendMod('Home', ['control'])
     await key('Right'); for (let i = 0; i < 3; i++) await key('Down')
-    result.formats = result.frozenStays === true && /^Showing 1 of \d+ rows$/.test(result.filterStatus) && result.skipsHidden && result.comments && result.validation
-    step('cell formats, row heights, freeze, filter, hiding, comments and validation')
+    // Colour rule: B1:B3 greater than 1000 gets Excel's light red fill.
+    const setInput = (sel, text) => js(`(() => { const t = document.querySelector(${JSON.stringify(sel)}); const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; set.call(t, ${JSON.stringify(text)}); t.dispatchEvent(new Event('input', { bubbles: true })) })()`)
+    await js("document.querySelector('.toolbar .more-button').click()")
+    await js("[...document.querySelectorAll('.more-menu li')].find((l) => l.textContent === 'Colour rules...').click()")
+    await waitFor('colour rule form', "!!document.querySelector('.cf-panel input[aria-label=\"Cells\"]')")
+    await setInput('.cf-panel input[aria-label="Cells"]', 'B1:B3')
+    await setInput('.cf-panel input[aria-label="Value"]', '1000')
+    await js("[...document.querySelectorAll('.cf-panel button')].find((b) => b.textContent.trim() === 'Save').click()")
+    await waitFor('rule listed', "document.querySelectorAll('.cf-list li').length === 1")
+    await js("document.querySelector('.cf-panel .close').click()")
+    await waitFor('coloured', cellNode(1, 2) + ".style.background === 'rgb(255, 199, 206)' && " + cellNode(3, 2) + ".style.background === 'rgb(255, 199, 206)'")
+    result.colourRules = true
+    await js("document.querySelector('.grid .body').focus()")
+    result.formats = result.frozenStays === true && /^Showing 1 of \d+ rows$/.test(result.filterStatus) && result.skipsHidden && result.comments && result.validation && result.colourRules
+    step('cell formats, row heights, freeze, filter, hiding, comments, validation and colour rules')
 
     // Ranges, copy and paste: select B1:B3, copy, paste into C1. The formula
     // moves with it, as in Excel.

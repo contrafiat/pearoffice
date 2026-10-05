@@ -3,7 +3,7 @@
 // On phones the shell does the file handling (share sheet, file picker).
 import * as XLSX from 'xlsx/dist/xlsx.mini.min.js'
 import * as fflate from 'fflate'
-import { workbookToTabs, workbookBytes, freezeFromXlsx, validationsFromXlsx, READ_OPTIONS, MAX_IMPORT_CELLS } from '../shared/xlsxMap.js'
+import { workbookToTabs, workbookBytes, freezeFromXlsx, validationsFromXlsx, condFormatsFromXlsx, READ_OPTIONS, MAX_IMPORT_CELLS } from '../shared/xlsxMap.js'
 import { stylesFromXlsx } from '../shared/xlsxStyles.js'
 import { call } from './bridge.js'
 import { writePref } from './prefs.js'
@@ -19,6 +19,7 @@ function importWorkbook (wb, name, bytes) {
   // So are cell styles and row heights.
   if (bytes) stylesFromXlsx(bytes, fflate, MAX_IMPORT_CELLS).forEach((x, i) => { if (tabs[i]) { tabs[i].styles = x.styles; tabs[i].heights = x.heights } })
   if (bytes) validationsFromXlsx(bytes, fflate).forEach((v, i) => { if (tabs[i] && v.length) tabs[i].validations = v })
+  if (bytes) condFormatsFromXlsx(bytes, fflate).forEach((v, i) => { if (tabs[i] && v.length) tabs[i].condFormats = v })
   const title = String(name || '').replace(/\.[^.]+$/, '') || 'Imported sheet'
   return call('sheet:import', { title, tabs }).then(async (r) => {
     // A filter in the file becomes this device's filter, with nothing hidden
