@@ -12,6 +12,8 @@ import { SortPanel } from './SortPanel.jsx'
 import { FilterPanel } from './FilterPanel.jsx'
 import { CommentPanel, CommentsList } from './CommentPanel.jsx'
 import { ValidationPanel } from './ValidationPanel.jsx'
+import { CondFormatPanel } from './CondFormatPanel.jsx'
+import { evaluate as evaluateColours } from '../shared/condFormat.js'
 import { typed, allows, explain, ruleFor } from '../shared/validation.js'
 import { filterRows, columnValues, isActive } from '../shared/filter.js'
 import { ChartPanel } from './ChartPanel.jsx'
@@ -148,6 +150,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
   const [validating, setValidating] = useState(null) // the range whose rules are being set
   const [badEntry, setBadEntry] = useState(null) // { row, col, value, move, rule } refused or warned
   const [picking, setPicking] = useState(null) // { row, col, x, y } list dropdown open
+  const [colouring, setColouring] = useState(false) // the colour rules panel
   const [selectedChart, setSelectedChart] = useState(null) // chart id (desktop)
   const [editingChart, setEditingChart] = useState(null) // chart id in the editor
   const [viewingChart, setViewingChart] = useState(null) // chart id full screen (phones)
@@ -238,6 +241,8 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
   const validations = (view && view.validations) || []
   const invalidCells = useMemo(() => (view && view.invalid && view.invalid.length ? new Set(view.invalid.map(([r, c]) => r + ',' + c)) : null), [view])
   const selRule = ruleFor(validations, sel.row, sel.col)
+  // Conditional formatting: worked out here from the merged values.
+  const cfStyles = useMemo(() => (view && view.condFormats && view.condFormats.length ? evaluateColours(view.condFormats, cells, todaySerial()) : null), [view, cells])
 
   const selected = cells.get(sel.row + ',' + sel.col)
   // Spilling (proposals/2026-10-04-spilling-formulas.md): the formula a
@@ -924,6 +929,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
               {freezeItems(() => setMore(false))}
               {filterItems(() => setMore(false))}
               {canEdit && <li role='menuitem' onClick={() => setValidating({ ...range })}>Validation...</li>}
+              {(canEdit || (view.condFormats || []).length > 0) && <li role='menuitem' onClick={() => setColouring(true)}>Colour rules...</li>}
               {threads.length > 0 && <li role='menuitem' onClick={() => setListingComments(true)}>Comments{openThreads ? ' (' + openThreads + ' open)' : ''}</li>}
               {canEdit && phone && <li role='menuitem' onClick={() => fillSelection('down')}>Fill down</li>}
               {canEdit && phone && <li role='menuitem' onClick={() => fillSelection('right')}>Fill right</li>}
@@ -1005,6 +1011,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
         hiddenRows={hidden}
         commentMarks={threadAt.size ? threadAt : null}
         invalidCells={invalidCells}
+        cfStyles={cfStyles}
         dropdownAt={canEdit && selRule && selRule.kind === 'list' && selRule.dropdown !== false && (selRule.items || []).length ? sel : null}
         onDropdown={(x, y) => setPicking({ row: sel.row, col: sel.col, x, y })}
         onComment={(row, col) => setCommenting({ row, col })}
@@ -1107,6 +1114,15 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
           firstKey={sorting.firstKey}
           onSort={({ keys, header }) => { setSorting(null); sortBy(sorting.box, keys, header); afterPanel() }}
           onClose={() => { setSorting(null); afterPanel() }}
+        />
+      )}
+      {colouring && (
+        <CondFormatPanel
+          rules={view.condFormats || []}
+          selection={colName(range.c1) + range.r1 + (range.r1 === range.r2 && range.c1 === range.c2 ? '' : ':' + colName(range.c2) + range.r2)}
+          canEdit={canEdit}
+          act={async (what, args) => { try { return await call('sheet:' + what, { sheetId, tabId, ...args }) } catch (err) { return { error: err.message } } }}
+          onClose={() => { setColouring(false); afterPanel() }}
         />
       )}
       {validating && (() => {
@@ -1231,6 +1247,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
               {freezeItems(() => setMenu(null))}
               {filterItems(() => setMenu(null))}
               {canEdit && <li role='menuitem' onClick={() => { setMenu(null); setValidating({ ...range }) }}>Validation...</li>}
+              {canEdit && <li role='menuitem' onClick={() => { setMenu(null); setColouring(true) }}>Colour rules...</li>}
               {(canEdit || threadAt.has(sel.row + ',' + sel.col)) && <li role='menuitem' onClick={() => { setMenu(null); setCommenting({ row: sel.row, col: sel.col }) }}>{threadAt.has(sel.row + ',' + sel.col) ? 'Show comments' : 'Comment'}</li>}
               {canEdit && <li role='menuitem' className='danger' onClick={() => { setMenu(null); run('sheet:clearRange', range) }}>Clear contents</li>}
             </>

@@ -70,6 +70,17 @@ function addStyles (files, tabs, { strToU8, strFromU8 }) {
     return id
   }
 
+  // Colour rules' looks (src/shared/condFormat.js) go in <dxfs>.
+  const { dxfXml } = require('./condFormat')
+  const dxfs = []
+  const dxfIds = new Map()
+  const dxfId = (style) => {
+    const xml = dxfXml(style)
+    if (!dxfIds.has(xml)) { dxfIds.set(xml, dxfs.length); dxfs.push(xml) }
+    return dxfIds.get(xml)
+  }
+  for (const tab of tabs) for (const r of tab.condFormats || []) if (r.style) dxfId(r.style)
+
   tabs.forEach((tab, t) => {
     const path = 'xl/worksheets/sheet' + (t + 1) + '.xml'
     if (!files[path]) return
@@ -92,7 +103,9 @@ function addStyles (files, tabs, { strToU8, strFromU8 }) {
     '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
     '<cellXfs count="' + xfs.items.length + '">' + xfs.items.join('') + '</cellXfs>' +
     '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>' +
-    '<dxfs count="0"/><tableStyles count="0" defaultTableStyle="TableStyleMedium9" defaultPivotStyle="PivotStyleLight16"/></styleSheet>')
+    (dxfs.length ? '<dxfs count="' + dxfs.length + '">' + dxfs.join('') + '</dxfs>' : '<dxfs count="0"/>') +
+    '<tableStyles count="0" defaultTableStyle="TableStyleMedium9" defaultPivotStyle="PivotStyleLight16"/></styleSheet>')
+  return { dxfId }
 }
 
 // The sheet XML with every cell's style number replaced by ours (SheetJS's
@@ -217,6 +230,26 @@ function sheetPaths (files, strFromU8) {
   })
 }
 
+// The workbook's dxf styles (what colour rules apply), in order, as
+// { color, fill, b, i, s }.
+function dxfStyles (files, strFromU8) {
+  const read = (p) => (files[p] ? strFromU8(files[p]) : '')
+  const theme = themeColors(read('xl/theme/theme1.xml'))
+  return children(section(read('xl/styles.xml'), 'dxfs'), 'dxf').map((dxf) => {
+    const f = {}
+    const font = section(dxf, 'font')
+    if (on(font, 'b')) f.b = true
+    if (on(font, 'i')) f.i = true
+    if (on(font, 'strike')) f.s = true
+    const color = colorOf((/<color\s[^>]*>/.exec(font) || [null])[0], theme)
+    if (color) f.color = '#' + color.toLowerCase()
+    const fill = section(dxf, 'fill')
+    const bg = colorOf((/<bgColor\s[^>]*>/.exec(fill) || /<fgColor\s[^>]*>/.exec(fill) || [null])[0], theme)
+    if (bg) f.fill = '#' + bg.toLowerCase()
+    return f
+  })
+}
+
 // Every tab's cell formats and row heights from an .xlsx file:
 // [{ styles: [[row, col, fmt]], heights: { row: px } }] in tab order.
 // SheetJS Community Edition reads none of this; number formats it does read.
@@ -299,4 +332,4 @@ function stylesFromXlsx (bytes, { unzipSync, strFromU8 }, maxCells = Infinity) {
   })
 }
 
-module.exports = { addStyles, stylesFromXlsx, sheetPaths }
+module.exports = { addStyles, stylesFromXlsx, sheetPaths, dxfStyles }

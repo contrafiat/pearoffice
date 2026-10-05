@@ -16,7 +16,7 @@ export const MAX_ZOOM = 2.5
 // sheets stay fast. Headers are drawn outside the scroll area and moved with
 // the scroll position.
 export const Grid = forwardRef(function Grid (props, ref) {
-  const { view, cells, sel, ext = sel, range, spillBox, editing, onSelect, onEdit, onEditChange, onEditKey, onEditBlur, onEditCaret = () => {}, onKeyDown, onHeaderMenu, onCellMenu = () => {}, onFill = null, charts = [], selectedChart = null, chartActions = null, onResize, onRowResize = () => {}, onCopy, onPaste, zoom = 1, onZoom, inputMode, hiddenRows = null, hiddenCols = null, unhideMarks = null, onUnhide = () => {}, onAutoFit = () => {}, filterHead = null, onFilterMenu = () => {}, commentMarks = null, onComment = () => {}, invalidCells = null, dropdownAt = null, onDropdown = () => {} } = props
+  const { view, cells, sel, ext = sel, range, spillBox, editing, onSelect, onEdit, onEditChange, onEditKey, onEditBlur, onEditCaret = () => {}, onKeyDown, onHeaderMenu, onCellMenu = () => {}, onFill = null, charts = [], selectedChart = null, chartActions = null, onResize, onRowResize = () => {}, onCopy, onPaste, zoom = 1, onZoom, inputMode, hiddenRows = null, hiddenCols = null, unhideMarks = null, onUnhide = () => {}, onAutoFit = () => {}, filterHead = null, onFilterMenu = () => {}, commentMarks = null, onComment = () => {}, invalidCells = null, cfStyles = null, dropdownAt = null, onDropdown = () => {} } = props
   // Row height and column widths scale with the zoom (pinch on a phone);
   // stored widths stay unzoomed.
   const ROW_H = Math.round(BASE_ROW_H * zoom)
@@ -301,7 +301,9 @@ export const Grid = forwardRef(function Grid (props, ref) {
         if (merged.hidden.has(r + ',' + c)) return null
         const m = merged.top.get(r + ',' + c)
         const cell = cells.get(r + ',' + c)
-        const fmt = (cell && cell.fmt) || {}
+        // Colour rules (src/shared/condFormat.js) go over the cell's own format.
+        const cf = cfStyles && cfStyles.get(r + ',' + c)
+        const fmt = cf ? { ...((cell && cell.fmt) || {}), ...cf } : (cell && cell.fmt) || {}
         const head = filterHead && r === filterHead.row && c >= filterHead.c1 && c <= filterHead.c2
         const cls = 'cell' + (cell ? ' k-' + cell.kind : '') + (fmt.b ? ' b' : '') + (fmt.i ? ' i' : '') + (fmt.wrap ? ' wrap' : '') + (fmt.valign ? ' v-' + fmt.valign : '') + (head ? ' filter-head' : '') + (invalidCells && invalidCells.has(r + ',' + c) ? ' invalid' : '')
         return (
@@ -319,6 +321,7 @@ export const Grid = forwardRef(function Grid (props, ref) {
             onTouchEnd={(e) => { if (!pinched.current && e.touches.length === 0 && sel.row === r && sel.col === c) { e.preventDefault(); onEdit(r, c) } }}
             title={cell && cell.volatile ? 'Changes on each device (time or random)' : cell && cell.blocked ? 'This answer cannot fill in. Select the cell to see why.' : undefined}
           >
+            {cf && cf.bar && <span className='cf-bar' style={{ left: cf.bar.from * 100 + '%', width: Math.max(0, cf.bar.to - cf.bar.from) * 100 + '%', background: cf.bar.color }} />}
             <span className='cell-text' style={textStyle(fmt, zoom)}>{cell ? cell.display : ''}</span>
             {hasBorder(fmt) && <span className='cell-borders' style={{ borderTop: borderCss(fmt.bt), borderRight: borderCss(fmt.br), borderBottom: borderCss(fmt.bb), borderLeft: borderCss(fmt.bl) }} />}
             {commentMarks && commentMarks.has(r + ',' + c) && (() => {

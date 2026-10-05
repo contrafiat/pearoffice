@@ -86,5 +86,5 @@ test('rules go out to .xlsx and come back', () => {
   model.initSheet(doc)
   model.importTabs(doc, { tabs })
   const back = model.getValidations(doc, model.tabIds(doc)[0]).map(({ id, n, r1, c1, r2, c2, ...r }) => r)
-  assert.deepEqual(back, v.map((r) => ({ ...r, range: r.range.includes(':') ? r.range : r.range + ':' + r.range })))
+  assert.deepEqual(back, v)
 })

@@ -494,23 +494,40 @@ function deleteLine (doc, tabId, kind, at, count) {
 
 function rewriteRangeEnds (doc, tabId, kind, gone, before, after) {
   const RANGE = new RegExp(refs.TOKEN_RE.source + ':' + refs.TOKEN_RE.source, 'g')
+  // A range whose first or last row (column) goes ends at the next one in.
+  const shrink = (raw, otherTab) => raw.replace(RANGE, (whole, t1, r1$, r1, c1$, c1, t2, r2$, r2, c2$, c2) => {
+    const tab1 = t1 || otherTab
+    const tab2 = t2 || otherTab
+    if (tab1 !== tabId || tab2 !== tabId) return whole
+    let [a, b] = kind === 'row' ? [r1, r2] : [c1, c2]
+    if (gone.has(a) && after && !gone.has(b)) a = after
+    if (gone.has(b) && before && !gone.has(a)) b = before
+    const tok = (t, r$, r, c$, c) => '{' + (t ? t + '|' : '') + (r === '' ? '' : r$ + r) + '.' + (c === '' ? '' : c$ + c) + '}'
+    return kind === 'row'
+      ? tok(t1, r1$, a, c1$, c1) + ':' + tok(t2, r2$, b, c2$, c2)
+      : tok(t1, r1$, r1, c1$, a) + ':' + tok(t2, r2$, r2, c2$, b)
+  })
   for (const otherTab of tabIds(doc)) {
     const cells = doc.getMap('tab:' + otherTab).get('cells')
     for (const [key, raw] of [...cells.entries()]) {
       if (typeof raw !== 'string' || raw[0] !== '=') continue
-      const next = raw.replace(RANGE, (whole, t1, r1$, r1, c1$, c1, t2, r2$, r2, c2$, c2) => {
-        const tab1 = t1 || otherTab
-        const tab2 = t2 || otherTab
-        if (tab1 !== tabId || tab2 !== tabId) return whole
-        let [a, b] = kind === 'row' ? [r1, r2] : [c1, c2]
-        if (gone.has(a) && after && !gone.has(b)) a = after
-        if (gone.has(b) && before && !gone.has(a)) b = before
-        const tok = (t, r$, r, c$, c) => '{' + (t ? t + '|' : '') + (r === '' ? '' : r$ + r) + '.' + (c === '' ? '' : c$ + c) + '}'
-        return kind === 'row'
-          ? tok(t1, r1$, a, c1$, c1) + ':' + tok(t2, r2$, b, c2$, c2)
-          : tok(t1, r1$, r1, c1$, a) + ':' + tok(t2, r2$, r2, c2$, b)
-      })
+      const next = shrink(raw, otherTab)
       if (next !== raw) cells.set(key, next)
+    }
+    // Ranges kept outside cells: colour rules, validation (range and list
+    // source) and chart data.
+    for (const [name, fields] of [['cf:', ['range']], ['valid:', ['range', 'source']]]) {
+      const map = doc.getMap(name + otherTab)
+      for (const [id, v] of [...map.entries()]) {
+        if (!v || typeof v !== 'object') continue
+        const patch = {}
+        for (const f of fields) if (typeof v[f] === 'string') { const next = shrink(v[f], otherTab); if (next !== v[f]) patch[f] = next }
+        if (Object.keys(patch).length) map.set(id, { ...v, ...patch })
+      }
+    }
+    for (const chart of doc.getMap('charts:' + otherTab).values()) {
+      const data = chart && typeof chart.get === 'function' ? chart.get('data') : null
+      if (typeof data === 'string') { const next = shrink(data, otherTab); if (next !== data) chart.set('data', next) }
     }
   }
 }
@@ -784,6 +801,8 @@ function getComments (doc, tabId) {
 // onBad, message }. A new rule replaces the ones wholly inside its range;
 // clearing (rule null) removes every rule that touches the range.
 const validation = require('./validation')
+// "A3" for a one-cell range, else null.
+const oneCell = (box) => (box.r1 === box.r2 && box.c1 === box.c2 ? numToCol(box.c1) + box.r1 : null)
 
 function setValidation (doc, tabId, rangeText, rule) {
   const box = require('./charts').parseRange(rangeText)
@@ -824,12 +843,84 @@ function getValidations (doc, tabId) {
     const range = refs.toDisplay(v.range || '', where)
     const box = require('./charts').parseRange(range)
     if (!box || box.sheet) continue
-    const rule = { id, range, r1: box.r1, c1: box.c1, r2: box.r2, c2: box.c2, n: v.n || 0 }
+    const rule = { id, range: oneCell(box) || range, r1: box.r1, c1: box.c1, r2: box.r2, c2: box.c2, n: v.n || 0 }
     for (const k of ['kind', 'op', 'a', 'b', 'items', 'dropdown', 'onBad', 'message']) if (v[k] !== undefined) rule[k] = v[k]
     if (v.source) rule.source = refs.toDisplay(v.source, where)
     out.push(rule)
   }
   return out.sort((a, b) => a.n - b.n || (a.id < b.id ? -1 : 1))
+}
+
+// Conditional formatting (proposals/2026-10-04-sheet-tools.md), in the root
+// map cf:<tabId>: rule id -> { range (stored like a formula reference),
+// order, ...rule }. Lower order comes first; a new rule goes on top. The
+// colours are worked out on each device (src/shared/condFormat.js).
+const condFormat = require('./condFormat')
+
+function cfRange (doc, tabId, rangeText) {
+  const box = require('./charts').parseRange(rangeText)
+  if (!box || box.sheet || box.spill) throw new Error('Pick a range on this tab')
+  makeCtx(doc, tabId).extend(tabId, box.r2, box.c2)
+  return refs.toStored(numToCol(box.c1) + box.r1 + ':' + numToCol(box.c2) + box.r2, makeCtx(doc, tabId))
+}
+
+function addCondFormat (doc, tabId, rangeText, rule) {
+  const clean = condFormat.normalize(rule)
+  const id = newId()
+  const update = capture(doc, () => {
+    const map = doc.getMap('cf:' + tabId)
+    let order = 0
+    for (const v of map.values()) if (v && typeof v.order === 'number') order = Math.min(order, v.order)
+    map.set(id, { ...clean, range: cfRange(doc, tabId, rangeText), order: order - 1 })
+  })
+  return { id, update }
+}
+
+function setCondFormat (doc, tabId, id, rangeText, rule) {
+  const map = doc.getMap('cf:' + tabId)
+  const old = map.get(id)
+  if (!old) throw new Error('That rule was deleted')
+  const clean = condFormat.normalize(rule)
+  return capture(doc, () => map.set(id, { ...clean, range: cfRange(doc, tabId, rangeText), order: old.order }))
+}
+
+function deleteCondFormat (doc, tabId, id) {
+  return capture(doc, () => doc.getMap('cf:' + tabId).delete(id))
+}
+
+// Move a rule up (-1) or down (+1) the list by swapping with its neighbour.
+function moveCondFormat (doc, tabId, id, dir) {
+  const list = getCondFormats(doc, tabId)
+  const i = list.findIndex((r) => r.id === id)
+  const j = i + (dir < 0 ? -1 : 1)
+  if (i < 0 || j < 0 || j >= list.length) return null
+  const map = doc.getMap('cf:' + tabId)
+  return capture(doc, () => {
+    const a = map.get(list[i].id)
+    const b = map.get(list[j].id)
+    // Equal orders (two added at once) are spread out first.
+    const oa = a.order === b.order ? b.order + (dir < 0 ? 0.5 : -0.5) : a.order
+    map.set(list[i].id, { ...a, order: b.order })
+    map.set(list[j].id, { ...b, order: oa })
+  })
+}
+
+// The tab's rules in priority order, ranges as numbers. A rule whose range
+// was deleted is left out.
+function getCondFormats (doc, tabId) {
+  const map = doc.getMap('cf:' + tabId)
+  if (!map.size) return []
+  const where = { tabId, tabs: tabsContext(doc) }
+  const out = []
+  for (const [id, v] of map.entries()) {
+    if (!v || typeof v !== 'object') continue
+    const range = refs.toDisplay(v.range || '', where)
+    const box = require('./charts').parseRange(range)
+    if (!box || box.sheet) continue
+    const { range: _r, ...rule } = v
+    out.push({ id, ...rule, range: oneCell(box) || range, r1: box.r1, c1: box.c1, r2: box.r2, c2: box.c2 })
+  }
+  return out.sort((a, b) => a.order - b.order || (a.id < b.id ? -1 : 1))
 }
 
 // Row heights (pixels at 100%), in the root map heights:<tabId> by row id.
@@ -895,6 +986,10 @@ function importTabs (doc, payload) {
       for (const [row, px] of Object.entries(tab.heights || {})) {
         const rowId = t.get('rows').get(Number(row) - 1)
         if (rowId && px > 0) doc.getMap('heights:' + id).set(rowId, Math.max(12, Math.min(600, Math.round(px))))
+      }
+      // Imported rules keep the file's order: add from the last so the first ends on top.
+      for (const r of [...(tab.condFormats || [])].reverse()) {
+        try { addCondFormat(doc, id, r.range, r) } catch {}
       }
       for (const v of tab.validations || []) {
         try { setValidation(doc, id, v.range, v) } catch {}
@@ -1034,6 +1129,11 @@ module.exports = {
   getFormat,
   setHidden,
   getHidden,
+  addCondFormat,
+  setCondFormat,
+  deleteCondFormat,
+  moveCondFormat,
+  getCondFormats,
   setValidation,
   getValidations,
   addComment,
