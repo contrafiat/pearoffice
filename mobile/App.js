@@ -4,7 +4,7 @@
 // src/ui/mobile-entry.js on top of the WebView bridge.
 
 import React, { useEffect, useRef, useState } from 'react'
-import { ActivityIndicator, Linking, Modal, Platform, StatusBar, StyleSheet, Text, TouchableOpacity, View, useColorScheme } from 'react-native'
+import { ActivityIndicator, Keyboard, Linking, Modal, Platform, StatusBar, StyleSheet, Text, TouchableOpacity, View, useColorScheme } from 'react-native'
 import { CameraView, useCameraPermissions } from 'expo-camera'
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
 import { WebView } from 'react-native-webview'
@@ -133,6 +133,19 @@ export default function App () {
     if (loaded.current && web.current) web.current.injectJavaScript(code + ';true;')
     else queued.current.push(code)
   }
+
+  // Android draws the app edge to edge, so the keyboard covers the WebView
+  // instead of shrinking it. Tell the page how much of it is covered (--kb),
+  // and bottom sheets move up by that much (src/ui/app.css).
+  useEffect(() => {
+    if (Platform.OS !== 'android') return
+    const setKb = (px) => inject("document.documentElement.style.setProperty('--kb', '" + Math.max(0, Math.round(px)) + "px')")
+    // The keyboard and the WebView both end just above the navigation bar,
+    // so the keyboard's height is how much of the page it covers.
+    const show = Keyboard.addListener('keyboardDidShow', (e) => setKb(e.endCoordinates.height))
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKb(0))
+    return () => { show.remove(); hide.remove() }
+  }, [])
 
   useEffect(() => {
     let alive = true

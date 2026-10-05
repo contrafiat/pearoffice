@@ -10,6 +10,7 @@ import { PeopleStack } from './Avatar.jsx'
 import { FindPanel } from './FindPanel.jsx'
 import { SortPanel } from './SortPanel.jsx'
 import { FilterPanel } from './FilterPanel.jsx'
+import { CommentPanel, CommentsList } from './CommentPanel.jsx'
 import { filterRows, columnValues, isActive } from '../shared/filter.js'
 import { ChartPanel } from './ChartPanel.jsx'
 import { ChartView, downloadChart, chartSvg } from './Chart.jsx'
@@ -140,6 +141,8 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
   const [droppingTab, setDroppingTab] = useState(null) // a tab waiting for "Delete"
   const [confirmMerge, setConfirmMerge] = useState(null) // a range whose merge would clear cells
   const [filtering, setFiltering] = useState(null) // the column whose filter panel is open
+  const [commenting, setCommenting] = useState(null) // { row, col } whose thread is open
+  const [listingComments, setListingComments] = useState(false)
   const [selectedChart, setSelectedChart] = useState(null) // chart id (desktop)
   const [editingChart, setEditingChart] = useState(null) // chart id in the editor
   const [viewingChart, setViewingChart] = useState(null) // chart id full screen (phones)
@@ -219,6 +222,12 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
     for (let c = filter.c1; c <= filter.c2; c++) if (isActive(filter, c)) active.add(c)
     return { row: filter.r1, c1: filter.c1, c2: filter.c2, active }
   }, [filter])
+
+  // Comments (proposals/2026-10-04-sheet-tools.md): each cell's thread.
+  const threads = (view && view.comments) || []
+  const threadAt = useMemo(() => new Map(threads.map((t) => [t.row + ',' + t.col, t])), [threads])
+  const openThreads = threads.filter((t) => !t.resolved).length
+  const commentAct = (what, args) => run('sheet:' + what, { ...args, ...(what === 'addComment' && commenting ? { row: commenting.row, col: commenting.col } : {}) })
 
   const selected = cells.get(sel.row + ',' + sel.col)
   // Spilling (proposals/2026-10-04-spilling-formulas.md): the formula a
@@ -606,6 +615,11 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
       setFinding({ replace: canEdit && (e.key === 'h' || e.key === 'H') })
       return
     }
+    if ((e.ctrlKey || e.metaKey) && e.altKey && (e.key === 'm' || e.key === 'M' || e.code === 'KeyM')) {
+      e.preventDefault()
+      if (canEdit || threadAt.has(sel.row + ',' + sel.col)) setCommenting({ row: sel.row, col: sel.col })
+      return
+    }
     if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'l' || e.key === 'L')) {
       e.preventDefault()
       if (filter) setFilter(null); else startFilter()
@@ -892,6 +906,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
               {canEdit && <li role='menuitem' onClick={openSort}>Sort...</li>}
               {freezeItems(() => setMore(false))}
               {filterItems(() => setMore(false))}
+              {threads.length > 0 && <li role='menuitem' onClick={() => setListingComments(true)}>Comments{openThreads ? ' (' + openThreads + ' open)' : ''}</li>}
               {canEdit && phone && <li role='menuitem' onClick={() => fillSelection('down')}>Fill down</li>}
               {canEdit && phone && <li role='menuitem' onClick={() => fillSelection('right')}>Fill right</li>}
               <li role='menuitem' onClick={() => setDeleting('local')}>Remove from this device</li>
@@ -970,6 +985,8 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
         onResize={(col, px) => { if (canEdit) run('sheet:setWidth', { col, px }) }}
         onRowResize={(row, px) => { if (canEdit) run('sheet:setHeight', { row, px }) }}
         hiddenRows={hidden}
+        commentMarks={threadAt.size ? threadAt : null}
+        onComment={(row, col) => setCommenting({ row, col })}
         hiddenCols={hiddenCols}
         unhideMarks={canEdit ? unhideMarks : null}
         onUnhide={unhideRun}
@@ -1071,6 +1088,27 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
           onClose={() => { setSorting(null); afterPanel() }}
         />
       )}
+      {commenting && (
+        <CommentPanel
+          sheetId={sheetId}
+          address={colName(commenting.col) + commenting.row}
+          thread={threadAt.get(commenting.row + ',' + commenting.col) || null}
+          members={members}
+          canEdit={canEdit}
+          act={commentAct}
+          onClose={() => { setCommenting(null); afterPanel() }}
+        />
+      )}
+      {listingComments && (
+        <CommentsList
+          sheetId={sheetId}
+          threads={threads}
+          members={members}
+          addressOf={(t) => colName(t.col) + t.row}
+          onOpen={(t) => { setListingComments(false); setSel({ row: t.row, col: t.col }); setExt({ row: t.row, col: t.col }); setCommenting({ row: t.row, col: t.col }) }}
+          onClose={() => { setListingComments(false); afterPanel() }}
+        />
+      )}
       {filtering && filter && (
         <FilterPanel
           key={filtering}
@@ -1116,6 +1154,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
               {canEdit && <li role='menuitem' onClick={() => { setMenu(null); openSort() }}>Sort...</li>}
               {freezeItems(() => setMenu(null))}
               {filterItems(() => setMenu(null))}
+              {(canEdit || threadAt.has(sel.row + ',' + sel.col)) && <li role='menuitem' onClick={() => { setMenu(null); setCommenting({ row: sel.row, col: sel.col }) }}>{threadAt.has(sel.row + ',' + sel.col) ? 'Show comments' : 'Comment'}</li>}
               {canEdit && <li role='menuitem' className='danger' onClick={() => { setMenu(null); run('sheet:clearRange', range) }}>Clear contents</li>}
             </>
           )}

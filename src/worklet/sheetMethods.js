@@ -200,9 +200,15 @@ function createSheetMethods (sheets, { getJoin, getMoves, getProfiles }) {
     },
 
     // Every tab's cells, typed values and formats, for export.
-    'sheet:dump': async ({ sheetId }) => {
+    'sheet:dump': async ({ sheetId }, ctx) => {
       const { e, doc } = await docFor(sheetId)
       const values = sheets.values(e)
+      // Members' names, for comments written to .xlsx as notes.
+      const names = {}
+      const base = ctx && ctx.bases && ctx.bases.get(sheetId)
+      if (base) for await (const { value } of base.view.createReadStream({ gt: 'member/', lt: 'member/~' })) names[value.identity] = value.name
+      const nameOf = (author) => names[author] || (String(author).startsWith('xlsx:') ? String(author).slice(5) : '') || 'Someone'
+      const noteOf = (t) => [t, ...t.replies].filter((c) => !c.deleted).map((c) => nameOf(c.author) + ': ' + c.text).join('\n')
       const tabs = model.tabIds(doc).map((id) => {
         const t = model.tabMap(doc, id)
         const rows = t.get('rows').toArray()
@@ -237,7 +243,7 @@ function createSheetMethods (sheets, { getJoin, getMoves, getProfiles }) {
         const widths = {}
         for (const [colId, px] of t.get('widths').entries()) if (colIndex.has(colId)) widths[colIndex.get(colId)] = px
         const tabCharts = model.getCharts(doc, id).map((c) => ({ ...c, resolved: resolveChart(doc, id, c, values) }))
-        return { name: t.get('name'), cells, widths, heights: model.getHeights(doc, id), merges: model.getMerges(doc, id), freeze: model.getFreeze(doc, id), hidden: model.getHidden(doc, id), charts: tabCharts }
+        return { name: t.get('name'), cells, widths, heights: model.getHeights(doc, id), merges: model.getMerges(doc, id), freeze: model.getFreeze(doc, id), hidden: model.getHidden(doc, id), comments: model.getComments(doc, id).map((t) => ({ row: t.row, col: t.col, author: nameOf(t.author), text: noteOf(t) })), charts: tabCharts }
       })
       return { title: model.title(doc), tabs }
     },
@@ -318,6 +324,7 @@ function createSheetMethods (sheets, { getJoin, getMoves, getProfiles }) {
         merges: model.getMerges(doc, tab),
         freeze: model.getFreeze(doc, tab),
         hidden: model.getHidden(doc, tab),
+        comments: model.getComments(doc, tab),
         charts: model.getCharts(doc, tab).map((c) => ({ ...c, resolved: resolveChart(doc, tab, c, sheets.values(e)) }))
       }
     },
@@ -338,6 +345,26 @@ function createSheetMethods (sheets, { getJoin, getMoves, getProfiles }) {
     'sheet:setTitle': mutate((doc, tab, a) => model.setTitle(doc, String(a.title))),
     'sheet:setWidth': mutate((doc, tab, a) => model.setWidth(doc, tab, a.col, a.px)),
     'sheet:setHeight': mutate((doc, tab, a) => model.setHeight(doc, tab, a.row, a.px === null ? null : a.px)),
+    // Comments (proposals/2026-10-04-sheet-tools.md): by editors and the
+    // owner; the author is this device's member identity.
+    'sheet:addComment': async (a, ctx) => {
+      await requireEdit(ctx, a.sheetId)
+      const { doc } = await docFor(a.sheetId)
+      const { id, update } = model.addComment(doc, firstTab(doc, a.tabId), { row: a.row | 0, col: a.col | 0, parent: a.parent || null, author: hex(ctx.identity.publicKey), text: a.text, at: Date.now() })
+      await commit(ctx, a.sheetId, update)
+      return { commentId: id }
+    },
+    'sheet:editComment': async (a, ctx) => {
+      await requireEdit(ctx, a.sheetId)
+      const { doc } = await docFor(a.sheetId)
+      return commit(ctx, a.sheetId, model.editComment(doc, firstTab(doc, a.tabId), String(a.id), hex(ctx.identity.publicKey), a.text, Date.now()))
+    },
+    'sheet:deleteComment': async (a, ctx) => {
+      await requireEdit(ctx, a.sheetId)
+      const { doc } = await docFor(a.sheetId)
+      return commit(ctx, a.sheetId, model.deleteComment(doc, firstTab(doc, a.tabId), String(a.id), hex(ctx.identity.publicKey)))
+    },
+    'sheet:resolveComment': mutate((doc, tab, a) => model.resolveComment(doc, tab, String(a.id), !!a.resolved)),
     'sheet:setHidden': mutate((doc, tab, a) => model.setHidden(doc, tab, a.kind === 'col' ? 'col' : 'row', a.from | 0, a.to | 0, !!a.hidden)),
     'sheet:setFreeze': mutate((doc, tab, a) => model.setFreeze(doc, tab, Math.max(0, a.rows | 0), Math.max(0, a.cols | 0))),
     'sheet:merge': mutate((doc, tab, a) => model.mergeCells(doc, tab, a.r1, a.c1, a.r2, a.c2)),

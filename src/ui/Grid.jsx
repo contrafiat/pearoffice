@@ -16,7 +16,7 @@ export const MAX_ZOOM = 2.5
 // sheets stay fast. Headers are drawn outside the scroll area and moved with
 // the scroll position.
 export const Grid = forwardRef(function Grid (props, ref) {
-  const { view, cells, sel, ext = sel, range, spillBox, editing, onSelect, onEdit, onEditChange, onEditKey, onEditBlur, onEditCaret = () => {}, onKeyDown, onHeaderMenu, onCellMenu = () => {}, onFill = null, charts = [], selectedChart = null, chartActions = null, onResize, onRowResize = () => {}, onCopy, onPaste, zoom = 1, onZoom, inputMode, hiddenRows = null, hiddenCols = null, unhideMarks = null, onUnhide = () => {}, onAutoFit = () => {}, filterHead = null, onFilterMenu = () => {} } = props
+  const { view, cells, sel, ext = sel, range, spillBox, editing, onSelect, onEdit, onEditChange, onEditKey, onEditBlur, onEditCaret = () => {}, onKeyDown, onHeaderMenu, onCellMenu = () => {}, onFill = null, charts = [], selectedChart = null, chartActions = null, onResize, onRowResize = () => {}, onCopy, onPaste, zoom = 1, onZoom, inputMode, hiddenRows = null, hiddenCols = null, unhideMarks = null, onUnhide = () => {}, onAutoFit = () => {}, filterHead = null, onFilterMenu = () => {}, commentMarks = null, onComment = () => {} } = props
   // Row height and column widths scale with the zoom (pinch on a phone);
   // stored widths stay unzoomed.
   const ROW_H = Math.round(BASE_ROW_H * zoom)
@@ -321,6 +321,20 @@ export const Grid = forwardRef(function Grid (props, ref) {
           >
             <span className='cell-text' style={textStyle(fmt, zoom)}>{cell ? cell.display : ''}</span>
             {hasBorder(fmt) && <span className='cell-borders' style={{ borderTop: borderCss(fmt.bt), borderRight: borderCss(fmt.br), borderBottom: borderCss(fmt.bb), borderLeft: borderCss(fmt.bl) }} />}
+            {commentMarks && commentMarks.has(r + ',' + c) && (() => {
+              const t = commentMarks.get(r + ',' + c)
+              return (
+                <span
+                  className={'comment-mark' + (t.resolved ? ' resolved' : '')}
+                  role='button'
+                  aria-label={'Comments on ' + colName(c) + r}
+                  title={t.deleted ? 'Comment deleted' : t.text}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  onTouchEnd={(e) => { e.stopPropagation(); e.preventDefault(); onComment(r, c) }}
+                  onClick={(e) => { e.stopPropagation(); onComment(r, c) }}
+                />
+              )
+            })()}
             {head && (
               <button
                 className={'filter-button' + (filterHead.active.has(c) ? ' on' : '')}

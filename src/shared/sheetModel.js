@@ -683,6 +683,99 @@ function getHidden (doc, tabId) {
   return out
 }
 
+// Comments (proposals/2026-10-04-sheet-tools.md), in the root map
+// comments:<tabId>: id -> { row, col (ids), parent, author, text, at,
+// edited, deleted }, and "<id>:resolved" -> true for a resolved thread (a
+// key of its own, so resolving never overwrites an edit made at the same
+// time). A thread is a comment with no parent and its replies. Authors may
+// change or delete only their own.
+const COMMENT_MAX = 2000
+const commentText = (text) => {
+  const t = String(text || '').trim()
+  if (!t) throw new Error('A comment needs some text')
+  return t.slice(0, COMMENT_MAX)
+}
+
+function addComment (doc, tabId, { row, col, parent = null, author, text, at }) {
+  const map = doc.getMap('comments:' + tabId)
+  const t = tabMap(doc, tabId)
+  let rowId = t.get('rows').get(row - 1)
+  let colId = t.get('cols').get(col - 1)
+  if (parent) {
+    const root = map.get(parent)
+    if (!root || root.parent) throw new Error('No such comment')
+    rowId = root.row
+    colId = root.col
+  }
+  if (!rowId || !colId) throw new Error('No such cell')
+  const id = newId()
+  const update = capture(doc, () => {
+    map.set(id, { row: rowId, col: colId, parent: parent || null, author: String(author), text: commentText(text), at: Number(at) || 0 })
+  })
+  return { id, update }
+}
+
+function ownComment (doc, tabId, id, author) {
+  const c = doc.getMap('comments:' + tabId).get(id)
+  if (!c || c.deleted) throw new Error('No such comment')
+  if (c.author !== author) throw new Error('Only the person who wrote a comment can change it')
+  return c
+}
+
+function editComment (doc, tabId, id, author, text, at) {
+  const c = ownComment(doc, tabId, id, author)
+  return capture(doc, () => doc.getMap('comments:' + tabId).set(id, { ...c, text: commentText(text), edited: Number(at) || 0 }))
+}
+
+// A thread that still has replies keeps its first comment as "deleted".
+function deleteComment (doc, tabId, id, author) {
+  const c = ownComment(doc, tabId, id, author)
+  const map = doc.getMap('comments:' + tabId)
+  const replies = !c.parent && [...map.values()].some((x) => x && x.parent === id && !x.deleted)
+  return capture(doc, () => {
+    if (replies) map.set(id, { ...c, text: '', deleted: true })
+    else { map.delete(id); if (map.has(id + ':resolved')) map.delete(id + ':resolved') }
+  })
+}
+
+function resolveComment (doc, tabId, id, resolved) {
+  const map = doc.getMap('comments:' + tabId)
+  const c = map.get(id)
+  if (!c || c.parent) throw new Error('No such thread')
+  return capture(doc, () => { if (resolved) map.set(id + ':resolved', true); else if (map.has(id + ':resolved')) map.delete(id + ':resolved') })
+}
+
+// The tab's threads: [{ id, row, col, author, text, at, edited, deleted,
+// resolved, replies: [...] }] in reading order, oldest reply first. A
+// thread whose cell was deleted, or whose comments are all deleted, is
+// left out.
+function getComments (doc, tabId) {
+  const map = doc.getMap('comments:' + tabId)
+  if (!map.size) return []
+  const t = tabMap(doc, tabId)
+  const rowAt = new Map(t.get('rows').toArray().map((id, i) => [id, i + 1]))
+  const colAt = new Map(t.get('cols').toArray().map((id, i) => [id, i + 1]))
+  const roots = new Map()
+  const replies = []
+  for (const [id, c] of map.entries()) {
+    if (id.includes(':') || !c || typeof c !== 'object') continue
+    if (c.parent) { replies.push({ id, ...c }); continue }
+    const row = rowAt.get(c.row)
+    const col = colAt.get(c.col)
+    if (!row || !col) continue
+    roots.set(id, { id, row, col, author: c.author, text: c.text, at: c.at, edited: c.edited || null, deleted: !!c.deleted, resolved: map.get(id + ':resolved') === true, replies: [] })
+  }
+  for (const r of replies) {
+    const root = roots.get(r.parent)
+    if (root && !r.deleted) root.replies.push({ id: r.id, author: r.author, text: r.text, at: r.at, edited: r.edited || null })
+  }
+  const order = (a, b) => a.at - b.at || (a.id < b.id ? -1 : 1)
+  return [...roots.values()]
+    .filter((x) => !x.deleted || x.replies.length)
+    .map((x) => ({ ...x, replies: x.replies.sort(order) }))
+    .sort((a, b) => a.row - b.row || a.col - b.col || order(a, b))
+}
+
 // Row heights (pixels at 100%), in the root map heights:<tabId> by row id.
 // A row without one is the default height, or taller to fit wrapped or
 // larger text on each device.
@@ -723,7 +816,7 @@ function importTabs (doc, payload) {
       const t = tabMap(doc, id)
       let maxR = 0
       let maxC = 0
-      for (const [r, c] of [...tab.cells, ...(tab.styles || [])]) { if (r > maxR) maxR = r; if (c > maxC) maxC = c }
+      for (const [r, c] of [...tab.cells, ...(tab.styles || []), ...(tab.comments || []).map((n) => [n.row, n.col])]) { if (r > maxR) maxR = r; if (c > maxC) maxC = c }
       ctx.extend(id, maxR + 20, Math.max(maxC + 2, DEFAULT_COLS))
       for (const [row, col, input, num] of tab.cells) {
         writeCell(doc, ctx, id, row, col, input)
@@ -746,6 +839,9 @@ function importTabs (doc, payload) {
       for (const [row, px] of Object.entries(tab.heights || {})) {
         const rowId = t.get('rows').get(Number(row) - 1)
         if (rowId && px > 0) doc.getMap('heights:' + id).set(rowId, Math.max(12, Math.min(600, Math.round(px))))
+      }
+      for (const note of tab.comments || []) {
+        try { addComment(doc, id, { row: note.row, col: note.col, author: String(note.author || 'xlsx:Imported'), text: note.text, at: 0 }) } catch {}
       }
       if (tab.hidden) {
         const map = doc.getMap('hidden:' + id)
@@ -879,6 +975,11 @@ module.exports = {
   getFormat,
   setHidden,
   getHidden,
+  addComment,
+  editComment,
+  deleteComment,
+  resolveComment,
+  getComments,
   insertRows,
   insertCols,
   deleteRows,

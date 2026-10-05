@@ -436,9 +436,9 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 @keyframes pearsheet-sheet-up { from { transform: translateY(100%); } to { transform: none; } }
 @keyframes pearsheet-fade-in { from { background: rgb(0 0 0 / 0); } }
 @media (max-width: 720px) {
-  .panel-backdrop { align-items: flex-end; padding: 0; animation: pearsheet-fade-in 0.24s ease; background: rgb(0 0 0 / 0.45); }
+  .panel-backdrop { align-items: flex-end; padding: 0 0 var(--kb, 0px); animation: pearsheet-fade-in 0.24s ease; background: rgb(0 0 0 / 0.45); }
   .panel {
-    width: 100%; max-height: 88vh; border-radius: 16px 16px 0 0; border-bottom: 0;
+    width: 100%; max-height: calc(88vh - var(--kb, 0px)); border-radius: 16px 16px 0 0; border-bottom: 0;
     padding: 8px 18px calc(22px + env(safe-area-inset-bottom));
     animation: pearsheet-sheet-up 0.26s cubic-bezier(0.32, 0.72, 0, 1);
   }
@@ -559,3 +559,20 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
   .unhide-mark.row { top: -6px; height: 12px; }
   .unhide-mark.col { left: -6px; width: 12px; }
 }
+
+/* Comments (proposals/2026-10-04-sheet-tools.md) */
+.comment-mark { position: absolute; top: 0; right: 0; width: 0; height: 0; border-style: solid; border-width: 0 8px 8px 0; border-color: transparent #e0a100 transparent transparent; cursor: pointer; z-index: 1; }
+.comment-mark.resolved { border-right-color: var(--line-strong); }
+@media (pointer: coarse) { .comment-mark { border-width: 0 12px 12px 0; } }
+.cell.filter-head .comment-mark { right: 0; }
+.comment-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; max-height: 50vh; overflow-y: auto; }
+.comment { display: flex; gap: 10px; align-items: flex-start; }
+.comment.pick { cursor: pointer; border-radius: 8px; padding: 6px; }
+.comment.pick:hover { background: var(--head); }
+.comment-body { flex: 1; min-width: 0; }
+.comment-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.comment-head .muted { margin: 0; font-size: 12px; }
+.comment-tools { margin-left: auto; display: flex; gap: 2px; }
+.panel .comment-tools .icon-button { border: 0; background: none; padding: 4px; width: auto; height: auto; color: var(--muted); }
+.comment-text { margin: 2px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.panel textarea { width: 100%; box-sizing: border-box; }
