@@ -1078,6 +1078,13 @@ function importTabs (doc, payload) {
         const rowId = t.get('rows').get(Number(row) - 1)
         if (rowId && px > 0) doc.getMap('heights:' + id).set(rowId, Math.max(12, Math.min(600, Math.round(px))))
       }
+      // Charts read from the file (src/shared/xlsxChartsRead.js).
+      for (const c of tab.charts || []) {
+        const key = newId()
+        const chart = new Y.Map()
+        chartsMap(doc, id).set(key, chart)
+        try { writeChart(doc, id, chart, c) } catch { chartsMap(doc, id).delete(key) }
+      }
       // Imported rules keep the file's order: add from the last so the first ends on top.
       for (const r of [...(tab.condFormats || [])].reverse()) {
         try { addCondFormat(doc, id, r.range, r) } catch {}
