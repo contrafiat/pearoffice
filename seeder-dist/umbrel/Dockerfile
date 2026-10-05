@@ -28,7 +28,8 @@ ENV SEEDER_HOST=0.0.0.0 \
     SEEDER_PORT=8761 \
     SEEDER_DATA=/data \
     SEEDER_BARE=/app/bare \
-    SEEDER_BUNDLE=/app/seeder/seeder.bundle
+    SEEDER_BUNDLE=/app/seeder/seeder.bundle \
+    PEARSHEET_NO_UPDATE_CHECK=1
 VOLUME /data
 EXPOSE 8761
 # Root, as Umbrel mounts ${APP_DATA_DIR} root-owned; compose sets

@@ -34,6 +34,8 @@
       "seeder-process.js",
       "paths.js",
       "login.js",
+      "updates.js",
+      "vendor/**",
       "smoke-run.js",
       "package.json",
       "build/icon.png"

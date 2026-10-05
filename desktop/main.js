@@ -9,6 +9,7 @@ const { Worklet } = require('./worklet')
 const { SeederProcess } = require('./seeder-process')
 const { resolvePaths } = require('./paths')
 const { createLoginItem } = require('./login')
+const { startUpdates } = require('./updates')
 
 const SMOKE = !!process.env.PEARSHEET_SMOKE
 
@@ -107,13 +108,23 @@ function createTray () {
     return
   }
   tray.setToolTip('PearSheet is running')
+  setTrayMenu()
+  tray.on('click', showWindow)
+}
+
+// "Update to 0.2.0" appears when a newer release is out.
+function setTrayMenu () {
+  if (!tray || tray.isDestroyed()) return
+  const u = updates && updates.state().update
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: 'Open PearSheet', click: showWindow },
+    ...(u && u.available ? [{ label: 'Update to ' + u.latest, click: () => { updates.apply(); showWindow() } }] : []),
     { type: 'separator' },
     { label: 'Quit PearSheet', click: () => app.quit() }
   ]))
-  tray.on('click', showWindow)
 }
+
+let updates = null
 
 function log (...args) {
   if (!app.isPackaged || SMOKE || process.env.PEARSHEET_DEBUG) console.log('[pearsheet]', ...args)
@@ -175,6 +186,11 @@ ipcMain.handle('worklet:call', async (_e, method, args) => {
   }
   // After a device link or a phrase restore the identity changed: start a
   // fresh worklet and reload the UI.
+  if (method === 'app:update') return updates ? updates.state() : { update: null, apply: { status: 'idle' } }
+  if (method === 'app:updateApply') {
+    if (!updates) throw new Error('Updates are off in this copy')
+    return updates.apply()
+  }
   if (method === 'app:settings') return { ...settings, startAtLogin: settings.startAtLogin && loginItem.isEnabled() }
   if (method === 'app:setSetting') {
     const patch = {}
@@ -254,6 +270,7 @@ app.whenReady().then(async () => {
   if (stayRunning()) createTray()
   if (!SMOKE) log(win.isVisible() ? 'window shown' : 'started hidden in the tray')
   if (settings.runSeeder) startSeeder().catch((err) => log('seeder failed to start:', err.message))
+  updates = startUpdates({ app, log, onChange: setTrayMenu })
   if (SMOKE) {
     // Downloads (Export) go straight to the smoke test's data folder.
     win.webContents.session.on('will-download', (_e, item) => {

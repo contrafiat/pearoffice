@@ -7,6 +7,7 @@ import { DevicesPanel } from './DevicesPanel.jsx'
 import { importFile, pickAndImport, isMobile } from './xlsx.js'
 import { Avatar, MemberAvatar } from './Avatar.jsx'
 import { SettingsPanel } from './SettingsPanel.jsx'
+import { UpdateBar } from './UpdateBar.jsx'
 import { FileArrowUp, GearSix, LinkSimple, List, Plus } from '@phosphor-icons/react'
 
 // Import .xlsx: a file input on desktop, the shell's file picker on phones.
@@ -241,6 +242,7 @@ export function App () {
       {devices && <DevicesPanel initialLink={devices.link || ''} startWith={devices.startWith || null} onBack={devices.fromSettings ? () => { setDevices(null); setSettings(true) } : null} onClose={() => setDevices(null)} onError={setError} />}
       {seeder && <SeederPanel initialLink={typeof seeder === 'string' && seeder !== 'fromSettings' ? seeder : ''} onBack={seeder === 'fromSettings' ? () => { setSeeder(false); setSettings(true) } : null} onClose={() => setSeeder(false)} onError={setError} />}
       <main className='main'>
+        {desktop && <UpdateBar />}
         {notice && <div className='banner info'>{notice} <button className='link-button' onClick={() => setNotice(null)}>OK</button></div>}
         {nudge && (
           <div className='banner info'>
