@@ -273,6 +273,9 @@ function createSheets ({ emit, getBase, getLocalDb = () => null, getStore = () =
   function noteLocal (sheetId, update) {
     const e = open.get(sheetId)
     e.guarded.mirror(update)
+    // So closing saves it even before the view catches up: after a move the
+    // saved copy is how this edit reaches the new sheet (moves.js, carry).
+    e.sinceSnapshot = (e.sinceSnapshot || 0) + 1
     trackUndo(e)
     scheduleRecompute(sheetId)
   }
@@ -300,7 +303,14 @@ function createSheets ({ emit, getBase, getLocalDb = () => null, getStore = () =
     return e && e.loading ? e : null
   }
 
-  return { load, attach, onUpdate, noteLocal, values, currentValues, forget, entryFor, peek, yKey, saveSnapshot, flushSnapshots, changed, getBase }
+  // The last saved state of a sheet, whatever view it was saved against (a
+  // move can rewind the view, which makes loading ignore it).
+  async function savedState (sheetId) {
+    const snap = await readSnapshot(sheetId).catch(() => null)
+    return snap ? b4a.from(snap.state, 'base64') : null
+  }
+
+  return { load, attach, onUpdate, noteLocal, values, currentValues, forget, entryFor, peek, yKey, saveSnapshot, flushSnapshots, changed, getBase, savedState }
 }
 
 module.exports = { createSheets, GuardedDoc, yKey, Y_PREFIX }
