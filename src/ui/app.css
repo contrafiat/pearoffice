@@ -610,3 +610,10 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 /* Long press opens PearSheet's menus, not the system's text callout. */
 .grid { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
 .grid .editor { -webkit-user-select: text; user-select: text; }
+
+/* Tabs scroll sideways when they do not fit; status and totals stay put. */
+.tab-strip { display: flex; align-items: stretch; gap: 2px; flex: 1 1 auto; min-width: 0; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.tab-strip::-webkit-scrollbar { display: none; }
+.tab-strip .tab { flex: none; white-space: nowrap; }
+.tabbar .filter-status, .tabbar .totals { flex: none; }
+.tabbar .filter-status { display: flex; align-items: center; font-size: 12px; white-space: nowrap; padding: 0 6px; }

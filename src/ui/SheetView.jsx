@@ -22,7 +22,7 @@ import { ChartPanel } from './ChartPanel.jsx'
 import { ChartView, downloadChart, chartSvg } from './Chart.jsx'
 import { guessChart } from '../shared/charts.js'
 import { readPref, writePref } from './prefs.js'
-import { ArrowCounterClockwise, ArrowClockwise, TextB, TextItalic, TextAUnderline, PaintBucket, Copy, Scissors, ClipboardText, Eraser, Numpad, FileXls, DotsThree, Plus, MagnifyingGlass, X, ChartBar, PencilSimple, DownloadSimple, Trash, TextUnderline, TextStrikethrough, TextAlignLeft, TextAlignCenter, TextAlignRight, ArrowUDownLeft, FrameCorners, AlignTop, AlignCenterVertical, AlignBottom, ArrowsOutLineHorizontal } from '@phosphor-icons/react'
+import { ArrowCounterClockwise, ArrowClockwise, TextB, TextItalic, TextAUnderline, PaintBucket, Copy, Scissors, ClipboardText, Eraser, Numpad, FileXls, DotsThree, Plus, MagnifyingGlass, X, ChartBar, PencilSimple, DownloadSimple, Trash, TextUnderline, TextStrikethrough, TextAlignLeft, TextAlignCenter, TextAlignRight, ArrowUDownLeft, FrameCorners, AlignTop, AlignCenterVertical, AlignBottom, ArrowsOutLineHorizontal, UserPlus } from '@phosphor-icons/react'
 import { DeletePanel } from './DeletePanel.jsx'
 import { FormulaHelp, helpFor, insertFunction } from './FormulaHelp.jsx'
 import { exportSheet, exportCsv, printTab, isMobile } from './xlsx.js'
@@ -157,6 +157,12 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
   const [goingTo, setGoingTo] = useState(null) // text typed in the name box
   // A menu opened near an edge (a long press on a phone) moves to fit on screen.
   const menuRef = useRef(null)
+  // The tab strip scrolls sideways when tabs do not fit; keep the open one in view.
+  const tabStrip = useRef(null)
+  useEffect(() => {
+    const el = tabStrip.current && tabStrip.current.querySelector('.tab.active')
+    if (el) el.scrollIntoView({ block: 'nearest', inline: 'nearest' })
+  }, [view && view.tabId, view && view.tabs.length])
   useLayoutEffect(() => {
     const el = menuRef.current
     if (!el) return
@@ -963,17 +969,21 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
             </>
           )}
         </div>
-        {window.pearsheet && (
+        {window.pearsheet && !phone && (
           <button className='export icon-button' title='Save a copy as an Excel file' aria-label='Export' onClick={() => exportSheet(sheetId).catch((err) => onError(err.message))}><FileXls size={ICON} /></button>
         )}
-        <button className='find-button icon-button' title='Find and replace (Ctrl+F)' aria-label='Find' onClick={() => setFinding({ replace: false })}><MagnifyingGlass size={ICON} /></button>
-        {members.length > 1 && <PeopleStack sheetId={sheetId} members={members} max={phone ? 2 : 3} size={phone ? 24 : 26} onClick={() => setSharing(true)} />}
-        <button className='share' onClick={() => setSharing(true)}>Share</button>
+        {/* Phones keep the title readable: Find and Export move into More,
+            and the people (or a share icon when alone) open Share. */}
+        {!phone && <button className='find-button icon-button' title='Find and replace (Ctrl+F)' aria-label='Find' onClick={() => setFinding({ replace: false })}><MagnifyingGlass size={ICON} /></button>}
+        {members.length > 1 && <PeopleStack sheetId={sheetId} members={members} max={phone ? 2 : 3} size={phone ? 26 : 26} onClick={() => setSharing(true)} />}
+        {!phone && <button className='share' onClick={() => setSharing(true)}>Share</button>}
+        {phone && members.length <= 1 && <button className='share-icon icon-button' aria-label='Share' title='Share' onClick={() => setSharing(true)}><UserPlus size={ICON} /></button>}
         <span className='more'>
           <button className='more-button icon-button' aria-label='More' title='More' onClick={() => setMore(!more)}><DotsThree size={ICON} weight='bold' /></button>
           {more && (
             <ul className='menu more-menu' role='menu' onClick={() => setMore(false)}>
               <li role='menuitem' onClick={() => setFinding({ replace: canEdit })}>Find and replace</li>
+              {phone && window.pearsheet && <li role='menuitem' onClick={() => exportSheet(sheetId).catch((err) => onError(err.message))}>Save as an Excel file</li>}
               <li role='menuitem' onClick={() => exportCsv(view).catch((err) => onError(err.message))}>Download this tab as CSV</li>
               {!phone && <li role='menuitem' onClick={() => printTab(view, 'pdf', printCharts()).catch((err) => onError(err.message))}>Save this tab as PDF</li>}
               {!phone && <li role='menuitem' onClick={() => printTab(view, 'print', printCharts()).catch((err) => onError(err.message))}>Print this tab...</li>}
@@ -1340,6 +1350,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
       )}
 
       <footer className='tabbar'>
+        <div className='tab-strip' ref={tabStrip} onWheel={(e) => { if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) e.currentTarget.scrollLeft += e.deltaY }}>
         {view.tabs.map((t) => renaming && renaming.id === t.id
           ? (
             <input
@@ -1370,6 +1381,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
             </button>
             ))}
         {canEdit && <button className='tab add' title='Add tab' aria-label='Add tab' onClick={async () => { const r = await run('sheet:addTab', {}); if (r) setTabId(r.tabId) }}><Plus size={16} /></button>}
+        </div>
         {filtered && <span className='filter-status' aria-live='polite'>Showing {filtered.showing} of {filtered.total} rows</span>}
               {totals && (
           <span className='totals' aria-live='polite'>
