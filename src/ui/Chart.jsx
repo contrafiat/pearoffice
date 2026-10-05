@@ -3,14 +3,14 @@
 
 import React, { useEffect, useRef } from 'react'
 import * as echarts from 'echarts/core'
-import { BarChart, LineChart, PieChart, ScatterChart } from 'echarts/charts'
-import { TitleComponent, TooltipComponent, LegendComponent, GridComponent } from 'echarts/components'
+import { BarChart, LineChart, PieChart, ScatterChart, RadarChart, CandlestickChart } from 'echarts/charts'
+import { TitleComponent, TooltipComponent, LegendComponent, GridComponent, RadarComponent } from 'echarts/components'
 import { SVGRenderer } from 'echarts/renderers'
 import { chartOption, themeColors } from './chartOption.js'
 import { call } from './bridge.js'
 import { isMobile } from './xlsx.js'
 
-echarts.use([BarChart, LineChart, PieChart, ScatterChart, TitleComponent, TooltipComponent, LegendComponent, GridComponent, SVGRenderer])
+echarts.use([BarChart, LineChart, PieChart, ScatterChart, RadarChart, CandlestickChart, TitleComponent, TooltipComponent, LegendComponent, GridComponent, RadarComponent, SVGRenderer])
 
 // A chart in a box of the given size. With no data, the reason instead.
 export function ChartView ({ chart, width, height }) {

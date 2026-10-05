@@ -2,7 +2,7 @@
 // once, so the chart redraws behind the panel as you go.
 
 import React, { useState } from 'react'
-import { X, ChartBar, ChartBarHorizontal, ChartLine, ChartLineUp, ChartPie, ChartDonut, ChartScatter, ChartPolar } from '@phosphor-icons/react'
+import { X, ChartBar, ChartBarHorizontal, ChartLine, ChartLineUp, ChartPie, ChartDonut, ChartScatter, ChartPolar, Pentagon, CirclesThree, ChartLineDown, Equalizer, Stairs } from '@phosphor-icons/react'
 
 const TYPES = [
   ['column', 'Column', ChartBar],
@@ -12,8 +12,20 @@ const TYPES = [
   ['pie', 'Pie', ChartPie],
   ['doughnut', 'Doughnut', ChartDonut],
   ['scatter', 'Scatter', ChartScatter],
-  ['combo', 'Column and line', ChartPolar]
+  ['combo', 'Column and line', ChartPolar],
+  ['radar', 'Radar', Pentagon],
+  ['bubble', 'Bubble', CirclesThree],
+  ['stock', 'Stock', ChartLineDown],
+  ['histogram', 'Histogram', Equalizer],
+  ['waterfall', 'Waterfall', Stairs]
 ]
+// What the range should hold, for the types that need a particular shape.
+const SHAPE = {
+  bubble: 'First column: X. Then two columns per series: Y and bubble size.',
+  stock: 'First column: dates or labels. Then Open, High, Low and Close.',
+  histogram: 'Columns of numbers. Bars count how many fall in each range.',
+  waterfall: 'Names and one column of changes. Mark totals below.'
+}
 const FORMATS = [['', 'Automatic'], ['#,##0', '1,234'], ['#,##0.00', '1,234.50'], ['$#,##0', '$1,234'], ['0%', '12%'], ['0.0%', '12.3%']]
 
 // A text setting saved when the field is left.
@@ -32,7 +44,11 @@ const toggleIn = (list, i) => { const s = new Set(list || []); if (s.has(i)) s.d
 export function ChartPanel ({ chart, selection, onChange, onDelete, onClose }) {
   const set = (patch) => onChange(patch)
   const series = (chart.resolved && chart.resolved.series) || []
-  const axes = !['pie', 'doughnut'].includes(chart.type || 'column')
+  const type = chart.type || 'column'
+  const axes = !['pie', 'doughnut', 'radar'].includes(type)
+  // Value axis settings and per-series options apply to the plain types.
+  const plain = ['column', 'bar', 'line', 'area', 'scatter', 'combo'].includes(type)
+  const cats = (chart.resolved && chart.resolved.categories) || []
   const labels = chart.labels || {}
   return (
     <div className='panel-backdrop chart-backdrop' onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
@@ -52,6 +68,7 @@ export function ChartPanel ({ chart, selection, onChange, onDelete, onClose }) {
         </div>
 
         <h3>Data</h3>
+        {SHAPE[type] && <p className='small chart-shape'>{SHAPE[type]}</p>}
         <TextSetting key={'data' + chart.data} label='Range' value={chart.data} onSave={(v) => set({ data: v || '' })} />
         {selection && selection !== chart.data && <div className='row'><button onClick={() => set({ data: selection })}>Use the selection ({selection})</button></div>}
         <div className='chart-checks'>
@@ -79,7 +96,28 @@ export function ChartPanel ({ chart, selection, onChange, onDelete, onClose }) {
           {['column', 'bar', 'area'].includes(chart.type || 'column') && <label className='check'><input type='checkbox' checked={!!chart.percent} onChange={(e) => set({ percent: e.target.checked || null })} /> 100%</label>}
         </div>
 
-        {axes && (
+        {type === 'histogram' && (
+          <>
+            <h3>Bins</h3>
+            <TextSetting key={'bin' + chart.binWidth} label='Bin width (empty: automatic)' value={chart.binWidth === undefined ? '' : String(chart.binWidth)} onSave={(v) => set({ binWidth: v === null || !(Number(v) > 0) ? null : Number(v) })} />
+          </>
+        )}
+
+        {type === 'waterfall' && cats.length > 0 && (
+          <>
+            <h3>Totals</h3>
+            <ul className='chart-series'>
+              {cats.map((c, i) => (
+                <li key={i}>
+                  <span>{String(c)}</span>
+                  <label className='check'><input type='checkbox' checked={(chart.totals || []).includes(i)} onChange={() => set({ totals: toggleIn(chart.totals, i) })} /> Total</label>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+
+        {axes && plain && (
           <>
             <h3>Value axis</h3>
             <div className='row chart-axis'>
@@ -96,7 +134,7 @@ export function ChartPanel ({ chart, selection, onChange, onDelete, onClose }) {
           </>
         )}
 
-        {series.length > 0 && axes && (
+        {series.length > 0 && plain && (
           <>
             <h3>Series</h3>
             <ul className='chart-series'>

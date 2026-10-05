@@ -8,7 +8,7 @@
 // `fflate` (zip) and the chart data are passed in; nothing here reads the
 // clock or the device.
 
-const { parseRange } = require('./charts')
+const { parseRange, histogram, waterfall } = require('./charts')
 const { numToCol } = require('./a1')
 
 const PALETTE = ['5B8C3A', '2F7D8C', 'D9822B', '6A4C93', 'A23E48', '3A5F8C', '8C7A2F', 'C45A8A']
@@ -41,7 +41,8 @@ function layout (chart, sheet) {
   const labels = chart.labels || {}
   const nameLine = rows ? !!labels.col : !!labels.row // names at the start of each series
   const catLine = rows ? !!labels.row : !!labels.col // categories before the first series
-  const firstSeries = catLine || chart.type === 'scatter' ? 1 : 0
+  const xFirst = chart.type === 'scatter' || chart.type === 'bubble'
+  const firstSeries = catLine || xFirst ? 1 : 0
   const n = d.categories.length
   const start = rows ? range.c1 : range.r1 // along a series
   const across = rows ? range.r1 : range.c1 // series after series
@@ -52,7 +53,7 @@ function layout (chart, sheet) {
     return ref(range.sheet || sheet, r1, c1, r2, c2)
   }
   return {
-    categories: catLine || chart.type === 'scatter' ? span(0) : null,
+    categories: catLine || xFirst ? span(0) : null,
     series: d.series.map((s, i) => {
       const [nr, nc] = at(start, firstSeries + i)
       return { ...s, name: s.name, nameRef: nameLine ? ref(range.sheet || sheet, nr, nc, nr, nc) : null, valuesRef: span(firstSeries + i) }
@@ -60,10 +61,21 @@ function layout (chart, sheet) {
   }
 }
 
-function seriesXml (chart, s, i, place, kind) {
+function seriesXml (chart, s, i, place, kind, size) {
   const tx = s.nameRef ? '<c:tx>' + strRef(s.nameRef, [s.name]) + '</c:tx>' : '<c:tx><c:v>' + esc(s.name) + '</c:v></c:tx>'
   const cats = chart.resolved.categories
   let xml = '<c:ser><c:idx val="' + i + '"/><c:order val="' + i + '"/>' + tx
+  if (kind === 'bubble') {
+    // X, Y and size; no data labels or trend lines here.
+    return xml + fill(i) + '<c:invertIfNegative val="0"/><c:xVal>' + numRef(place.categories, cats) + '</c:xVal><c:yVal>' + numRef(s.valuesRef, s.values) + '</c:yVal>' +
+      '<c:bubbleSize>' + numRef(size.valuesRef, size.values) + '</c:bubbleSize><c:bubble3D val="0"/></c:ser>'
+  }
+  if (kind === 'stock' || kind === 'radar') {
+    xml += kind === 'stock' ? '<c:spPr><a:ln w="19050"><a:noFill/></a:ln></c:spPr>' : line(i)
+    xml += '<c:marker><c:symbol val="none"/></c:marker>'
+    if (place.categories) xml += '<c:cat>' + strRef(place.categories, cats.map(String)) + '</c:cat>'
+    return xml + '<c:val>' + numRef(s.valuesRef, s.values) + '</c:val>' + (kind === 'stock' ? '<c:smooth val="0"/>' : '') + '</c:ser>'
+  }
   if (kind === 'scatter') {
     // Points only: no line between them, a filled circle each.
     xml += '<c:spPr><a:ln w="19050"><a:noFill/></a:ln></c:spPr><c:marker><c:symbol val="circle"/><c:size val="6"/>' + fill(i) + '</c:marker>'
@@ -111,7 +123,22 @@ function chartXml (chart, sheet) {
     list.map(({ s, i }) => seriesXml(chart, s, i, place, 'bar')).join('') + '<c:gapWidth val="80"/>' + (grouping ? '<c:overlap val="100"/>' : '') + ids(axA, axB) + '</c:barChart>'
   const lines = (list, area, axA, axB) => '<c:' + (area ? 'area' : 'line') + 'Chart><c:grouping val="' + (grouping || 'standard') + '"/><c:varyColors val="0"/>' +
     list.map(({ s, i }) => seriesXml(chart, s, i, place, area ? 'bar' : 'line')).join('') + (area ? '' : '<c:marker val="1"/>') + ids(axA, axB) + '</c:' + (area ? 'area' : 'line') + 'Chart>'
-  if (type === 'pie' || type === 'doughnut') {
+  if (type === 'radar') {
+    plot = '<c:radarChart><c:radarStyle val="marker"/><c:varyColors val="0"/>' + all.map(({ s, i }) => seriesXml(chart, s, i, place, 'radar')).join('') +
+      ids(100, 200) + '</c:radarChart>' + axes(chart, 100, 200)
+  } else if (type === 'bubble') {
+    const pairs = []
+    for (let k = 0; k + 1 < place.series.length; k += 2) pairs.push([place.series[k], place.series[k + 1]])
+    plot = '<c:bubbleChart><c:varyColors val="0"/>' + pairs.map(([y, z], i) => seriesXml(chart, y, i, place, 'bubble', z)).join('') +
+      '<c:bubbleScale val="100"/><c:showNegBubbles val="0"/>' + ids(500, 600) + '</c:bubbleChart>' + axes(chart, 500, 600, { scatter: true })
+  } else if (type === 'stock') {
+    const solid = (hex) => '<c:spPr><a:solidFill><a:srgbClr val="' + hex + '"/></a:solidFill></c:spPr>'
+    plot = '<c:stockChart>' + place.series.slice(0, 4).map((s, i) => seriesXml(chart, s, i, place, 'stock')).join('') +
+      '<c:hiLowLines/><c:upDownBars><c:gapWidth val="150"/><c:upBars>' + solid('3C9A5F') + '</c:upBars><c:downBars>' + solid('C0392B') + '</c:downBars></c:upDownBars>' +
+      ids(100, 200) + '</c:stockChart>' + axes(chart, 100, 200)
+  } else if (type === 'histogram' || type === 'waterfall') {
+    plot = fallbackPlot(chart) + axes(chart, 100, 200)
+  } else if (type === 'pie' || type === 'doughnut') {
     const s = place.series[0]
     plot = '<c:' + (type === 'pie' ? 'pie' : 'doughnut') + 'Chart><c:varyColors val="1"/>' + (s ? seriesXml(chart, s, 0, place, 'pie') : '') +
       (type === 'doughnut' ? '<c:firstSliceAng val="0"/><c:holeSize val="50"/>' : '<c:firstSliceAng val="0"/>') + '</c:' + (type === 'pie' ? 'pie' : 'doughnut') + 'Chart>'
@@ -138,7 +165,7 @@ function chartXml (chart, sheet) {
     plot = bars(all, type === 'bar', 100, 200) + axes(chart, 100, 200, { horizontal: type === 'bar' })
   }
   const legendPos = chart.legend === 'right' ? 'r' : 'b'
-  const showLegend = chart.legend ? chart.legend !== 'none' : place.series.length > 1 || type === 'pie' || type === 'doughnut'
+  const showLegend = ['stock', 'histogram', 'waterfall'].includes(type) ? false : chart.legend ? chart.legend !== 'none' : place.series.length > 1 || type === 'pie' || type === 'doughnut'
   return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<c:chartSpace ' + NS + '><c:roundedCorners val="0"/><c:chart>' +
     (chart.title ? title(chart.title) + '<c:autoTitleDeleted val="0"/>' : '<c:autoTitleDeleted val="1"/>') +
     '<c:plotArea><c:layout/>' + plot + '</c:plotArea>' +
@@ -146,18 +173,78 @@ function chartXml (chart, sheet) {
     '<c:plotVisOnly val="1"/><c:dispBlanksAs val="gap"/></c:chart></c:chartSpace>'
 }
 
+// Histogram and waterfall (proposals/2026-10-05-more-chart-types.md) for
+// programs that do not read Excel's newer chart format: the bars as they are
+// drawn, as fixed values. A waterfall is two stacked series, an invisible one
+// lifting each bar to where the last ended.
+function fallbackPlot (chart) {
+  const d = chart.resolved
+  const lit = (values) => '<c:numLit><c:formatCode>General</c:formatCode><c:ptCount val="' + values.length + '"/>' + values.map((v, k) => '<c:pt idx="' + k + '"><c:v>' + num(v) + '</c:v></c:pt>').join('') + '</c:numLit>'
+  const cats = (labels) => '<c:cat><c:strLit><c:ptCount val="' + labels.length + '"/>' + labels.map((c, k) => '<c:pt idx="' + k + '"><c:v>' + esc(c) + '</c:v></c:pt>').join('') + '</c:strLit></c:cat>'
+  const ser = (i, name, labels, values, spPr, extra = '') => '<c:ser><c:idx val="' + i + '"/><c:order val="' + i + '"/><c:tx><c:v>' + esc(name) + '</c:v></c:tx>' + spPr + '<c:invertIfNegative val="0"/>' + extra + cats(labels) + '<c:val>' + lit(values) + '</c:val></c:ser>'
+  const solid = (hex) => '<c:spPr><a:solidFill><a:srgbClr val="' + hex + '"/></a:solidFill></c:spPr>'
+  if (chart.type === 'histogram') {
+    const bins = histogram(d.series.flatMap((s) => s.values), chart.binWidth)
+    return '<c:barChart><c:barDir val="col"/><c:grouping val="clustered"/><c:varyColors val="0"/>' + ser(0, 'Count', bins.map((b) => b.label), bins.map((b) => b.count), solid(PALETTE[0])) +
+      '<c:gapWidth val="5"/><c:axId val="100"/><c:axId val="200"/></c:barChart>'
+  }
+  const s = d.series[0] || { name: '', values: [] }
+  const bars = waterfall(s.values, chart.totals || [])
+  const labels = d.categories.map(String)
+  const colours = bars.map((b, k) => '<c:dPt><c:idx val="' + k + '"/><c:invertIfNegative val="0"/><c:bubble3D val="0"/>' + solid(b.kind === 'total' ? PALETTE[1] : b.kind === 'down' ? 'C0392B' : '3C9A5F') + '</c:dPt>').join('')
+  return '<c:barChart><c:barDir val="col"/><c:grouping val="stacked"/><c:varyColors val="0"/>' +
+    ser(0, 'Base', labels, bars.map((b) => Math.min(b.start, b.end)), '<c:spPr><a:noFill/></c:spPr>') +
+    ser(1, s.name, labels, bars.map((b) => Math.abs(b.end - b.start)), solid(PALETTE[0]), colours) +
+    '<c:gapWidth val="50"/><c:overlap val="100"/><c:axId val="100"/><c:axId val="200"/></c:barChart>'
+}
+
+// The same two in Excel's newer chart format (chartex), reading the cells.
+const CX = 'http://schemas.microsoft.com/office/drawing/2014/chartex'
+// nameFor(ref): Excel points these charts at hidden workbook names
+// (_xlchart.v1.N) rather than at cells; the caller adds the names.
+function chartexXml (chart, sheet, nameFor = (ref) => ref) {
+  const place = layout(chart, sheet)
+  const d = chart.resolved
+  const pts = (values, str) => values.map((v, k) => (str || num(v) !== null ? '<cx:pt idx="' + k + '">' + esc(str ? String(v) : num(v)) + '</cx:pt>' : '')).join('')
+  const series = chart.type === 'histogram' ? place.series : place.series.slice(0, 1)
+  let data = ''
+  series.forEach((s, i) => {
+    data += '<cx:data id="' + i + '">'
+    if (chart.type === 'waterfall' && place.categories) data += '<cx:strDim type="cat"><cx:f dir="row">' + esc(nameFor(place.categories)) + '</cx:f><cx:lvl ptCount="' + d.categories.length + '">' + pts(d.categories, true) + '</cx:lvl></cx:strDim>'
+    data += '<cx:numDim type="val"><cx:f dir="row">' + esc(nameFor(s.valuesRef)) + '</cx:f><cx:lvl ptCount="' + s.values.length + '" formatCode="General">' + pts(s.values) + '</cx:lvl></cx:numDim></cx:data>'
+  })
+  const layoutPr = chart.type === 'histogram'
+    ? '<cx:layoutPr><cx:binning intervalClosed="r">' + (Number(chart.binWidth) > 0 ? '<cx:binSize val="' + Number(chart.binWidth) + '"/>' : '') + '</cx:binning></cx:layoutPr>'
+    : '<cx:layoutPr><cx:subtotals>' + (chart.totals || []).map((k) => '<cx:idx val="' + k + '"/>').join('') + '</cx:subtotals></cx:layoutPr>'
+  const ser = series.map((s, i) => '<cx:series layoutId="' + (chart.type === 'histogram' ? 'clusteredColumn' : 'waterfall') + '" uniqueId="{0000000' + i + '-0000-4000-8000-000000000000}">' +
+    '<cx:tx><cx:txData>' + (s.nameRef ? '<cx:f>' + esc(nameFor(s.nameRef)) + '</cx:f>' : '') + '<cx:v>' + esc(s.name) + '</cx:v></cx:txData></cx:tx><cx:dataId val="' + i + '"/>' + layoutPr + '</cx:series>').join('')
+  const ctitle = chart.title ? '<cx:title pos="t" align="ctr" overlay="0"><cx:tx><cx:txData><cx:v>' + esc(chart.title) + '</cx:v></cx:txData></cx:tx></cx:title>' : ''
+  return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<cx:chartSpace xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:cx="' + CX + '">' +
+    '<cx:chartData>' + data + '</cx:chartData><cx:chart>' + ctitle + '<cx:plotArea><cx:plotAreaRegion>' + ser + '</cx:plotAreaRegion>' +
+    '<cx:axis id="0"><cx:catScaling gapWidth="' + (chart.type === 'histogram' ? '0' : '0.5') + '"/><cx:tickLabels/></cx:axis><cx:axis id="1"><cx:valScaling/><cx:majorGridlines/><cx:tickLabels/></cx:axis>' +
+    '</cx:plotArea></cx:chart></cx:chartSpace>'
+}
+
 // Where a chart starts: its anchor cell and offset, in EMUs.
-function anchorXml (chart, rid, n) {
+// exRid: the chart's part in Excel's newer format, when it has one; the
+// classic chart is then the fallback.
+function anchorXml (chart, rid, n, exRid) {
   const a = chart.anchor
+  const frame = (uri, inner) => '<xdr:graphicFrame macro=""><xdr:nvGraphicFramePr><xdr:cNvPr id="' + (n + 1) + '" name="' + esc(chart.title || 'Chart ' + n) + '"/><xdr:cNvGraphicFramePr/></xdr:nvGraphicFramePr>' +
+    '<xdr:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></xdr:xfrm><a:graphic><a:graphicData uri="' + uri + '">' + inner + '</a:graphicData></a:graphic></xdr:graphicFrame>'
+  const classic = frame('http://schemas.openxmlformats.org/drawingml/2006/chart', '<c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" r:id="' + rid + '"/>')
+  const body = exRid
+    ? '<mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"><mc:Choice xmlns:cx1="http://schemas.microsoft.com/office/drawing/2015/9/8/chartex" Requires="cx1">' +
+      frame(CX, '<cx:chart xmlns:cx="' + CX + '" r:id="' + exRid + '"/>') + '</mc:Choice><mc:Fallback>' + classic + '</mc:Fallback></mc:AlternateContent>'
+    : classic
   return '<xdr:oneCellAnchor><xdr:from><xdr:col>' + (a.col - 1) + '</xdr:col><xdr:colOff>' + Math.round(a.dx * EMU) + '</xdr:colOff><xdr:row>' + (a.row - 1) +
     '</xdr:row><xdr:rowOff>' + Math.round(a.dy * EMU) + '</xdr:rowOff></xdr:from><xdr:ext cx="' + Math.round(chart.size.w * EMU) + '" cy="' + Math.round(chart.size.h * EMU) + '"/>' +
-    '<xdr:graphicFrame macro=""><xdr:nvGraphicFramePr><xdr:cNvPr id="' + (n + 1) + '" name="' + esc(chart.title || 'Chart ' + n) + '"/><xdr:cNvGraphicFramePr/></xdr:nvGraphicFramePr>' +
-    '<xdr:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/></xdr:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart">' +
-    '<c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" r:id="' + rid + '"/></a:graphicData></a:graphic></xdr:graphicFrame><xdr:clientData/></xdr:oneCellAnchor>'
+    body + '<xdr:clientData/></xdr:oneCellAnchor>'
 }
 
 const DRAWING_TYPE = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing'
 const CHART_TYPE = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart'
+const CHARTEX_TYPE = 'http://schemas.microsoft.com/office/2014/relationships/chartEx'
 const rels = (list) => '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
   list.map(([id, type, target]) => '<Relationship Id="' + id + '" Type="' + type + '" Target="' + target + '"/>').join('') + '</Relationships>'
 
@@ -169,6 +256,8 @@ function addChartsToXlsx (bytes, tabs, { unzipSync, zipSync, strToU8, strFromU8 
   let types = strFromU8(files['[Content_Types].xml'])
   let chartNo = 0
   let drawingNo = 0
+  const xlNames = [] // [name, ref] for Excel's newer charts
+  const nameFor = (ref) => { const n = '_xlchart.v1.' + xlNames.length; xlNames.push([n, ref]); return n }
   tabs.forEach((tab, t) => {
     const charts = (tab.charts || []).filter((c) => c.resolved && !c.resolved.error && parseRange(c.data))
     if (!charts.length) return
@@ -182,7 +271,14 @@ function addChartsToXlsx (bytes, tabs, { unzipSync, zipSync, strToU8, strFromU8 
       files['xl/charts/chart' + chartNo + '.xml'] = strToU8(chartXml(chart, tab.name))
       types = types.replace('</Types>', '<Override PartName="/xl/charts/chart' + chartNo + '.xml" ContentType="application/vnd.openxmlformats-officedocument.drawingml.chart+xml"/></Types>')
       drawingRels.push(['rId' + (k + 1), CHART_TYPE, '../charts/chart' + chartNo + '.xml'])
-      anchors.push(anchorXml(chart, 'rId' + (k + 1), k + 1))
+      let exRid = null
+      if (chart.type === 'histogram' || chart.type === 'waterfall') {
+        exRid = 'rIdEx' + (k + 1)
+        files['xl/charts/chartEx' + chartNo + '.xml'] = strToU8(chartexXml(chart, tab.name, nameFor))
+        types = types.replace('</Types>', '<Override PartName="/xl/charts/chartEx' + chartNo + '.xml" ContentType="application/vnd.ms-office.chartex+xml"/></Types>')
+        drawingRels.push([exRid, CHARTEX_TYPE, '../charts/chartEx' + chartNo + '.xml'])
+      }
+      anchors.push(anchorXml(chart, 'rId' + (k + 1), k + 1, exRid))
     })
     files['xl/drawings/drawing' + drawingNo + '.xml'] = strToU8('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' + anchors.join('') + '</xdr:wsDr>')
     files['xl/drawings/_rels/drawing' + drawingNo + '.xml.rels'] = strToU8(rels(drawingRels))
@@ -198,6 +294,12 @@ function addChartsToXlsx (bytes, tabs, { unzipSync, zipSync, strToU8, strFromU8 
     files[sheetPath] = strToU8(sheet)
   })
   files['[Content_Types].xml'] = strToU8(types)
+  if (xlNames.length && files['xl/workbook.xml']) {
+    const defs = xlNames.map(([n, ref]) => '<definedName name="' + n + '" hidden="1">' + esc(ref) + '</definedName>').join('')
+    let wb = strFromU8(files['xl/workbook.xml'])
+    wb = /<definedNames>/.test(wb) ? wb.replace('</definedNames>', defs + '</definedNames>') : wb.replace('</sheets>', '</sheets><definedNames>' + defs + '</definedNames>')
+    files['xl/workbook.xml'] = strToU8(wb)
+  }
   return zipSync(files)
 }
 

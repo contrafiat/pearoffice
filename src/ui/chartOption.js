@@ -3,7 +3,10 @@
 // or dark.
 
 import { SSF } from 'xlsx/dist/xlsx.mini.min.js'
+import { histogram, waterfall } from '../shared/charts.js'
 
+export const UP = '#3c9a5f'
+export const DOWN = '#c0392b'
 export const PALETTE = ['#5b8c3a', '#2f7d8c', '#d9822b', '#6a4c93', '#a23e48', '#3a5f8c', '#8c7a2f', '#c45a8a']
 
 // The app's colours, read from its CSS variables.
@@ -68,6 +71,24 @@ export function chartOption (chart, data, theme = themeColors()) {
     return option
   }
 
+  // Radar (proposals/2026-10-05-more-chart-types.md): a spoke per category,
+  // a closed shape per series.
+  if (type === 'radar') {
+    const top = Math.max(0, ...data.series.flatMap((s) => s.values.filter((v) => v !== null)))
+    option.radar = {
+      indicator: data.categories.map((name) => ({ name: String(name), max: top ? top * 1.1 : 1 })),
+      center: ['50%', chart.title ? '56%' : '52%'],
+      radius: '62%',
+      axisName: { color: theme.muted },
+      axisLine: { lineStyle: { color: theme.line } },
+      splitLine: { lineStyle: { color: theme.line } },
+      splitArea: { show: false }
+    }
+    option.tooltip = { trigger: 'item' }
+    option.series = [{ type: 'radar', data: data.series.map((s) => ({ name: s.name, value: s.values.map((v) => (v === null ? 0 : v)), areaStyle: { opacity: 0.15 } })), label }]
+    return option
+  }
+
   const axisLine = { lineStyle: { color: theme.lineStrong } }
   const splitLine = { lineStyle: { color: theme.line } }
   const axisName = (name) => (name ? { name, nameLocation: 'middle', nameGap: 32, nameTextStyle: text } : {})
@@ -82,10 +103,62 @@ export function chartOption (chart, data, theme = themeColors()) {
     ...extra
   })
 
+  const categoryAxis = (labels) => ({ type: 'category', data: labels.map(String), axisLabel: { color: theme.muted }, axisLine, ...axisName(chart.xTitle) })
   if (type === 'scatter') {
     option.xAxis = { type: 'value', scale: true, axisLabel: { color: theme.muted }, axisLine, splitLine, ...axisName(chart.xTitle) }
     option.yAxis = valueAxis({ scale: true })
     option.series = data.series.map((s) => ({ type: 'scatter', name: s.name, data: data.categories.map((x, i) => [x, s.values[i]]).filter((p) => p[0] !== null && p[1] !== null), label }))
+  } else if (type === 'bubble') {
+    // X in the first column, then Y and size for each series. Circle area
+    // follows the size; the largest is 48 pixels across.
+    // Room around the edges, so the outer bubbles are not cut off.
+    option.xAxis = { type: 'value', scale: true, boundaryGap: ['12%', '12%'], axisLabel: { color: theme.muted }, axisLine, splitLine, ...axisName(chart.xTitle) }
+    option.yAxis = valueAxis({ scale: true, boundaryGap: ['15%', '15%'] })
+    option.tooltip = { trigger: 'item' }
+    const pairs = []
+    for (let i = 0; i + 1 < data.series.length; i += 2) pairs.push([data.series[i], data.series[i + 1]])
+    const biggest = Math.max(0, ...pairs.flatMap(([, z]) => z.values.filter((v) => v !== null).map(Math.abs)))
+    option.series = pairs.map(([y, z]) => ({
+      type: 'scatter',
+      name: y.name,
+      data: data.categories.map((x, k) => [x, y.values[k], z.values[k]]).filter((p) => p[0] !== null && p[1] !== null && p[2] !== null),
+      symbolSize: (p) => (biggest ? 6 + 42 * Math.sqrt(Math.abs(p[2]) / biggest) : 10),
+      itemStyle: { opacity: 0.75 },
+      label: label && { ...label, formatter: (p) => fmt(p.value[1]) }
+    }))
+  } else if (type === 'stock') {
+    // Open, high, low, close: green when it closed higher than it opened.
+    const [o, h, l, c] = data.series
+    option.xAxis = categoryAxis(data.categories)
+    option.yAxis = valueAxis({ scale: true })
+    option.legend = { show: false }
+    option.series = o && h && l && c
+      ? [{ type: 'candlestick', name: chart.title || 'Price', data: data.categories.map((_, k) => [o.values[k], c.values[k], l.values[k], h.values[k]]), itemStyle: { color: UP, color0: DOWN, borderColor: UP, borderColor0: DOWN } }]
+      : []
+  } else if (type === 'histogram') {
+    const bins = histogram(data.series.flatMap((s) => s.values), chart.binWidth)
+    option.xAxis = { ...categoryAxis(bins.map((b) => b.label)), axisLabel: { color: theme.muted, interval: 0, hideOverlap: true } }
+    option.yAxis = valueAxis({ minInterval: 1 })
+    option.legend = { show: false }
+    option.series = [{ type: 'bar', name: 'Count', data: bins.map((b) => b.count), barCategoryGap: '2%', label: chart.dataLabels ? { show: true, position: 'top', color: theme.ink } : undefined }]
+  } else if (type === 'waterfall') {
+    // An invisible bar lifts each visible one to where the last ended.
+    const s = data.series[0] || { values: [] }
+    const bars = waterfall(s.values, chart.totals || [])
+    option.xAxis = categoryAxis(data.categories)
+    option.yAxis = valueAxis()
+    option.legend = { show: false }
+    option.tooltip = { trigger: 'axis', formatter: (ps) => { const p = ps.find((x) => x.seriesIndex === 1); if (!p) return ''; const b = bars[p.dataIndex]; return p.name + ': ' + fmt(b.kind === 'total' ? b.end : b.end - b.start) } }
+    option.series = [
+      { type: 'bar', stack: 'w', silent: true, itemStyle: { color: 'transparent' }, data: bars.map((b) => Math.min(b.start, b.end)) },
+      {
+        type: 'bar',
+        stack: 'w',
+        name: s.name,
+        data: bars.map((b) => ({ value: Math.abs(b.end - b.start), itemStyle: { color: b.kind === 'total' ? PALETTE[1] : b.kind === 'down' ? DOWN : UP } })),
+        label: chart.dataLabels ? { show: true, position: 'top', color: theme.ink, formatter: (p) => { const b = bars[p.dataIndex]; return fmt(b.kind === 'total' ? b.end : b.end - b.start) } } : undefined
+      }
+    ]
   } else {
     let values = data.series.map((s) => s.values)
     if (chart.percent) {
@@ -94,10 +167,10 @@ export function chartOption (chart, data, theme = themeColors()) {
     }
     const lines = new Set(chart.lineSeries || [])
     const second = new Set(chart.secondAxis || [])
-    const categoryAxis = { type: 'category', data: data.categories.map(String), axisLabel: { color: theme.muted }, axisLine, ...axisName(chart.xTitle) }
+    const catAxis = categoryAxis(data.categories)
     const horizontal = type === 'bar'
-    option.xAxis = horizontal ? valueAxis() : categoryAxis
-    option.yAxis = horizontal ? { ...categoryAxis, inverse: true } : (type === 'combo' && second.size ? [valueAxis(), valueAxis({ name: undefined, splitLine: { show: false } })] : valueAxis())
+    option.xAxis = horizontal ? valueAxis() : catAxis
+    option.yAxis = horizontal ? { ...catAxis, inverse: true } : (type === 'combo' && second.size ? [valueAxis(), valueAxis({ name: undefined, splitLine: { show: false } })] : valueAxis())
     option.series = data.series.map((s, i) => {
       const asLine = type === 'line' || type === 'area' || (type === 'combo' && lines.has(i))
       return {
@@ -117,7 +190,7 @@ export function chartOption (chart, data, theme = themeColors()) {
   }
 
   // Straight-line trends, dashed, with R² in the legend.
-  for (const i of chart.trendline || []) {
+  for (const i of ['column', 'bar', 'line', 'area', 'scatter', 'combo'].includes(type) ? chart.trendline || [] : []) {
     const s = data.series[i]
     if (!s) continue
     const xs = type === 'scatter' ? data.categories : data.categories.map((_, k) => k)
