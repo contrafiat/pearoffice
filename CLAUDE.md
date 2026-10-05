@@ -119,7 +119,7 @@ the checking and installing code is `@peerloom/host`'s, copied into
 `desktop/vendor/peerloom-host/` by `node scripts/vendor-peerloom-host.js`.
 The seeder download's launcher checks daily and has `pearsheet-seeder
 update`. Test against a fake release with `scripts/serve-local-release.js`
-and `PEARSHEET_UPDATE_LATEST_URL`; `node scripts/check-update-appimage.js`
+and `PEARSHEET_UPDATE_LATEST_URL`; `node scripts/check-update.js`
 runs Update now on a real AppImage. `PEARSHEET_NO_UPDATE_CHECK=1` turns it
 off.
 
