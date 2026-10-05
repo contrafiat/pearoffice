@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react'
-import { ArrowSquareOut, CaretLeft, Devices, EnvelopeSimple, HardDrives, X } from '@phosphor-icons/react'
+import { ArrowSquareOut, Camera, CaretLeft, Devices, EnvelopeSimple, HardDrives, Trash, X } from '@phosphor-icons/react'
 import { call } from './bridge.js'
 import { Avatar, shrinkPicture } from './Avatar.jsx'
 import { readPref, writePref } from './prefs.js'
@@ -90,13 +90,15 @@ export function SettingsPanel ({ me, onMe, desktop, keepOnline, startAtLogin, on
                   }}
                   onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur() }}
                 />
-                <span className='row'>
-                  <button className='link-button' onClick={() => picRef.current && picRef.current.click()}>{avatar ? 'Change picture' : 'Add a picture'}</button>
+                <span className='pic-actions'>
+                  <button className='pic-button' title={avatar ? 'Change picture' : 'Add a picture'} aria-label={avatar ? 'Change picture' : 'Add a picture'} onClick={() => picRef.current && picRef.current.click()}><Camera size={18} /></button>
                   {avatar && (
                     <button
-                      className='link-button remove-picture'
+                      className='pic-button remove-picture'
+                      title='Remove picture'
+                      aria-label='Remove picture'
                       onClick={async () => { try { await call('app:setAvatar', { data: '' }); onMe() } catch (err) { onError(err.message) } }}
-                    >Remove picture
+                    ><Trash size={18} />
                     </button>
                   )}
                 </span>
