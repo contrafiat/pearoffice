@@ -125,7 +125,16 @@ function workbookToTabs (XLSX, wb) {
     tabs.push({ name: String(name).slice(0, 100), cells, widths, merges, hidden, comments })
   }
   if (!tabs.length) throw new Error('This file has no sheets')
-  return { tabs }
+  // Workbook-wide named ranges (names for one sheet only are skipped).
+  const names = []
+  for (const n of (wb.Workbook && wb.Workbook.Names) || []) {
+    if (n.Sheet !== undefined && n.Sheet !== null) continue
+    const box = require('./charts').parseRange(String(n.Ref || ''))
+    const tab = box && box.sheet ? wb.SheetNames.findIndex((x) => x.toUpperCase() === box.sheet.toUpperCase()) : -1
+    if (!box || box.spill || tab < 0 || /^_xlnm\./i.test(n.Name)) continue
+    names.push({ name: n.Name, tab, range: numToCol(box.c1) + box.r1 + ':' + numToCol(box.c2) + box.r2 })
+  }
+  return { tabs, names }
 }
 
 // Sheet dump (from the worklet's sheet:dump) -> SheetJS workbook.
@@ -182,6 +191,16 @@ function dumpToWorkbook (XLSX, dump) {
     used.add(name.toUpperCase())
     XLSX.utils.book_append_sheet(wb, ws, name)
   }
+  // Named ranges: { name, tab (its name in the dump), range }.
+  const names = (dump.names || []).map((n) => {
+    const i = dump.tabs.findIndex((t) => t.name === n.tab)
+    const box = i >= 0 && require('./charts').parseRange(n.range)
+    if (!box) return null
+    const abs = (r, c) => '$' + numToCol(c) + '$' + r
+    const ref = abs(box.r1, box.c1) + (box.r1 === box.r2 && box.c1 === box.c2 ? '' : ':' + abs(box.r2, box.c2))
+    return { Name: n.name, Ref: "'" + wb.SheetNames[i].replace(/'/g, "''") + "'!" + ref }
+  }).filter(Boolean)
+  if (names.length) wb.Workbook = { ...(wb.Workbook || {}), Names: names }
   return wb
 }
 

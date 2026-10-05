@@ -413,8 +413,33 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
     await waitFor('coloured', cellNode(1, 2) + ".style.background === 'rgb(255, 199, 206)' && " + cellNode(3, 2) + ".style.background === 'rgb(255, 199, 206)'")
     result.colourRules = true
     await js("document.querySelector('.grid .body').focus()")
-    result.formats = result.frozenStays === true && /^Showing 1 of \d+ rows$/.test(result.filterStatus) && result.skipsHidden && result.comments && result.validation && result.colourRules
-    step('cell formats, row heights, freeze, filter, hiding, comments, validation and colour rules')
+    // Named range: B1:B2 as "Budget", used in a formula in Q1, then found
+    // again from the name box.
+    await js("document.querySelector('.toolbar .more-button').click()")
+    await js("[...document.querySelectorAll('.more-menu li')].find((l) => l.textContent === 'Named ranges...').click()")
+    await waitFor('names panel', "[...document.querySelectorAll('.names-panel button')].some((b) => b.textContent.trim() === 'Name a range')")
+    await js("[...document.querySelectorAll('.names-panel button')].find((b) => b.textContent.trim() === 'Name a range').click()")
+    await waitFor('name form', "!!document.querySelector('.names-panel input[aria-label=\"Name\"]')")
+    await setInput('.names-panel input[aria-label="Name"]', 'Budget')
+    await setInput('.names-panel input[aria-label="Range"]', 'B1:B2')
+    await js("[...document.querySelectorAll('.names-panel button')].find((b) => b.textContent.trim() === 'Save').click()")
+    await waitFor('named', "document.querySelectorAll('.names-panel .name-go').length === 1")
+    await js("document.querySelector('.names-panel .close').click()")
+    await js("document.querySelector('.grid .body').focus()")
+    await sendMod('Home', ['control'])
+    for (let i = 0; i < 16; i++) await key('Right')
+    await enter('=ROWS(Budget)', 'Return', '2')
+    await js("document.querySelector('.formula-bar span.address').click()")
+    await waitFor('name box', "!!document.querySelector('.formula-bar input.address')")
+    await setInput('.formula-bar input.address', 'budget')
+    await key('Return')
+    await waitFor('went to the name', "document.querySelector('.formula-bar .address').textContent === 'B1' && !!document.querySelector('.range')")
+    result.names = true
+    await js("document.querySelector('.grid .body').focus()")
+    await sendMod('Home', ['control'])
+    await key('Right'); for (let i = 0; i < 3; i++) await key('Down')
+    result.formats = result.frozenStays === true && /^Showing 1 of \d+ rows$/.test(result.filterStatus) && result.skipsHidden && result.comments && result.validation && result.colourRules && result.names
+    step('cell formats, row heights, freeze, filter, hiding, comments, validation, colour rules and names')
 
     // Ranges, copy and paste: select B1:B3, copy, paste into C1. The formula
     // moves with it, as in Excel.

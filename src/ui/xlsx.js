@@ -13,7 +13,7 @@ const MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 export const isMobile = () => !!(window.pearsheet && window.pearsheet.platform === 'mobile')
 
 function importWorkbook (wb, name, bytes) {
-  const { tabs } = workbookToTabs(XLSX, wb)
+  const { tabs, names } = workbookToTabs(XLSX, wb)
   // Frozen panes come from the raw file (SheetJS does not report them).
   if (bytes) freezeFromXlsx(bytes, fflate).forEach((f, i) => { if (f && tabs[i]) tabs[i].freeze = f })
   // So are cell styles and row heights.
@@ -21,7 +21,7 @@ function importWorkbook (wb, name, bytes) {
   if (bytes) validationsFromXlsx(bytes, fflate).forEach((v, i) => { if (tabs[i] && v.length) tabs[i].validations = v })
   if (bytes) condFormatsFromXlsx(bytes, fflate).forEach((v, i) => { if (tabs[i] && v.length) tabs[i].condFormats = v })
   const title = String(name || '').replace(/\.[^.]+$/, '') || 'Imported sheet'
-  return call('sheet:import', { title, tabs }).then(async (r) => {
+  return call('sheet:import', { title, tabs, names }).then(async (r) => {
     // A filter in the file becomes this device's filter, with nothing hidden
     // (proposals/2026-10-04-freeze-filter.md).
     const ranges = wb.SheetNames.map((n) => { const f = wb.Sheets[n]['!autofilter']; return f && f.ref ? XLSX.utils.decode_range(f.ref) : null })

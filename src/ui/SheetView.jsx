@@ -13,6 +13,8 @@ import { FilterPanel } from './FilterPanel.jsx'
 import { CommentPanel, CommentsList } from './CommentPanel.jsx'
 import { ValidationPanel } from './ValidationPanel.jsx'
 import { CondFormatPanel } from './CondFormatPanel.jsx'
+import { NamesPanel } from './NamesPanel.jsx'
+import { parseRange } from '../shared/charts.js'
 import { evaluate as evaluateColours } from '../shared/condFormat.js'
 import { typed, allows, explain, ruleFor } from '../shared/validation.js'
 import { filterRows, columnValues, isActive } from '../shared/filter.js'
@@ -151,6 +153,8 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
   const [badEntry, setBadEntry] = useState(null) // { row, col, value, move, rule } refused or warned
   const [picking, setPicking] = useState(null) // { row, col, x, y } list dropdown open
   const [colouring, setColouring] = useState(false) // the colour rules panel
+  const [naming, setNaming] = useState(null) // { adding } while the names panel is open
+  const [goingTo, setGoingTo] = useState(null) // text typed in the name box
   const [selectedChart, setSelectedChart] = useState(null) // chart id (desktop)
   const [editingChart, setEditingChart] = useState(null) // chart id in the editor
   const [viewingChart, setViewingChart] = useState(null) // chart id full screen (phones)
@@ -522,6 +526,29 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
     setFilter({ ...filter, cols })
   }
 
+  // Go to a named range or a cell or range typed in the name box.
+  function goTo (text) {
+    const t = String(text || '').trim()
+    if (!t) return
+    const n = ((view && view.names) || []).find((x) => x.name.toUpperCase() === t.toUpperCase())
+    if (n) {
+      if (n.range === '#REF!') { onError('The cells of ' + n.name + ' were deleted'); return }
+      if (n.tabId !== view.tabId) setTabId(n.tabId)
+      setSel({ row: n.r1, col: n.c1 })
+      setExt({ row: n.r2, col: n.c2 })
+      return
+    }
+    const box = parseRange(t)
+    if (!box || box.spill) { onError('There is no cell or named range called ' + t); return }
+    if (box.sheet) {
+      const tab = view.tabs.find((x) => x.name.toUpperCase() === box.sheet.toUpperCase())
+      if (!tab) { onError('There is no tab called ' + box.sheet); return }
+      if (tab.id !== view.tabId) setTabId(tab.id)
+    }
+    setSel({ row: Math.min(box.r1, view.rows), col: Math.min(box.c1, view.cols) })
+    setExt({ row: Math.min(box.r2, view.rows), col: Math.min(box.c2, view.cols) })
+  }
+
   const chartActions = {
     canEdit,
     select: (id) => setSelectedChart(id),
@@ -700,7 +727,8 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
 
   const editValue = editing ? editing.value : null
   const caretAt = caret === null || editValue === null ? (editValue || '').length : Math.min(caret, editValue.length)
-  const help = editing && canEdit ? helpFor(editValue, caretAt) : null
+  const nameHelp = useMemo(() => ((view && view.names) || []).filter((n) => n.range !== '#REF!').map((n) => ({ name: n.name, about: 'Named range, ' + (n.tabId === view.tabId ? '' : n.tab + '!') + n.range })), [view])
+  const help = editing && canEdit ? helpFor(editValue, caretAt, nameHelp) : null
   const shownHelp = help && help.list && helpOff === help.partial ? null : help
   useEffect(() => { setHelpSel(0) }, [help && help.partial])
   useEffect(() => { if (!editing) { setCaret(null); setHelpOff(null) } }, [!!editing])
@@ -715,7 +743,8 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
 
   function pickFunction (name) {
     if (!help || !help.list) return
-    const r = insertFunction(editValue, caretAt, help.partial, name)
+    const item = help.list.find((f) => f.name === name)
+    const r = insertFunction(editValue, caretAt, help.partial, name, !!(item && item.isName))
     nextCaret.current = r.caret
     setEditing((ed) => ({ ...ed, value: r.value }))
   }
@@ -930,6 +959,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
               {filterItems(() => setMore(false))}
               {canEdit && <li role='menuitem' onClick={() => setValidating({ ...range })}>Validation...</li>}
               {(canEdit || (view.condFormats || []).length > 0) && <li role='menuitem' onClick={() => setColouring(true)}>Colour rules...</li>}
+              {(canEdit || (view.names || []).length > 0) && <li role='menuitem' onClick={() => setNaming({ adding: false })}>Named ranges...</li>}
               {threads.length > 0 && <li role='menuitem' onClick={() => setListingComments(true)}>Comments{openThreads ? ' (' + openThreads + ' open)' : ''}</li>}
               {canEdit && phone && <li role='menuitem' onClick={() => fillSelection('down')}>Fill down</li>}
               {canEdit && phone && <li role='menuitem' onClick={() => fillSelection('right')}>Fill right</li>}
@@ -942,7 +972,9 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
 
       {frozenNote && <div className='banner info'>{frozenNote}</div>}
       <div className='formula-bar'>
-        <span className='address'>{colName(sel.col) + sel.row}</span>
+        {goingTo === null
+          ? <span className='address' role='button' tabIndex={-1} title='Go to a cell or named range' onClick={() => setGoingTo('')}>{colName(sel.col) + sel.row}</span>
+          : <input className='address' aria-label='Go to' autoFocus value={goingTo} placeholder={colName(sel.col) + sel.row} onChange={(e) => setGoingTo(e.target.value)} onBlur={() => setGoingTo(null)} onKeyDown={(e) => { if (e.key === 'Enter') { goTo(goingTo); setGoingTo(null); focusGrid() } if (e.key === 'Escape') { setGoingTo(null); focusGrid() } }} />}
         <span className='fx' aria-hidden='true'>fx</span>
         <input
           aria-label='Cell contents'
@@ -1116,6 +1148,18 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
           onClose={() => { setSorting(null); afterPanel() }}
         />
       )}
+      {naming && (
+        <NamesPanel
+          names={view.names || []}
+          tabId={view.tabId}
+          selection={colName(range.c1) + range.r1 + (range.r1 === range.r2 && range.c1 === range.c2 ? '' : ':' + colName(range.c2) + range.r2)}
+          startAdding={naming.adding}
+          canEdit={canEdit}
+          act={async (what, args) => { try { return await call('sheet:' + what, { sheetId, tabId, ...args }) } catch (err) { return { error: err.message } } }}
+          onGo={(n) => { setNaming(null); goTo(n.name); afterPanel() }}
+          onClose={() => { setNaming(null); afterPanel() }}
+        />
+      )}
       {colouring && (
         <CondFormatPanel
           rules={view.condFormats || []}
@@ -1248,6 +1292,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
               {filterItems(() => setMenu(null))}
               {canEdit && <li role='menuitem' onClick={() => { setMenu(null); setValidating({ ...range }) }}>Validation...</li>}
               {canEdit && <li role='menuitem' onClick={() => { setMenu(null); setColouring(true) }}>Colour rules...</li>}
+              {canEdit && <li role='menuitem' onClick={() => { setMenu(null); setNaming({ adding: true }) }}>Name this range...</li>}
               {(canEdit || threadAt.has(sel.row + ',' + sel.col)) && <li role='menuitem' onClick={() => { setMenu(null); setCommenting({ row: sel.row, col: sel.col }) }}>{threadAt.has(sel.row + ',' + sel.col) ? 'Show comments' : 'Comment'}</li>}
               {canEdit && <li role='menuitem' className='danger' onClick={() => { setMenu(null); run('sheet:clearRange', range) }}>Clear contents</li>}
             </>
