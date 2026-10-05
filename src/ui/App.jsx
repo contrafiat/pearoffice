@@ -33,7 +33,7 @@ function ImportButton ({ className, onImported, onError }) {
       <FileArrowUp size={16} /> Import a file
       <input
         type='file'
-        accept='.xlsx,.csv,.json'
+        accept='.xlsx,.csv,.tsv,.json'
         hidden
         onChange={async (e) => {
           const file = e.target.files && e.target.files[0]

@@ -15,12 +15,9 @@
 //   looks like a number.
 const { MAX_ROWS, MAX_COLS } = require('./a1')
 
+const { textInput, isoDateCell, widthFor } = require('./importValues')
+
 const MAX_IMPORT_CELLS = 200000
-const DATE_ONLY = /^(\d{4})-(\d{2})-(\d{2})$/
-const DATE_TIME = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?$/
-const NUMBERISH = /^[+-]?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?$/i
-const DAY_MS = 86400000
-const EPOCH_SERIAL = 25569 // 1970-01-01 as a spreadsheet date
 
 const isRecord = (v) => v !== null && typeof v === 'object' && !Array.isArray(v)
 const isTable = (v) => Array.isArray(v) && v.length > 0 && v.every(isRecord)
@@ -37,29 +34,9 @@ function cellFor (v) {
   }
   if (typeof v === 'object') return [textInput(JSON.stringify(v))]
   const s = String(v)
-  const d = DATE_ONLY.exec(s)
-  if (d) {
-    const ms = Date.UTC(Number(d[1]), Number(d[2]) - 1, Number(d[3]))
-    // Date.UTC rolls 2026-13-45 over into 2027; only a real date counts.
-    if (new Date(ms).toISOString().slice(0, 10) === s) return [String(ms / DAY_MS + EPOCH_SERIAL), 'yyyy-mm-dd']
-  }
-  if (DATE_TIME.test(s)) {
-    const t = new Date(s)
-    if (!Number.isNaN(t.getTime())) {
-      // As the clock on this device showed it.
-      const local = t.getTime() - t.getTimezoneOffset() * 60000
-      return [String(Math.round((local / DAY_MS + EPOCH_SERIAL) * 1e8) / 1e8), 'yyyy-mm-dd hh:mm']
-    }
-  }
+  const date = isoDateCell(s)
+  if (date) return date
   return [textInput(s)]
-}
-
-// Text that would read as a number, a boolean or a formula keeps a leading
-// apostrophe, as in an .xlsx import.
-function textInput (s) {
-  if (s === '') return s
-  if (s[0] === '=' || s[0] === "'" || NUMBERISH.test(s.trim()) || /^(true|false)$/i.test(s.trim())) return "'" + s
-  return s
 }
 
 // A record's fields, with nested objects spread out as "a.b".
@@ -90,11 +67,6 @@ function tabName (path, used) {
   for (let i = 2; used.has(name.toLowerCase()); i++) name = base.slice(0, 31 - String(i).length - 1) + ' ' + i
   used.add(name.toLowerCase())
   return name
-}
-
-function widthFor (texts) {
-  const longest = texts.reduce((n, t) => Math.max(n, String(t).length), 0)
-  return Math.max(60, Math.min(320, longest * 7 + 16))
 }
 
 // A JSON value (already parsed) -> the import payload.
