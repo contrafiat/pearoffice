@@ -73,3 +73,16 @@ export function neededHeight (cell, colWidth, baseRowH) {
   const h = n * lineH + 6
   return h > baseRowH ? h : 0
 }
+
+// The width (pixels at 100%) that fits the widest text in a column, for
+// double-clicking a column edge. cells: the view's cells.
+export function fitWidth (cells, col) {
+  let w = 0
+  for (const cell of cells) {
+    if (cell.col !== col || !cell.display) continue
+    const f = cell.fmt || {}
+    const font = (f.b ? 'bold ' : '') + (f.i ? 'italic ' : '') + fontPx(f) + 'px ' + (FONTS[f.font] || FONTS.sans)
+    for (const line of String(cell.display).split('\n')) w = Math.max(w, measure(line, font))
+  }
+  return w ? Math.max(24, Math.min(1000, Math.ceil(w + 14))) : null
+}

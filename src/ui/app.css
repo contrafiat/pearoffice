@@ -536,8 +536,8 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 .row-heads .frozen-heads { box-shadow: 0 2px 0 var(--line-strong); }
 
 /* Filters (proposals/2026-10-04-freeze-filter.md) */
-.cell.filter-head { padding-right: 22px; }
-.filter-button { position: absolute; right: 2px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; min-height: 0; padding: 0; display: flex; align-items: center; justify-content: center; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--panel); color: var(--muted); cursor: pointer; z-index: 1; }
+.cell.filter-head { padding-right: 28px; }
+.filter-button { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; min-height: 0; padding: 0; display: flex; align-items: center; justify-content: center; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--panel); color: var(--muted); cursor: pointer; z-index: 1; }
 .filter-button.on { color: var(--pear-dark); border-color: var(--pear-dark); }
 .row-head.after-hidden { box-shadow: inset 0 2px 0 var(--pear-dark); }
 .filter-values { max-height: 240px; overflow-y: auto; border: 1px solid var(--line); border-radius: 8px; padding: 4px 8px; }
@@ -546,6 +546,16 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 .filter-status { color: var(--muted); }
 .filter-cond select { flex: 1; min-width: 0; }
 @media (pointer: coarse) {
-  .filter-button { width: 26px; height: 26px; }
-  .cell.filter-head { padding-right: 30px; }
+  .filter-button { width: 26px; height: 26px; right: 8px; }
+  .cell.filter-head { padding-right: 38px; }
+}
+
+/* Hidden rows and columns (proposals/2026-10-04-sheet-tools.md) */
+.unhide-mark { position: absolute; padding: 0; min-height: 0; border: 0; border-radius: 3px; background: var(--pear-dark); opacity: 0.7; cursor: pointer; z-index: 2; }
+.unhide-mark:hover { opacity: 1; }
+.unhide-mark.row { left: 4px; right: 4px; top: -3px; height: 6px; }
+.unhide-mark.col { top: 4px; bottom: 4px; left: -3px; width: 6px; }
+@media (pointer: coarse) {
+  .unhide-mark.row { top: -6px; height: 12px; }
+  .unhide-mark.col { left: -6px; width: 12px; }
 }

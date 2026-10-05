@@ -3,7 +3,7 @@ import { call, on } from './bridge.js'
 import { Grid } from './Grid.jsx'
 import { colName } from './a1.js'
 import { changeDecimals, jumpTarget, todaySerial } from './cellTools.js'
-import { SIZES, borderCss } from './cellStyle.js'
+import { SIZES, borderCss, fitWidth } from './cellStyle.js'
 import { shiftA1 } from '../shared/refs.js'
 import { SharePanel } from './SharePanel.jsx'
 import { PeopleStack } from './Avatar.jsx'
@@ -196,8 +196,23 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
   }, [filterKey, viewTab])
   const setFilter = (f) => { setFilterState(f); writePref(filterKey, f ? JSON.stringify(f) : '') }
   const filtered = useMemo(() => (filter && view ? filterRows(cells, filter, view.rows) : null), [filter, cells, view])
-  const hidden = filtered && filtered.hidden.size ? filtered.hidden : null
+  // Rows and columns hidden for everyone (proposals/2026-10-04-sheet-tools.md);
+  // rows this device's filter hides join them for drawing and moving.
+  const manual = useMemo(() => ({ rows: new Set((view && view.hidden && view.hidden.rows) || []), cols: new Set((view && view.hidden && view.hidden.cols) || []) }), [view])
+  const hidden = useMemo(() => {
+    if (!(filtered && filtered.hidden.size) && !manual.rows.size) return null
+    const set = new Set(manual.rows)
+    if (filtered) for (const r of filtered.hidden) set.add(r)
+    return set
+  }, [filtered, manual])
+  const hiddenCols = manual.cols.size ? manual.cols : null
   const isHidden = (r) => !!(hidden && hidden.has(r))
+  const isHiddenCol = (c) => manual.cols.has(c)
+  // The last hidden row or column of each run, where a mark shows them again.
+  const unhideMarks = useMemo(() => {
+    const ends = (set) => new Set([...set].filter((n) => !set.has(n + 1)))
+    return manual.rows.size || manual.cols.size ? { rows: ends(manual.rows), cols: ends(manual.cols) } : null
+  }, [manual])
   const filterHead = useMemo(() => {
     if (!filter) return null
     const active = new Set()
@@ -284,7 +299,9 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
     const m = mergeAt(from.row, from.col)
     if (m) from = { row: dr > 0 ? m.r2 : dr < 0 ? m.r1 : from.row, col: dc > 0 ? m.c2 : dc < 0 ? m.c1 : from.col }
     let row = Math.max(1, Math.min(view.rows, from.row + dr))
-    const col = Math.max(1, Math.min(view.cols, from.col + dc))
+    let col = Math.max(1, Math.min(view.cols, from.col + dc))
+    while (dc && isHiddenCol(col) && col + Math.sign(dc) >= 1 && col + Math.sign(dc) <= view.cols) col += Math.sign(dc)
+    if (isHiddenCol(col)) col = from.col
     // Over rows the filter hides.
     while (dr && isHidden(row) && row + Math.sign(dr) >= 1 && row + Math.sign(dr) <= view.rows) row += Math.sign(dr)
     if (isHidden(row)) row = from.row
@@ -307,7 +324,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
     for (let r = range.r1; r <= range.r2; r++) {
       if (isHidden(r)) continue // copy takes only the rows a filter shows
       const line = []
-      for (let c = range.c1; c <= range.c2; c++) line.push(pick(cells.get(r + ',' + c) || null))
+      for (let c = range.c1; c <= range.c2; c++) if (!isHiddenCol(c)) line.push(pick(cells.get(r + ',' + c) || null))
       out.push(line)
     }
     return out
@@ -680,6 +697,25 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
     else if (e.key === 'Escape') { e.preventDefault(); setEditing(null); focusGrid() }
   }
 
+  // The rows or columns a header menu acts on: the selection when the
+  // clicked header is in it, else that one.
+  function headerSpan (kind, index) {
+    const [a, b] = kind === 'row' ? [range.r1, range.r2] : [range.c1, range.c2]
+    return index >= a && index <= b ? [a, b] : [index, index]
+  }
+  function setLinesHidden (kind, hide) {
+    const [from, to] = headerSpan(kind, menu.index)
+    setMenu(null)
+    run('sheet:setHidden', { kind, from, to, hidden: hide })
+    focusGrid()
+  }
+  function unhideRun (kind, last) {
+    const set = kind === 'row' ? manual.rows : manual.cols
+    let first = last
+    while (first > 1 && set.has(first - 1)) first--
+    run('sheet:setHidden', { kind, from: first, to: last, hidden: false })
+  }
+
   async function lineAction (action) {
     const { kind, index } = menu
     setMenu(null)
@@ -934,6 +970,10 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
         onResize={(col, px) => { if (canEdit) run('sheet:setWidth', { col, px }) }}
         onRowResize={(row, px) => { if (canEdit) run('sheet:setHeight', { row, px }) }}
         hiddenRows={hidden}
+        hiddenCols={hiddenCols}
+        unhideMarks={canEdit ? unhideMarks : null}
+        onUnhide={unhideRun}
+        onAutoFit={(col) => { const px = fitWidth(view.cells, col); if (px && canEdit) run('sheet:setWidth', { col, px }) }}
         filterHead={filterHead}
         onFilterMenu={(col) => setFiltering(col)}
       />
@@ -1081,6 +1121,19 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
           )}
           {(menu.kind === 'row' || menu.kind === 'col') && <li role='menuitem' onClick={() => lineAction('before')}>Insert {menu.kind === 'row' ? 'row above' : 'column left'}</li>}
           {(menu.kind === 'row' || menu.kind === 'col') && <li role='menuitem' onClick={() => lineAction('after')}>Insert {menu.kind === 'row' ? 'row below' : 'column right'}</li>}
+          {(menu.kind === 'row' || menu.kind === 'col') && (() => {
+            const [from, to] = headerSpan(menu.kind, menu.index)
+            const noun = menu.kind === 'row' ? (from === to ? 'row ' + from : 'rows ' + from + ' to ' + to) : (from === to ? 'column ' + colName(from) : 'columns ' + colName(from) + ' to ' + colName(to))
+            const set = menu.kind === 'row' ? manual.rows : manual.cols
+            let anyHidden = false
+            for (let n = from; n <= to; n++) if (set.has(n)) anyHidden = true
+            return (
+              <>
+                <li role='menuitem' onClick={() => setLinesHidden(menu.kind, true)}>Hide {noun}</li>
+                {anyHidden && <li role='menuitem' onClick={() => setLinesHidden(menu.kind, false)}>Show hidden {menu.kind === 'row' ? 'rows' : 'columns'}</li>}
+              </>
+            )
+          })()}
           {(menu.kind === 'row' || menu.kind === 'col') && <li role='menuitem' className='danger' onClick={() => lineAction('delete')}>Delete {menu.kind === 'row' ? 'row ' + menu.index : 'column ' + colName(menu.index)}</li>}
         </ul>
       )}
