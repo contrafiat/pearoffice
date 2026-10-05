@@ -576,3 +576,12 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 .panel .comment-tools .icon-button { border: 0; background: none; padding: 4px; width: auto; height: auto; color: var(--muted); }
 .comment-text { margin: 2px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 .panel textarea { width: 100%; box-sizing: border-box; }
+
+/* Data validation (proposals/2026-10-04-sheet-tools.md) */
+.cell.invalid::after { content: ''; position: absolute; left: 0; top: 0; border-style: solid; border-width: 8px 8px 0 0; border-color: var(--danger, #c0392b) transparent transparent transparent; pointer-events: none; }
+.list-button { position: absolute; z-index: 3; width: 22px; height: 22px; min-height: 0; padding: 0; display: flex; align-items: center; justify-content: center; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--panel); color: var(--ink); cursor: pointer; }
+@media (pointer: coarse) { .list-button { width: 28px; height: 28px; margin-top: -3px; margin-left: -6px; } }
+.pick-menu { position: fixed; min-width: 200px; max-height: 300px; overflow-y: auto; z-index: 30; }
+.pick-menu li[aria-selected='true'], .pick-list li[aria-selected='true'] { font-weight: 600; color: var(--pear-dark); }
+.pick-list { list-style: none; margin: 0; padding: 0; max-height: 50vh; overflow-y: auto; }
+.pick-list li { padding: 12px 6px; border-bottom: 1px solid var(--line); text-align: center; cursor: pointer; }

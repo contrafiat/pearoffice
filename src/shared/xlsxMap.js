@@ -187,6 +187,19 @@ function dumpToWorkbook (XLSX, dump) {
 
 // The workbook with the dump's charts added (src/shared/xlsxCharts.js), as
 // .xlsx bytes. Charts name tabs as the workbook does (Excel shortens some).
+// Worksheet parts that must come after data validation (and conditional
+// formatting) in the file, in the order Excel requires.
+const AFTER_VALIDATION = ['hyperlinks', 'printOptions', 'pageMargins', 'pageSetup', 'headerFooter', 'rowBreaks', 'colBreaks', 'customProperties', 'cellWatches', 'ignoredErrors', 'smartTags', 'drawing', 'legacyDrawing', 'legacyDrawingHF', 'picture', 'oleObjects', 'controls', 'webPublishItems', 'tableParts', 'extLst']
+function insertBefore (xml, piece, tags) {
+  let at = -1
+  for (const t of tags) {
+    const i = xml.search(new RegExp('<' + t + '[\\s/>]'))
+    if (i >= 0 && (at < 0 || i < at)) at = i
+  }
+  if (at < 0) at = xml.lastIndexOf('</worksheet>')
+  return xml.slice(0, at) + piece + xml.slice(at)
+}
+
 function workbookBytes (XLSX, fflate, dump) {
   const wb = dumpToWorkbook(XLSX, dump)
   const bytes = new Uint8Array(XLSX.write(wb, { type: 'array', bookType: 'xlsx' }))
@@ -206,7 +219,20 @@ function workbookBytes (XLSX, fflate, dump) {
     const xml = fflate.strFromU8(files[path]).replace(/<sheetView(\s[^>]*?)?(\/?)>/, (m, attrs = '', empty) => '<sheetView' + attrs + '>' + pane + (empty ? '</sheetView>' : ''))
     files[path] = fflate.strToU8(xml)
   })
+  // Data validation (proposals/2026-10-04-sheet-tools.md).
+  dump.tabs.forEach((t, i) => {
+    const path = 'xl/worksheets/sheet' + (i + 1) + '.xml'
+    const xml = (t.validations || []).length && files[path] ? require('./validation').toXlsx(t.validations) : ''
+    if (xml) files[path] = fflate.strToU8(insertBefore(fflate.strFromU8(files[path]), xml, AFTER_VALIDATION))
+  })
   return require('./xlsxCharts').addChartsToXlsx(fflate.zipSync(files), tabs, fflate)
 }
 
-module.exports = { freezeFromXlsx, workbookBytes, workbookToTabs, dumpToWorkbook, textInput, toFile, fromFile, READ_OPTIONS, MAX_IMPORT_CELLS }
+// Each tab's validation rules from an .xlsx file, in tab order.
+function validationsFromXlsx (bytes, fflate) {
+  let files
+  try { files = fflate.unzipSync(bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes)) } catch { return [] }
+  return require('./xlsxStyles').sheetPaths(files, fflate.strFromU8).map((p) => (p && files[p] ? require('./validation').fromXlsx(fflate.strFromU8(files[p])) : []))
+}
+
+module.exports = { validationsFromXlsx, insertBefore, AFTER_VALIDATION, freezeFromXlsx, workbookBytes, workbookToTabs, dumpToWorkbook, textInput, toFile, fromFile, READ_OPTIONS, MAX_IMPORT_CELLS }

@@ -299,4 +299,4 @@ function stylesFromXlsx (bytes, { unzipSync, strFromU8 }, maxCells = Infinity) {
   })
 }
 
-module.exports = { addStyles, stylesFromXlsx }
+module.exports = { addStyles, stylesFromXlsx, sheetPaths }

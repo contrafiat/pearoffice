@@ -376,8 +376,32 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
     await js("document.querySelector('.grid .body').focus()")
     await sendMod('Home', ['control'])
     await key('Right'); for (let i = 0; i < 3; i++) await key('Down')
-    result.formats = result.frozenStays === true && /^Showing 1 of \d+ rows$/.test(result.filterStatus) && result.skipsHidden && result.comments
-    step('cell formats, row heights, freeze, filter, hiding and comments')
+    // Validation: a list on P5 refuses "Maybe"; the dropdown enters "Yes".
+    await sendMod('Home', ['control'])
+    for (let i = 0; i < 15; i++) await key('Right')
+    for (let i = 0; i < 4; i++) await key('Down')
+    await waitFor('at P5', "document.querySelector('.formula-bar .address').textContent === 'P5'")
+    await js("document.querySelector('.toolbar .more-button').click()")
+    await js("[...document.querySelectorAll('.more-menu li')].find((l) => l.textContent === 'Validation...').click()")
+    await waitFor('validation panel', "!!document.querySelector('.panel[aria-label=\"Validation\"] textarea')")
+    await typeInto('.panel[aria-label="Validation"] textarea', 'Yes\nNo')
+    await js("[...document.querySelectorAll('.panel button')].find((b) => b.textContent.trim() === 'Save').click()")
+    await waitFor('list button', "!document.querySelector('.panel') && !!document.querySelector('.list-button')")
+    await js("document.querySelector('.grid .body').focus()")
+    await type('Maybe')
+    await key('Return')
+    await waitFor('refused', "!!document.querySelector('.panel[aria-label=\"Not allowed\"]')")
+    await js("[...document.querySelectorAll('.panel button')].find((b) => b.textContent.trim() === 'Cancel').click()")
+    await js("document.querySelector('.list-button').click()")
+    await waitFor('list open', "[...document.querySelectorAll('.pick-menu li')].some((l) => l.textContent === 'Yes')")
+    await js("[...document.querySelectorAll('.pick-menu li')].find((l) => l.textContent === 'Yes').click()")
+    await waitFor('picked', cellNode(5, 16) + " && " + cellNode(5, 16) + ".textContent === 'Yes'")
+    result.validation = true
+    await js("document.querySelector('.grid .body').focus()")
+    await sendMod('Home', ['control'])
+    await key('Right'); for (let i = 0; i < 3; i++) await key('Down')
+    result.formats = result.frozenStays === true && /^Showing 1 of \d+ rows$/.test(result.filterStatus) && result.skipsHidden && result.comments && result.validation
+    step('cell formats, row heights, freeze, filter, hiding, comments and validation')
 
     // Ranges, copy and paste: select B1:B3, copy, paste into C1. The formula
     // moves with it, as in Excel.
