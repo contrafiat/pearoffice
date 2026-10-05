@@ -88,6 +88,24 @@ function encodeState (doc) {
   return Y.encodeStateAsUpdate(doc)
 }
 
+// What `from` has that `into` lacks, as one update, or null when nothing:
+// after a move each writer device sends the new sheet the edits only its copy
+// of the old one holds (proposals/2026-10-05-shared-compaction.md). The new
+// sheet starts from the same document, so the two line up. An update always
+// carries the whole delete set, so "nothing" means it changes no snapshot.
+function missingFrom (from, into) {
+  const update = Y.encodeStateAsUpdate(from, Y.encodeStateVector(into))
+  const probe = new Y.Doc()
+  try {
+    Y.applyUpdate(probe, Y.encodeStateAsUpdate(into))
+    const before = Y.snapshot(probe)
+    Y.applyUpdate(probe, update)
+    return Y.equalSnapshots(before, Y.snapshot(probe)) ? null : update
+  } finally {
+    probe.destroy()
+  }
+}
+
 function newTab (doc, name, rows = DEFAULT_ROWS, cols = DEFAULT_COLS) {
   // Each tab is its own root map. Only the device that creates a tab writes
   // its nested lists, so two devices never race to create the same ones.
@@ -1260,6 +1278,7 @@ module.exports = {
   applyUpdate,
   checkUpdate,
   encodeState,
+  missingFrom,
   initSheet,
   title,
   setTitle,

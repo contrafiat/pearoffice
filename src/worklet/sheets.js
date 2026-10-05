@@ -66,7 +66,7 @@ const SNAPSHOT_CHUNK = 512 * 1024
 // old snapshot stayed on disk: 343 MB instead of 178 MB at 100,000 edits.)
 // The Hyperbee holds only a small record pointing at the latest copy.
 
-function createSheets ({ emit, getBase, getLocalDb = () => null, getStore = () => null }) {
+function createSheets ({ emit, getBase, getLocalDb = () => null, getStore = () => null, onSnapshot = () => {} }) {
   const open = new Map() // sheetId -> entry
 
   function entryFor (sheetId) {
@@ -239,6 +239,8 @@ function createSheets ({ emit, getBase, getLocalDb = () => null, getStore = () =
       await core.close()
     }
     e.sinceSnapshot = 0
+    // Every 2,000 updates: the engine checks whether the sheet needs tidying.
+    try { onSnapshot(sheetId) } catch {}
   }
 
   // Before shutting down: snapshot sheets that changed since the last one.
@@ -298,7 +300,7 @@ function createSheets ({ emit, getBase, getLocalDb = () => null, getStore = () =
     return e && e.loading ? e : null
   }
 
-  return { load, attach, onUpdate, noteLocal, values, currentValues, forget, entryFor, peek, yKey, saveSnapshot, flushSnapshots, changed }
+  return { load, attach, onUpdate, noteLocal, values, currentValues, forget, entryFor, peek, yKey, saveSnapshot, flushSnapshots, changed, getBase }
 }
 
 module.exports = { createSheets, GuardedDoc, yKey, Y_PREFIX }

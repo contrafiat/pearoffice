@@ -181,10 +181,12 @@ function unseal (sealedB64, identity) {
 
 // The owner moves the sheet to a fresh key: everything a remaining person
 // needs is sealed to their identity. Nothing about the new sheet is in clear.
-function moveOp ({ sheetId, owner, target, recipients }) {
+// reason: 'remove' (someone was removed) or 'compact' (a tidy-up that keeps
+// everyone, proposals/2026-10-05-shared-compaction.md). Older builds ignore it.
+function moveOp ({ sheetId, owner, target, recipients, reason = 'remove' }) {
   const sealed = {}
   for (const identity of recipients) sealed[identity] = seal(target, identity)
-  return { type: 'move', move: signValue({ purpose: P.move, sheetId, sealed, by: hex(owner.publicKey) }, owner.secretKey) }
+  return { type: 'move', move: signValue({ purpose: P.move, sheetId, sealed, reason, by: hex(owner.publicKey) }, owner.secretKey) }
 }
 
 // The owner deletes the sheet for everyone (proposals/2026-10-04-deleting-sheets.md).
@@ -352,7 +354,7 @@ async function applyMembershipOp (op, { view, base, groupId, node, log }) {
     if (!mv.sealed || typeof mv.sealed !== 'object') return skip('bad move')
     if (await get(view, 'moved')) return skip('already moved')
     // From here on apply ignores every op in this base (see sheetWire.js).
-    await view.put('moved', { sealed: mv.sealed })
+    await view.put('moved', { sealed: mv.sealed, reason: mv.reason === 'compact' ? 'compact' : 'remove' })
     return true
   }
 

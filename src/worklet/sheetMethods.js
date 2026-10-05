@@ -144,8 +144,9 @@ function createSheetMethods (sheets, { getJoin, getMoves, getProfiles }) {
   // A sheet that moved (or that removed this person) is read-only here.
   async function frozenInfo (ctx, sheetId) {
     const rec = (await ctx.localDb.get('moves:' + sheetId))?.value
-    if (rec) return rec.removed ? { removed: true } : { movedTo: rec.to }
-    return (await viewGet(ctx, sheetId, 'moved')) ? { moving: true } : null
+    if (rec) return rec.removed ? { removed: true } : { movedTo: rec.to, tidied: rec.reason === 'compact' }
+    const moved = await viewGet(ctx, sheetId, 'moved')
+    return moved ? { moving: true, tidied: moved.reason === 'compact' } : null
   }
 
   async function isFrozen (ctx, sheetId) {
@@ -650,6 +651,16 @@ function createSheetMethods (sheets, { getJoin, getMoves, getProfiles }) {
 
     // Remove someone: the sheet moves to fresh keys without them.
     'sheet:removeMember': async ({ sheetId, identity }) => getMoves().removeMember(sheetId, identity),
+
+    // Tidy up (proposals/2026-10-05-shared-compaction.md): the same move,
+    // keeping everyone. sheet:history says how long the history is and
+    // whether the owner can tidy it now.
+    'sheet:compact': async ({ sheetId }) => getMoves().compact(sheetId),
+    'sheet:history': async ({ sheetId }) => {
+      const base = sheets.getBase(sheetId)
+      if (!base) throw new Error('unknown sheet: ' + sheetId)
+      return { updates: base.view.core.length, openInvites: await getMoves().openInvites(sheetId) }
+    },
 
     'sheet:join': async ({ link }, ctx) => {
       if (!getJoin()) throw new Error('Not ready yet')

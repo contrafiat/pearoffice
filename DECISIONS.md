@@ -2,6 +2,24 @@
 
 Append-only, newest on top. Per Constitution §4.
 
+## 2026-10-05 - Shared compaction: a move that keeps everyone
+Tier: T2
+Context: proposals/2026-10-05-shared-compaction.md.
+Choice: tidying up is the removal move with nobody removed; `move` gains
+`reason: 'compact' | 'remove'`. After any move, each writer device sends
+the new sheet what only its old copy holds, so offline edits are no longer
+lost (they were, on removals). The owner's device tidies up by itself at
+50,000 updates, never while an invite link is unused, and the owner has
+"Tidy up this sheet". The frozen copy stays until every member has a device
+in the new sheet (then a week) or 90 days; the seeder is asked to drop it
+only then, since it caps drops at 30 days and keeps the earliest date.
+Alternatives: a fresh Yjs document (rejected - offline edits could no longer
+merge; the Yjs record is about 26 bytes per edit); manual only (rejected -
+owners would not find it).
+Consequences: at 50,000 edits a new device joins in 0.7 s instead of 19 s
+and keeps 5 MB instead of 70 MB (`bench/RESULTS.md`). Undo history restarts
+after a tidy-up. Older builds follow a tidy-up as a plain move.
+
 ## 2026-10-05 - No StartOS seeder for now
 Tier: T1
 Context: proposals/2026-10-05-start9-seeder.md.

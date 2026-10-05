@@ -590,6 +590,18 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
     await waitFor('tab deleted', "document.querySelectorAll('.tab:not(.add)').length === 1 && document.querySelector('.tab.active').textContent === 'Sheet1'")
     result.tabs = true
     step('csv, pdf, duplicate and delete a tab')
+
+    // Tidy up (proposals/2026-10-05-shared-compaction.md): the sheet moves to
+    // a fresh copy with the same content, and the app switches to it.
+    const listBudget = "window.pearsheet.call('sheet:list', {}).then((l) => JSON.stringify(l.filter((x) => x.title === 'Household budget').map((x) => x.sheetId)))"
+    const beforeIds = JSON.parse(await js(listBudget))
+    await more('Tidy up this sheet...')
+    await waitFor('tidy panel ready', "[...document.querySelectorAll('.panel button')].some((b) => b.textContent.trim() === 'Tidy up' && !b.disabled)")
+    await js("[...document.querySelectorAll('.panel button')].find((b) => b.textContent.trim() === 'Tidy up').click()")
+    await waitFor('tidied', listBudget + ".then((s) => { const ids = JSON.parse(s); return ids.length === 1 && ids[0] !== " + JSON.stringify(beforeIds[0]) + " })")
+    await waitFor('the tidied copy is open', "!document.querySelector('.panel') && [...document.querySelectorAll('.cell')].some((c) => c.textContent === '1650.5')")
+    result.tidied = beforeIds.length === 1
+    step('tidy up')
     const b64 = fs.readFileSync(file).toString('base64')
     await js(`(() => {
       const bytes = Uint8Array.from(atob(${JSON.stringify(b64)}), (c) => c.charCodeAt(0))
@@ -733,7 +745,7 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
       fs.writeFileSync(shot, image.toPNG())
       step('screenshot', shot)
     }
-    result.ok = result.moreChartTypes && result.importedFormats && result.keepOnline && result.avatar && result.spill && result.quickWins && result.findSort && result.fill && result.charts && result.formats && result.csvPdf && result.tabs && result.suggested === 'SUBSTITUTE,SUBTOTAL,SUM' && result.argHelp === 'number1' && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.importedFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000 && result.pastedFormula === '=SUM(C1:C2)' && result.inviteLink === 'pearsheet://join?s=' + result.inviteLink.slice(19) && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
+    result.ok = result.moreChartTypes && result.importedFormats && result.keepOnline && result.avatar && result.spill && result.quickWins && result.findSort && result.fill && result.charts && result.formats && result.csvPdf && result.tabs && result.tidied && result.suggested === 'SUBSTITUTE,SUBTOTAL,SUM' && result.argHelp === 'number1' && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.importedFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000 && result.pastedFormula === '=SUM(C1:C2)' && result.inviteLink === 'pearsheet://join?s=' + result.inviteLink.slice(19) && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
   } catch (err) {
     result.error = err.message
     // What the page showed, to tell a UI failure from a load failure.
