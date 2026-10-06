@@ -208,9 +208,9 @@ function cleanName (name) {
 
 // --- links -------------------------------------------------------------------
 
-// f: the kind of file (sheet, later doc and slides). A link without one is a
+// f: the kind of file (sheet or doc, later slides). A link without one is a
 // sheet; a kind this build does not know needs a newer version.
-const LINK_KINDS = ['sheet']
+const LINK_KINDS = ['sheet', 'doc']
 
 function inviteLink ({ sheetId, groupKey, inviteId, seed, owner, role, kind = 'sheet' }) {
   const q = new URLSearchParams({ s: sheetId, t: groupKey, i: inviteId, k: b64url(seed), o: owner, r: role, f: kind, v: '1' })

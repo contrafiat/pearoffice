@@ -2,12 +2,12 @@ import React from 'react'
 import { FileText, PresentationChart, Table, X } from '@phosphor-icons/react'
 import { MemberAvatar } from './Avatar.jsx'
 
-// The kinds of file PearOffice makes. Documents and slides come later
+// The kinds of file PearOffice makes. Slides come later
 // (proposals/2026-10-06-rename-to-pearoffice.md); until then New shows them
 // as coming soon.
 export const KINDS = [
   { kind: 'sheet', label: 'Spreadsheet', Icon: Table },
-  { kind: 'doc', label: 'Document', Icon: FileText, soon: true },
+  { kind: 'doc', label: 'Document', Icon: FileText },
   { kind: 'slides', label: 'Slides', Icon: PresentationChart, soon: true }
 ]
 

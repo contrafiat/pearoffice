@@ -71,7 +71,7 @@ function createFileHelpers (sheets) {
   async function requireEdit (ctx, sheetId) {
     if (await isFrozen(ctx, sheetId)) throw new Error('This copy of the sheet is frozen')
     const role = await myRole(ctx, sheetId)
-    if (role !== 'owner' && role !== 'editor') throw new Error('You can view this sheet but not edit it')
+    if (role !== 'owner' && role !== 'editor') throw new Error('You can view this file but not edit it')
     const base = ctx.bases.get(sheetId)
     if (!base.writable) throw new Error('Still getting edit access to this sheet. Try again in a moment.')
   }
@@ -93,11 +93,15 @@ function createFileHelpers (sheets) {
 
 function createFileMethods (sheets, { getJoin, getMoves, getProfiles }) {
   const { profileName, viewGet, peopleOf, requireOwner, requireEdit, commit, docFor } = createFileHelpers(sheets)
+  // The kind each join's invite named, for a just-joined file whose content
+  // has not arrived yet (it would otherwise show as a sheet).
+  const joinKinds = new Map()
 
   const files = {
     list: async (args, ctx) => {
       const out = []
       const joining = new Map((getJoin() ? getJoin().pending() : []).map((p) => [p.sheetId, p]))
+      for (const p of joining.values()) joinKinds.set(p.sheetId, p.kind)
       for await (const { value } of ctx.localDb.createReadStream({ gt: 'groups:joined:', lt: 'groups:joined:~' })) {
         if (!value || !value.groupId) continue
         // A file that moved to a fresh key is replaced by its new copy.
@@ -108,7 +112,7 @@ function createFileMethods (sheets, { getJoin, getMoves, getProfiles }) {
         // Not loaded yet: load it in the background, so its title (and any
         // later change) reaches the list live through sheet:changed.
         if (!e && !(moved && moved.removed)) sheets.load(value.groupId).then(() => sheets.changed(value.groupId)).catch(() => {})
-        out.push({ sheetId: value.groupId, title: (e && model.title(e.guarded.doc)) || value.name || '', kind: e ? model.kind(e.guarded.doc) : 'sheet', joining: joining.has(value.groupId) || undefined, removed: (moved && moved.removed) || undefined, ...(await peopleOf(ctx, value.groupId)) })
+        out.push({ sheetId: value.groupId, title: (e && model.title(e.guarded.doc)) || value.name || '', kind: (e && e.guarded.doc.getMap('meta').get('kind')) || joinKinds.get(value.groupId) || 'sheet', joining: joining.has(value.groupId) || undefined, removed: (moved && moved.removed) || undefined, ...(await peopleOf(ctx, value.groupId)) })
         joining.delete(value.groupId)
       }
       // Joins that have not been welcomed yet have no base.

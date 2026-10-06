@@ -45,6 +45,12 @@ class Worklet extends EventEmitter {
     return this._readyP
   }
 
+  // Resolves once init has finished: methods called earlier find no local
+  // database yet.
+  ready () {
+    return (this._readyP || Promise.resolve()).catch(() => {})
+  }
+
   call (method, args = {}, { timeoutMs = 15000 } = {}) {
     if (!this._proc) return Promise.reject(new Error('worklet not running'))
     const id = this._nextId++

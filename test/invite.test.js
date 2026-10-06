@@ -86,7 +86,7 @@ test('invites, roles and membership', async (t) => {
     await call(viewer, 'sheet:join', { link })
     await waitFor('viewer is a member', async () => viewer.bases.get(sheetId) && (await call(viewer, 'sheet:view', { sheetId })).myRole === 'viewer')
     await waitFor('viewer has content', async () => (await grid(viewer, sheetId))['2,1'] === 'from-editor')
-    await assert.rejects(call(viewer, 'sheet:setCell', { sheetId, row: 3, col: 1, input: 'nope' }), /view this sheet but not edit/)
+    await assert.rejects(call(viewer, 'sheet:setCell', { sheetId, row: 3, col: 1, input: 'nope' }), /view this file but not edit/)
     assert.equal(viewer.bases.get(sheetId).writable, false)
     await call(owner, 'sheet:setCell', { sheetId, row: 4, col: 1, input: 'live' })
     await waitFor('viewer sees a new edit', async () => (await grid(viewer, sheetId))['4,1'] === 'live')

@@ -824,7 +824,65 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
       fs.writeFileSync(shot, image.toPNG())
       step('screenshot', shot)
     }
-    result.ok = result.about && result.donation && result.kinds === 'Spreadsheet, Document (soon), Slides (soon)' && result.fileIcons === result.sheetsAfter && result.moreChartTypes && result.importedFormats && result.keepOnline && result.avatar && result.spill && result.quickWins && result.findSort && result.fill && result.charts && result.formats && result.csvPdf && result.tabs && result.tidied && result.jsonImport && result.csvImport && result.suggested === 'SUBSTITUTE,SUBTOTAL,SUM' && result.argHelp === 'number1' && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.importedFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000 && result.pastedFormula === '=SUM(C1:C2)' && result.inviteLink.startsWith('pearoffice://join?s=') && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
+
+    // A document (proposals/2026-10-06-documents.md): typed with real keys,
+    // a heading and a list from typed shortcuts, bold, centred, a bigger
+    // size, a table, renamed, found in All files and reopened.
+    await js("document.querySelector('.sidebar .new-sheet').click()")
+    await waitFor('kind choices', "!!document.querySelector('.kind-choice.kind-doc:not(:disabled)')")
+    await js("document.querySelector('.kind-choice.kind-doc').click()")
+    await waitFor('doc editor', "!!document.querySelector('.doc-body[contenteditable=\"true\"]') && !!document.querySelector('.doc-tools')")
+    await js("document.querySelector('.doc-body').focus()")
+    await waitFor('doc focus', "document.activeElement === document.querySelector('.doc-body')")
+    const docKey = async (keyCode, modifiers = []) => { wc.sendInputEvent({ type: 'keyDown', keyCode, modifiers }); wc.sendInputEvent({ type: 'keyUp', keyCode, modifiers }); await sleep(60) }
+    await type('# Weekly plan')
+    await key('Return')
+    await waitFor('heading', "(document.querySelector('.doc-body h1') || {}).textContent === 'Weekly plan'")
+    await type('Hello world')
+    for (let i = 0; i < 5; i++) await docKey('Left', ['shift'])
+    await docKey('B', ['control'])
+    await waitFor('bold word', "(document.querySelector('.doc-body p strong') || {}).textContent === 'world'")
+    await js("(() => { const s = document.querySelector('.doc-tools .size-select'); s.value = '18'; s.dispatchEvent(new Event('change', { bubbles: true })) })()")
+    await waitFor('font size', "[...document.querySelectorAll('.doc-body p span')].some((x) => x.style.fontSize === '18pt' && x.textContent === 'world')")
+    await js("document.querySelector('.doc-tools .align-button').click()")
+    await waitFor('align menu', "!!document.querySelector('.doc-pop li.align-center')")
+    await js("document.querySelector('.doc-pop li.align-center').click()")
+    await waitFor('centred', "[...document.querySelectorAll('.doc-body p')].some((x) => x.style.textAlign === 'center' && x.textContent === 'Hello world')")
+    await docKey('End')
+    await key('Return')
+    await js("document.querySelector('.doc-tools .align-button').click()")
+    await waitFor('align menu', "!!document.querySelector('.doc-pop li.align-left')")
+    await js("document.querySelector('.doc-pop li.align-left').click()")
+    await type('- First item')
+    await key('Return')
+    await type('Second item')
+    await key('Return')
+    await key('Return')
+    await waitFor('list', "document.querySelectorAll('.doc-body ul li').length === 2")
+    await js("document.querySelector('.doc-tools .table-button').click()")
+    await waitFor('table', "document.querySelectorAll('.doc-body table td, .doc-body table th').length === 9")
+    await type('Name')
+    await key('Tab')
+    await type('Role')
+    await waitFor('table text', "(document.querySelector('.doc-body table') || {}).textContent.startsWith('NameRole')")
+    result.docWords = await js("document.querySelector('.doc-footer .word-count').textContent")
+    await js(`(() => {
+      const el = document.querySelector('.toolbar .title')
+      const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set
+      el.focus(); set.call(el, 'Smoke notes'); el.dispatchEvent(new Event('input', { bubbles: true }))
+      el.dispatchEvent(new FocusEvent('focusout', { bubbles: true }))
+    })()`)
+    await waitFor('doc title in list', "[...document.querySelectorAll('.sheet-link .sheet-title')].some((b) => b.textContent.trim() === 'Smoke notes')")
+    await sleep(600) // the editor sends its edits a moment after typing
+    await js("document.querySelector('.sheet-link.all-files').click()")
+    await waitFor('doc in all files', "[...document.querySelectorAll('.file-card')].some((c) => !!c.querySelector('.kind-icon.kind-doc') && c.querySelector('.file-title').textContent === 'Smoke notes')")
+    result.docCard = true
+    await js("[...document.querySelectorAll('.file-card')].find((c) => c.querySelector('.file-title').textContent === 'Smoke notes').click()")
+    await waitFor('doc reopened', "!!document.querySelector('.doc-body') && document.querySelector('.doc-body').textContent.includes('Hello world') && (document.querySelector('.doc-body p strong') || {}).textContent === 'world' && !!document.querySelector('.doc-body table')")
+    result.docReopened = await js("(() => { const p = [...document.querySelectorAll('.doc-body p')].find((x) => x.textContent === 'Hello world'); return !!p && p.style.textAlign === 'center' && [...p.querySelectorAll('span')].some((x) => x.style.fontSize === '18pt') })()")
+    if (process.env.PEAROFFICE_SMOKE_DOC_SHOT) { await sleep(300); fs.writeFileSync(process.env.PEAROFFICE_SMOKE_DOC_SHOT, (await wc.capturePage()).toPNG()) }
+    step('document')
+    result.ok = result.about && result.donation && result.kinds === 'Spreadsheet, Document, Slides (soon)' && result.docCard && result.docReopened && result.docWords === '10 words' && result.fileIcons === result.sheetsAfter && result.moreChartTypes && result.importedFormats && result.keepOnline && result.avatar && result.spill && result.quickWins && result.findSort && result.fill && result.charts && result.formats && result.csvPdf && result.tabs && result.tidied && result.jsonImport && result.csvImport && result.suggested === 'SUBSTITUTE,SUBTOTAL,SUM' && result.argHelp === 'number1' && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.importedFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000 && result.pastedFormula === '=SUM(C1:C2)' && result.inviteLink.startsWith('pearoffice://join?s=') && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
   } catch (err) {
     result.error = err.message
     // What the page showed, to tell a UI failure from a load failure.

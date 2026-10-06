@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { call, on } from './bridge.js'
 import { SheetView } from './sheet/SheetView.jsx'
+import { DocView } from './doc/DocView.jsx'
 import { JoinPanel, JoinProgress, JoinPill } from './JoinPanel.jsx'
 import { SeederPanel } from './SeederPanel.jsx'
 import { DevicesPanel } from './DevicesPanel.jsx'
@@ -58,10 +59,13 @@ function ImportButton ({ className, onImported, onError }) {
 
 // Whether this build has an editor for the file's kind. Older builds learn
 // about newer kinds through device linking (proposals/2026-10-06-documents.md).
-const EDITORS = ['sheet']
-function opensHere (files, sheetId) {
+const EDITORS = ['sheet', 'doc']
+function kindOf (files, sheetId) {
   const f = files && files.find((x) => x.sheetId === sheetId)
-  return !f || !f.kind || EDITORS.includes(f.kind)
+  return (f && f.kind) || 'sheet'
+}
+function opensHere (files, sheetId) {
+  return EDITORS.includes(kindOf(files, sheetId))
 }
 
 function StartActions ({ onNew, onJoin, onImported, onError }) {
@@ -181,9 +185,11 @@ export function App () {
 
   async function create (kind) {
     setNewFile(false)
-    if (kind !== 'sheet') return // documents and slides are not built yet
+    if (!EDITORS.includes(kind)) return // slides are not built yet
     try {
-      const { sheetId } = await call('sheet:create', { title: 'Untitled sheet' })
+      const { sheetId } = kind === 'doc'
+        ? await call('doc:create', { title: 'Untitled document' })
+        : await call('sheet:create', { title: 'Untitled sheet' })
       await refresh()
       setCurrent(sheetId)
     } catch (err) {
@@ -301,24 +307,26 @@ export function App () {
               <div className='empty-actions'><button className='join-sheet big' onClick={() => setCurrent(null)}><House size={18} /> All files</button></div>
             </div>
             )
-          : current
-            ? <SheetView key={current} sheetId={current} onTitleChange={refresh} onError={setError} onGone={async () => { forget(current); await refresh() }} />
-            : sheets && sheets.length
-              ? (
-                <FileHome
-                  files={sheets}
-                  onOpen={setCurrent}
-                  onWaiting={setWaitingJoin}
-                  actions={<StartActions onNew={() => setNewFile(true)} onJoin={() => setJoining('')} onImported={opened} onError={setError} />}
-                />
-                )
-              : (
-                <div className='empty'>
-                  <h1>Shared files, device to device.</h1>
-                  <p>No accounts and no servers. Create a file, join one with a link or import a spreadsheet.</p>
-                  <StartActions onNew={() => setNewFile(true)} onJoin={() => setJoining('')} onImported={opened} onError={setError} />
-                </div>
-                )}
+          : current && kindOf(sheets, current) === 'doc'
+            ? <DocView key={current} sheetId={current} onTitleChange={refresh} onError={setError} onGone={async () => { forget(current); await refresh() }} />
+            : current
+              ? <SheetView key={current} sheetId={current} onTitleChange={refresh} onError={setError} onGone={async () => { forget(current); await refresh() }} />
+              : sheets && sheets.length
+                ? (
+                  <FileHome
+                    files={sheets}
+                    onOpen={setCurrent}
+                    onWaiting={setWaitingJoin}
+                    actions={<StartActions onNew={() => setNewFile(true)} onJoin={() => setJoining('')} onImported={opened} onError={setError} />}
+                  />
+                  )
+                : (
+                  <div className='empty'>
+                    <h1>Shared files, device to device.</h1>
+                    <p>No accounts and no servers. Create a file, join one with a link or import a spreadsheet.</p>
+                    <StartActions onNew={() => setNewFile(true)} onJoin={() => setJoining('')} onImported={opened} onError={setError} />
+                  </div>
+                  )}
       </main>
     </div>
   )
