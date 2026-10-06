@@ -220,6 +220,12 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
     window.addEventListener('pearoffice:pref', pref)
     return () => { document.removeEventListener('visibilitychange', vis); window.removeEventListener('pearoffice:pref', pref) }
   }, [])
+  // On screen: the worklet looks again for the sheet's other devices while
+  // nobody is connected (src/worklet/rediscover.js), whatever the presence setting.
+  useEffect(() => {
+    call('sheet:visible', { sheetId, visible: onScreen }).catch(() => {})
+    return () => { call('sheet:visible', { sheetId, visible: false }).catch(() => {}) }
+  }, [sheetId, onScreen])
   useEffect(() => {
     setPresent([])
     call('sheet:present', { sheetId }).then((d) => setPresent(d.people)).catch(() => {})

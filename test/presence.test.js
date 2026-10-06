@@ -75,6 +75,11 @@ test('presence between members, and nothing for anyone else', async (t) => {
     assert.equal(await check(fromEditor, hello(editor, { at: Date.now() - 3600000 })), false, 'too old')
   })
 
+  await t.test('looking again finds the sheet\'s topic and sees the connected device', async () => {
+    assert.equal(await owner.rediscover.refresh(sheetId), true, 'the topic is joined and can be refreshed')
+    await waitFor('editor replicates the sheet', async () => owner.bases.get(sheetId).local.peers.length > 0)
+  })
+
   await t.test('closing the sheet takes the person off', async () => {
     await call(editor, 'sheet:presence', { sheetId, open: false })
     await waitFor('editor gone', async () => !seen(owner).some((p) => p.identity === hex(editor.identity.publicKey)))
