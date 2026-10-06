@@ -1,8 +1,7 @@
 # Pictures in documents
 
-**Status:** approved by Tim 2026-10-06; built in PR #117 (design B, 1 MB per picture, all
-devices fetch all pictures, .md embeds them). Spike done. Being built on
-`feature/document-pictures`.
+**Status:** approved by Tim 2026-10-06 (design B, 1 MB per picture, all
+devices fetch all pictures, .md embeds them). Spike PR #116; built in PR #117.
 
 **Goal:** people can add pictures to a document (insert, paste, import) and
 everyone in it sees them, including a member who catches up from the seeder
