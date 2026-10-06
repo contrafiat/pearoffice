@@ -1,15 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as Y from 'yjs'
 import { useEditor, useEditorState, EditorContent } from '@tiptap/react'
-import StarterKit from '@tiptap/starter-kit'
 import Collaboration from '@tiptap/extension-collaboration'
-import { TextStyle, Color, FontSize, FontFamily } from '@tiptap/extension-text-style'
-import Highlight from '@tiptap/extension-highlight'
-import { TaskList, TaskItem } from '@tiptap/extension-list'
-import { TableKit } from '@tiptap/extension-table'
-import TextAlign from '@tiptap/extension-text-align'
-import Subscript from '@tiptap/extension-subscript'
-import Superscript from '@tiptap/extension-superscript'
 import Typography from '@tiptap/extension-typography'
 import Placeholder from '@tiptap/extension-placeholder'
 import { CharacterCount } from '@tiptap/extensions'
@@ -20,7 +12,8 @@ import { FileBar, useMembers } from '../FileBar.jsx'
 import { colourFor } from '../Avatar.jsx'
 import { readPref } from '../prefs.js'
 import { isMobile } from '../sheet/xlsx.js'
-import { ParagraphFormat, FindReplace, findKey, changeCaseCommand, LINE_HEIGHTS } from './extensions.js'
+import { exportDocument } from './docFiles.js'
+import { documentExtensions, FindReplace, findKey, changeCaseCommand, LINE_HEIGHTS } from './extensions.js'
 import {
   ArrowCounterClockwise, ArrowClockwise, TextB, TextItalic, TextUnderline, TextStrikethrough, TextAUnderline, Highlighter,
   TextSuperscript, TextSubscript, TextAlignLeft, TextAlignCenter, TextAlignRight, TextAlignJustify, ArrowsDownUp,
@@ -239,7 +232,19 @@ export function DocView ({ sheetId, onTitleChange, onError, onGone }) {
         onTitleChange={onTitleChange}
         onError={onError}
         onGone={onGone}
-        menuItems={() => <li role='menuitem' onClick={() => setFinding(true)}>Find and replace</li>}
+        menuItems={() => {
+          const save = (format) => exportDocument(ydoc, title, format).catch((err) => onError(err.message))
+          return (
+            <>
+              <li role='menuitem' onClick={() => setFinding(true)}>Find and replace</li>
+              <li role='menuitem' onClick={() => save('docx')}>Save as a Word file</li>
+              <li role='menuitem' onClick={() => save('md')}>Save as Markdown</li>
+              <li role='menuitem' onClick={() => save('txt')}>Save as plain text</li>
+              {!phone && <li role='menuitem' onClick={() => save('pdf')}>Save as PDF</li>}
+              {!phone && <li role='menuitem' onClick={() => save('print')}>Print...</li>}
+            </>
+          )
+        }}
       />
       {note && <div className='banner info'>{note}</div>}
       <DocEditor ydoc={ydoc} canEdit={canEdit} phone={phone} finding={finding} setFinding={setFinding} onBlur={() => flushRef.current()} cursors={cursors} onCursor={onCursor} />
@@ -254,27 +259,11 @@ function DocEditor ({ ydoc, canEdit, phone, finding, setFinding, onBlur, cursors
   const editor = useEditor({
     editable: canEdit,
     extensions: [
-      StarterKit.configure({
-        undoRedo: false, // Collaboration's undo only undoes this person's edits
-        trailingNode: false, // it would add a paragraph on every device at once
-        link: { openOnClick: false, autolink: true, defaultProtocol: 'https' }
-      }),
+      ...documentExtensions(),
       Collaboration.configure({ document: ydoc, field: 'body' }),
-      TextStyle,
-      Color,
-      FontSize,
-      FontFamily,
-      Highlight.configure({ multicolor: true }),
-      TaskList,
-      TaskItem.configure({ nested: true }),
-      TableKit.configure({ table: { resizable: false } }),
-      TextAlign.configure({ types: ['heading', 'paragraph'] }),
-      Subscript,
-      Superscript,
       Typography,
       Placeholder.configure({ placeholder: () => (canEditRef.current ? 'Type here to start your document.' : 'This document is empty.') }),
       CharacterCount,
-      ParagraphFormat,
       FindReplace,
       RemoteCursors.configure({ others })
     ],

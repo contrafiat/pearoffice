@@ -893,7 +893,42 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
     wc.send('worklet:event', { name: 'sheet:presence', data: { sheetId: docId, people: [] } })
     await waitFor('remote caret gone', "!document.querySelector('.doc-caret')")
     step('document')
-    result.ok = result.about && result.donation && result.docCursors && result.kinds === 'Spreadsheet, Document, Slides (soon)' && result.docCard && result.docReopened && result.docWords === '10 words' && result.fileIcons === result.sheetsAfter && result.moreChartTypes && result.importedFormats && result.keepOnline && result.avatar && result.spill && result.quickWins && result.findSort && result.fill && result.charts && result.formats && result.csvPdf && result.tabs && result.tidied && result.jsonImport && result.csvImport && result.suggested === 'SUBSTITUTE,SUBTOTAL,SUM' && result.argHelp === 'number1' && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.importedFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000 && result.pastedFormula === '=SUM(C1:C2)' && result.inviteLink.startsWith('pearoffice://join?s=') && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
+
+    // A Markdown file imported as a document (src/ui/doc/docFiles.js), then
+    // saved as Word, Markdown and PDF. The picture in it is left out, and
+    // a notice says so.
+    const md = '# Imported heading\n\nSome **bold** text.\n\n- Apples\n- Pears\n\nPacking:\n\n- [x] Packed\n\n| Item | Cost |\n| --- | --- |\n| Tent | 80 |\n\n![A picture](pic.png)\n'
+    await js(`(() => {
+      const dt = new DataTransfer()
+      dt.items.add(new File([${JSON.stringify(md)}], 'Smoke import.md'))
+      const input = document.querySelector('.import input[type=file]')
+      input.files = dt.files
+      input.dispatchEvent(new Event('change', { bubbles: true }))
+    })()`)
+    await waitFor('imported doc open', "document.querySelector('.toolbar .title').value === 'Smoke import' && (document.querySelector('.doc-body h1') || {}).textContent === 'Imported heading'")
+    await waitFor('imported doc content', "document.querySelectorAll('.doc-body ul:not([data-type]) li').length === 2 && document.querySelectorAll('.doc-body li[data-checked=\"true\"]').length === 1 && (document.querySelector('.doc-body p strong') || {}).textContent === 'bold' && (document.querySelector('.doc-body table') || {}).textContent === 'ItemCostTent80'")
+    result.docImportNotice = await js("[...document.querySelectorAll('.banner.info')].some((b) => b.textContent.includes('Some parts of this file, such as pictures, were left out.'))")
+    result.docImport = true
+    step('document import')
+    const waitFile = async (file, timeout = 15000) => {
+      for (const t0 = Date.now(); !(fs.existsSync(file) && fs.statSync(file).size > 0) && Date.now() - t0 < timeout;) await sleep(200)
+      await sleep(300)
+      return fs.existsSync(file) ? fs.readFileSync(file) : Buffer.alloc(0)
+    }
+    await more('Save as a Word file')
+    const docxOut = await waitFile(require('node:path').join(downloads, 'Smoke import.docx'))
+    let docXml = ''
+    try { docXml = require('fflate').strFromU8(require('fflate').unzipSync(new Uint8Array(docxOut))['word/document.xml']) } catch {}
+    await more('Save as Markdown')
+    const mdOut = (await waitFile(require('node:path').join(downloads, 'Smoke import.md'))).toString('utf8')
+    await more('Save as PDF')
+    const docPdf = await waitFile(require('node:path').join(dataDir, 'Smoke import.pdf'))
+    result.docExport = docXml.includes('Imported heading') && docXml.includes('w:val="Heading1"') && docXml.includes('Tent') &&
+      mdOut.startsWith('# Imported heading\n') && mdOut.includes('- [x] Packed') && mdOut.includes('| Tent | 80 |') &&
+      docPdf.length > 1000 && docPdf.slice(0, 4).toString() === '%PDF'
+    if (!result.docExport) throw new Error('document export: ' + JSON.stringify({ docx: docxOut.length, md: mdOut.slice(0, 200), pdf: docPdf.length }))
+    step('document export')
+    result.ok = result.docImport && result.docImportNotice && result.docExport && result.about && result.donation && result.docCursors && result.kinds === 'Spreadsheet, Document, Slides (soon)' && result.docCard && result.docReopened && result.docWords === '10 words' && result.fileIcons === result.sheetsAfter && result.moreChartTypes && result.importedFormats && result.keepOnline && result.avatar && result.spill && result.quickWins && result.findSort && result.fill && result.charts && result.formats && result.csvPdf && result.tabs && result.tidied && result.jsonImport && result.csvImport && result.suggested === 'SUBSTITUTE,SUBTOTAL,SUM' && result.argHelp === 'number1' && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.importedFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000 && result.pastedFormula === '=SUM(C1:C2)' && result.inviteLink.startsWith('pearoffice://join?s=') && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
   } catch (err) {
     result.error = err.message
     // What the page showed, to tell a UI failure from a load failure.

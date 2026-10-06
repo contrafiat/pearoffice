@@ -40,7 +40,7 @@ async function shellMethod (method, args) {
   }
   if (method === 'app:pickFile') {
     const res = await DocumentPicker.getDocumentAsync({
-      type: ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'text/csv', 'text/comma-separated-values', 'text/tab-separated-values', 'application/json', 'text/json', 'application/octet-stream'],
+      type: ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'text/csv', 'text/comma-separated-values', 'text/tab-separated-values', 'application/json', 'text/json', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/markdown', 'text/x-markdown', 'text/plain', 'text/html', 'application/octet-stream'],
       copyToCacheDirectory: true
     })
     if (res.canceled || !res.assets || !res.assets[0]) return { canceled: true }
