@@ -10,7 +10,21 @@ const b4a = require('b4a')
 const { yKey } = require('./sheets')
 const { applyMembershipOp, mayEdit } = require('./membership')
 
+const { PART_CHARS, MAX_PARTS } = require('./yOps')
+
 const MAX_UPDATE_BYTES = 1024 * 1024
+const PART_PREFIX = 'ypart/'
+
+// A part of a split update (yOps.js), or null if malformed.
+function partOf (op) {
+  const p = op.part
+  if (!p || typeof p !== 'object') return null
+  if (typeof p.id !== 'string' || !/^[0-9a-f]{16}$/.test(p.id)) return null
+  if (!Number.isInteger(p.n) || p.n < 2 || p.n > MAX_PARTS) return null
+  if (!Number.isInteger(p.i) || p.i < 0 || p.i >= p.n) return null
+  if (op.data.length > PART_CHARS || op.data.length === 0) return null
+  return p
+}
 
 function createApplyOps ({ onUpdate, onMembership, log }) {
   return async function applySheetOp (op, ctx) {
@@ -19,6 +33,25 @@ function createApplyOps ({ onUpdate, onMembership, log }) {
     // A moved or deleted sheet is frozen: after the owner's `move` or
     // `delete`, nothing applies.
     if (await view.get('moved') || await view.get('deleted')) return
+
+    if (op.type === 'y' && op.part !== undefined) {
+      if (typeof op.data !== 'string') return
+      const p = partOf(op)
+      if (!p || !(await mayEdit(view, node))) return
+      // Parts are kept per writer, so nobody else can add to them.
+      const prefix = PART_PREFIX + b4a.toString(node.from.key, 'hex') + '/' + p.id + '/'
+      await view.put(prefix + String(p.i).padStart(3, '0'), { data: op.data, n: p.n })
+      const parts = []
+      for await (const { key, value } of view.createReadStream({ gt: prefix, lt: prefix + '~' })) parts.push({ key, value })
+      if (parts.length < p.n || parts.some((x) => x.value.n !== p.n)) return
+      for (const x of parts) await view.del(x.key)
+      const data = parts.map((x) => x.value.data).join('')
+      const update = b4a.from(data, 'base64')
+      if (update.byteLength === 0) return
+      await view.put(yKey(node), { data })
+      onUpdate(groupId, update)
+      return
+    }
 
     if (op.type === 'y') {
       if (typeof op.data !== 'string' || op.data.length > MAX_UPDATE_BYTES * 4 / 3 + 4) return

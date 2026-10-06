@@ -20,6 +20,7 @@ const b4a = require('b4a')
 const { defaultEncodeInvite } = require('@peerloom/core/engine')
 const model = require('../sheet/sheetModel')
 const m = require('./membership')
+const { yOps } = require('./yOps')
 
 const hex = (buf) => b4a.toString(buf, 'hex')
 const DEVICE_RESEND_MS = 3000
@@ -111,7 +112,7 @@ function createMoves ({ engine, sheets, getJoin, getDeleting = () => null, emit,
     // 3. The current content, then the seeders, re-signed by the owner.
     model.applyUpdate(entry.guarded.doc, state)
     sheets.noteLocal(newId, state)
-    await engine.append(newId, { type: 'y', data: b4a.toString(state, 'base64') })
+    for (const op of yOps(state)) await engine.append(newId, op)
     for (const seederKey of await seedersOf(oldId)) {
       await engine.append(newId, m.seederOp({ sheetId: newId, identity: engine.identity, seederKey }))
     }
@@ -217,7 +218,7 @@ function createMoves ({ engine, sheets, getJoin, getDeleting = () => null, emit,
       if (missing) {
         model.applyUpdate(into.guarded.doc, missing)
         sheets.noteLocal(newId, missing)
-        await engine.append(newId, { type: 'y', data: b4a.toString(missing, 'base64') })
+        for (const op of yOps(missing)) await engine.append(newId, op)
         log('carried ' + missing.byteLength + ' bytes from ' + oldId.slice(0, 8) + ' to ' + newId.slice(0, 8))
       }
     }

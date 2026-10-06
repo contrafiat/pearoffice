@@ -68,7 +68,7 @@ Code that works for any kind of file sits apart from each editor's own
   rules, .xlsx/.csv/.json import and export, and `sheetMethods.js` (the
   sheet's IPC methods, run in the worklet).
 - `src/worklet/` - the Bare program: `bare.js` entry, `engine.js` (core
-  wiring), `sheetWire.js` (apply rules), `membership.js` (signed membership
+  wiring), `sheetWire.js` (apply rules), `yOps.js` (edits over 1 MB split into parts), `membership.js` (signed membership
   ops, built and checked), `join.js` (the `pearoffice/join/1` handshake),
   `moves.js` (removal by moving to fresh keys), `seeding.js` (seeder client),
   `linking.js` (linking a person's devices, recovery phrase),

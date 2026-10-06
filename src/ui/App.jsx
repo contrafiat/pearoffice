@@ -56,6 +56,14 @@ function ImportButton ({ className, onImported, onError }) {
   )
 }
 
+// Whether this build has an editor for the file's kind. Older builds learn
+// about newer kinds through device linking (proposals/2026-10-06-documents.md).
+const EDITORS = ['sheet']
+function opensHere (files, sheetId) {
+  const f = files && files.find((x) => x.sheetId === sheetId)
+  return !f || !f.kind || EDITORS.includes(f.kind)
+}
+
 function StartActions ({ onNew, onJoin, onImported, onError }) {
   return (
     <div className='empty-actions'>
@@ -285,24 +293,32 @@ export function App () {
           </div>
         )}
         {error && <div className='banner' role='alert'>{error} <button className='link-button' onClick={() => setError(null)}>Dismiss</button></div>}
-        {current
-          ? <SheetView key={current} sheetId={current} onTitleChange={refresh} onError={setError} onGone={async () => { forget(current); await refresh() }} />
-          : sheets && sheets.length
-            ? (
-              <FileHome
-                files={sheets}
-                onOpen={setCurrent}
-                onWaiting={setWaitingJoin}
-                actions={<StartActions onNew={() => setNewFile(true)} onJoin={() => setJoining('')} onImported={opened} onError={setError} />}
-              />
-              )
-            : (
-              <div className='empty'>
-                <h1>Shared files, device to device.</h1>
-                <p>No accounts and no servers. Create a file, join one with a link or import a spreadsheet.</p>
-                <StartActions onNew={() => setNewFile(true)} onJoin={() => setJoining('')} onImported={opened} onError={setError} />
-              </div>
-              )}
+        {current && !opensHere(sheets, current)
+          ? (
+            <div className='empty'>
+              <h1>Update PearOffice to open this file.</h1>
+              <p>It was made with a newer version that has file types this one does not know.</p>
+              <div className='empty-actions'><button className='join-sheet big' onClick={() => setCurrent(null)}><House size={18} /> All files</button></div>
+            </div>
+            )
+          : current
+            ? <SheetView key={current} sheetId={current} onTitleChange={refresh} onError={setError} onGone={async () => { forget(current); await refresh() }} />
+            : sheets && sheets.length
+              ? (
+                <FileHome
+                  files={sheets}
+                  onOpen={setCurrent}
+                  onWaiting={setWaitingJoin}
+                  actions={<StartActions onNew={() => setNewFile(true)} onJoin={() => setJoining('')} onImported={opened} onError={setError} />}
+                />
+                )
+              : (
+                <div className='empty'>
+                  <h1>Shared files, device to device.</h1>
+                  <p>No accounts and no servers. Create a file, join one with a link or import a spreadsheet.</p>
+                  <StartActions onNew={() => setNewFile(true)} onJoin={() => setJoining('')} onImported={opened} onError={setError} />
+                </div>
+                )}
       </main>
     </div>
   )
