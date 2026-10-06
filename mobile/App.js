@@ -14,6 +14,7 @@ import * as FileSystem from 'expo-file-system/legacy'
 import * as Sharing from 'expo-sharing'
 import * as Print from 'expo-print'
 import * as DocumentPicker from 'expo-document-picker'
+import * as ImagePicker from 'expo-image-picker'
 import * as Clipboard from 'expo-clipboard'
 import b4a from 'b4a'
 import { requestLocalNetworkPermission } from '../modules/local-network'
@@ -50,8 +51,23 @@ async function shellMethod (method, args) {
     await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: safe, UTI: UTIS['application/pdf'] })
     return { ok: true }
   }
+  if (method === 'app:pickFile' && args && args.images && args.source === 'photos') {
+    // A photo from the library: the system photo picker, which needs no
+    // permission. 'compatible' has iOS hand over JPEG in place of HEIC.
+    const res = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 1,
+      base64: true,
+      exif: false,
+      preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible
+    })
+    if (res.canceled || !res.assets || !res.assets[0]) return { canceled: true }
+    const photo = res.assets[0]
+    const base64 = photo.base64 || await FileSystem.readAsStringAsync(photo.uri, { encoding: FileSystem.EncodingType.Base64 })
+    return { name: photo.fileName || String(photo.uri).split('/').pop(), mime: photo.mimeType || null, base64 }
+  }
   if (method === 'app:pickFile') {
-    // A picture for a document (args.images) or a file to import.
+    // A picture file for a document (args.images) or a file to import.
     const res = await DocumentPicker.getDocumentAsync({
       type: args && args.images ? ['image/*'] : ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'text/csv', 'text/comma-separated-values', 'text/tab-separated-values', 'application/json', 'text/json', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/markdown', 'text/x-markdown', 'text/plain', 'text/html', 'application/octet-stream'],
       copyToCacheDirectory: true

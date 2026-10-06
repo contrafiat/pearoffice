@@ -72,6 +72,13 @@
           "microphonePermission": false,
           "recordAudioAndroid": false
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "PearOffice adds the photos you choose to your documents.",
+          "microphonePermission": false
+        }
       ]
     ],
     "assets": [
