@@ -7,9 +7,10 @@ import * as Y from 'yjs'
 import { generateJSON, generateHTML, getSchema } from '@tiptap/core'
 import { prosemirrorJSONToYXmlFragment, yXmlFragmentToProseMirrorRootNode } from '@tiptap/y-tiptap'
 import mammoth from 'mammoth'
+import JSZip from 'jszip'
 import { marked } from 'marked'
 import * as D from 'docx'
-import { documentExtensions } from './extensions.js'
+import { documentExtensions, SIZES } from './extensions.js'
 import { call } from '../bridge.js'
 import { fileName, saveFile, isMobile } from '../save.js'
 
@@ -41,10 +42,11 @@ const UNSUPPORTED = 'img, picture, video, audio, iframe, object, embed, svg, can
 // Tidy the HTML from any source into what the editor's parser reads: Title
 // and Subtitle, headings 4 to 6 as 3, task lists (Markdown's checkboxes and
 // our own .docx checklist marks), no footnotes or pictures.
-function tidy (html) {
+function tidy (html, styles) {
   const doc = new window.DOMParser().parseFromString('<body>' + html + '</body>', 'text/html')
   const body = doc.body
   let dropped = false
+  if (styles) applyStyles(body, styles)
   const rename = (el, tag) => {
     const next = doc.createElement(tag)
     for (const a of el.attributes) next.setAttribute(a.name, a.value)
@@ -90,10 +92,11 @@ function tidy (html) {
       }
     }
   }
-  // Our .docx checklists: paragraphs starting with ☐ or ☑ in a row.
+  // Our .docx checklists: paragraphs starting with ☐, ☒ or ☑ in a row (we
+  // write ☒, which LibreOffice draws; older exports wrote ☑).
   let run = null
   for (const p of [...body.querySelectorAll('p')]) {
-    const m = /^([☐☑])\s?/.exec(p.textContent)
+    const m = /^([☐☑☒])\s?/.exec(p.textContent)
     if (!m || p.closest('li, td, th')) { run = null; continue }
     if (!run || p.previousElementSibling !== run) {
       const ul = doc.createElement('ul')
@@ -104,11 +107,178 @@ function tidy (html) {
     stripPrefix(p, m[0].length)
     const li = doc.createElement('li')
     li.setAttribute('data-type', 'taskItem')
-    li.setAttribute('data-checked', m[1] === '☑' ? 'true' : 'false')
+    li.setAttribute('data-checked', m[1] !== '☐' ? 'true' : 'false')
     li.appendChild(p)
     run.appendChild(li)
   }
   return { html: body.innerHTML, dropped }
+}
+
+// --- .docx formatting --------------------------------------------------------
+
+// mammoth leaves out colour, size, font, highlight and alignment. They are
+// carried through its HTML as markers in the text: \uE000 n \uE001 text \uE002
+// for a run with styles[n], \uE003 n \uE001 at a paragraph's start for its
+// alignment. tidy turns them into spans, marks and text-align.
+
+// Word's highlight colours to the editor's highlight palette.
+const WORD_HIGHLIGHTS = {
+  yellow: '#fef08a',
+  darkYellow: '#fed7aa',
+  red: '#fecaca',
+  darkRed: '#fecaca',
+  green: '#bbf7d0',
+  darkGreen: '#bbf7d0',
+  cyan: '#a5f3fc',
+  darkCyan: '#a5f3fc',
+  blue: '#bfdbfe',
+  darkBlue: '#bfdbfe',
+  magenta: '#ddd6fe',
+  darkMagenta: '#ddd6fe',
+  lightGray: '#e5e7eb',
+  darkGray: '#e5e7eb'
+}
+const WORD_ALIGN = { center: 'center', right: 'right', end: 'right', both: 'justify', distribute: 'justify' }
+
+export function fontFamily (name) {
+  const f = String(name || '').toLowerCase()
+  if (/mono|courier|consolas|menlo|monaco|lucida console|source code/.test(f)) return 'monospace'
+  if (/times|georgia|cambria|garamond|palatino|book antiqua|baskerville|bodoni|didot|century|constantia|serif/.test(f) && !/sans/.test(f)) return 'serif'
+  return null
+}
+
+export function nearestSize (pt) {
+  const n = Number(pt)
+  if (!n) return null
+  return SIZES.reduce((best, x) => (Math.abs(x - n) < Math.abs(best - n) ? x : best))
+}
+
+const wordHex = (v) => (/^[0-9a-f]{6}$/i.test(v || '') ? '#' + v.toLowerCase() : null)
+
+// Colour (w:color) and shading (w:shd) of each run, which mammoth does not
+// read: per paragraph of word/document.xml, in order, the runs that have text.
+// By qualified name: Word, LibreOffice and Google Docs all write the w prefix.
+async function runColours (buf) {
+  const zip = await JSZip.loadAsync(buf)
+  const file = zip.file('word/document.xml')
+  if (!file) return []
+  const xml = new window.DOMParser().parseFromString(await file.async('string'), 'application/xml')
+  const kids = (el, name) => [...el.childNodes].filter((c) => c.nodeName === name)
+  const closest = (el, name) => {
+    for (let x = el.parentNode; x; x = x.parentNode) if (x.nodeName === name) return x
+    return null
+  }
+  const out = []
+  for (const p of [...xml.getElementsByTagName('w:p')]) {
+    const runs = []
+    for (const r of [...p.getElementsByTagName('w:r')]) {
+      if (closest(r, 'w:p') !== p) continue
+      const text = kids(r, 'w:t').map((t) => t.textContent).join('')
+      if (!text) continue
+      const rPr = kids(r, 'w:rPr')[0]
+      const color = rPr && kids(rPr, 'w:color')[0]
+      const shd = rPr && kids(rPr, 'w:shd')[0]
+      runs.push({ text, color: color ? wordHex(color.getAttribute('w:val')) : null, shade: shd ? wordHex(shd.getAttribute('w:fill')) : null })
+    }
+    out.push(runs)
+  }
+  return out
+}
+
+const runText = (run) => run.children.filter((c) => c.type === 'text').map((c) => c.value).join('')
+
+// mammoth's transformDocument: put the markers in. Colours are matched to a
+// paragraph's runs by their text; a paragraph whose runs do not line up keeps
+// the rest of its formatting and loses only its colours.
+function markFormatting (colours, styles) {
+  return (document) => {
+    let next = 0
+    const paragraphs = []
+    const walk = (el) => {
+      if (el.type === 'paragraph') paragraphs.push(el)
+      else for (const c of el.children || []) walk(c)
+    }
+    walk(document)
+    for (const p of paragraphs) {
+      const runs = []
+      const collect = (el) => { for (const c of el.children || []) { if (c.type === 'run') { if (runText(c)) runs.push(c) } else if (c.type !== 'paragraph') collect(c) } }
+      collect(p)
+      let found = null
+      if (runs.length) {
+        const sig = runs.map(runText).join('\u0001')
+        for (let j = next; j < Math.min(colours.length, next + 50); j++) {
+          if (colours[j].map((r) => r.text).join('\u0001') === sig) { found = colours[j]; next = j + 1; break }
+        }
+      }
+      runs.forEach((run, i) => {
+        const c = found ? found[i] : {}
+        const css = []
+        if (c.color && c.color !== '#000000') css.push('color:' + c.color)
+        if (run.fontSize && nearestSize(run.fontSize) !== 11) css.push('font-size:' + nearestSize(run.fontSize) + 'pt')
+        const family = fontFamily(run.font)
+        if (family) css.push('font-family:' + family)
+        const mark = (run.highlight && WORD_HIGHLIGHTS[run.highlight]) || c.shade
+        if (!css.length && !mark) return
+        const n = styles.push({ css: css.join(';'), mark }) - 1
+        for (const t of run.children) if (t.type === 'text') t.value = '\uE000' + n + '\uE001' + t.value + '\uE002'
+      })
+      const align = WORD_ALIGN[p.alignment]
+      const first = align && firstText(p)
+      if (first) first.value = '\uE003' + (styles.push({ align }) - 1) + '\uE001' + first.value
+    }
+    return document
+  }
+}
+
+function firstText (el) {
+  for (const c of el.children || []) {
+    if (c.type === 'text' && c.value) return c
+    const t = firstText(c)
+    if (t) return t
+  }
+  return null
+}
+
+const MARKER = /\uE003(\d+)\uE001|\uE000(\d+)\uE001([^\uE000-\uE003]*)\uE002|[\uE000-\uE003]/g
+
+function applyStyles (body, styles) {
+  const doc = body.ownerDocument
+  const walker = doc.createTreeWalker(body, 4)
+  const nodes = []
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) if (/[\uE000-\uE003]/.test(n.textContent)) nodes.push(n)
+  for (const node of nodes) {
+    const text = node.textContent
+    const frag = doc.createDocumentFragment()
+    let at = 0
+    let m
+    MARKER.lastIndex = 0
+    while ((m = MARKER.exec(text))) {
+      if (m.index > at) frag.appendChild(doc.createTextNode(text.slice(at, m.index)))
+      at = MARKER.lastIndex
+      const st = styles[m[1] || m[2]]
+      if (m[1] && st && st.align) {
+        const block = node.parentElement && node.parentElement.closest('p, h1, h2, h3, h4, h5, h6')
+        if (block) block.style.textAlign = st.align
+      } else if (m[2] && st) {
+        let el = doc.createTextNode(m[3])
+        if (st.css) {
+          const span = doc.createElement('span')
+          span.setAttribute('style', st.css)
+          span.appendChild(el)
+          el = span
+        }
+        if (st.mark) {
+          const mark = doc.createElement('mark')
+          mark.setAttribute('data-color', st.mark)
+          mark.appendChild(el)
+          el = mark
+        }
+        frag.appendChild(el)
+      } else if (m[2]) frag.appendChild(doc.createTextNode(m[3]))
+    }
+    if (at < text.length) frag.appendChild(doc.createTextNode(text.slice(at)))
+    node.replaceWith(frag)
+  }
 }
 
 // Remove the first n characters of an element's text, wherever they sit.
@@ -141,10 +311,15 @@ export async function fileToJson (name, bytes) {
   const ext = (/\.([^.]+)$/.exec(String(name || '')) || [])[1].toLowerCase()
   if (ext === 'txt') return { json: textToJson(new TextDecoder().decode(bytes)), dropped: false }
   let html
+  let styles = null
   if (ext === 'docx') {
     const buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)
+    // Colours are a nicety: a file whose XML we cannot read still imports.
+    const colours = await runColours(buf).catch(() => [])
+    styles = []
     const out = await mammoth.convertToHtml({ arrayBuffer: buf, buffer: buf }, {
       styleMap: STYLE_MAP,
+      transformDocument: markFormatting(colours, styles),
       // Pictures are left out; keep a marker so they are counted.
       convertImage: mammoth.images.imgElement(() => ({ src: '' }))
     })
@@ -154,7 +329,7 @@ export async function fileToJson (name, bytes) {
   } else {
     html = new TextDecoder().decode(bytes)
   }
-  const t = tidy(html)
+  const t = tidy(html, styles)
   return { json: htmlToJson(t.html), dropped: t.dropped }
 }
 
@@ -316,6 +491,7 @@ function mdBlocks (nodes) {
 
 const FONT = 'Arial'
 const MONO = 'Courier New'
+const BOX_FONT = 'Segoe UI Symbol'
 const FONT_NAMES = { '': FONT, serif: 'Times New Roman', monospace: MONO, 'sans-serif': FONT }
 const ALIGN = { left: D.AlignmentType.LEFT, center: D.AlignmentType.CENTER, right: D.AlignmentType.RIGHT, justify: D.AlignmentType.JUSTIFIED }
 const HEADINGS = [null, D.HeadingLevel.HEADING_1, D.HeadingLevel.HEADING_2, D.HeadingLevel.HEADING_3, D.HeadingLevel.HEADING_4, D.HeadingLevel.HEADING_5, D.HeadingLevel.HEADING_6]
@@ -448,8 +624,12 @@ function docxBlocks (nodes, ctx, out = []) {
         const [first, ...rest] = item.content || []
         if (first && first.type === 'paragraph') {
           if (n.type === 'taskList') {
-            const box = { type: 'text', text: item.attrs && item.attrs.checked ? '☑ ' : '☐ ' }
-            out.push(paragraph({ ...first, content: [box, ...(first.content || [])] }, { ...inner, indent: LIST_INDENT * level }))
+            // Arial has no box glyphs: Word finds them in Segoe UI Symbol,
+            // LibreOffice falls back to a symbol font. ☒, as LibreOffice
+            // draws ☑ with an emoji font that leaves a PDF blank.
+            const box = { type: 'text', text: item.attrs && item.attrs.checked ? '☒' : '☐', marks: [{ type: 'textStyle', attrs: { fontFamily: BOX_FONT } }] }
+            const gap = { type: 'text', text: ' ' }
+            out.push(paragraph({ ...first, content: [box, gap, ...(first.content || [])] }, { ...inner, indent: LIST_INDENT * level }))
           } else {
             out.push(paragraph(first, inner, { numbering: { reference, level: Math.min(level, 8), instance } }))
           }
@@ -550,7 +730,7 @@ export function toHtml (json, title = '') {
 
 // --- saving -------------------------------------------------------------------
 
-// Save the document as 'docx', 'md', 'txt' or 'pdf' (PDF and print on
+// Save the document as 'docx', 'md', 'txt', 'pdf' or 'print' (print on
 // desktop only, as for sheets).
 export async function exportDocument (ydoc, title, format) {
   const json = docToJson(ydoc)
@@ -558,6 +738,6 @@ export async function exportDocument (ydoc, title, format) {
   if (format === 'docx') return saveFile(name + '.docx', DOCX, await toDocx(json, title))
   if (format === 'md') return saveFile(name + '.md', 'text/markdown', toMarkdown(json))
   if (format === 'txt') return saveFile(name + '.txt', 'text/plain', toText(json))
-  if (isMobile()) throw new Error('PDF is not available on phones yet.')
+  if (format === 'print' && isMobile()) throw new Error('Printing is not available on phones.')
   return call(format === 'print' ? 'app:print' : 'app:savePdf', { html: toHtml(json, title), name: name + '.pdf' })
 }

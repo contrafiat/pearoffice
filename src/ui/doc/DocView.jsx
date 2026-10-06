@@ -13,7 +13,7 @@ import { colourFor } from '../Avatar.jsx'
 import { readPref } from '../prefs.js'
 import { isMobile } from '../sheet/xlsx.js'
 import { exportDocument } from './docFiles.js'
-import { documentExtensions, FindReplace, findKey, changeCaseCommand, LINE_HEIGHTS } from './extensions.js'
+import { documentExtensions, FindReplace, findKey, changeCaseCommand, LINE_HEIGHTS, SIZES } from './extensions.js'
 import {
   ArrowCounterClockwise, ArrowClockwise, TextB, TextItalic, TextUnderline, TextStrikethrough, TextAUnderline, Highlighter,
   TextSuperscript, TextSubscript, TextAlignLeft, TextAlignCenter, TextAlignRight, TextAlignJustify, ArrowsDownUp,
@@ -29,7 +29,6 @@ import {
 
 const COLOURS = ['#1f2420', '#b3261e', '#c2410c', '#a16207', '#15803d', '#0e7490', '#1d4ed8', '#7e22ce']
 const HIGHLIGHTS = ['#fef08a', '#fed7aa', '#fecaca', '#bbf7d0', '#a5f3fc', '#bfdbfe', '#ddd6fe', '#e5e7eb']
-const SIZES = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36]
 const DEFAULT_SIZE = '11'
 const FONTS = [['', 'Sans'], ['serif', 'Serif'], ['monospace', 'Mono']]
 const STYLES = [['normal', 'Normal text'], ['title', 'Title'], ['subtitle', 'Subtitle'], ['h1', 'Heading 1'], ['h2', 'Heading 2'], ['h3', 'Heading 3']]
@@ -240,7 +239,7 @@ export function DocView ({ sheetId, onTitleChange, onError, onGone }) {
               <li role='menuitem' onClick={() => save('docx')}>Save as a Word file</li>
               <li role='menuitem' onClick={() => save('md')}>Save as Markdown</li>
               <li role='menuitem' onClick={() => save('txt')}>Save as plain text</li>
-              {!phone && <li role='menuitem' onClick={() => save('pdf')}>Save as PDF</li>}
+              <li role='menuitem' onClick={() => save('pdf')}>Save as PDF</li>
               {!phone && <li role='menuitem' onClick={() => save('print')}>Print...</li>}
             </>
           )

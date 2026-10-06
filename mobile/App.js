@@ -12,6 +12,7 @@ import { Worklet } from 'react-native-bare-kit'
 import { Asset } from 'expo-asset'
 import * as FileSystem from 'expo-file-system/legacy'
 import * as Sharing from 'expo-sharing'
+import * as Print from 'expo-print'
 import * as DocumentPicker from 'expo-document-picker'
 import * as Clipboard from 'expo-clipboard'
 import b4a from 'b4a'
@@ -24,7 +25,8 @@ const UTIS = {
   'text/csv': 'public.comma-separated-values-text',
   'application/json': 'public.json',
   'image/png': 'public.png',
-  'image/svg+xml': 'public.svg-image'
+  'image/svg+xml': 'public.svg-image',
+  'application/pdf': 'com.adobe.pdf'
 }
 
 // Phone features the web UI cannot reach on its own, answered by the shell.
@@ -36,6 +38,16 @@ async function shellMethod (method, args) {
     const uri = FileSystem.cacheDirectory + safe
     await FileSystem.writeAsStringAsync(uri, args.base64, { encoding: FileSystem.EncodingType.Base64 })
     await Sharing.shareAsync(uri, { mimeType: args.mime, dialogTitle: safe, UTI: UTIS[args.mime] || 'public.data' })
+    return { ok: true }
+  }
+  if (method === 'app:savePdf') {
+    // The UI sends a printable page, as on desktop. A4, then the share sheet.
+    const safe = String(args.name || 'PearOffice.pdf').replace(/[\\/:*?"<>|]/g, ' ')
+    const { uri: tmp } = await Print.printToFileAsync({ html: String(args.html || ''), width: 595, height: 842 })
+    const uri = FileSystem.cacheDirectory + safe
+    await FileSystem.deleteAsync(uri, { idempotent: true })
+    await FileSystem.moveAsync({ from: tmp, to: uri })
+    await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: safe, UTI: UTIS['application/pdf'] })
     return { ok: true }
   }
   if (method === 'app:pickFile') {

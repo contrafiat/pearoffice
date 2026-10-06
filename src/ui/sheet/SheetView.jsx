@@ -912,7 +912,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
             {phone && window.pearoffice && <li role='menuitem' onClick={() => exportSheet(sheetId).catch((err) => onError(err.message))}>Save as an Excel file</li>}
             <li role='menuitem' onClick={() => exportCsv(view).catch((err) => onError(err.message))}>Download this tab as CSV</li>
             <li role='menuitem' onClick={() => exportJson(sheetId).catch((err) => onError(err.message))}>Save as JSON</li>
-            {!phone && <li role='menuitem' onClick={() => printTab(view, 'pdf', printCharts()).catch((err) => onError(err.message))}>Save this tab as PDF</li>}
+            <li role='menuitem' onClick={() => printTab(view, 'pdf', printCharts()).catch((err) => onError(err.message))}>Save this tab as PDF</li>
             {!phone && <li role='menuitem' onClick={() => printTab(view, 'print', printCharts()).catch((err) => onError(err.message))}>Print this tab...</li>}
             {canEdit && <li role='menuitem' onClick={openSort}>Sort...</li>}
             {freezeItems(close)}

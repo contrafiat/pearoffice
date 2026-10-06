@@ -1,6 +1,8 @@
 // Exports a document with every kind of block to .docx the way the app does
 // (src/ui/doc/docFiles.js), then has LibreOffice open it and checks the text,
-// headings, lists and table it finds. Needs `soffice`.
+// headings, lists, table and checkboxes it finds (the checkboxes in its PDF
+// need `pdftotext`), then imports LibreOffice's own .docx of it and checks the
+// formatting came back. Needs `soffice`.
 // Usage: node scripts/check-doc-export.js [out-dir]
 // With an out-dir it also keeps the .docx and a PDF of it for a look.
 
@@ -54,10 +56,20 @@ let a = 1
   const file = path.join(out, 'Plan.docx')
   fs.writeFileSync(file, await f.toDocx(json, 'Plan'))
 
-  const soffice = (fmt) => execFileSync('soffice', ['--headless', '-env:UserInstallation=file://' + path.join(out, 'lo-profile'), '--convert-to', fmt, '--outdir', out, file], { stdio: 'pipe', timeout: 120000 })
+  const soffice = (fmt, dir = out) => execFileSync('soffice', ['--headless', '-env:UserInstallation=file://' + path.join(out, 'lo-profile'), '--convert-to', fmt, '--outdir', dir, file], { stdio: 'pipe', timeout: 120000 })
   soffice('txt:Text (encoded):UTF8')
   soffice('html')
-  if (keep) soffice('pdf')
+  soffice('pdf')
+  // LibreOffice saves it as its own .docx; importing that keeps the formatting.
+  soffice('docx:MS Word 2007 XML', path.join(out, 'lo'))
+  const lo = (await f.fileToJson('Plan.docx', fs.readFileSync(path.join(out, 'lo', 'Plan.docx')))).json
+  const big = []
+  const walk = (n) => { if (n.type === 'text' && n.text.includes('Big blue')) big.push(n); (n.content || []).forEach(walk) }
+  walk(lo)
+  const loBlock = lo.content.find((b) => JSON.stringify(b).includes('Big blue'))
+  const marks = big.length ? big[0].marks || [] : []
+  const ts = (marks.find((m) => m.type === 'textStyle') || {}).attrs || {}
+  const hl = (marks.find((m) => m.type === 'highlight') || {}).attrs || {}
   const text = fs.readFileSync(path.join(out, 'Plan.txt'), 'utf8')
   const html = fs.readFileSync(path.join(out, 'Plan.html'), 'utf8')
 
@@ -68,10 +80,21 @@ let a = 1
     'bold text': /<b>bold<\/b>|<strong>bold<\/strong>/.test(html),
     'list items': ['First', 'Second', 'Nested', 'One', 'Two'].every((s) => text.includes(s)),
     'numbered list': /1\.\s*One/.test(text) && /2\.\s*Two/.test(text),
-    checklist: text.includes('☐ Open task') && text.includes('☑ Done task'),
+    checklist: text.includes('☐ Open task') && text.includes('☒ Done task'),
     'table cells': /<table[\s\S]*Name[\s\S]*Role[\s\S]*Ann[\s\S]*Owner[\s\S]*<\/table>/.test(html),
     'quote and code': text.includes('A quote') && text.includes('let a = 1'),
-    link: html.includes('https://example.com')
+    link: html.includes('https://example.com'),
+    'formatting back from LibreOffice': [ts.color, ts.fontSize, ts.fontFamily, hl.color, loBlock && loBlock.attrs.textAlign].join() === '#1d4ed8,18pt,serif,#fef08a,center'
+  }
+  // Both boxes drawn in the PDF: pdftotext finds them and no colour emoji
+  // font drew them (it leaves a PDF blank, as it did for ☑).
+  const pdf = path.join(out, 'Plan.pdf')
+  try {
+    const pdfText = execFileSync('pdftotext', [pdf, '-'], { encoding: 'utf8' })
+    const fonts = execFileSync('pdffonts', [pdf], { encoding: 'utf8' })
+    checks['checkboxes in the PDF'] = pdfText.includes('☐ Open task') && pdfText.includes('☒ Done task') && !/emoji/i.test(fonts)
+  } catch {
+    console.log('skip checkboxes in the PDF (needs pdftotext and pdffonts from poppler)')
   }
   for (const [name, ok] of Object.entries(checks)) console.log((ok ? 'ok   ' : 'FAIL ') + name)
   const failed = Object.values(checks).filter((x) => !x).length

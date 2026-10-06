@@ -203,6 +203,66 @@ test('Word export writes formatting as Word properties', async () => {
   assert.ok(fflate.strFromU8(files['docProps/core.xml']).includes('<dc:title>Formats</dc:title>'))
 })
 
+test('Word import keeps colour, size, font, highlight and alignment', async () => {
+  const f = await load()
+  const style = (attrs) => ({ type: 'textStyle', attrs })
+  const json = {
+    type: 'doc',
+    content: [
+      {
+        type: 'paragraph',
+        attrs: { textAlign: 'center' },
+        content: [
+          { type: 'text', text: 'Big blue ', marks: [style({ fontSize: '18pt', color: '#1d4ed8', fontFamily: 'serif' })] },
+          { type: 'text', text: 'lit', marks: [{ type: 'highlight', attrs: { color: '#bbf7d0' } }] },
+          { type: 'text', text: ' plain' }
+        ]
+      },
+      { type: 'paragraph', attrs: { textAlign: 'right' }, content: [{ type: 'text', text: 'Code font', marks: [style({ fontFamily: 'Consolas', fontSize: '13.5pt' })] }] },
+      { type: 'heading', attrs: { level: 2, textAlign: 'justify' }, content: [{ type: 'text', text: 'Georgia red', marks: [style({ fontFamily: 'Georgia', color: '#b3261e' })] }] },
+      { type: 'paragraph', content: [{ type: 'text', text: 'Arial left', marks: [style({ fontFamily: 'Arial' })] }] }
+    ]
+  }
+  const back = (await f.fileToJson('Formats.docx', await f.toDocx(json, 'Formats'))).json
+  const runs = []
+  const walk = (n) => { if (n.type === 'text') runs.push(n); else (n.content || []).forEach(walk) }
+  walk(back)
+  const show = (n) => n.text + ':' + (n.marks || []).map((m) => m.type + (m.attrs ? '=' + Object.entries(m.attrs).filter(([, v]) => v != null && v !== '').sort().map(([k, v]) => k + '/' + v).join('+') : '')).sort().join(',')
+  assert.equal(runs.map(show).join('|'), [
+    'Big blue :textStyle=color/#1d4ed8+fontFamily/serif+fontSize/18pt',
+    'lit:highlight=color/#bbf7d0',
+    ' plain:',
+    'Code font:textStyle=fontFamily/monospace+fontSize/14pt',
+    'Georgia red:textStyle=color/#b3261e+fontFamily/serif',
+    'Arial left:'
+  ].join('|'))
+  assert.equal(back.content.map((b) => b.type + '/' + b.attrs.textAlign).join(), 'paragraph/center,paragraph/right,heading/justify,paragraph/null')
+})
+
+test('Word import reads run shading as a highlight and nearest sizes', async () => {
+  const f = await load()
+  const D = await import('docx')
+  const doc = new D.Document({
+    sections: [{
+      children: [new D.Paragraph({
+        children: [
+          new D.TextRun({ text: 'shaded', shading: { type: D.ShadingType.CLEAR, color: 'auto', fill: 'FED7AA' } }),
+          new D.TextRun({ text: ' tiny', size: 11 }),
+          new D.TextRun({ text: ' huge', size: 100, color: '000000' })
+        ]
+      })]
+    }]
+  })
+  const bytes = new Uint8Array(await D.Packer.toArrayBuffer(doc))
+  const back = (await f.fileToJson('Shade.docx', bytes)).json
+  const p = back.content[0].content
+  assert.equal(p.map((n) => n.text).join(), 'shaded, tiny, huge')
+  assert.equal(p[0].marks.map((m) => m.type + '/' + m.attrs.color).join(), 'highlight/#fed7aa')
+  assert.equal(p[1].marks.map((m) => m.attrs.fontSize).join(), '8pt')
+  assert.equal(p[2].marks.map((m) => m.attrs.fontSize + '/' + (m.attrs.color || 'none')).join(), '36pt/none')
+  assert.equal(f.fontFamily('Liberation Serif') + ',' + f.fontFamily('PT Sans') + ',' + f.fontFamily('JetBrains Mono'), 'serif,null,monospace')
+})
+
 test('Word highlight colours are the nearest by hue', async () => {
   const f = await load()
   const got = ['#fef08a', '#fed7aa', '#fecaca', '#bbf7d0', '#a5f3fc', '#bfdbfe', '#ddd6fe', '#e5e7eb'].map(f.nearestHighlight).join()

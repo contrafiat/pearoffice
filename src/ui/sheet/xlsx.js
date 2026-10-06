@@ -173,7 +173,7 @@ export function tabHtml (view, chartSvgs = []) {
     chartSvgs.map((svg) => '<div class="chart">' + svg + '</div>').join('') + '</body></html>'
 }
 
-// Desktop only: save the tab as a PDF, or open the print dialog.
+// Save the tab as a PDF, or open the print dialog (desktop only).
 export function printTab (view, how, chartSvgs = []) {
   const tab = (view.tabs.find((t) => t.id === view.tabId) || {}).name
   const name = fileName(view.title + (view.tabs.length > 1 ? ' - ' + tab : '')) + '.pdf'
