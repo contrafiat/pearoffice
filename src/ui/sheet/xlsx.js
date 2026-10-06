@@ -11,10 +11,12 @@ import { csvBytesToTabs } from '../../sheet/csvImport.js'
 import { sheetToJson } from '../../sheet/jsonExport.js'
 import { call } from '../bridge.js'
 import { writePref } from '../prefs.js'
+import { isMobile, fileName, saveFile } from '../save.js'
+import { isDocFile, importDocument } from '../doc/docFiles.js'
 import { borderCss, fontPx, FONTS } from './cellStyle.js'
 
 const MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-export const isMobile = () => !!(window.pearoffice && window.pearoffice.platform === 'mobile')
+export { isMobile }
 
 function importWorkbook (wb, name, bytes) {
   const { tabs, names } = workbookToTabs(XLSX, wb)
@@ -47,16 +49,18 @@ function importWorkbook (wb, name, bytes) {
 // CSV and tab-separated files have their own reader (src/sheet/csvImport.js):
 // UTF-8, leading zeros kept, dates shown as dates.
 const isJson = (name) => /\.json$/i.test(String(name || ''))
-const isCsv = (name) => /\.(csv|tsv|txt)$/i.test(String(name || ''))
+const isCsv = (name) => /\.(csv|tsv)$/i.test(String(name || ''))
 function importText (bytes, name) {
   const { tabs, names } = isJson(name) ? jsonFileToTabs(new TextDecoder().decode(bytes)) : csvBytesToTabs(bytes)
   const title = String(name || '').replace(/\.[^.]+$/, '') || 'Imported sheet'
   return call('sheet:import', { title, tabs, names })
 }
 
-// Desktop: a File from an <input type=file>.
+// Desktop: a File from an <input type=file>. Word, Markdown, text and HTML
+// files become documents (src/ui/doc/docFiles.js), the rest sheets.
 export async function importFile (file) {
   const data = new Uint8Array(await file.arrayBuffer())
+  if (isDocFile(file.name)) return importDocument(data, file.name)
   if (isJson(file.name) || isCsv(file.name)) return importText(data, file.name)
   return importWorkbook(XLSX.read(data, { type: 'array', ...READ_OPTIONS }), file.name, data)
 }
@@ -66,6 +70,7 @@ export async function pickAndImport () {
   const picked = await call('app:pickFile')
   if (!picked || picked.canceled) return null
   const bytes = Uint8Array.from(atob(picked.base64), (ch) => ch.charCodeAt(0))
+  if (isDocFile(picked.name)) return importDocument(bytes, picked.name)
   if (isJson(picked.name) || isCsv(picked.name)) return importText(bytes, picked.name)
   return importWorkbook(XLSX.read(bytes, { type: 'array', ...READ_OPTIONS }), picked.name, bytes)
 }
@@ -73,19 +78,7 @@ export async function pickAndImport () {
 export async function exportSheet (sheetId) {
   const dump = await call('sheet:dump', { sheetId })
   const bytes = workbookBytes(XLSX, fflate, dump)
-  const name = (dump.title || 'PearOffice').replace(/[\\/:*?"<>|]/g, ' ') + '.xlsx'
-  if (isMobile()) {
-    let bin = ''
-    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000))
-    return call('app:shareFile', { name, mime: MIME, base64: btoa(bin) })
-  }
-  const a = document.createElement('a')
-  a.href = URL.createObjectURL(new Blob([bytes], { type: MIME }))
-  a.download = name
-  document.body.appendChild(a)
-  a.click()
-  a.remove()
-  setTimeout(() => URL.revokeObjectURL(a.href), 10000)
+  return saveFile(fileName(dump.title) + '.xlsx', MIME, bytes)
 }
 
 // --- one tab as .csv, and as a printable page (PDF, print) -------------------
@@ -98,8 +91,6 @@ function usedBlock (view) {
   const at = new Map(view.cells.map((c) => [c.row + ',' + c.col, c]))
   return { rows, cols, at }
 }
-
-const fileName = (s) => String(s || 'PearOffice').replace(/[\\/:*?"<>|]/g, ' ')
 
 // What the cells show, comma-separated, with a byte order mark so Excel
 // reads it as UTF-8.
@@ -117,30 +108,13 @@ export function tabCsv (view) {
 
 export async function exportCsv (view) {
   const tab = (view.tabs.find((t) => t.id === view.tabId) || {}).name
-  return saveText(fileName(view.title + (view.tabs.length > 1 ? ' - ' + tab : '')) + '.csv', 'text/csv', tabCsv(view))
+  return saveFile(fileName(view.title + (view.tabs.length > 1 ? ' - ' + tab : '')) + '.csv', 'text/csv', tabCsv(view))
 }
 
 // The whole sheet as JSON, values only (src/sheet/jsonExport.js).
 export async function exportJson (sheetId) {
   const dump = await call('sheet:dump', { sheetId })
-  return saveText(fileName(dump.title) + '.json', 'application/json', JSON.stringify(sheetToJson(dump), null, 2) + '\n')
-}
-
-// A text file: the share sheet on phones, a download on desktop.
-async function saveText (name, mime, text) {
-  if (isMobile()) {
-    const bytes = new TextEncoder().encode(text)
-    let bin = ''
-    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000))
-    return call('app:shareFile', { name, mime, base64: btoa(bin) })
-  }
-  const a = document.createElement('a')
-  a.href = URL.createObjectURL(new Blob([text], { type: mime }))
-  a.download = name
-  document.body.appendChild(a)
-  a.click()
-  a.remove()
-  setTimeout(() => URL.revokeObjectURL(a.href), 10000)
+  return saveFile(fileName(dump.title) + '.json', 'application/json', JSON.stringify(sheetToJson(dump), null, 2) + '\n')
 }
 
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')

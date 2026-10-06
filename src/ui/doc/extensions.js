@@ -5,6 +5,14 @@
 import { Extension } from '@tiptap/core'
 import { Plugin, PluginKey, TextSelection } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
+import StarterKit from '@tiptap/starter-kit'
+import { TextStyle, Color, FontSize, FontFamily } from '@tiptap/extension-text-style'
+import Highlight from '@tiptap/extension-highlight'
+import { TaskList, TaskItem } from '@tiptap/extension-list'
+import { TableKit } from '@tiptap/extension-table'
+import TextAlign from '@tiptap/extension-text-align'
+import Subscript from '@tiptap/extension-subscript'
+import Superscript from '@tiptap/extension-superscript'
 
 export const MAX_INDENT = 8
 export const LINE_HEIGHTS = ['1', '1.15', '1.5', '2']
@@ -111,6 +119,31 @@ export const ParagraphFormat = Extension.create({
     }
   }
 })
+
+// The extensions that make up the document's schema. The editor adds its own
+// (Collaboration, cursors, find, placeholder) on top; import and export use
+// these alone, so both read and write the same nodes and marks.
+export function documentExtensions () {
+  return [
+    StarterKit.configure({
+      undoRedo: false, // Collaboration's undo only undoes this person's edits
+      trailingNode: false, // it would add a paragraph on every device at once
+      link: { openOnClick: false, autolink: true, defaultProtocol: 'https' }
+    }),
+    TextStyle,
+    Color,
+    FontSize,
+    FontFamily,
+    Highlight.configure({ multicolor: true }),
+    TaskList,
+    TaskItem.configure({ nested: true }),
+    TableKit.configure({ table: { resizable: false } }),
+    TextAlign.configure({ types: ['heading', 'paragraph'] }),
+    Subscript,
+    Superscript,
+    ParagraphFormat
+  ]
+}
 
 // --- find and replace -------------------------------------------------------
 

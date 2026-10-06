@@ -16,8 +16,9 @@ import { FileArrowUp, GearSix, House, LinkSimple, List, Plus } from '@phosphor-i
 
 applyTheme()
 
-// Import a file (.xlsx, .csv or .json): a file input on desktop, the shell's
-// file picker on phones.
+// Import a file: .xlsx, .csv, .tsv or .json make a sheet; .docx, .md, .txt
+// or .html a document. A file input on desktop, the shell's file picker on
+// phones. onImported gets the new file's id and the import's result.
 function ImportButton ({ className, onImported, onError }) {
   if (isMobile()) {
     return (
@@ -26,7 +27,7 @@ function ImportButton ({ className, onImported, onError }) {
         onClick={async () => {
           try {
             const r = await pickAndImport()
-            if (r) await onImported(r.sheetId)
+            if (r) await onImported(r.sheetId, r)
           } catch (err) { onError('Could not import: ' + err.message) }
         }}
       >
@@ -39,15 +40,15 @@ function ImportButton ({ className, onImported, onError }) {
       <FileArrowUp size={16} /> Import a file
       <input
         type='file'
-        accept='.xlsx,.csv,.tsv,.json'
+        accept='.xlsx,.csv,.tsv,.json,.docx,.md,.markdown,.txt,.html,.htm'
         hidden
         onChange={async (e) => {
           const file = e.target.files && e.target.files[0]
           e.target.value = ''
           if (!file) return
           try {
-            const { sheetId } = await importFile(file)
-            await onImported(sheetId)
+            const r = await importFile(file)
+            await onImported(r.sheetId, r)
           } catch (err) {
             onError('Could not import ' + file.name + ': ' + err.message)
           }
@@ -122,7 +123,11 @@ export function App () {
     setCurrent((c) => (c === sheetId ? null : c))
   }, [])
 
-  const opened = useCallback(async (sheetId) => { await refresh(); setCurrent(sheetId) }, [refresh])
+  const opened = useCallback(async (sheetId, r) => {
+    await refresh()
+    setCurrent(sheetId)
+    if (r && r.dropped) setNotice('Some parts of this file, such as pictures, were left out.')
+  }, [refresh])
 
   const soon = useRef(null)
   const refreshSoon = useCallback(() => {

@@ -5,6 +5,7 @@
 // The file-wide methods (title, sharing, roles, tidy up) are file:* ones.
 
 const b4a = require('b4a')
+const Y = require('yjs')
 const model = require('../sheet/sheetModel')
 const docModel = require('./docModel')
 const m = require('../worklet/membership')
@@ -15,7 +16,7 @@ const hex = (buf) => b4a.toString(buf, 'hex')
 function createDocMethods (sheets, { getJoin }) {
   const { profileName, myRole, frozenInfo, isFrozen, requireEdit, commit, docFor } = createFileHelpers(sheets)
 
-  return {
+  const methods = {
     'doc:create': async ({ title = 'Untitled document' } = {}, ctx) => {
       const { groupId } = await ctx.createGroup({ name: title })
       const base = ctx.bases.get(groupId)
@@ -65,8 +66,25 @@ function createDocMethods (sheets, { getJoin }) {
       const bytes = b4a.from(update, 'base64')
       if (!e.guarded.apply(bytes, 'ui')) throw new Error('That edit could not be saved')
       return commit(ctx, sheetId, bytes)
+    },
+
+    // A new document made from a file. The UI turns the file into the
+    // document's body as one Yjs update; it goes in the guarded way like any
+    // edit, and commit splits it into edits under the size limit.
+    'doc:import': async ({ title = 'Imported document', update } = {}, ctx) => {
+      if (typeof update !== 'string' || !update) throw new Error('Nothing to import')
+      const bytes = b4a.from(update, 'base64')
+      // Checked before the document is made, so a bad file leaves nothing.
+      const scratch = new Y.Doc()
+      try { Y.applyUpdate(scratch, bytes) } catch { throw new Error('This file could not be read') } finally { scratch.destroy() }
+      const { sheetId } = await methods['doc:create']({ title: String(title) }, ctx)
+      const { e } = await docFor(sheetId)
+      if (!e.guarded.apply(bytes, 'ui')) throw new Error('This file could not be read')
+      await commit(ctx, sheetId, bytes)
+      return { sheetId }
     }
   }
+  return methods
 }
 
 module.exports = { createDocMethods }

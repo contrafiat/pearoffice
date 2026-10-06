@@ -1,0 +1,563 @@
+// Documents in and out of other formats (proposals/2026-10-06-documents.md):
+// import .docx, .md, .txt and .html; export .docx, .md, .txt and PDF.
+// Imports go through HTML into the editor's own schema (documentExtensions),
+// so a document made from a file holds only what the editor knows. Exports
+// read the editor's ProseMirror JSON.
+import * as Y from 'yjs'
+import { generateJSON, generateHTML, getSchema } from '@tiptap/core'
+import { prosemirrorJSONToYXmlFragment, yXmlFragmentToProseMirrorRootNode } from '@tiptap/y-tiptap'
+import mammoth from 'mammoth'
+import { marked } from 'marked'
+import * as D from 'docx'
+import { documentExtensions } from './extensions.js'
+import { call } from '../bridge.js'
+import { fileName, saveFile, isMobile } from '../save.js'
+
+const FIELD = 'body' // src/doc/docModel.js
+const DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+
+export const isDocFile = (name) => /\.(docx|md|markdown|txt|html?)$/i.test(String(name || ''))
+
+const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+
+// --- import -------------------------------------------------------------------
+
+// Word styles to our blocks. Title and Subtitle come out as classes and are
+// turned into the paragraph's blockStyle below.
+const STYLE_MAP = [
+  "p[style-name='Title'] => p.pearoffice-title:fresh",
+  "p[style-name='Subtitle'] => p.pearoffice-subtitle:fresh",
+  "p[style-name='Quote'] => blockquote > p:fresh",
+  "p[style-name='Intense Quote'] => blockquote > p:fresh",
+  "p[style-name='Code'] => pre:separator('\\n')",
+  'u => u',
+  'strike => s'
+]
+
+// Content the editor has no place for. Anything found is left out and the
+// person is told once.
+const UNSUPPORTED = 'img, picture, video, audio, iframe, object, embed, svg, canvas, math'
+
+// Tidy the HTML from any source into what the editor's parser reads: Title
+// and Subtitle, headings 4 to 6 as 3, task lists (Markdown's checkboxes and
+// our own .docx checklist marks), no footnotes or pictures.
+function tidy (html) {
+  const doc = new window.DOMParser().parseFromString('<body>' + html + '</body>', 'text/html')
+  const body = doc.body
+  let dropped = false
+  const rename = (el, tag) => {
+    const next = doc.createElement(tag)
+    for (const a of el.attributes) next.setAttribute(a.name, a.value)
+    while (el.firstChild) next.appendChild(el.firstChild)
+    el.replaceWith(next)
+    return next
+  }
+  for (const el of [...body.querySelectorAll(UNSUPPORTED)]) { dropped = true; el.remove() }
+  // Footnotes and endnotes (mammoth's markers and the list at the end).
+  for (const a of [...body.querySelectorAll('a[href^="#footnote-"], a[href^="#endnote-"]')]) {
+    dropped = true
+    const sup = a.closest('sup')
+    ;(sup || a).remove()
+  }
+  for (const li of [...body.querySelectorAll('li[id^="footnote-"], li[id^="endnote-"]')]) {
+    const list = li.parentElement
+    li.remove()
+    if (list && !list.children.length) list.remove()
+  }
+  for (const el of [...body.querySelectorAll('p.pearoffice-title, p.pearoffice-subtitle')]) {
+    el.setAttribute('data-style', el.classList.contains('pearoffice-title') ? 'title' : 'subtitle')
+    el.removeAttribute('class')
+  }
+  for (const el of [...body.querySelectorAll('h4, h5, h6')]) rename(el, 'h3')
+  for (const code of [...body.querySelectorAll('pre > code')]) {
+    const last = code.lastChild
+    if (last && last.nodeType === 3) last.textContent = last.textContent.replace(/\n$/, '')
+  }
+  // Markdown task lists: <li><input type=checkbox> text</li>.
+  for (const ul of [...body.querySelectorAll('ul')]) {
+    const items = [...ul.children].filter((x) => x.tagName === 'LI')
+    const box = (li) => li.querySelector(':scope > input[type=checkbox], :scope > p:first-child > input[type=checkbox]')
+    if (!items.length || !items.some(box)) continue
+    ul.setAttribute('data-type', 'taskList')
+    for (const li of items) {
+      const input = box(li)
+      li.setAttribute('data-type', 'taskItem')
+      li.setAttribute('data-checked', input && input.hasAttribute('checked') ? 'true' : 'false')
+      if (input) {
+        const after = input.nextSibling
+        input.remove()
+        if (after && after.nodeType === 3) after.textContent = after.textContent.replace(/^\s+/, '')
+      }
+    }
+  }
+  // Our .docx checklists: paragraphs starting with ☐ or ☑ in a row.
+  let run = null
+  for (const p of [...body.querySelectorAll('p')]) {
+    const m = /^([☐☑])\s?/.exec(p.textContent)
+    if (!m || p.closest('li, td, th')) { run = null; continue }
+    if (!run || p.previousElementSibling !== run) {
+      const ul = doc.createElement('ul')
+      ul.setAttribute('data-type', 'taskList')
+      p.before(ul)
+      run = ul
+    }
+    stripPrefix(p, m[0].length)
+    const li = doc.createElement('li')
+    li.setAttribute('data-type', 'taskItem')
+    li.setAttribute('data-checked', m[1] === '☑' ? 'true' : 'false')
+    li.appendChild(p)
+    run.appendChild(li)
+  }
+  return { html: body.innerHTML, dropped }
+}
+
+// Remove the first n characters of an element's text, wherever they sit.
+function stripPrefix (el, n) {
+  const walker = el.ownerDocument.createTreeWalker(el, 4)
+  let node
+  while (n > 0 && (node = walker.nextNode())) {
+    const take = Math.min(n, node.textContent.length)
+    node.textContent = node.textContent.slice(take)
+    n -= take
+  }
+}
+
+export function htmlToJson (html) {
+  return generateJSON(html, documentExtensions())
+}
+
+// Plain text: one paragraph per line; blank lines only separate them.
+export function textToJson (text) {
+  const lines = String(text).replace(/^\ufeff/, '').split(/\r\n|\r|\n/).filter((l) => l.trim() !== '')
+  return {
+    type: 'doc',
+    content: lines.length ? lines.map((l) => ({ type: 'paragraph', content: [{ type: 'text', text: l }] })) : [{ type: 'paragraph' }]
+  }
+}
+
+// A file's bytes to the editor's JSON. { json, dropped }: dropped when some of
+// its content had no place in a document.
+export async function fileToJson (name, bytes) {
+  const ext = (/\.([^.]+)$/.exec(String(name || '')) || [])[1].toLowerCase()
+  if (ext === 'txt') return { json: textToJson(new TextDecoder().decode(bytes)), dropped: false }
+  let html
+  if (ext === 'docx') {
+    const buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)
+    const out = await mammoth.convertToHtml({ arrayBuffer: buf, buffer: buf }, {
+      styleMap: STYLE_MAP,
+      // Pictures are left out; keep a marker so they are counted.
+      convertImage: mammoth.images.imgElement(() => ({ src: '' }))
+    })
+    html = out.value
+  } else if (ext === 'md' || ext === 'markdown') {
+    html = marked.parse(new TextDecoder().decode(bytes).replace(/^\ufeff/, ''), { gfm: true, async: false })
+  } else {
+    html = new TextDecoder().decode(bytes)
+  }
+  const t = tidy(html)
+  return { json: htmlToJson(t.html), dropped: t.dropped }
+}
+
+// The JSON as the first Yjs update of a document's body.
+export function jsonToUpdate (json) {
+  const doc = new Y.Doc()
+  try {
+    prosemirrorJSONToYXmlFragment(getSchema(documentExtensions()), json, doc.getXmlFragment(FIELD))
+    return Y.encodeStateAsUpdate(doc)
+  } finally {
+    doc.destroy()
+  }
+}
+
+// The document's body as the editor's JSON, every attribute filled in.
+export function docToJson (ydoc) {
+  return yXmlFragmentToProseMirrorRootNode(ydoc.getXmlFragment(FIELD), getSchema(documentExtensions())).toJSON()
+}
+
+function toB64 (bytes) {
+  let s = ''
+  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000))
+  return btoa(s)
+}
+
+// Import a file as a new document. Resolves to { sheetId, dropped }.
+export async function importDocument (bytes, name) {
+  const { json, dropped } = await fileToJson(name, bytes)
+  const title = String(name || '').replace(/\.[^.]+$/, '') || 'Imported document'
+  const r = await call('doc:import', { title, update: toB64(jsonToUpdate(json)) })
+  return { ...r, dropped }
+}
+
+// --- shared walking -----------------------------------------------------------
+
+const marksOf = (n) => n.marks || []
+const hasMark = (n, type) => marksOf(n).some((m) => m.type === type)
+const markAttrs = (n, type) => (marksOf(n).find((m) => m.type === type) || {}).attrs || {}
+
+function inlineText (nodes) {
+  return (nodes || []).map((n) => (n.type === 'text' ? n.text : n.type === 'hardBreak' ? '\n' : inlineText(n.content))).join('')
+}
+
+// --- plain text ---------------------------------------------------------------
+
+// Blank lines between paragraphs; list items one to a line, "- " for bullets.
+export function toText (json) {
+  return blocksText(json.content, '').join('\n\n').replace(/\n{3,}/g, '\n\n') + '\n'
+}
+
+function blocksText (nodes, pad) {
+  const out = []
+  for (const n of nodes || []) {
+    if (n.type === 'paragraph' || n.type === 'heading') out.push(pad + inlineText(n.content).replace(/\n/g, '\n' + pad))
+    else if (n.type === 'codeBlock') out.push(inlineText(n.content).split('\n').map((l) => pad + l).join('\n'))
+    else if (n.type === 'horizontalRule') out.push(pad + '---')
+    else if (n.type === 'blockquote') out.push(...blocksText(n.content, pad))
+    else if (n.type === 'bulletList' || n.type === 'orderedList' || n.type === 'taskList') {
+      const start = (n.attrs && n.attrs.start) || 1
+      out.push((n.content || []).map((item, i) => {
+        const marker = n.type === 'orderedList' ? (start + i) + '. ' : n.type === 'taskList' ? (item.attrs && item.attrs.checked ? '- [x] ' : '- [ ] ') : '- '
+        const inner = blocksText(item.content, pad + '  ')
+        return pad + marker + (inner[0] || '').slice(pad.length + 2) + (inner.length > 1 ? '\n' + inner.slice(1).join('\n') : '')
+      }).join('\n'))
+    } else if (n.type === 'table') {
+      out.push((n.content || []).map((row) => pad + (row.content || []).map((cell) => blocksText(cell.content, '').join(' ')).join('\t')).join('\n'))
+    }
+  }
+  return out
+}
+
+// --- Markdown -----------------------------------------------------------------
+
+// GitHub-flavoured Markdown. Formatting with no Markdown form (colour, size,
+// font, underline, alignment and the rest) is left out.
+export function toMarkdown (json) {
+  return mdBlocks(json.content).join('\n\n').replace(/\n{3,}/g, '\n\n').trim() + '\n'
+}
+
+const MD_MARKS = [['link'], ['bold', '**'], ['italic', '_'], ['strike', '~~'], ['code', '`']]
+
+function mdEscape (s) {
+  return s.replace(/([\\`*_[\]<>~|])/g, '\\$1')
+}
+
+function mdInline (nodes, inTable) {
+  let out = ''
+  const open = [] // marks open now, outermost first: { type, close }
+  let trail = ''
+  const closeTo = (keep) => {
+    while (open.length > keep) out += open.pop().close
+  }
+  for (const n of nodes || []) {
+    if (n.type === 'hardBreak') { closeTo(0); out += trail + (inTable ? '<br>' : '\\\n'); trail = ''; continue }
+    if (n.type !== 'text') continue
+    const want = MD_MARKS.filter(([t]) => hasMark(n, t)).map(([t, d]) => ({ type: t, d, href: t === 'link' ? markAttrs(n, 'link').href : null }))
+    // Keep the open marks that are still wanted, in order.
+    let keep = 0
+    while (keep < open.length && keep < want.length && open[keep].type === want[keep].type && open[keep].href === want[keep].href) keep++
+    closeTo(keep)
+    const text = hasMark(n, 'code') ? n.text : mdEscape(n.text)
+    const lead = /^\s*/.exec(text)[0]
+    const core = text.slice(lead.length).replace(/\s+$/, '')
+    out += trail + lead
+    trail = text.slice(lead.length + core.length)
+    if (!core) { trail = text.slice(lead.length); continue }
+    for (const w of want.slice(keep)) {
+      if (w.type === 'link') { out += '['; open.push({ type: 'link', href: w.href, close: '](' + String(w.href || '').replace(/[()\s]/g, (c) => '%' + c.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0')) + ')' }) } else { out += w.d; open.push({ type: w.type, href: null, close: w.d }) }
+    }
+    out += core
+  }
+  closeTo(0)
+  out += trail
+  if (inTable) out = out.replace(/\n/g, ' ')
+  return out
+}
+
+function mdBlocks (nodes) {
+  const out = []
+  for (const n of nodes || []) {
+    const a = n.attrs || {}
+    if (n.type === 'heading') out.push('#'.repeat(Math.min(6, a.level || 1)) + ' ' + mdInline(n.content))
+    else if (n.type === 'paragraph') {
+      let text = mdInline(n.content)
+      if (a.blockStyle === 'title') text = '# ' + text
+      else text = text.replace(/^(#{1,6}\s|[-+]\s)/, '\\$1').replace(/^(\d+)([.)]\s)/, '$1\\$2')
+      out.push(text)
+    } else if (n.type === 'codeBlock') {
+      const code = inlineText(n.content).replace(/\n$/, '')
+      const fence = '`'.repeat(Math.max(3, ...[...code.matchAll(/`+/g)].map((x) => x[0].length + 1)))
+      out.push(fence + (a.language || '') + '\n' + code + '\n' + fence)
+    } else if (n.type === 'horizontalRule') out.push('---')
+    else if (n.type === 'blockquote') out.push(mdBlocks(n.content).join('\n\n').split('\n').map((l) => (l ? '> ' + l : '>')).join('\n'))
+    else if (n.type === 'bulletList' || n.type === 'orderedList' || n.type === 'taskList') {
+      const start = a.start || 1
+      out.push((n.content || []).map((item, i) => {
+        let marker = n.type === 'orderedList' ? (start + i) + '. ' : '- '
+        const pad = ' '.repeat(marker.length)
+        if (n.type === 'taskList') marker += item.attrs && item.attrs.checked ? '[x] ' : '[ ] '
+        // A list right under the item's text stays tight; other blocks get a
+        // blank line.
+        const kids = (item.content || []).filter((b) => mdBlocks([b]).length)
+        const inner = mdBlocks(kids)
+        const body = inner.map((b, j) => (j === 0 ? b : (/List$/.test(kids[j].type) ? '' : '\n') + b)).join('\n').split('\n').map((l, j) => (j === 0 ? l : l ? pad + l : '')).join('\n')
+        return marker + body
+      }).join('\n'))
+    } else if (n.type === 'table') {
+      const rows = (n.content || []).map((row) => (row.content || []).map((cell) => (cell.content || []).map((b) => mdInline(b.content, true).replace(/\|/g, '\\|')).join('<br>')))
+      if (!rows.length) continue
+      const cols = Math.max(...rows.map((r) => r.length))
+      const line = (r) => '| ' + Array.from({ length: cols }, (_, i) => r[i] || '').join(' | ') + ' |'
+      out.push([line(rows[0]), '|' + ' --- |'.repeat(cols), ...rows.slice(1).map(line)].join('\n'))
+    }
+  }
+  return out.filter((b) => b !== '')
+}
+
+// --- Word ---------------------------------------------------------------------
+
+const FONT = 'Arial'
+const MONO = 'Courier New'
+const FONT_NAMES = { '': FONT, serif: 'Times New Roman', monospace: MONO, 'sans-serif': FONT }
+const ALIGN = { left: D.AlignmentType.LEFT, center: D.AlignmentType.CENTER, right: D.AlignmentType.RIGHT, justify: D.AlignmentType.JUSTIFIED }
+const HEADINGS = [null, D.HeadingLevel.HEADING_1, D.HeadingLevel.HEADING_2, D.HeadingLevel.HEADING_3, D.HeadingLevel.HEADING_4, D.HeadingLevel.HEADING_5, D.HeadingLevel.HEADING_6]
+const INDENT = 440 // twips per indent step: the editor's 2em at 11pt
+const LIST_INDENT = 720
+const BULLETS = ['•', '◦', '▪']
+const NUMBER_FORMATS = [D.LevelFormat.DECIMAL, D.LevelFormat.LOWER_LETTER, D.LevelFormat.LOWER_ROMAN]
+
+function hexColour (c) {
+  if (!c) return null
+  const s = String(c).trim()
+  let m = /^#([0-9a-f]{3})$/i.exec(s)
+  if (m) return m[1].split('').map((x) => x + x).join('').toUpperCase()
+  m = /^#([0-9a-f]{6})$/i.exec(s)
+  if (m) return m[1].toUpperCase()
+  m = /^rgba?\(\s*(\d+)[\s,]+(\d+)[\s,]+(\d+)/i.exec(s)
+  if (m) return [m[1], m[2], m[3]].map((x) => Math.min(255, Number(x)).toString(16).padStart(2, '0')).join('').toUpperCase()
+  return null
+}
+
+// Word highlights come in a few fixed colours: the nearest by hue, grey for
+// colours with little of one.
+export function nearestHighlight (c) {
+  const hex = hexColour(c)
+  if (!hex) return 'yellow'
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255)
+  const max = Math.max(r, g, b)
+  const min = Math.min(r, g, b)
+  const l = (max + min) / 2
+  const sat = max === min ? 0 : (max - min) / (1 - Math.abs(2 * l - 1))
+  if (sat < 0.2) return l < 0.5 ? 'darkGray' : 'lightGray'
+  let h = max === r ? ((g - b) / (max - min)) % 6 : max === g ? (b - r) / (max - min) + 2 : (r - g) / (max - min) + 4
+  h = (h * 60 + 360) % 360
+  const hues = [[0, 'red'], [60, 'yellow'], [120, 'green'], [180, 'cyan'], [240, 'blue'], [300, 'magenta'], [360, 'red']]
+  return hues.reduce((best, x) => (Math.abs(x[0] - h) < Math.abs(best[0] - h) ? x : best))[1]
+}
+
+function fontSize (v) {
+  const n = parseFloat(v)
+  if (!n) return undefined
+  return Math.round((/px$/.test(String(v)) ? n * 0.75 : n) * 2)
+}
+
+function fontName (v) {
+  if (v == null) return undefined
+  const first = String(v).split(',')[0].trim().replace(/^["']|["']$/g, '')
+  return FONT_NAMES[first] || first || undefined
+}
+
+function textRun (n, base) {
+  const o = { ...base, text: n.text }
+  for (const m of marksOf(n)) {
+    const a = m.attrs || {}
+    if (m.type === 'bold') o.bold = true
+    else if (m.type === 'italic') o.italics = true
+    else if (m.type === 'underline') o.underline = {}
+    else if (m.type === 'strike') o.strike = true
+    else if (m.type === 'subscript') o.subScript = true
+    else if (m.type === 'superscript') o.superScript = true
+    else if (m.type === 'code') o.font = MONO
+    else if (m.type === 'link') o.style = 'Hyperlink'
+    else if (m.type === 'highlight') o.highlight = nearestHighlight(a.color || '#fef08a')
+    else if (m.type === 'textStyle') {
+      if (hexColour(a.color)) o.color = hexColour(a.color)
+      if (fontSize(a.fontSize)) o.size = fontSize(a.fontSize)
+      if (fontName(a.fontFamily)) o.font = fontName(a.fontFamily)
+    }
+  }
+  return new D.TextRun(o)
+}
+
+// A block's text: runs, with links as Word hyperlinks.
+function runs (nodes, base = {}) {
+  const out = []
+  let link = null
+  for (const n of nodes || []) {
+    const href = n.type === 'text' && hasMark(n, 'link') ? markAttrs(n, 'link').href : null
+    const run = n.type === 'hardBreak' ? new D.TextRun({ ...base, break: 1 }) : n.type === 'text' ? textRun(n, base) : null
+    if (!run) continue
+    if (href) {
+      if (!link || link.href !== href) { link = { href, children: [] }; out.push(link) }
+      link.children.push(run)
+    } else {
+      link = null
+      out.push(run)
+    }
+  }
+  return out.map((x) => (x.href ? new D.ExternalHyperlink({ link: x.href, children: x.children }) : x))
+}
+
+function paragraph (n, ctx, extra = {}) {
+  const a = n.attrs || {}
+  const opts = { children: runs(n.content, ctx.run), ...extra }
+  if (n.type === 'heading') opts.heading = HEADINGS[Math.max(1, Math.min(6, a.level || 1))]
+  else if (a.blockStyle === 'title') opts.heading = D.HeadingLevel.TITLE
+  else if (a.blockStyle === 'subtitle') opts.style = 'Subtitle'
+  else if (ctx.quote) opts.style = 'Quote'
+  if (ALIGN[a.textAlign]) opts.alignment = ALIGN[a.textAlign]
+  const left = (a.indent > 0 ? a.indent * INDENT : 0) + (extra.numbering ? 0 : ctx.indent || 0)
+  if (left && !extra.numbering) opts.indent = { left }
+  const spacing = {}
+  if (a.lineHeight) spacing.line = Math.round(240 * Number(a.lineHeight))
+  if (a.spaceAfter === 'none' || ctx.tight) spacing.after = 0
+  if (Object.keys(spacing).length) opts.spacing = spacing
+  return new D.Paragraph(opts)
+}
+
+function docxBlocks (nodes, ctx, out = []) {
+  for (const n of nodes || []) {
+    if (n.type === 'paragraph' || n.type === 'heading') out.push(paragraph(n, ctx))
+    else if (n.type === 'blockquote') docxBlocks(n.content, { ...ctx, quote: true }, out)
+    else if (n.type === 'codeBlock') {
+      for (const line of inlineText(n.content).split('\n')) {
+        out.push(new D.Paragraph({
+          style: 'Code',
+          indent: ctx.indent ? { left: ctx.indent } : undefined,
+          children: [new D.TextRun({ text: line })]
+        }))
+      }
+    } else if (n.type === 'horizontalRule') {
+      out.push(new D.Paragraph({ children: [], border: { bottom: { style: D.BorderStyle.SINGLE, size: 6, color: 'A0A0A0', space: 1 } } }))
+    } else if (n.type === 'bulletList' || n.type === 'orderedList' || n.type === 'taskList') {
+      const level = (ctx.level === undefined ? -1 : ctx.level) + 1
+      const reference = n.type === 'orderedList' ? 'numbers' : 'bullets'
+      // Each numbered list counts from 1 (or its start); a list inside one
+      // of the same kind carries on its numbering.
+      const instance = ctx.list && ctx.list.reference === reference ? ctx.list.instance : ++ctx.counter.n
+      for (const item of n.content || []) {
+        const inner = { ...ctx, level, list: n.type === 'taskList' ? null : { reference, instance }, indent: LIST_INDENT * (level + 1), tight: true }
+        const [first, ...rest] = item.content || []
+        if (first && first.type === 'paragraph') {
+          if (n.type === 'taskList') {
+            const box = { type: 'text', text: item.attrs && item.attrs.checked ? '☑ ' : '☐ ' }
+            out.push(paragraph({ ...first, content: [box, ...(first.content || [])] }, { ...inner, indent: LIST_INDENT * level }))
+          } else {
+            out.push(paragraph(first, inner, { numbering: { reference, level: Math.min(level, 8), instance } }))
+          }
+          docxBlocks(rest, inner, out)
+        } else docxBlocks(item.content, inner, out)
+      }
+    } else if (n.type === 'table') {
+      const rows = (n.content || []).map((row) => {
+        const cells = row.content || []
+        return new D.TableRow({
+          tableHeader: cells.length > 0 && cells.every((c) => c.type === 'tableHeader'),
+          children: cells.map((cell) => {
+            const ca = cell.attrs || {}
+            const children = docxBlocks(cell.content, { counter: ctx.counter, run: ctx.run, tight: true })
+            return new D.TableCell({
+              children: children.length ? children : [new D.Paragraph({ children: [] })],
+              columnSpan: ca.colspan > 1 ? ca.colspan : undefined,
+              rowSpan: ca.rowspan > 1 ? ca.rowspan : undefined,
+              shading: cell.type === 'tableHeader' ? { type: D.ShadingType.CLEAR, color: 'auto', fill: 'F1F3F1' } : undefined,
+              margins: { top: 60, bottom: 60, left: 100, right: 100 }
+            })
+          })
+        })
+      })
+      if (rows.length) out.push(new D.Table({ rows, width: { size: 100, type: D.WidthType.PERCENTAGE } }))
+      out.push(new D.Paragraph({ children: [], spacing: { after: 0 } }))
+    }
+  }
+  return out
+}
+
+function levels (kind) {
+  return Array.from({ length: 9 }, (_, l) => ({
+    level: l,
+    format: kind === 'bullets' ? D.LevelFormat.BULLET : NUMBER_FORMATS[l % 3],
+    text: kind === 'bullets' ? BULLETS[l % 3] : '%' + (l + 1) + '.',
+    alignment: D.AlignmentType.LEFT,
+    style: { paragraph: { indent: { left: LIST_INDENT * (l + 1), hanging: 360 } } }
+  }))
+}
+
+// The document as .docx bytes.
+export async function toDocx (json, title = '') {
+  const counter = { n: 0 }
+  const children = docxBlocks(json.content, { counter, run: {} })
+  const heading = (size, extra = {}) => ({ run: { size, bold: true, font: FONT, color: '1F2420', ...extra }, paragraph: { spacing: { before: 360, after: 120 } } })
+  const doc = new D.Document({
+    title,
+    creator: 'PearOffice',
+    styles: {
+      default: {
+        document: { run: { font: FONT, size: 22 }, paragraph: { spacing: { after: 160, line: 276 } } },
+        title: { run: { size: 52, font: FONT, color: '1F2420' }, paragraph: { spacing: { after: 60 } } },
+        heading1: heading(40),
+        heading2: heading(32),
+        heading3: heading(28, { color: '5F6B62' }),
+        hyperlink: { run: { color: '3B6E22', underline: { type: D.UnderlineType.SINGLE } } }
+      },
+      paragraphStyles: [
+        { id: 'Subtitle', name: 'Subtitle', basedOn: 'Normal', next: 'Normal', quickFormat: true, run: { size: 30, color: '5F6B62' }, paragraph: { spacing: { after: 320 } } },
+        { id: 'Quote', name: 'Quote', basedOn: 'Normal', next: 'Normal', quickFormat: true, run: { color: '5F6B62' }, paragraph: { indent: { left: 720 }, border: { left: { style: D.BorderStyle.SINGLE, size: 18, color: 'C9CFC9', space: 8 } } } },
+        { id: 'Code', name: 'Code', basedOn: 'Normal', next: 'Normal', run: { font: MONO, size: 20 }, paragraph: { spacing: { after: 0, line: 240 }, shading: { type: D.ShadingType.CLEAR, color: 'auto', fill: 'F4F5F3' } } }
+      ]
+    },
+    numbering: { config: [{ reference: 'bullets', levels: levels('bullets') }, { reference: 'numbers', levels: levels('numbers') }] },
+    sections: [{
+      properties: { page: { size: { width: 11906, height: 16838 }, margin: { top: 1440, bottom: 1440, left: 1440, right: 1440 } } },
+      children: children.length ? children : [new D.Paragraph({ children: [] })]
+    }]
+  })
+  return new Uint8Array(await D.Packer.toArrayBuffer(doc))
+}
+
+// --- printable page (PDF) -----------------------------------------------------
+
+const PRINT_CSS = [
+  '@page{size:A4;margin:20mm}',
+  'body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;font-size:11pt;line-height:1.15;color:#1f2420;overflow-wrap:break-word}',
+  'p{margin:0 0 8pt}[data-space-after=none]{margin-bottom:0}',
+  'h1{font-size:20pt;font-weight:600;margin:20pt 0 6pt}h2{font-size:16pt;font-weight:600;margin:18pt 0 6pt}h3{font-size:14pt;font-weight:600;margin:16pt 0 4pt;color:#5f6b62}',
+  'h1,h2,h3{break-after:avoid;page-break-after:avoid}body>:first-child{margin-top:0}',
+  'p[data-style=title]{font-size:26pt;margin-bottom:3pt}p[data-style=subtitle]{font-size:15pt;color:#5f6b62;margin-bottom:16pt}',
+  'ul,ol{padding-left:1.6em;margin:0 0 8pt}li>p{margin:0 0 2pt}',
+  'ul[data-type=taskList]{list-style:none;padding-left:.2em}ul[data-type=taskList] li{display:flex;align-items:flex-start;gap:8px}',
+  'ul[data-type=taskList] li>label{flex:none;margin-top:2px}ul[data-type=taskList] li>div{flex:1;min-width:0}',
+  'blockquote{margin:0 0 8pt;padding-left:14px;border-left:3px solid #c9cfc9;color:#5f6b62}',
+  'pre{background:#f4f5f3;border:1px solid #e1e5e1;border-radius:6px;padding:10px 12px;margin:0 0 8pt;font-size:10pt;white-space:pre-wrap}',
+  'code{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace}:not(pre)>code{background:#f4f5f3;border-radius:3px;padding:1px 3px;font-size:.92em}',
+  'hr{border:0;border-top:1px solid #c9cfc9;margin:14pt 0}a{color:#3b6e22}mark{border-radius:2px;padding:0 1px;color:inherit}',
+  'table{border-collapse:collapse;width:100%;margin:0 0 8pt;table-layout:fixed}td,th{border:1px solid #c9cfc9;padding:4px 8px;vertical-align:top}',
+  'th{background:#f1f3f1;font-weight:600;text-align:left}td>p,th>p{margin:0}tr{break-inside:avoid;page-break-inside:avoid}'
+].join('')
+
+export function toHtml (json, title = '') {
+  const body = generateHTML(json, documentExtensions())
+  return '<!doctype html><html><head><meta charset="utf-8"><title>' + esc(title) + '</title><style>' + PRINT_CSS + '</style></head><body>' + body + '</body></html>'
+}
+
+// --- saving -------------------------------------------------------------------
+
+// Save the document as 'docx', 'md', 'txt' or 'pdf' (PDF and print on
+// desktop only, as for sheets).
+export async function exportDocument (ydoc, title, format) {
+  const json = docToJson(ydoc)
+  const name = fileName(title || 'Untitled document')
+  if (format === 'docx') return saveFile(name + '.docx', DOCX, await toDocx(json, title))
+  if (format === 'md') return saveFile(name + '.md', 'text/markdown', toMarkdown(json))
+  if (format === 'txt') return saveFile(name + '.txt', 'text/plain', toText(json))
+  if (isMobile()) throw new Error('PDF is not available on phones yet.')
+  return call(format === 'print' ? 'app:print' : 'app:savePdf', { html: toHtml(json, title), name: name + '.pdf' })
+}
