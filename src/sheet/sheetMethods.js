@@ -9,6 +9,7 @@ const model = require('./sheetModel')
 const { displayNumber } = require('./formula')
 const SSF = require('./formula/vendor/fast-formula-parser/ssf/ssf')
 const m = require('../worklet/membership')
+const { yOps } = require('../worklet/yOps')
 const validation = require('./validation')
 const condFormat = require('./condFormat')
 const refs = require('./refs')
@@ -162,7 +163,7 @@ function createSheetMethods (sheets, { getJoin, getMoves, getProfiles }) {
   async function commit (ctx, sheetId, update) {
     if (!update) return { changed: false }
     sheets.noteLocal(sheetId, update)
-    await ctx.append(sheetId, { type: 'y', data: b4a.toString(update, 'base64') })
+    for (const op of yOps(update)) await ctx.append(sheetId, op)
     return { changed: true }
   }
 
