@@ -66,7 +66,7 @@ const SNAPSHOT_CHUNK = 512 * 1024
 // old snapshot stayed on disk: 343 MB instead of 178 MB at 100,000 edits.)
 // The Hyperbee holds only a small record pointing at the latest copy.
 
-function createSheets ({ emit, getBase, getLocalDb = () => null, getStore = () => null, onSnapshot = () => {} }) {
+function createSheets ({ emit, getBase, getLocalDb = () => null, getStore = () => null, onSnapshot = () => {}, onChange = () => {} }) {
   const open = new Map() // sheetId -> entry
 
   function entryFor (sheetId) {
@@ -74,7 +74,7 @@ function createSheets ({ emit, getBase, getLocalDb = () => null, getStore = () =
     if (!e) {
       e = { guarded: new GuardedDoc(), loading: null, values: null, timer: null, undo: null, docOut: null }
       open.set(sheetId, e)
-      e.guarded.doc.on('update', (update, origin) => sendDoc(sheetId, e, update, origin))
+      e.guarded.doc.on('update', (update, origin) => { sendDoc(sheetId, e, update, origin); onChange(sheetId) })
     }
     return e
   }

@@ -17,6 +17,7 @@ const { createDeleting } = require('./deleting')
 const { createProfiles } = require('./profiles')
 const { createPresence } = require('./presence')
 const { createRediscover } = require('./rediscover')
+const { createPictures } = require('./pictures')
 const model = require('../sheet/sheetModel')
 
 function createSheetEngine (opts = {}) {
@@ -30,6 +31,7 @@ function createSheetEngine (opts = {}) {
   let profiles = null
   let presence = null
   let rediscover = null
+  let pictures = null
   const emit = (event, data) => engine && engine.emit(event, data)
 
   const sheets = createSheets({
@@ -37,7 +39,8 @@ function createSheetEngine (opts = {}) {
     getBase: (sheetId) => engine && engine.bases.get(sheetId),
     getLocalDb: () => engine && engine.localDb,
     getStore: () => engine && engine.store,
-    onSnapshot: (sheetId) => autoCompact(sheetId).catch((e) => log('tidy-up failed: ' + e.message))
+    onSnapshot: (sheetId) => autoCompact(sheetId).catch((e) => log('tidy-up failed: ' + e.message)),
+    onChange: (sheetId) => { if (pictures) pictures.changed(sheetId) }
   })
 
   // The owner's device tidies up a sheet by itself once its history passes
@@ -61,7 +64,7 @@ function createSheetEngine (opts = {}) {
     }
   }
 
-  const deps = { getJoin: () => join, getMoves: () => moves, getProfiles: () => profiles }
+  const deps = { getJoin: () => join, getMoves: () => moves, getProfiles: () => profiles, getPictures: () => pictures }
   const methods = {
     ...createFileMethods(sheets, deps),
     ...createSheetMethods(sheets, deps),
@@ -156,11 +159,12 @@ function createSheetEngine (opts = {}) {
       // Let core attach replication first, then add our channels.
       swarm.on('connection', (conn) => { Promise.resolve().then(() => { join.onConnection(conn); presence.onConnection(conn); if (linking) linking.listen(conn) }) })
       setTimeout(() => join.resume().catch((e) => log('resume joins failed: ' + e.message)), 0)
-      seeding = createSeeding({ engine, log })
+      pictures = createPictures({ engine, sheets, getSeeding: () => seeding, log })
+      seeding = createSeeding({ engine, getPictures: () => pictures, log })
       setTimeout(() => seeding.start(), 0)
-      moves = createMoves({ engine, sheets, getJoin: () => join, getDeleting: () => deleting, emit, log })
+      moves = createMoves({ engine, sheets, getJoin: () => join, getDeleting: () => deleting, getPictures: () => pictures, emit, log })
       linking = createLinking({ engine, log })
-      deleting = createDeleting({ engine, sheets, getSeeding: () => seeding, emit, log })
+      deleting = createDeleting({ engine, sheets, getSeeding: () => seeding, getPictures: () => pictures, emit, log })
       // Core has no hook for "init finished", so catch up a little after
       // start, and once more later: open sheets that came with a device link,
       // follow sheets that moved, ask to be admitted where needed.
@@ -170,6 +174,7 @@ function createSheetEngine (opts = {}) {
           try { await moves.resume() } catch {}
           try { await deleting.resume() } catch {}
           try { await profiles.reconcileAll() } catch {}
+          try { await pictures.resume() } catch {}
         }, ms)
         if (t.unref) t.unref()
       }
@@ -188,6 +193,7 @@ function createSheetEngine (opts = {}) {
     if (profiles) profiles.close()
     if (presence) presence.close()
     if (rediscover) rediscover.close()
+    if (pictures) await pictures.close()
     return coreClose()
   }
   engine.sheets = sheets
@@ -200,6 +206,7 @@ function createSheetEngine (opts = {}) {
   Object.defineProperty(engine, 'profiles', { get: () => profiles })
   Object.defineProperty(engine, 'presence', { get: () => presence })
   Object.defineProperty(engine, 'rediscover', { get: () => rediscover })
+  Object.defineProperty(engine, 'pictures', { get: () => pictures })
   return engine
 }
 

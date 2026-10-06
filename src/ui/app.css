@@ -838,6 +838,22 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 .doc-body code { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; }
 .doc-body :not(pre) > code { background: var(--paper); border-radius: 3px; padding: 1px 3px; font-size: 0.92em; }
 .doc-body hr { border: 0; border-top: 1px solid var(--line-strong); margin: 14pt 0; }
+.doc-picture-block { margin: 0 0 8pt; display: flex; justify-content: center; }
+.doc-picture-block[data-align='left'] { justify-content: flex-start; }
+.doc-picture-block[data-align='right'] { justify-content: flex-end; }
+.doc-picture-frame { position: relative; max-width: 100%; background: var(--head); border-radius: 2px; }
+.doc-picture-frame img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.doc-picture-frame img[hidden], .doc-picture-wait[hidden] { display: none; }
+.doc-picture-wait { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 8px; color: var(--muted); font-size: 13px; text-align: center; min-height: 48px; }
+.doc-picture-block.ProseMirror-selectednode .doc-picture-frame { outline: 2px solid var(--pear); outline-offset: 2px; }
+.doc-picture-handle { display: none; position: absolute; right: -7px; bottom: -7px; width: 14px; height: 14px; border-radius: 50%; background: var(--pear); border: 2px solid var(--panel); cursor: nwse-resize; touch-action: none; }
+.doc-picture-block[data-align='right'] .doc-picture-handle { right: auto; left: -7px; cursor: nesw-resize; }
+.ProseMirror[contenteditable='true'] .doc-picture-block.ProseMirror-selectednode .doc-picture-handle { display: block; }
+@media (pointer: coarse) { .doc-picture-handle { width: 24px; height: 24px; right: -12px; bottom: -12px; } }
+.picture-bubble { position: fixed; z-index: 12; display: flex; align-items: center; gap: 4px; padding: 4px; background: var(--panel); border: 1px solid var(--line-strong); border-radius: 8px; box-shadow: 0 6px 20px rgb(0 0 0 / 0.15); transform: translateX(-50%); }
+.picture-bubble button { border: 1px solid transparent; background: var(--panel); color: var(--ink); border-radius: 6px; height: 30px; min-width: 30px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+.picture-bubble button.on { background: var(--pear-soft); border-color: var(--pear); color: var(--pear-dark); }
+.picture-bubble input { width: 180px; border: 1px solid var(--line-strong); border-radius: 6px; padding: 5px 8px; background: var(--paper); color: var(--ink); font: inherit; font-size: 13px; }
 .doc-body a { color: var(--pear-dark); text-decoration: underline; cursor: text; }
 .doc-body mark { border-radius: 2px; padding: 0 1px; color: inherit; }
 .doc-body table { border-collapse: collapse; width: 100%; margin: 0 0 8pt; table-layout: fixed; }

@@ -935,6 +935,43 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
     result.docImportNotice = await js("[...document.querySelectorAll('.banner.info')].some((b) => b.textContent.includes('Some parts of this file, such as pictures, were left out.'))")
     result.docImport = true
     step('document import')
+
+    // A picture (proposals/2026-10-06-document-images.md): a generated PNG
+    // through the insert button's file input, shown from its picture core,
+    // resized by its corner handle and aligned from its bubble.
+    await js(`(async () => {
+      const c = document.createElement('canvas')
+      c.width = 320; c.height = 160
+      const g = c.getContext('2d')
+      g.fillStyle = '#3b6e22'; g.fillRect(0, 0, 320, 160)
+      g.fillStyle = '#f0c040'; g.fillRect(40, 40, 120, 80)
+      const blob = await new Promise((resolve) => c.toBlob(resolve, 'image/png'))
+      const dt = new DataTransfer()
+      dt.items.add(new File([blob], 'box.png', { type: 'image/png' }))
+      document.querySelector('.doc-body').editor.commands.focus('end')
+      const input = document.querySelector('.doc-tools .picture-input')
+      input.files = dt.files
+      input.dispatchEvent(new Event('change', { bubbles: true }))
+    })()`)
+    await waitFor('picture shown', "(() => { const i = document.querySelector('.doc-body .doc-picture-frame img'); return !!i && !i.hidden && i.src.startsWith('blob:') && i.naturalWidth === 320 })()")
+    await js("(() => { const ed = document.querySelector('.doc-body').editor; let at = null; ed.state.doc.descendants((n, p) => { if (n.type.name === 'image') at = p }); ed.chain().focus().setNodeSelection(at).run() })()")
+    await waitFor('picture handle and bubble', "!!document.querySelector('.doc-picture-block.ProseMirror-selectednode .doc-picture-handle') && !!document.querySelector('.picture-bubble')")
+    await js(`(() => {
+      const h = document.querySelector('.doc-picture-handle')
+      const r = h.getBoundingClientRect()
+      const x = r.left + r.width / 2
+      const y = r.top + r.height / 2
+      h.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, clientX: x, clientY: y, pointerId: 1 }))
+      window.dispatchEvent(new PointerEvent('pointermove', { clientX: x - 60, clientY: y, pointerId: 1 }))
+      window.dispatchEvent(new PointerEvent('pointerup', { clientX: x - 60, clientY: y, pointerId: 1 }))
+    })()`)
+    await waitFor('picture resized', "(() => { let w = null; document.querySelector('.doc-body').editor.state.doc.descendants((n) => { if (n.type.name === 'image') w = n.attrs.width }); return w > 10 && w < 100 })()")
+    await js("document.querySelector('.picture-bubble .picture-align-left').click()")
+    await waitFor('picture aligned', "(document.querySelector('.doc-body .doc-picture-block') || {}).dataset?.align === 'left'")
+    if (process.env.PEAROFFICE_SMOKE_PICTURE_SHOT) { await sleep(300); fs.writeFileSync(process.env.PEAROFFICE_SMOKE_PICTURE_SHOT, (await wc.capturePage()).toPNG()) }
+    result.docPicture = await js("(() => { let a = null; document.querySelector('.doc-body').editor.state.doc.descendants((n) => { if (n.type.name === 'image') a = n.attrs }); return !!a && /^[0-9a-f]{64}:/.test(a.ref) && a.w === 320 && a.h === 160 && a.align === 'left' })()")
+    await sleep(600) // the editor sends its edits a moment later
+    step('document picture')
     const waitFile = async (file, timeout = 15000) => {
       for (const t0 = Date.now(); !(fs.existsSync(file) && fs.statSync(file).size > 0) && Date.now() - t0 < timeout;) await sleep(200)
       await sleep(300)
@@ -943,17 +980,22 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
     await more('Save as a Word file')
     const docxOut = await waitFile(require('node:path').join(downloads, 'Smoke import.docx'))
     let docXml = ''
-    try { docXml = require('fflate').strFromU8(require('fflate').unzipSync(new Uint8Array(docxOut))['word/document.xml']) } catch {}
+    let docMedia = 0
+    try {
+      const zip = require('fflate').unzipSync(new Uint8Array(docxOut))
+      docXml = require('fflate').strFromU8(zip['word/document.xml'])
+      docMedia = Object.keys(zip).filter((k) => /^word\/media\/.+\.(png|jpe?g)$/.test(k)).length
+    } catch {}
     await more('Save as Markdown')
     const mdOut = (await waitFile(require('node:path').join(downloads, 'Smoke import.md'))).toString('utf8')
     await more('Save as PDF')
     const docPdf = await waitFile(require('node:path').join(dataDir, 'Smoke import.pdf'))
-    result.docExport = docXml.includes('Imported heading') && docXml.includes('w:val="Heading1"') && docXml.includes('Tent') &&
-      mdOut.startsWith('# Imported heading\n') && mdOut.includes('- [x] Packed') && mdOut.includes('| Tent | 80 |') &&
+    result.docExport = docXml.includes('Imported heading') && docXml.includes('w:val="Heading1"') && docXml.includes('Tent') && docMedia === 1 &&
+      mdOut.startsWith('# Imported heading\n') && mdOut.includes('- [x] Packed') && mdOut.includes('| Tent | 80 |') && /!\[\]\(data:image\/(webp|jpeg|png);base64,/.test(mdOut) &&
       docPdf.length > 1000 && docPdf.slice(0, 4).toString() === '%PDF'
-    if (!result.docExport) throw new Error('document export: ' + JSON.stringify({ docx: docxOut.length, md: mdOut.slice(0, 200), pdf: docPdf.length }))
+    if (!result.docExport) throw new Error('document export: ' + JSON.stringify({ docx: docxOut.length, media: docMedia, md: mdOut.slice(0, 200), pdf: docPdf.length }))
     step('document export')
-    result.ok = result.docPaste && result.docOutline && result.docImport && result.docImportNotice && result.docExport && result.about && result.donation && result.docCursors && result.kinds === 'Spreadsheet, Document, Slides (soon)' && result.docCard && result.docReopened && result.docWords === '10 words' && result.fileIcons === result.sheetsAfter && result.moreChartTypes && result.importedFormats && result.keepOnline && result.avatar && result.spill && result.quickWins && result.findSort && result.fill && result.charts && result.formats && result.csvPdf && result.tabs && result.tidied && result.jsonImport && result.csvImport && result.suggested === 'SUBSTITUTE,SUBTOTAL,SUM' && result.argHelp === 'number1' && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.importedFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000 && result.pastedFormula === '=SUM(C1:C2)' && result.inviteLink.startsWith('pearoffice://join?s=') && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
+    result.ok = result.docPicture && result.docPaste && result.docOutline && result.docImport && result.docImportNotice && result.docExport && result.about && result.donation && result.docCursors && result.kinds === 'Spreadsheet, Document, Slides (soon)' && result.docCard && result.docReopened && result.docWords === '10 words' && result.fileIcons === result.sheetsAfter && result.moreChartTypes && result.importedFormats && result.keepOnline && result.avatar && result.spill && result.quickWins && result.findSort && result.fill && result.charts && result.formats && result.csvPdf && result.tabs && result.tidied && result.jsonImport && result.csvImport && result.suggested === 'SUBSTITUTE,SUBTOTAL,SUM' && result.argHelp === 'number1' && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.importedFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000 && result.pastedFormula === '=SUM(C1:C2)' && result.inviteLink.startsWith('pearoffice://join?s=') && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
   } catch (err) {
     result.error = err.message
     // What the page showed, to tell a UI failure from a load failure.

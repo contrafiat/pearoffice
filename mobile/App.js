@@ -51,14 +51,15 @@ async function shellMethod (method, args) {
     return { ok: true }
   }
   if (method === 'app:pickFile') {
+    // A picture for a document (args.images) or a file to import.
     const res = await DocumentPicker.getDocumentAsync({
-      type: ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'text/csv', 'text/comma-separated-values', 'text/tab-separated-values', 'application/json', 'text/json', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/markdown', 'text/x-markdown', 'text/plain', 'text/html', 'application/octet-stream'],
+      type: args && args.images ? ['image/*'] : ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'text/csv', 'text/comma-separated-values', 'text/tab-separated-values', 'application/json', 'text/json', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/markdown', 'text/x-markdown', 'text/plain', 'text/html', 'application/octet-stream'],
       copyToCacheDirectory: true
     })
     if (res.canceled || !res.assets || !res.assets[0]) return { canceled: true }
     const file = res.assets[0]
     const base64 = await FileSystem.readAsStringAsync(file.uri, { encoding: FileSystem.EncodingType.Base64 })
-    return { name: file.name, base64 }
+    return { name: file.name, mime: file.mimeType || null, base64 }
   }
   if (method === 'app:openUrl') {
     const url = String(args.url || '')

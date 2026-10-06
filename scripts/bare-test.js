@@ -66,7 +66,13 @@ async function main () {
     assert.equal(cell.input, '=A1+2')
     const list = await call('sheet:list', {})
     assert.equal(list[0].title, 'Bare check')
-    console.log('ok - worklet bundle under Bare: create, edit, formula, list')
+    // A picture in a document: stored in the encrypted picture core, read back.
+    const { sheetId: docId } = await call('doc:create', { title: 'Bare doc' })
+    const bytes = Buffer.alloc(150 * 1024, 7).toString('base64')
+    const pic = await call('doc:addPicture', { sheetId: docId, bytes, mime: 'image/jpeg', width: 10, height: 10 })
+    const back = await call('doc:picture', { sheetId: docId, ref: pic.ref, hash: pic.hash })
+    assert.equal(back.data === bytes, true)
+    console.log('ok - worklet bundle under Bare: create, edit, formula, list, document picture')
   } finally {
     proc.kill()
     fs.rmSync(dataDir, { recursive: true, force: true })

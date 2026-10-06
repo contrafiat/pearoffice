@@ -17,7 +17,7 @@ const MOVE_CLEANUP_MS = DROP_GRACE_MS
 const COMPACT_KEEP_MS = 90 * 24 * 3600 * 1000
 const COMPACT_CHECK_MS = 60 * 60 * 1000
 
-function createDeleting ({ engine, sheets, getSeeding, emit, log = () => {}, now = () => Date.now() }) {
+function createDeleting ({ engine, sheets, getSeeding, getPictures = () => null, emit, log = () => {}, now = () => Date.now() }) {
   async function viewGet (base, key) {
     const node = await base.view.get(key)
     return node ? node.value : null
@@ -44,6 +44,10 @@ function createDeleting ({ engine, sheets, getSeeding, emit, log = () => {}, now
   async function removeLocal (sheetId, { reason = 'removed' } = {}) {
     const base = engine.bases.get(sheetId)
     const keys = base ? coreKeys(base) : []
+    // A document's picture cores (pictures.js): this device's and the
+    // others' it fetched.
+    const pictures = getPictures()
+    if (pictures) { try { keys.push(...(await pictures.forget(sheetId))) } catch {} }
     sheets.forget(sheetId)
     await engine.destroyGroup(sheetId)
     let freed = 0

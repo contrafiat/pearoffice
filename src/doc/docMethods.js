@@ -10,10 +10,11 @@ const model = require('../sheet/sheetModel')
 const docModel = require('./docModel')
 const m = require('../worklet/membership')
 const { createFileHelpers } = require('../worklet/fileMethods')
+const { MIMES, TOO_BIG, MAX_BYTES } = require('../worklet/pictures')
 
 const hex = (buf) => b4a.toString(buf, 'hex')
 
-function createDocMethods (sheets, { getJoin }) {
+function createDocMethods (sheets, { getJoin, getPictures }) {
   const { profileName, myRole, frozenInfo, isFrozen, requireEdit, commit, docFor } = createFileHelpers(sheets)
 
   const methods = {
@@ -66,6 +67,46 @@ function createDocMethods (sheets, { getJoin }) {
       const bytes = b4a.from(update, 'base64')
       if (!e.guarded.apply(bytes, 'ui')) throw new Error('That edit could not be saved')
       return commit(ctx, sheetId, bytes)
+    },
+
+    // A picture for the document (proposals/2026-10-06-document-images.md):
+    // stored in this device's picture core for the file, and the document
+    // moves to the schema version with pictures. Returns the image node's
+    // reference attributes; the editor inserts the node. `replace`: point
+    // image nodes with that ref here instead (an import's placeholders).
+    'doc:addPicture': async ({ sheetId, bytes, mime, width, height, replace } = {}, ctx) => {
+      await requireEdit(ctx, sheetId)
+      const { doc } = await docFor(sheetId)
+      if (model.kind(doc) !== 'doc') throw new Error('Not a document')
+      if (!MIMES.includes(mime)) throw new Error('This kind of picture cannot be added.')
+      if (typeof bytes !== 'string' || !bytes) throw new Error('This picture is empty.')
+      if (bytes.length > Math.ceil(MAX_BYTES / 3) * 4 + 4) throw new Error(TOO_BIG)
+      const data = b4a.from(bytes, 'base64')
+      const stored = await getPictures().put(sheetId, data)
+      const attrs = { ref: stored.ref, hash: stored.hash, mime, w: Math.max(1, Math.round(Number(width)) || 1), h: Math.max(1, Math.round(Number(height)) || 1) }
+      const update = docModel.capture(doc, () => {
+        docModel.raiseVersion(doc, docModel.PICTURES_VERSION)
+        if (!replace) return
+        for (const node of docModel.images(doc)) {
+          if (node.getAttribute('ref') !== String(replace)) continue
+          for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v)
+        }
+      })
+      await commit(ctx, sheetId, update)
+      return { ...attrs, size: stored.size }
+    },
+
+    // A picture's bytes (base64), checked against the hash the document
+    // holds for it (or the one given).
+    'doc:picture': async ({ sheetId, ref, hash } = {}, ctx) => {
+      const { doc } = await docFor(sheetId)
+      if (!hash) {
+        const node = docModel.images(doc).find((n) => n.getAttribute('ref') === ref)
+        if (!node) throw new Error('This picture is not in the document')
+        hash = node.getAttribute('hash')
+      }
+      const bytes = await getPictures().get(sheetId, ref, hash)
+      return { data: b4a.toString(bytes, 'base64') }
     },
 
     // A new document made from a file. The UI turns the file into the

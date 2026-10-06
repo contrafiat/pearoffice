@@ -3,6 +3,12 @@
 // Imports go through HTML into the editor's own schema (documentExtensions),
 // so a document made from a file holds only what the editor knows. Exports
 // read the editor's ProseMirror JSON.
+//
+// Pictures (proposals/2026-10-06-document-images.md): an import keeps the
+// ones in the file itself (.docx pictures, data: URLs) and never fetches one
+// from the web. Each goes in as an image node whose ref is 'pending:<n>'
+// until doc:addPicture stores it and points the node at the stored copy.
+// Exports take the bytes from a map of ref -> { bytes, mime }.
 import * as Y from 'yjs'
 import { generateJSON, generateHTML, getSchema } from '@tiptap/core'
 import { prosemirrorJSONToYXmlFragment, yXmlFragmentToProseMirrorRootNode } from '@tiptap/y-tiptap'
@@ -13,6 +19,7 @@ import * as D from 'docx'
 import { documentExtensions, SIZES, LINE_HEIGHTS, MAX_INDENT } from './extensions.js'
 import { call } from '../bridge.js'
 import { fileName, saveFile, isMobile } from '../save.js'
+import { preparePicture, wordPicture, toB64, fromB64 } from './pictures.js'
 
 const FIELD = 'body' // src/doc/docModel.js
 const DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
@@ -36,8 +43,9 @@ const STYLE_MAP = [
 ]
 
 // Content the editor has no place for. Anything found is left out and the
-// person is told once.
+// person is told once. Pictures in the file itself are kept on import.
 const UNSUPPORTED = 'img, picture, video, audio, iframe, object, embed, svg, canvas, math'
+const DATA_PICTURE = /^data:(image\/(?:png|jpe?g|gif|webp|bmp));base64,([A-Za-z0-9+/=\s]+)$/i
 
 // Tidy the HTML from any source into what the editor's parser reads: Title
 // and Subtitle, headings 4 to 6 as 3, task lists (Markdown's checkboxes and
@@ -51,7 +59,29 @@ function tidy (html, styles, paste = false) {
   const body = doc.body
   let dropped = false
   if (styles) applyStyles(body, styles)
-  for (const el of [...body.querySelectorAll(UNSUPPORTED)]) { dropped = true; el.remove() }
+  // Pictures given as data: URLs (and .docx pictures, which mammoth turns
+  // into them), on import only. A picture at a web address is never fetched.
+  const pictures = []
+  const kept = new Set()
+  if (!paste) {
+    for (const pic of [...body.querySelectorAll('picture')]) {
+      for (const source of [...pic.querySelectorAll('source')]) source.remove()
+      unwrap(pic)
+    }
+    for (const img of [...body.querySelectorAll('img')]) {
+      const m = DATA_PICTURE.exec(img.getAttribute('src') || '')
+      if (!m) continue
+      const ref = 'pending:' + pictures.length
+      pictures.push({ ref, mime: m[1].toLowerCase().replace('jpg', 'jpeg'), data: m[2].replace(/\s/g, '') })
+      const next = doc.createElement('img')
+      next.setAttribute('data-ref', ref)
+      if (img.getAttribute('alt')) next.setAttribute('alt', img.getAttribute('alt'))
+      // The editor's parser puts it on its own line.
+      img.replaceWith(next)
+      kept.add(next)
+    }
+  }
+  for (const el of [...body.querySelectorAll(UNSUPPORTED)]) { if (kept.has(el)) continue; dropped = true; el.remove() }
   if (foreign(body)) dropped = true
   // Footnotes and endnotes (mammoth's markers and the list at the end).
   for (const a of [...body.querySelectorAll('a[href^="#footnote-"], a[href^="#endnote-"]')]) {
@@ -116,7 +146,7 @@ function tidy (html, styles, paste = false) {
     run.appendChild(li)
   }
   for (const el of [...body.querySelectorAll('input, button, select, textarea')]) el.remove()
-  return { html: body.innerHTML, dropped }
+  return { html: body.innerHTML, dropped, pictures }
 }
 
 // Clipboard HTML tidied for the editor. { html, dropped }.
@@ -563,11 +593,13 @@ export function textToJson (text) {
   }
 }
 
-// A file's bytes to the editor's JSON. { json, dropped }: dropped when some of
-// its content had no place in a document.
+// A file's bytes to the editor's JSON. { json, dropped, pictures }: dropped
+// when some of its content had no place in a document; pictures are the ones
+// it carried, [{ ref: 'pending:<n>', mime, data (base64) }], each an image
+// node in the JSON.
 export async function fileToJson (name, bytes) {
   const ext = (/\.([^.]+)$/.exec(String(name || '')) || [])[1].toLowerCase()
-  if (ext === 'txt') return { json: textToJson(new TextDecoder().decode(bytes)), dropped: false }
+  if (ext === 'txt') return { json: textToJson(new TextDecoder().decode(bytes)), dropped: false, pictures: [] }
   let html
   let styles = null
   if (ext === 'docx') {
@@ -578,8 +610,8 @@ export async function fileToJson (name, bytes) {
     const out = await mammoth.convertToHtml({ arrayBuffer: buf, buffer: buf }, {
       styleMap: STYLE_MAP,
       transformDocument: markFormatting(colours, styles),
-      // Pictures are left out; keep a marker so they are counted.
-      convertImage: mammoth.images.imgElement(() => ({ src: '' }))
+      // Pictures as data: URLs, kept by tidy.
+      convertImage: mammoth.images.imgElement(async (image) => ({ src: 'data:' + image.contentType + ';base64,' + await image.read('base64') }))
     })
     html = out.value
   } else if (ext === 'md' || ext === 'markdown') {
@@ -588,7 +620,18 @@ export async function fileToJson (name, bytes) {
     html = new TextDecoder().decode(bytes)
   }
   const t = tidy(html, styles)
-  return { json: htmlToJson(t.html), dropped: t.dropped }
+  return { json: htmlToJson(t.html), dropped: t.dropped, pictures: t.pictures }
+}
+
+// Every node in the JSON, depth first.
+function eachNode (json, fn) {
+  for (const n of json.content || []) { fn(n); eachNode(n, fn) }
+}
+
+// The JSON without the nodes `drop` picks.
+function without (json, drop) {
+  if (!json.content) return json
+  return { ...json, content: json.content.filter((n) => !drop(n)).map((n) => without(n, drop)) }
 }
 
 // The JSON as the first Yjs update of a document's body.
@@ -607,18 +650,28 @@ export function docToJson (ydoc) {
   return yXmlFragmentToProseMirrorRootNode(ydoc.getXmlFragment(FIELD), getSchema(documentExtensions())).toJSON()
 }
 
-function toB64 (bytes) {
-  let s = ''
-  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000))
-  return btoa(s)
-}
-
 // Import a file as a new document. Resolves to { sheetId, dropped }.
-export async function importDocument (bytes, name) {
-  const { json, dropped } = await fileToJson(name, bytes)
+// Each picture is shrunk as an inserted one is (`prepare`), then stored once
+// the document exists; one that cannot be used is left out.
+export async function importDocument (bytes, name, { prepare = (b, mime) => preparePicture(new Blob([b], { type: mime }), mime) } = {}) {
+  const { json, dropped, pictures } = await fileToJson(name, bytes)
+  const ready = new Map()
+  let lost = false
+  for (const p of pictures) {
+    try { ready.set(p.ref, await prepare(fromB64(p.data), p.mime)) } catch { lost = true }
+  }
+  const body = without(json, (n) => n.type === 'image' && !ready.has(n.attrs && n.attrs.ref))
+  eachNode(body, (n) => {
+    if (n.type !== 'image') return
+    const p = ready.get(n.attrs.ref)
+    n.attrs = { ...n.attrs, mime: p.mime, w: p.w, h: p.h }
+  })
   const title = String(name || '').replace(/\.[^.]+$/, '') || 'Imported document'
-  const r = await call('doc:import', { title, update: toB64(jsonToUpdate(json)) })
-  return { ...r, dropped }
+  const r = await call('doc:import', { title, update: toB64(jsonToUpdate(body)) })
+  for (const [ref, p] of ready) {
+    try { await call('doc:addPicture', { sheetId: r.sheetId, bytes: toB64(p.bytes), mime: p.mime, width: p.w, height: p.h, replace: ref }) } catch { lost = true }
+  }
+  return { ...r, dropped: dropped || lost }
 }
 
 // --- shared walking -----------------------------------------------------------
@@ -644,6 +697,7 @@ function blocksText (nodes, pad) {
     if (n.type === 'paragraph' || n.type === 'heading') out.push(pad + inlineText(n.content).replace(/\n/g, '\n' + pad))
     else if (n.type === 'codeBlock') out.push(inlineText(n.content).split('\n').map((l) => pad + l).join('\n'))
     else if (n.type === 'horizontalRule') out.push(pad + '---')
+    else if (n.type === 'image') out.push(pad + '[Picture' + (n.attrs && n.attrs.alt ? ': ' + n.attrs.alt : '') + ']')
     else if (n.type === 'blockquote') out.push(...blocksText(n.content, pad))
     else if (n.type === 'bulletList' || n.type === 'orderedList' || n.type === 'taskList') {
       const start = (n.attrs && n.attrs.start) || 1
@@ -662,10 +716,13 @@ function blocksText (nodes, pad) {
 // --- Markdown -----------------------------------------------------------------
 
 // GitHub-flavoured Markdown. Formatting with no Markdown form (colour, size,
-// font, underline, alignment and the rest) is left out.
-export function toMarkdown (json) {
-  return mdBlocks(json.content).join('\n\n').replace(/\n{3,}/g, '\n\n').trim() + '\n'
+// font, underline, alignment and the rest) is left out. Pictures go in the
+// file as data: URLs (`pictures`: ref -> { bytes, mime }).
+export function toMarkdown (json, pictures = new Map()) {
+  return mdBlocks(json.content, pictures).join('\n\n').replace(/\n{3,}/g, '\n\n').trim() + '\n'
 }
+
+const dataUrl = (p) => 'data:' + p.mime + ';base64,' + toB64(p.bytes)
 
 const MD_MARKS = [['link'], ['bold', '**'], ['italic', '_'], ['strike', '~~'], ['code', '`']]
 
@@ -705,7 +762,7 @@ function mdInline (nodes, inTable) {
   return out
 }
 
-function mdBlocks (nodes) {
+function mdBlocks (nodes, pics = new Map()) {
   const out = []
   for (const n of nodes || []) {
     const a = n.attrs || {}
@@ -720,7 +777,10 @@ function mdBlocks (nodes) {
       const fence = '`'.repeat(Math.max(3, ...[...code.matchAll(/`+/g)].map((x) => x[0].length + 1)))
       out.push(fence + (a.language || '') + '\n' + code + '\n' + fence)
     } else if (n.type === 'horizontalRule') out.push('---')
-    else if (n.type === 'blockquote') out.push(mdBlocks(n.content).join('\n\n').split('\n').map((l) => (l ? '> ' + l : '>')).join('\n'))
+    else if (n.type === 'image') {
+      const p = pics.get(a.ref)
+      if (p) out.push('![' + mdEscape(a.alt || '').replace(/\n/g, ' ') + '](' + dataUrl(p) + ')')
+    } else if (n.type === 'blockquote') out.push(mdBlocks(n.content, pics).join('\n\n').split('\n').map((l) => (l ? '> ' + l : '>')).join('\n'))
     else if (n.type === 'bulletList' || n.type === 'orderedList' || n.type === 'taskList') {
       const start = a.start || 1
       out.push((n.content || []).map((item, i) => {
@@ -729,8 +789,8 @@ function mdBlocks (nodes) {
         if (n.type === 'taskList') marker += item.attrs && item.attrs.checked ? '[x] ' : '[ ] '
         // A list right under the item's text stays tight; other blocks get a
         // blank line.
-        const kids = (item.content || []).filter((b) => mdBlocks([b]).length)
-        const inner = mdBlocks(kids)
+        const kids = (item.content || []).filter((b) => mdBlocks([b], pics).length)
+        const inner = mdBlocks(kids, pics)
         const body = inner.map((b, j) => (j === 0 ? b : (/List$/.test(kids[j].type) ? '' : '\n') + b)).join('\n').split('\n').map((l, j) => (j === 0 ? l : l ? pad + l : '')).join('\n')
         return marker + body
       }).join('\n'))
@@ -857,9 +917,25 @@ function paragraph (n, ctx, extra = {}) {
   return new D.Paragraph(opts)
 }
 
+// Word's page is 6.27 inches wide inside the margins: 602 pixels at 96 dpi.
+const PAGE_PX = 602
+const WORD_TYPES = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/gif': 'gif', 'image/bmp': 'bmp' }
+
+function picture (n, ctx) {
+  const a = n.attrs || {}
+  const p = ctx.pictures && ctx.pictures.get(a.ref)
+  if (!p || !WORD_TYPES[p.mime] || !a.w || !a.h) return null
+  const width = Math.round(a.width ? PAGE_PX * a.width / 100 : Math.min(a.w, PAGE_PX))
+  return new D.Paragraph({
+    alignment: ALIGN[a.align] || D.AlignmentType.CENTER,
+    children: [new D.ImageRun({ type: WORD_TYPES[p.mime], data: p.bytes, transformation: { width, height: Math.round(width * a.h / a.w) }, altText: { name: 'Picture', description: a.alt || '', title: a.alt || '' } })]
+  })
+}
+
 function docxBlocks (nodes, ctx, out = []) {
   for (const n of nodes || []) {
     if (n.type === 'paragraph' || n.type === 'heading') out.push(paragraph(n, ctx))
+    else if (n.type === 'image') out.push(...[picture(n, ctx)].filter(Boolean))
     else if (n.type === 'blockquote') docxBlocks(n.content, { ...ctx, quote: true }, out)
     else if (n.type === 'codeBlock') {
       for (const line of inlineText(n.content).split('\n')) {
@@ -901,7 +977,7 @@ function docxBlocks (nodes, ctx, out = []) {
           tableHeader: cells.length > 0 && cells.every((c) => c.type === 'tableHeader'),
           children: cells.map((cell) => {
             const ca = cell.attrs || {}
-            const children = docxBlocks(cell.content, { counter: ctx.counter, run: ctx.run, tight: true })
+            const children = docxBlocks(cell.content, { counter: ctx.counter, run: ctx.run, pictures: ctx.pictures, tight: true })
             return new D.TableCell({
               children: children.length ? children : [new D.Paragraph({ children: [] })],
               columnSpan: ca.colspan > 1 ? ca.colspan : undefined,
@@ -929,10 +1005,11 @@ function levels (kind) {
   }))
 }
 
-// The document as .docx bytes.
-export async function toDocx (json, title = '') {
+// The document as .docx bytes. `pictures`: ref -> { bytes, mime }, in a type
+// Word reads (wordPicture).
+export async function toDocx (json, title = '', pictures = new Map()) {
   const counter = { n: 0 }
-  const children = docxBlocks(json.content, { counter, run: {} })
+  const children = docxBlocks(json.content, { counter, run: {}, pictures })
   const heading = (size, extra = {}) => ({ run: { size, bold: true, font: FONT, color: '1F2420', ...extra }, paragraph: { spacing: { before: 360, after: 120 } } })
   const doc = new D.Document({
     title,
@@ -978,24 +1055,55 @@ const PRINT_CSS = [
   'code{font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace}:not(pre)>code{background:#f4f5f3;border-radius:3px;padding:1px 3px;font-size:.92em}',
   'hr{border:0;border-top:1px solid #c9cfc9;margin:14pt 0}a{color:#3b6e22}mark{border-radius:2px;padding:0 1px;color:inherit}',
   'table{border-collapse:collapse;width:100%;margin:0 0 8pt;table-layout:fixed}td,th{border:1px solid #c9cfc9;padding:4px 8px;vertical-align:top}',
-  'th{background:#f1f3f1;font-weight:600;text-align:left}td>p,th>p{margin:0}tr{break-inside:avoid;page-break-inside:avoid}'
+  'th{background:#f1f3f1;font-weight:600;text-align:left}td>p,th>p{margin:0}tr{break-inside:avoid;page-break-inside:avoid}',
+  'img.doc-picture{display:block;max-width:100%;height:auto;margin:0 auto 8pt;break-inside:avoid}img.doc-picture[data-align=left]{margin-left:0}img.doc-picture[data-align=right]{margin-right:0}'
 ].join('')
 
-export function toHtml (json, title = '') {
-  const body = generateHTML(json, documentExtensions())
+// The printable page, each picture in it as a data: URL.
+export function toHtml (json, title = '', pictures = new Map()) {
+  let body = generateHTML(json, documentExtensions())
+  if (/<img/.test(body)) {
+    const doc = new window.DOMParser().parseFromString('<body>' + body + '</body>', 'text/html')
+    for (const img of [...doc.body.querySelectorAll('img.doc-picture')]) {
+      const p = pictures.get(img.getAttribute('data-ref'))
+      if (!p) { img.remove(); continue }
+      img.setAttribute('src', dataUrl(p))
+      const pct = Number(img.getAttribute('data-width'))
+      const w = Number(img.getAttribute('data-w'))
+      img.setAttribute('style', pct ? 'width:' + pct + '%' : w ? 'width:' + w + 'px' : '')
+    }
+    body = doc.body.innerHTML
+  }
   return '<!doctype html><html><head><meta charset="utf-8"><title>' + esc(title) + '</title><style>' + PRINT_CSS + '</style></head><body>' + body + '</body></html>'
 }
 
 // --- saving -------------------------------------------------------------------
 
+// The pictures in the JSON, fetched: ref -> { bytes, mime }. One that cannot
+// be fetched is left out of the export.
+export async function picturesOf (json, fetchPicture) {
+  const out = new Map()
+  const nodes = []
+  eachNode(json, (n) => { if (n.type === 'image' && n.attrs && n.attrs.ref) nodes.push(n.attrs) })
+  for (const a of nodes) {
+    if (out.has(a.ref)) continue
+    try { out.set(a.ref, { bytes: await fetchPicture(a), mime: a.mime }) } catch {}
+  }
+  return out
+}
+
 // Save the document as 'docx', 'md', 'txt', 'pdf' or 'print' (print on
 // desktop only, as for sheets).
-export async function exportDocument (ydoc, title, format) {
+export async function exportDocument (ydoc, title, format, sheetId) {
   const json = docToJson(ydoc)
   const name = fileName(title || 'Untitled document')
-  if (format === 'docx') return saveFile(name + '.docx', DOCX, await toDocx(json, title))
-  if (format === 'md') return saveFile(name + '.md', 'text/markdown', toMarkdown(json))
   if (format === 'txt') return saveFile(name + '.txt', 'text/plain', toText(json))
   if (format === 'print' && isMobile()) throw new Error('Printing is not available on phones.')
-  return call(format === 'print' ? 'app:print' : 'app:savePdf', { html: toHtml(json, title), name: name + '.pdf' })
+  const pictures = await picturesOf(json, async (a) => fromB64((await call('doc:picture', { sheetId, ref: a.ref, hash: a.hash })).data))
+  if (format === 'docx') {
+    for (const [ref, p] of pictures) pictures.set(ref, await wordPicture(p.bytes, p.mime).catch(() => p))
+    return saveFile(name + '.docx', DOCX, await toDocx(json, title, pictures))
+  }
+  if (format === 'md') return saveFile(name + '.md', 'text/markdown', toMarkdown(json, pictures))
+  return call(format === 'print' ? 'app:print' : 'app:savePdf', { html: toHtml(json, title, pictures), name: name + '.pdf' })
 }
