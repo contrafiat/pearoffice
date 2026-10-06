@@ -86,7 +86,7 @@ Code that works for any kind of file sits apart from each editor's own
 - `src/sheet/jsonImport.js` turns a .json file into the same import payload
   as an .xlsx (a tab per list of records, the rest on a Summary tab).
 - `src/ui/` - the React UI: the app shell, file list, sharing, seeder,
-  devices and settings panels. `src/ui/sheet/` is the spreadsheet editor
+  devices and settings panels, About and donations (`About.jsx`). `src/ui/sheet/` is the spreadsheet editor
   (grid, toolbar, its panels, charts, `xlsx.js` file handling). Talks only to
   `window.pearoffice` (`call`, `on`), which the desktop preload and the mobile
   WebView provide. Built to `dist/ui` by `scripts/build-ui.mjs`.

@@ -21,6 +21,7 @@ if (!window.pearoffice) {
   }
   window.pearoffice = {
     platform: 'mobile',
+    os: window.__pearPlatform, // 'android' or 'ios', set by the shell
     call (method, args) {
       return new Promise((resolve, reject) => {
         const id = ++next

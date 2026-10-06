@@ -32,7 +32,7 @@ function menuEntry (appImage) {
 }
 
 // image: an Electron nativeImage of the app icon (resized here).
-function installMenuEntry ({ appImage, image, dataHome = process.env.XDG_DATA_HOME || path.join(os.homedir(), '.local', 'share') }) {
+function installMenuEntry ({ appImage, image, dataHome = process.env.XDG_DATA_HOME || path.join(os.homedir(), '.local', 'share'), refresh = true }) {
   if (!appImage) return false
   const file = path.join(dataHome, 'applications', NAME + '.desktop')
   const entry = menuEntry(appImage)
@@ -52,7 +52,8 @@ function installMenuEntry ({ appImage, image, dataHome = process.env.XDG_DATA_HO
     changed = true
   }
   // So pearoffice:// links find the entry. Not every desktop has the tool.
-  if (changed) execFile('update-desktop-database', [path.dirname(file)], () => {})
+  // (`refresh: false` in tests: it writes into the folder in the background.)
+  if (changed && refresh) execFile('update-desktop-database', [path.dirname(file)], () => {})
   return changed
 }
 

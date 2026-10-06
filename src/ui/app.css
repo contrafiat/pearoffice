@@ -303,6 +303,30 @@ button, input, select { font: inherit; color: inherit; }
 .credits { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; font-size: 13px; }
 .credits li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--line); }
 .credits li .muted { margin: 0; text-align: right; }
+/* About, as in the other PeerLoom apps: one section open at a time. */
+.panel .about-head { text-align: center; }
+.panel .about-head p { margin: 0; }
+.about-section { border-bottom: 1px solid var(--line); }
+.panel button.about-toggle { width: 100%; display: flex; align-items: center; justify-content: space-between; background: none; border: 0; border-radius: 0; padding: 12px 2px; font: inherit; font-weight: 600; color: var(--ink); cursor: pointer; }
+.about-toggle svg { transition: transform 0.15s ease; color: var(--muted); }
+.about-section.open .about-toggle svg { transform: rotate(180deg); }
+.about-body { display: flex; flex-direction: column; gap: 10px; padding: 0 2px 14px; }
+.panel .row.center { justify-content: center; }
+.panel .row.equal > button { flex: 1; justify-content: center; }
+.panel .about-foot { text-align: center; }
+.panel .center-text { text-align: center; }
+.panel button.wide { width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.bitcoin { display: flex; flex-direction: column; gap: 8px; }
+.bitcoin h3 { text-align: center; }
+.copy-field { display: flex; align-items: center; gap: 8px; border: 1px solid var(--line-strong); border-radius: 8px; padding: 6px 6px 6px 12px; }
+.copy-field code { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.copy-field button { flex: none; }
+.wallets { display: flex; flex-direction: column; gap: 8px; }
+.panel button.wallet { display: flex; align-items: center; justify-content: space-between; gap: 10px; text-align: left; }
+.wallet > span { display: flex; flex-direction: column; }
+.wallet .muted { margin: 0; }
+.panel.donate-reminder { max-width: 380px; }
+.panel .already { align-self: center; }
 .mono { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-size: 12px; }
 .me { display: flex; align-items: flex-start; gap: 10px; padding: 0 4px; }
 .me-picture { border: none; background: none; padding: 0; margin-top: 4px; cursor: pointer; border-radius: 50%; flex: none; }

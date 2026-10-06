@@ -44,6 +44,9 @@
         "NSBonjourServices": [
           "_hyperswarm._udp",
           "_pearofficelan._tcp"
+        ],
+        "LSApplicationQueriesSchemes": [
+          "lightning"
         ]
       }
     },
@@ -59,6 +62,7 @@
       "./plugins/with-android-debug-standalone",
       "./plugins/with-android-abis",
       "./plugins/with-gradle-jvmargs",
+      "./plugins/with-android-queries",
       "./plugins/with-ios-pod-deployment-target",
       "./plugins/with-ios-scene-lifecycle",
       [

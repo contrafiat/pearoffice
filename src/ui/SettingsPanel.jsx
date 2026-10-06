@@ -1,42 +1,18 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { ArrowSquareOut, Camera, CaretLeft, Desktop, Devices, EnvelopeSimple, HardDrives, Moon, Sun, Trash, X } from '@phosphor-icons/react'
+import { Camera, CaretLeft, Desktop, Devices, HardDrives, Moon, Sun, Trash, X } from '@phosphor-icons/react'
 import { call } from './bridge.js'
 import { Avatar, shrinkPicture } from './Avatar.jsx'
 import { readPref, writePref } from './prefs.js'
 import { themePref, setThemePref } from './theme.js'
 
-/* global __APP_VERSION__ */
-const VERSION = typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : ''
+import { AboutContent, BitcoinContent, VERSION } from './About.jsx'
 
-// The main open-source parts of PearOffice and their licences.
-const CREDITS = [
-  ['Yjs', 'MIT', 'merging edits'],
-  ['fast-formula-parser', 'MIT', 'formulas'],
-  ['Formula.js', 'MIT', 'formula functions'],
-  ['jStat', 'MIT', 'statistics functions'],
-  ['stdlib', 'Apache-2.0', 'maths functions'],
-  ['Chevrotain', 'Apache-2.0', 'formula parsing'],
-  ['SheetJS Community Edition', 'Apache-2.0', '.xlsx files'],
-  ['Hypercore, Autobase, Hyperbee, Corestore', 'MIT and Apache-2.0', 'storage and sync'],
-  ['Hyperswarm and HyperDHT', 'MIT', 'finding other devices'],
-  ['Blind Peer', 'Apache-2.0', 'the seeder'],
-  ['Bare and BareKit', 'Apache-2.0', 'the sync engine runtime'],
-  ['libsodium (sodium-universal)', 'ISC and MIT', 'encryption'],
-  ['React', 'MIT', 'the interface'],
-  ['Electron', 'MIT', 'the desktop app'],
-  ['React Native and Expo', 'MIT', 'the phone app'],
-  ['qrcode-generator', 'MIT', 'QR codes'],
-  ['Manrope', 'OFL-1.1', 'the font'],
-  ['Phosphor Icons', 'MIT', 'icons']
-]
-
-function openUrl (url) {
-  call('app:openUrl', { url }).catch(() => {})
-}
+const TITLES = { settings: 'Settings', about: 'About PearOffice', bitcoin: 'Bitcoin Lightning' }
 
 // One place for your profile and this device's settings, plus About.
-export function SettingsPanel ({ me, onMe, desktop, keepOnline, startAtLogin, onSetting, onDevices, onSeeder, onClose, onError }) {
-  const [mode, setMode] = useState('settings')
+export function SettingsPanel ({ me, onMe, desktop, keepOnline, startAtLogin, onSetting, onDevices, onSeeder, onClose, onError, startIn = null }) {
+  const [mode, setMode] = useState(startIn ? startIn.mode : 'settings') // settings | about | bitcoin
+  const [wallet, setWallet] = useState(false) // a Lightning wallet is installed
   const [numPad, setNumPad] = useState(() => readPref('pearoffice:numpad') === '1')
   const [theme, setTheme] = useState(themePref)
   const [showMe, setShowMe] = useState(() => readPref('pearoffice:presence') !== '0')
@@ -55,10 +31,11 @@ export function SettingsPanel ({ me, onMe, desktop, keepOnline, startAtLogin, on
 
   return (
     <div className='panel-backdrop' onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
-      <section className='panel settings' role='dialog' aria-label={mode === 'about' ? 'About PearOffice' : 'Settings'}>
+      <section className='panel settings' role='dialog' aria-label={TITLES[mode]}>
         <header>
           {mode === 'about' && <button className='link-button back' onClick={() => setMode('settings')}><CaretLeft size={14} /> Settings</button>}
-          <h2>{mode === 'about' ? 'About PearOffice' : 'Settings'}</h2>
+          {mode === 'bitcoin' && <button className='link-button back' onClick={() => setMode('about')}><CaretLeft size={14} /> About</button>}
+          <h2>{TITLES[mode]}</h2>
           <button className='close' aria-label='Close' onClick={onClose}><X size={18} /></button>
         </header>
 
@@ -173,25 +150,8 @@ export function SettingsPanel ({ me, onMe, desktop, keepOnline, startAtLogin, on
           </>
         )}
 
-        {mode === 'about' && (
-          <>
-            <p className='about-lead'>Shared spreadsheets, device to device. No accounts and no servers.</p>
-            <p className='small'>Version {VERSION || 'unknown'}</p>
-            <h3>How it works</h3>
-            <p>Your sheets live on your devices. When you share one, it syncs straight between the devices of the people in it, encrypted, with no company server in between. A seeder you run can keep a copy online while everyone is offline, and it cannot read it.</p>
-            <div className='row'><button onClick={() => openUrl('https://pears.com/')}><ArrowSquareOut size={16} /> Learn about peer-to-peer</button></div>
-            <h3>Contact</h3>
-            <div className='row'><button onClick={() => openUrl('mailto:peerloomllc@proton.me?subject=%5BPearOffice%5D%20Feedback')}><EnvelopeSimple size={16} /> Email PeerLoom</button></div>
-            <h3>Open-source software</h3>
-            <p className='small'>PearOffice is built on these projects, used under their licences.</p>
-            <ul className='credits'>
-              {CREDITS.map(([what, licence, use]) => (
-                <li key={what}><span>{what}</span><span className='muted'>{licence} · {use}</span></li>
-              ))}
-            </ul>
-            <p className='small muted'>© PeerLoom LLC</p>
-          </>
-        )}
+        {mode === 'about' && <AboutContent startSection={startIn && startIn.section} onBitcoin={(detected) => { setWallet(detected); setMode('bitcoin') }} />}
+        {mode === 'bitcoin' && <BitcoinContent detected={wallet} />}
       </section>
     </div>
   )

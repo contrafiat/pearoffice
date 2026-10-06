@@ -14,6 +14,8 @@ const condFormat = require('./condFormat')
 const refs = require('./refs')
 const charts = require('./charts')
 
+const DONATE_AFTER_MS = 14 * 24 * 3600 * 1000
+
 const hex = (buf) => b4a.toString(buf, 'hex')
 const INVITE_HOURS = 24
 
@@ -677,6 +679,19 @@ function createSheetMethods (sheets, { getJoin, getMoves, getProfiles }) {
       return { identity: hex(ctx.identity.publicKey), name: p.name, avatar: p.avatar, phraseNudge: hasSheet && !nudged }
     },
     'app:phraseNudged': async (args, ctx) => { await ctx.localDb.put('phraseNudged', { at: Date.now() }); return { ok: true } },
+
+    // A nudge to donate, once, two weeks after first use (as in the other
+    // PeerLoom apps). The UI never shows it on iOS before the first release.
+    'donation:status': async (args, ctx) => {
+      let row = (await ctx.localDb.get('donateReminder'))?.value
+      if (!row) { row = { firstUseAt: Date.now(), shown: false }; await ctx.localDb.put('donateReminder', row) }
+      return { due: !row.shown && Date.now() - row.firstUseAt >= DONATE_AFTER_MS }
+    },
+    'donation:dismiss': async (args, ctx) => {
+      const row = (await ctx.localDb.get('donateReminder'))?.value || { firstUseAt: Date.now() }
+      await ctx.localDb.put('donateReminder', { ...row, shown: true })
+      return { ok: true }
+    },
 
     // Saves the name or picture locally and updates it in every sheet
     // (proposals/2026-10-04-profiles-with-avatars.md).
