@@ -13,6 +13,7 @@ const { createLinking } = require('./linking')
 const { createDeleting } = require('./deleting')
 const { createProfiles } = require('./profiles')
 const { createPresence } = require('./presence')
+const { createRediscover } = require('./rediscover')
 const model = require('../sheet/sheetModel')
 
 function createSheetEngine (opts = {}) {
@@ -25,6 +26,7 @@ function createSheetEngine (opts = {}) {
   let deleting = null
   let profiles = null
   let presence = null
+  let rediscover = null
   const emit = (event, data) => engine && engine.emit(event, data)
 
   const sheets = createSheets({
@@ -61,6 +63,9 @@ function createSheetEngine (opts = {}) {
     // Who has a sheet open (proposals/2026-10-05-presence.md).
     'sheet:presence': async ({ sheetId, ...state }) => { if (presence) presence.set(sheetId, state); return {} },
     'sheet:present': async ({ sheetId }) => ({ people: presence ? presence.list(sheetId) : [] }),
+    // A sheet came on screen or left it: look again for its other devices
+    // while it is open and nobody is connected (src/worklet/rediscover.js).
+    'sheet:visible': async ({ sheetId, visible }) => { if (rediscover) rediscover.visible(sheetId, !!visible); return {} },
     'seeder:pair': async ({ link }) => seeding.pair(link),
     'seeder:list': async () => seeding.list(),
     'seeder:sheet': async ({ sheetId }) => seeding.sheetSeeders(sheetId),
@@ -139,6 +144,7 @@ function createSheetEngine (opts = {}) {
       profiles = createProfiles({ engine, getJoin: () => join, emit, log })
       join = createJoinService({ engine, emit, onProfile: (sheetId, op) => profiles.take(sheetId, op), kindOf: async (sheetId) => model.kind((await sheets.load(sheetId)).guarded.doc), log })
       presence = createPresence({ engine, emit, log })
+      rediscover = createRediscover({ engine, log })
       // Let core attach replication first, then add our channels.
       swarm.on('connection', (conn) => { Promise.resolve().then(() => { join.onConnection(conn); presence.onConnection(conn); if (linking) linking.listen(conn) }) })
       setTimeout(() => join.resume().catch((e) => log('resume joins failed: ' + e.message)), 0)
@@ -173,6 +179,7 @@ function createSheetEngine (opts = {}) {
     if (linking) linking.close()
     if (profiles) profiles.close()
     if (presence) presence.close()
+    if (rediscover) rediscover.close()
     return coreClose()
   }
   engine.sheets = sheets
@@ -184,6 +191,7 @@ function createSheetEngine (opts = {}) {
   Object.defineProperty(engine, 'deleting', { get: () => deleting })
   Object.defineProperty(engine, 'profiles', { get: () => profiles })
   Object.defineProperty(engine, 'presence', { get: () => presence })
+  Object.defineProperty(engine, 'rediscover', { get: () => rediscover })
   return engine
 }
 
