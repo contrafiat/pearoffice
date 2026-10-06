@@ -58,6 +58,11 @@ execFileSync(process.execPath, [
   path.join(root, 'src', 'seeder', 'bare.js')
 ], { cwd: root, stdio: 'inherit' })
 
+// Every addon the bundles load must be there for the target, or the app
+// fails only on the user's machine.
+const { assertAddons } = require('./check-addons')
+for (const b of ['worklet/worklet.bundle', 'seeder/seeder.bundle']) assertAddons(path.join(out, b), host)
+
 // 4. The UI, minified.
 execFileSync(process.execPath, [path.join(root, 'scripts', 'build-ui.mjs'), '--minify'], { cwd: root, stdio: 'inherit' })
 fs.cpSync(path.join(root, 'dist', 'ui'), path.join(out, 'ui'), { recursive: true })

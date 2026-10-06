@@ -206,15 +206,19 @@ test (`scripts/smoke-packaged.js`) run against the installed-layout app.
   then the packaged smoke. Hardened runtime entitlements are in
   `desktop/build/entitlements.mac.plist` (V8 JIT for Electron and Bare, Bare's
   addons, network). The Intel build is smoke-tested under Rosetta.
-- `npm run dist:windows` - NSIS installer, built on the local libvirt VM
-  `win11-pearguard` (start it with `virsh -c qemu:///system start
-  win11-pearguard`, shut it down after).
+- `npm run dist:windows` - NSIS installer, built here with Wine (about a
+  minute). Staging fails if an addon the bundles load has no Windows file
+  (`scripts/check-addons.js`, run for every platform). Before a release,
+  `npm run dist:windows:vm` builds on the local libvirt VM `win11-pearguard`
+  and runs the packaged smoke there (start it with `virsh -c qemu:///system
+  start win11-pearguard`, shut it down after). The app installs per user to
+  `%LOCALAPPDATA%\Programs\pearoffice-desktop\`.
 
 `scripts/stage-desktop.js` gathers the Bare runtime, the worklet bundle with
 the target's addons and the minified UI into `desktop/build/resources`, which
 electron-builder copies into the app (`desktop/paths.js` finds them). Mac
 builds are signed and notarized; Linux and Windows builds are unsigned
-(no Windows code-signing certificate yet).
+(no Windows code-signing certificate).
 
 ## Verify
 
