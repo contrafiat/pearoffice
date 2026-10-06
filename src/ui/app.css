@@ -115,7 +115,7 @@ button, input, select { font: inherit; color: inherit; }
 .kind-icon { display: inline-flex; flex: none; }
 .kind-sheet { color: #2f9e5b; }
 .kind-doc { color: #3b82f6; }
-.kind-slides { color: #e8792b; }
+.kind-slides { color: #d24726; }
 .files-home { flex: 1; min-height: 0; overflow-y: auto; padding: 32px 24px; }
 .files-home h1 { text-align: center; font-size: 22px; font-weight: 650; margin: 0 0 16px; }
 .files-home .empty-actions { margin-bottom: 24px; }
