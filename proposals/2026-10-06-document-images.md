@@ -180,6 +180,22 @@ files. If B fails in testing before release, ship A instead (T2), with a
 3. Limit per picture after scaling: 1 MB.
 4. Every member device fetches all pictures, for offline use.
 
+## Spike results (2026-10-06)
+
+`spikes/picture-core/RESULTS.md`. All three guesses held. Changes for the
+build:
+
+- Encrypt each picture core with a key derived from the file key (keyed
+  BLAKE2b of `pearoffice/pictures/1`, as `linking.js` derives keys), not
+  the file key itself.
+- The seeder needs no change; register picture cores with `base.key` as
+  referrer. `seeding.js` must register them again after `rebuild()`.
+- Encode WebP where the WebView can (check `blob.type`: iOS WebKit returns
+  PNG), else JPEG, and keep the smaller. Shrunk photos measured 90 to 460
+  KB and screenshots 20 to 100 KB, so the 1 MB cap rarely applies.
+- Tests: do not open a picture core on the seeder before blind-peer has
+  recorded it, or the seeder skips the download.
+
 ## Open questions
 
 None left from the draft. Before building, check the three guesses above
