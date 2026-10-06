@@ -40,7 +40,11 @@ function trend (points) {
 
 export function chartOption (chart, data, theme = themeColors()) {
   const type = chart.type || 'column'
-  const fmt = formatter(chart.yFormat)
+  // The format picked for the chart, else the cells' own (the first series'
+  // for the main axis). A histogram's values are counts, so it keeps none.
+  const cellFmt = type === 'histogram' ? null : (data.series[0] || {}).format
+  const fmt = formatter(chart.yFormat || cellFmt)
+  const tipFmt = chart.percent ? (v) => (typeof v === 'number' ? Number(v.toFixed(1)) + '%' : v) : fmt
   const legend = chart.legend || (data.series.length > 1 || type === 'pie' || type === 'doughnut' ? 'bottom' : 'none')
   const text = { color: theme.ink, fontFamily: "'Manrope', system-ui, sans-serif" }
   const option = {
@@ -49,7 +53,7 @@ export function chartOption (chart, data, theme = themeColors()) {
     color: PALETTE,
     textStyle: text,
     title: chart.title ? { text: chart.title, left: 'center', top: 6, textStyle: { ...text, fontSize: 14, fontWeight: 500 } } : undefined,
-    tooltip: { trigger: type === 'pie' || type === 'doughnut' || type === 'scatter' ? 'item' : 'axis', valueFormatter: fmt },
+    tooltip: { trigger: type === 'pie' || type === 'doughnut' || type === 'scatter' ? 'item' : 'axis', valueFormatter: tipFmt },
     legend: legend === 'none' ? { show: false } : legend === 'right'
       ? { type: 'scroll', orient: 'vertical', right: 8, top: 'middle', textStyle: text }
       : { type: 'scroll', bottom: 4, textStyle: text },
@@ -105,14 +109,14 @@ export function chartOption (chart, data, theme = themeColors()) {
 
   const categoryAxis = (labels) => ({ type: 'category', data: labels.map(String), axisLabel: { color: theme.muted }, axisLine, ...axisName(chart.xTitle) })
   if (type === 'scatter') {
-    option.xAxis = { type: 'value', scale: true, axisLabel: { color: theme.muted }, axisLine, splitLine, ...axisName(chart.xTitle) }
+    option.xAxis = { type: 'value', scale: true, axisLabel: { color: theme.muted, formatter: formatter(data.xFormat) }, axisLine, splitLine, ...axisName(chart.xTitle) }
     option.yAxis = valueAxis({ scale: true })
     option.series = data.series.map((s) => ({ type: 'scatter', name: s.name, data: data.categories.map((x, i) => [x, s.values[i]]).filter((p) => p[0] !== null && p[1] !== null), label }))
   } else if (type === 'bubble') {
     // X in the first column, then Y and size for each series. Circle area
     // follows the size; the largest is 48 pixels across.
     // Room around the edges, so the outer bubbles are not cut off.
-    option.xAxis = { type: 'value', scale: true, boundaryGap: ['12%', '12%'], axisLabel: { color: theme.muted }, axisLine, splitLine, ...axisName(chart.xTitle) }
+    option.xAxis = { type: 'value', scale: true, boundaryGap: ['12%', '12%'], axisLabel: { color: theme.muted, formatter: formatter(data.xFormat) }, axisLine, splitLine, ...axisName(chart.xTitle) }
     option.yAxis = valueAxis({ scale: true, boundaryGap: ['15%', '15%'] })
     option.tooltip = { trigger: 'item' }
     const pairs = []
@@ -136,7 +140,10 @@ export function chartOption (chart, data, theme = themeColors()) {
       ? [{ type: 'candlestick', name: chart.title || 'Price', data: data.categories.map((_, k) => [o.values[k], c.values[k], l.values[k], h.values[k]]), itemStyle: { color: UP, color0: DOWN, borderColor: UP, borderColor0: DOWN } }]
       : []
   } else if (type === 'histogram') {
-    const bins = histogram(data.series.flatMap((s) => s.values), chart.binWidth)
+    let bins = histogram(data.series.flatMap((s) => s.values), chart.binWidth)
+    // Bin edges in the cells' format, when they have one.
+    const edge = (data.series[0] || {}).format && formatter(data.series[0].format)
+    if (edge) bins = bins.map((b, k) => ({ ...b, label: (k ? '(' : '[') + edge(b.from) + ', ' + edge(b.to) + ']' }))
     option.xAxis = { ...categoryAxis(bins.map((b) => b.label)), axisLabel: { color: theme.muted, interval: 0, hideOverlap: true } }
     option.yAxis = valueAxis({ minInterval: 1 })
     option.legend = { show: false }
@@ -169,11 +176,18 @@ export function chartOption (chart, data, theme = themeColors()) {
     const second = new Set(chart.secondAxis || [])
     const catAxis = categoryAxis(data.categories)
     const horizontal = type === 'bar'
+    // The second axis takes the format of the first series on it.
+    const secondFmt = formatter(chart.yFormat || (data.series.find((_, i) => second.has(i)) || {}).format)
+    const secondAxis = valueAxis({ name: undefined, splitLine: { show: false } })
+    if (!chart.percent) secondAxis.axisLabel = { ...secondAxis.axisLabel, formatter: secondFmt }
     option.xAxis = horizontal ? valueAxis() : catAxis
-    option.yAxis = horizontal ? { ...catAxis, inverse: true } : (type === 'combo' && second.size ? [valueAxis(), valueAxis({ name: undefined, splitLine: { show: false } })] : valueAxis())
+    option.yAxis = horizontal ? { ...catAxis, inverse: true } : (type === 'combo' && second.size ? [valueAxis(), secondAxis] : valueAxis())
     option.series = data.series.map((s, i) => {
       const asLine = type === 'line' || type === 'area' || (type === 'combo' && lines.has(i))
+      // Each series shows its own cells' format in the tooltip and labels.
+      const own = chart.percent ? tipFmt : formatter(chart.yFormat || s.format || cellFmt)
       return {
+        tooltip: { valueFormatter: own },
         type: asLine ? 'line' : 'bar',
         // One series: each category its own colour, as pie slices are.
         colorBy: !asLine && data.series.length === 1 && type !== 'combo' ? 'data' : 'series',
@@ -184,7 +198,7 @@ export function chartOption (chart, data, theme = themeColors()) {
         yAxisIndex: type === 'combo' && second.has(i) ? 1 : 0,
         connectNulls: asLine,
         symbolSize: 5,
-        label: label && { ...label, position: horizontal ? 'right' : chart.stacked || chart.percent ? 'inside' : 'top' }
+        label: label && { ...label, formatter: (p) => own(p.value), position: horizontal ? 'right' : chart.stacked || chart.percent ? 'inside' : 'top' }
       }
     })
   }

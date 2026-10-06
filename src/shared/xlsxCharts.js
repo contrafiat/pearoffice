@@ -25,8 +25,8 @@ function strRef (f, values) {
   return '<c:strRef><c:f>' + esc(f) + '</c:f><c:strCache><c:ptCount val="' + values.length + '"/>' +
     values.map((v, i) => '<c:pt idx="' + i + '"><c:v>' + esc(v) + '</c:v></c:pt>').join('') + '</c:strCache></c:strRef>'
 }
-function numRef (f, values) {
-  return '<c:numRef><c:f>' + esc(f) + '</c:f><c:numCache><c:formatCode>General</c:formatCode><c:ptCount val="' + values.length + '"/>' +
+function numRef (f, values, format) {
+  return '<c:numRef><c:f>' + esc(f) + '</c:f><c:numCache><c:formatCode>' + esc(format || 'General') + '</c:formatCode><c:ptCount val="' + values.length + '"/>' +
     values.map((v, i) => (num(v) === null ? '' : '<c:pt idx="' + i + '"><c:v>' + num(v) + '</c:v></c:pt>')).join('') + '</c:numCache></c:numRef>'
 }
 const text = (t) => '<c:tx><c:rich><a:bodyPr/><a:p><a:r><a:t>' + esc(t) + '</a:t></a:r></a:p></c:rich></c:tx>'
@@ -68,14 +68,14 @@ function seriesXml (chart, s, i, place, kind, size) {
   let xml = '<c:ser><c:idx val="' + i + '"/><c:order val="' + i + '"/>' + tx
   if (kind === 'bubble') {
     // X, Y and size; no data labels or trend lines here.
-    return xml + fill(i) + '<c:invertIfNegative val="0"/><c:xVal>' + numRef(place.categories, cats) + '</c:xVal><c:yVal>' + numRef(s.valuesRef, s.values) + '</c:yVal>' +
-      '<c:bubbleSize>' + numRef(size.valuesRef, size.values) + '</c:bubbleSize><c:bubble3D val="0"/></c:ser>'
+    return xml + fill(i) + '<c:invertIfNegative val="0"/><c:xVal>' + numRef(place.categories, cats, chart.resolved.xFormat) + '</c:xVal><c:yVal>' + numRef(s.valuesRef, s.values, s.format) + '</c:yVal>' +
+      '<c:bubbleSize>' + numRef(size.valuesRef, size.values, size.format) + '</c:bubbleSize><c:bubble3D val="0"/></c:ser>'
   }
   if (kind === 'stock' || kind === 'radar') {
     xml += kind === 'stock' ? '<c:spPr><a:ln w="19050"><a:noFill/></a:ln></c:spPr>' : line(i)
     xml += '<c:marker><c:symbol val="none"/></c:marker>'
     if (place.categories) xml += '<c:cat>' + strRef(place.categories, cats.map(String)) + '</c:cat>'
-    return xml + '<c:val>' + numRef(s.valuesRef, s.values) + '</c:val>' + (kind === 'stock' ? '<c:smooth val="0"/>' : '') + '</c:ser>'
+    return xml + '<c:val>' + numRef(s.valuesRef, s.values, s.format) + '</c:val>' + (kind === 'stock' ? '<c:smooth val="0"/>' : '') + '</c:ser>'
   }
   if (kind === 'scatter') {
     // Points only: no line between them, a filled circle each.
@@ -88,11 +88,11 @@ function seriesXml (chart, s, i, place, kind, size) {
   if (chart.dataLabels) xml += '<c:dLbls><c:showLegendKey val="0"/><c:showVal val="1"/><c:showCatName val="0"/><c:showSerName val="0"/><c:showPercent val="0"/><c:showBubbleSize val="0"/></c:dLbls>'
   if ((chart.trendline || []).includes(i) && kind !== 'pie') xml += '<c:trendline><c:trendlineType val="linear"/><c:dispRSqr val="1"/><c:dispEq val="0"/></c:trendline>'
   if (kind === 'scatter') {
-    xml += '<c:xVal>' + numRef(place.categories, cats) + '</c:xVal><c:yVal>' + numRef(s.valuesRef, s.values) + '</c:yVal><c:smooth val="0"/>'
+    xml += '<c:xVal>' + numRef(place.categories, cats, chart.resolved.xFormat) + '</c:xVal><c:yVal>' + numRef(s.valuesRef, s.values, s.format) + '</c:yVal><c:smooth val="0"/>'
   } else {
     if (place.categories) xml += '<c:cat>' + strRef(place.categories, cats.map(String)) + '</c:cat>'
     else xml += '<c:cat>' + '<c:strLit><c:ptCount val="' + cats.length + '"/>' + cats.map((c, k) => '<c:pt idx="' + k + '"><c:v>' + esc(c) + '</c:v></c:pt>').join('') + '</c:strLit></c:cat>'
-    xml += '<c:val>' + numRef(s.valuesRef, s.values) + '</c:val>'
+    xml += '<c:val>' + numRef(s.valuesRef, s.values, s.format) + '</c:val>'
     if (kind === 'line') xml += '<c:smooth val="0"/>'
   }
   return xml + '</c:ser>'

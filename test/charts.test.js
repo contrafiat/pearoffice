@@ -72,3 +72,15 @@ test('a chart follows inserted rows, and says when its data was deleted', () => 
   assert.match(c.data, /#REF!/)
   assert.throws(() => model.setChart(doc, tab, 'nope', { title: 'x' }), /deleted/)
 })
+
+test('series keep their cells\' number format', () => {
+  const money = (v) => ({ num: v, text: '$' + v, fmt: '"$"#,##0.00' })
+  const b = [[cell(''), cell('Rent'), cell('Count')], [cell('Jan'), money(1200), cell(3)], [cell('Feb'), money(1250), cell(4)]]
+  const d = chartData(b, { seriesIn: 'columns', labels: { row: true, col: true } })
+  assert.equal(d.series[0].format, '"$"#,##0.00')
+  assert.equal(d.series[1].format, undefined, 'plain numbers have no format')
+  const xy = chartData([[money(1), cell(2)], [money(2), cell(4)]], { type: 'scatter' })
+  assert.equal(xy.xFormat, '"$"#,##0.00', 'scatter x values keep theirs')
+  const block = rangeBlock(parseRange('A1:A1'), () => ({ value: 5, display: '$5.00', numFmt: '"$"#,##0.00' }))
+  assert.equal(block[0][0].fmt, '"$"#,##0.00')
+})
