@@ -111,6 +111,28 @@ button, input, select { font: inherit; color: inherit; }
 .empty-actions { display: flex; gap: 10px; justify-content: center; align-items: center; }
 .empty-actions .join-sheet { margin-top: 0; padding: 10px 18px; font-size: 15px; color: var(--ink); }
 
+/* The start screen: every file, with an icon for its kind. */
+.kind-icon { display: inline-flex; flex: none; }
+.kind-sheet { color: #2f9e5b; }
+.kind-doc { color: #3b82f6; }
+.kind-slides { color: #e8792b; }
+.files-home { flex: 1; min-height: 0; overflow-y: auto; padding: 32px 24px; }
+.files-home h1 { text-align: center; font-size: 22px; font-weight: 650; margin: 0 0 16px; }
+.files-home .empty-actions { margin-bottom: 24px; }
+.file-grid { list-style: none; margin: 0 auto; padding: 0; max-width: 960px; display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+.file-card { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 14px; text-align: left; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; cursor: pointer; color: var(--ink); font: inherit; }
+.file-card:hover { border-color: var(--pear); }
+.file-card .file-title { font-weight: 600; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-card .file-meta { display: flex; align-items: center; gap: 8px; min-height: 20px; }
+.file-card.waiting { color: var(--muted); font-style: italic; }
+.sheet-link.all-files { margin-bottom: 4px; }
+.kind-choices { display: flex; gap: 10px; }
+.kind-choice { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 16px 8px; background: none; border: 1px solid var(--line-strong); border-radius: 10px; cursor: pointer; font: inherit; }
+.kind-choice:hover:not(:disabled) { border-color: var(--pear); background: var(--pear-soft); }
+.kind-choice:disabled { cursor: default; opacity: 0.5; }
+.kind-choice .kind-label { color: var(--ink); font-weight: 600; }
+.kind-choice .kind-soon { color: var(--muted); font-size: 12px; }
+
 .sheet { display: flex; flex-direction: column; height: 100%; min-height: 0; }
 
 .toolbar { display: flex; align-items: center; gap: 16px; padding: 10px 14px 8px; background: var(--panel); border-bottom: 1px solid var(--line); }
@@ -367,6 +389,10 @@ button, input, select { font: inherit; color: inherit; }
   .banner { padding-left: 52px; } /* clear the menu button */
   .empty { padding: 0 24px; }
   .empty-actions { flex-direction: column; align-items: stretch; }
+  .files-home { padding: 56px 16px 24px; }
+  .file-grid { grid-template-columns: 1fr; }
+  .file-card { flex-direction: row; align-items: center; }
+  .file-card .file-title { flex: 1; }
   .formula-bar .address { width: 48px; }
   .panel-backdrop { padding-top: 4vh; }
 }

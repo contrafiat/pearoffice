@@ -9,7 +9,8 @@ import { Avatar, MemberAvatar } from './Avatar.jsx'
 import { SettingsPanel } from './SettingsPanel.jsx'
 import { UpdateBar } from './UpdateBar.jsx'
 import { applyTheme } from './theme.js'
-import { FileArrowUp, GearSix, LinkSimple, List, Plus } from '@phosphor-icons/react'
+import { FileHome, NewPanel } from './Files.jsx'
+import { FileArrowUp, GearSix, House, LinkSimple, List, Plus } from '@phosphor-icons/react'
 
 applyTheme()
 
@@ -54,6 +55,16 @@ function ImportButton ({ className, onImported, onError }) {
   )
 }
 
+function StartActions ({ onNew, onJoin, onImported, onError }) {
+  return (
+    <div className='empty-actions'>
+      <button className='new-sheet big' onClick={onNew}><Plus size={18} /> New</button>
+      <button className='join-sheet big' onClick={onJoin}><LinkSimple size={18} /> Join with a link</button>
+      <ImportButton className='join-sheet big' onImported={onImported} onError={onError} />
+    </div>
+  )
+}
+
 export function App () {
   const [sheets, setSheets] = useState(null)
   const [current, setCurrent] = useState(null)
@@ -63,6 +74,7 @@ export function App () {
   const [avatar, setAvatar] = useState(null) // { data, mime, hash } or null
   const [myId, setMyId] = useState(null)
   const [settings, setSettings] = useState(false)
+  const [newFile, setNewFile] = useState(false) // the New panel, asking which kind
   // A short note at the bottom ("Joined ..."), gone after a few seconds.
   const [toast, setToast] = useState(null)
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(null), 4000); return () => clearTimeout(t) }, [toast])
@@ -89,8 +101,8 @@ export function App () {
 
   const loadMe = useCallback(() => call('app:me').then((me) => { setName(me.name); setAvatar(me.avatar || null); setMyId(me.identity); setNudge(!!me.phraseNudge) }).catch(() => {}), [])
 
-  // A sheet that left this device: drop it from the list before anything
-  // else, or the "open the most recent sheet" step below picks it again.
+  // A sheet that left this device: drop it from the list and, if it was on
+  // screen, go back to the file list.
   const forget = useCallback((sheetId) => {
     setSheets((list) => (list ? list.filter((x) => x.sheetId !== sheetId) : list))
     setCurrent((c) => (c === sheetId ? null : c))
@@ -146,7 +158,9 @@ export function App () {
     else if (/^pearoffice:\/\/link\?/.test(url)) setDevices({ link: url })
   }
 
-  async function create () {
+  async function create (kind) {
+    setNewFile(false)
+    if (kind !== 'sheet') return // documents and slides are not built yet
     try {
       const { sheetId } = await call('sheet:create', { title: 'Untitled sheet' })
       await refresh()
@@ -156,28 +170,26 @@ export function App () {
     }
   }
 
-  // Open the most recent sheet on start. Not a join still waiting for its
-  // keys: there is nothing to open yet.
-  useEffect(() => {
-    const ready = (sheets || []).filter((s) => !s.waiting)
-    if (ready.length && !current) setCurrent(ready[ready.length - 1].sheetId)
-  }, [sheets, current])
-
   return (
     <div className={'app' + (navOpen ? ' nav-open' : '')}>
-      <button className='nav-toggle' aria-label='Your sheets' aria-expanded={navOpen} onClick={() => setNavOpen(true)}><List size={20} aria-hidden='true' /></button>
+      <button className='nav-toggle' aria-label='Your files' aria-expanded={navOpen} onClick={() => setNavOpen(true)}><List size={20} aria-hidden='true' /></button>
       {navOpen && <div className='nav-scrim' onClick={() => setNavOpen(false)} />}
       <aside className='sidebar' onClick={(e) => { if (e.target.closest('button')) setNavOpen(false) }}>
         <div className='brand'>
           <span className='brand-mark' aria-hidden='true' />
           PearOffice
         </div>
-        <button className='new-sheet' onClick={create}><Plus size={16} /> New sheet</button>
+        <button className='new-sheet' onClick={() => setNewFile(true)}><Plus size={16} /> New</button>
         <button className='join-sheet' onClick={() => setJoining('')}><LinkSimple size={16} /> Join with a link</button>
         <ImportButton className='join-sheet' onImported={opened} onError={setError} />
-        <nav className='sheet-list' aria-label='Your sheets'>
+        <nav className='sheet-list' aria-label='Your files'>
           {sheets === null && <p className='muted'>Starting...</p>}
-          {sheets && sheets.length === 0 && <p className='muted'>No sheets yet.</p>}
+          {sheets && sheets.length > 0 && (
+            <button className={'sheet-link all-files' + (current ? '' : ' active')} onClick={() => setCurrent(null)}>
+              <House size={18} aria-hidden='true' /><span className='sheet-title'>All files</span>
+            </button>
+          )}
+          {sheets && sheets.length === 0 && <p className='muted'>No files yet.</p>}
           {sheets && [...sheets].reverse().map((s) => (
             <button
               key={s.sheetId}
@@ -209,6 +221,7 @@ export function App () {
           <GearSix className='gear' size={20} aria-hidden='true' />
         </button>
       </aside>
+      {newFile && <NewPanel onPick={create} onClose={() => setNewFile(false)} />}
       {joining !== null && (
         <JoinPanel
           initialLink={joining}
@@ -259,17 +272,22 @@ export function App () {
         {error && <div className='banner' role='alert'>{error} <button className='link-button' onClick={() => setError(null)}>Dismiss</button></div>}
         {current
           ? <SheetView key={current} sheetId={current} onTitleChange={refresh} onError={setError} onGone={async () => { forget(current); await refresh() }} />
-          : (
-            <div className='empty'>
-              <h1>Shared spreadsheets, device to device.</h1>
-              <p>No accounts and no servers. Create a sheet, join one with a link or import a file.</p>
-              <div className='empty-actions'>
-                <button className='new-sheet big' onClick={create}><Plus size={18} /> New sheet</button>
-                <button className='join-sheet big' onClick={() => setJoining('')}><LinkSimple size={18} /> Join with a link</button>
-                <ImportButton className='join-sheet big' onImported={opened} onError={setError} />
+          : sheets && sheets.length
+            ? (
+              <FileHome
+                files={sheets}
+                onOpen={setCurrent}
+                onWaiting={setWaitingJoin}
+                actions={<StartActions onNew={() => setNewFile(true)} onJoin={() => setJoining('')} onImported={opened} onError={setError} />}
+              />
+              )
+            : (
+              <div className='empty'>
+                <h1>Shared files, device to device.</h1>
+                <p>No accounts and no servers. Create a file, join one with a link or import a spreadsheet.</p>
+                <StartActions onNew={() => setNewFile(true)} onJoin={() => setJoining('')} onImported={opened} onError={setError} />
               </div>
-            </div>
-            )}
+              )}
       </main>
     </div>
   )
