@@ -208,8 +208,12 @@ function cleanName (name) {
 
 // --- links -------------------------------------------------------------------
 
-function inviteLink ({ sheetId, groupKey, inviteId, seed, owner, role }) {
-  const q = new URLSearchParams({ s: sheetId, t: groupKey, i: inviteId, k: b64url(seed), o: owner, r: role, v: '1' })
+// f: the kind of file (sheet, later doc and slides). A link without one is a
+// sheet; a kind this build does not know needs a newer version.
+const LINK_KINDS = ['sheet']
+
+function inviteLink ({ sheetId, groupKey, inviteId, seed, owner, role, kind = 'sheet' }) {
+  const q = new URLSearchParams({ s: sheetId, t: groupKey, i: inviteId, k: b64url(seed), o: owner, r: role, f: kind, v: '1' })
   return 'pearoffice://join?' + q.toString()
 }
 
@@ -217,8 +221,8 @@ function parseInviteLink (link) {
   const m = /^pearoffice:\/\/join\?(.+)$/.exec(String(link).trim())
   if (!m) throw new Error('That is not a PearOffice invite link')
   const q = new URLSearchParams(m[1])
-  const out = { sheetId: q.get('s'), groupKey: q.get('t'), inviteId: q.get('i'), seed: q.get('k') ? fromB64url(q.get('k')) : null, owner: q.get('o'), role: q.get('r'), v: q.get('v') }
-  if (out.v !== '1') throw new Error('This invite needs a newer version of PearOffice')
+  const out = { sheetId: q.get('s'), groupKey: q.get('t'), inviteId: q.get('i'), seed: q.get('k') ? fromB64url(q.get('k')) : null, owner: q.get('o'), role: q.get('r'), kind: q.get('f') || 'sheet', v: q.get('v') }
+  if (out.v !== '1' || !LINK_KINDS.includes(out.kind)) throw new Error('This invite needs a newer version of PearOffice')
   if (!out.sheetId || !HEX64.test(out.groupKey || '') || !HEX32.test(out.inviteId || '') || !out.seed || out.seed.length !== 32 || !HEX64.test(out.owner || '')) {
     throw new Error('This invite link is damaged')
   }

@@ -13,6 +13,7 @@ const { createLinking } = require('./linking')
 const { createDeleting } = require('./deleting')
 const { createProfiles } = require('./profiles')
 const { createPresence } = require('./presence')
+const model = require('../shared/sheetModel')
 
 function createSheetEngine (opts = {}) {
   const { createSwarm: makeSwarm, log = () => {}, ...rest } = opts
@@ -136,7 +137,7 @@ function createSheetEngine (opts = {}) {
     createSwarm: (args) => {
       const swarm = makeSwarm ? makeSwarm(args) : new (require('hyperswarm'))(args)
       profiles = createProfiles({ engine, getJoin: () => join, emit, log })
-      join = createJoinService({ engine, emit, onProfile: (sheetId, op) => profiles.take(sheetId, op), log })
+      join = createJoinService({ engine, emit, onProfile: (sheetId, op) => profiles.take(sheetId, op), kindOf: async (sheetId) => model.kind((await sheets.load(sheetId)).guarded.doc), log })
       presence = createPresence({ engine, emit, log })
       // Let core attach replication first, then add our channels.
       swarm.on('connection', (conn) => { Promise.resolve().then(() => { join.onConnection(conn); presence.onConnection(conn); if (linking) linking.listen(conn) }) })

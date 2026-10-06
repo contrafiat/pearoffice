@@ -324,11 +324,11 @@ function createSheetMethods (sheets, { getJoin, getMoves, getProfiles }) {
         // Not loaded yet: load it in the background, so its title (and any
         // later change) reaches the list live through sheet:changed.
         if (!e && !(moved && moved.removed)) sheets.load(value.groupId).then(() => sheets.changed(value.groupId)).catch(() => {})
-        out.push({ sheetId: value.groupId, title: (e && model.title(e.guarded.doc)) || value.name || '', joining: joining.has(value.groupId) || undefined, removed: (moved && moved.removed) || undefined, ...(await peopleOf(ctx, value.groupId)) })
+        out.push({ sheetId: value.groupId, title: (e && model.title(e.guarded.doc)) || value.name || '', kind: e ? model.kind(e.guarded.doc) : 'sheet', joining: joining.has(value.groupId) || undefined, removed: (moved && moved.removed) || undefined, ...(await peopleOf(ctx, value.groupId)) })
         joining.delete(value.groupId)
       }
       // Joins that have not been welcomed yet have no base.
-      for (const p of joining.values()) out.push({ sheetId: p.sheetId, title: '', joining: true, waiting: true, role: p.role, reason: p.reason, startedAt: p.startedAt })
+      for (const p of joining.values()) out.push({ sheetId: p.sheetId, title: '', kind: p.kind, joining: true, waiting: true, role: p.role, reason: p.reason, startedAt: p.startedAt })
       return out
     },
 
@@ -609,7 +609,7 @@ function createSheetMethods (sheets, { getJoin, getMoves, getProfiles }) {
       const expiresAt = Date.now() + Math.max(1, Math.min(24 * 7, Number(hours) || INVITE_HOURS)) * 3600 * 1000
       const { op, inviteId, seed } = m.inviteOp({ sheetId, owner: ctx.identity, role, expiresAt })
       await ctx.append(sheetId, op)
-      const link = m.inviteLink({ sheetId, groupKey: mine.groupKey, inviteId, seed, owner: hex(ctx.identity.publicKey), role })
+      const link = m.inviteLink({ sheetId, groupKey: mine.groupKey, inviteId, seed, owner: hex(ctx.identity.publicKey), role, kind: model.kind((await docFor(sheetId)).doc) })
       return { link, inviteId, role, expiresAt }
     },
 

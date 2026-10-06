@@ -124,10 +124,19 @@ function newTab (doc, name, rows = DEFAULT_ROWS, cols = DEFAULT_COLS) {
   return id
 }
 
+// What kind of file a document is (proposals/2026-10-06-rename-to-pearoffice.md,
+// step 2). Only sheets exist so far; files made before kinds count as sheets.
+const KINDS = ['sheet']
+
+function kind (doc) {
+  return doc.getMap('meta').get('kind') || 'sheet'
+}
+
 function initSheet (doc, { title = 'Untitled sheet' } = {}) {
   return capture(doc, () => {
     const meta = doc.getMap('meta')
     meta.set('title', title)
+    meta.set('kind', 'sheet')
     meta.set('version', VERSION)
     const id = newTab(doc, 'Sheet1')
     doc.getArray('tabs').push([id])
@@ -1273,6 +1282,8 @@ function setTitle (doc, value) {
 
 module.exports = {
   VERSION,
+  KINDS,
+  kind,
   FORMAT_ATTRS,
   createDoc,
   applyUpdate,

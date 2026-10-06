@@ -37,7 +37,7 @@ const LOOKUP_EVERY_MS = [3000, 5000, 10000, 15000]
 const GIVE_UP_MS = 7 * 24 * 3600 * 1000
 const hex = (buf) => b4a.toString(buf, 'hex')
 
-function createJoinService ({ engine, emit, onProfile = async () => {}, log = () => {}, now = () => Date.now() }) {
+function createJoinService ({ engine, emit, onProfile = async () => {}, kindOf = async () => 'sheet', log = () => {}, now = () => Date.now() }) {
   const muxes = new Set()
   const joins = new Map() // sheetId -> { link, welcome, channels:Set, timer, done }
   const recentlyAppended = new Map() // inviteId -> time
@@ -137,7 +137,8 @@ function createJoinService ({ engine, emit, onProfile = async () => {}, log = ()
     const mine = (await engine.localDb.get('groups:joined:' + sheetId))?.value
     if (!mine || !mine.encryptionKey) return reject('This device cannot share that sheet')
     log('welcome ' + String(msg.inviteId).slice(0, 8))
-    ch.msg.send({ t: 'welcome', groupKey: mine.groupKey, bootstrap: mine.bootstrap, encryptionKey: mine.encryptionKey, name: mine.name || '', role: invite.role })
+    const kind = await kindOf(sheetId).catch(() => 'sheet')
+    ch.msg.send({ t: 'welcome', groupKey: mine.groupKey, bootstrap: mine.bootstrap, encryptionKey: mine.encryptionKey, name: mine.name || '', role: invite.role, kind })
   }
 
   async function takeClaim (ch, sheetId, msg) {
@@ -300,7 +301,7 @@ function createJoinService ({ engine, emit, onProfile = async () => {}, log = ()
   }
 
   function pending () {
-    return [...joins.entries()].map(([sheetId, j]) => ({ sheetId, stage: j.welcome ? 'claiming' : 'looking', role: j.link.role, reason: j.reason || undefined, startedAt: j.startedAt }))
+    return [...joins.entries()].map(([sheetId, j]) => ({ sheetId, kind: (j.welcome && j.welcome.kind) || j.link.kind || 'sheet', stage: j.welcome ? 'claiming' : 'looking', role: j.link.role, reason: j.reason || undefined, startedAt: j.startedAt }))
   }
 
   // Stop a join. Returns whether keys had arrived, in which case the caller
