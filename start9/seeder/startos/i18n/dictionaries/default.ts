@@ -1,7 +1,7 @@
 export const DEFAULT_LANG = 'en_US'
 
 const dict = {
-  'Starting the PearSheet seeder': 0,
+  'Starting the PearOffice seeder': 0,
   Dashboard: 1,
   'The dashboard is ready': 2,
   'The dashboard is not ready': 3,

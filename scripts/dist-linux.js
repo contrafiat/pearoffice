@@ -11,7 +11,7 @@ execFileSync(process.execPath, [path.join(root, 'scripts', 'stage-desktop.js'), 
 const dist = path.join(root, 'desktop', 'dist')
 if (fs.existsSync(dist)) {
   for (const f of fs.readdirSync(dist)) {
-    if (/^pearsheet-.*-linux-|^linux-unpacked$/.test(f)) fs.rmSync(path.join(dist, f), { recursive: true, force: true })
+    if (/^pearoffice-.*-linux-|^linux-unpacked$/.test(f)) fs.rmSync(path.join(dist, f), { recursive: true, force: true })
   }
 }
 execFileSync('npx', ['electron-builder', '--linux', '--x64', '--publish', 'never'], { cwd: path.join(root, 'desktop'), stdio: 'inherit' })

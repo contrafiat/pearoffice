@@ -68,7 +68,7 @@ export async function shrinkPicture (file) {
   const img = await new Promise((resolve, reject) => {
     const i = new window.Image()
     i.onload = () => resolve(i)
-    i.onerror = () => reject(new Error('That file is not a picture PearSheet can read'))
+    i.onerror = () => reject(new Error('That file is not a picture PearOffice can read'))
     i.src = url
   })
   const side = Math.min(img.naturalWidth, img.naturalHeight)

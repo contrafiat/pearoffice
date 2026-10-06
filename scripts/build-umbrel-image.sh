@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Build the PearSheet seeder image for amd64 and arm64 and push it to
-# ghcr.io/peerloomllc/pearsheet-seeder:<version> (version from package.json
+# Build the PearOffice seeder image for amd64 and arm64 and push it to
+# ghcr.io/peerloomllc/pearoffice-seeder:<version> (version from package.json
 # unless given). PUSH=0 builds without pushing. Needs podman, and
 # qemu-user-static for the arm64 apt step.
 #
@@ -8,7 +8,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
-IMAGE="${IMAGE:-ghcr.io/peerloomllc/pearsheet-seeder}"
+IMAGE="${IMAGE:-ghcr.io/peerloomllc/pearoffice-seeder}"
 VERSION="${1:-$(node -p "require('./package.json').version")}"
 TAG="$IMAGE:$VERSION"
 PUSH="${PUSH:-1}"

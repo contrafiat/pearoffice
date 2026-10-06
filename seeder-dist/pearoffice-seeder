@@ -1,23 +1,23 @@
 #!/bin/sh
-# PearSheet seeder launcher. Data goes to $PEARSHEET_SEEDER_DATA, or
-# ~/.pearsheet-seeder. Type `pair` for a new pairing code, `status` for counts.
+# PearOffice seeder launcher. Data goes to $PEAROFFICE_SEEDER_DATA, or
+# ~/.pearoffice-seeder. Type `pair` for a new pairing code, `status` for counts.
 #
-#   pearsheet-seeder           run the seeder
-#   pearsheet-seeder update    install the newest release over this one
+#   pearoffice-seeder           run the seeder
+#   pearoffice-seeder update    install the newest release over this one
 #
 # While it runs it checks for a newer release a minute after start and then
-# daily, and says so in its output. PEARSHEET_NO_UPDATE_CHECK=1 turns that
+# daily, and says so in its output. PEAROFFICE_NO_UPDATE_CHECK=1 turns that
 # off; it is always off inside a container. See
-# proposals/2026-10-05-update-checker.md in the PearSheet repo.
+# proposals/2026-10-05-update-checker.md in the PearOffice repo.
 here="$(cd "$(dirname "$0")" && pwd)"
 current="$(cat "$here/VERSION" 2>/dev/null || echo 0.0.0)"
-latest_url="${PEARSHEET_UPDATE_LATEST_URL:-https://api.github.com/repos/peerloomllc/pearsheet-releases/releases/latest}"
+latest_url="${PEAROFFICE_UPDATE_LATEST_URL:-https://api.github.com/repos/peerloomllc/pearoffice-releases/releases/latest}"
 
-say () { echo "[pearsheet-seeder] $*"; }
+say () { echo "[pearoffice-seeder] $*"; }
 
 # The latest release's JSON, or nothing.
 release_json () {
-  curl -fsSL --max-time 30 -H 'Accept: application/vnd.github+json' -A "pearsheet-seeder/$current" "$latest_url" 2>/dev/null
+  curl -fsSL --max-time 30 -H 'Accept: application/vnd.github+json' -A "pearoffice-seeder/$current" "$latest_url" 2>/dev/null
 }
 
 # "1.2.3" from the release's tag, or nothing.
@@ -36,14 +36,14 @@ asset_url () {
 }
 
 update_check_off () {
-  [ -n "$PEARSHEET_NO_UPDATE_CHECK" ] || [ -f /.dockerenv ] || ! command -v curl >/dev/null 2>&1
+  [ -n "$PEAROFFICE_NO_UPDATE_CHECK" ] || [ -f /.dockerenv ] || ! command -v curl >/dev/null 2>&1
 }
 
 check () {
   json="$(release_json)" || return 0
   latest="$(latest_version "$json")"
   if newer "$latest" "$current"; then
-    say "PearSheet seeder $latest is out (this is $current). To install it, run: $here/pearsheet-seeder update"
+    say "PearOffice seeder $latest is out (this is $current). To install it, run: $here/pearoffice-seeder update"
   fi
 }
 
@@ -57,7 +57,7 @@ update () {
     aarch64|arm64) arch=arm64 ;;
     *) say "no build for $(uname -m)"; exit 1 ;;
   esac
-  name="pearsheet-seeder-$latest-linux-$arch"
+  name="pearoffice-seeder-$latest-linux-$arch"
   url="$(asset_url "$json" "$name.tar.gz")"
   sha_url="$(asset_url "$json" "$name.tar.gz.sha256")"
   if [ -z "$url" ] || [ -z "$sha_url" ]; then say "release $latest has no $name.tar.gz with a .sha256; nothing changed"; exit 1; fi
@@ -74,16 +74,16 @@ update () {
   [ -x "$new/bare" ] && [ -f "$new/seeder/seeder.bundle" ] || { say "the download is missing files; nothing changed"; exit 1; }
   # Move each piece in whole. A running seeder keeps the old files open, and
   # mv never rewrites this script in place while it is being read.
-  for f in bare seeder VERSION pearsheet-seeder pearsheet-seeder.service README.md; do
+  for f in bare seeder VERSION pearoffice-seeder pearoffice-seeder.service README.md; do
     [ -e "$new/$f" ] || continue
     rm -rf "$here/$f.old"
     [ -e "$here/$f" ] && mv "$here/$f" "$here/$f.old"
     mv "$new/$f" "$here/$f"
   done
-  for f in bare seeder VERSION pearsheet-seeder pearsheet-seeder.service README.md; do rm -rf "$here/$f.old"; done
+  for f in bare seeder VERSION pearoffice-seeder pearoffice-seeder.service README.md; do rm -rf "$here/$f.old"; done
   say "installed $latest"
-  if command -v systemctl >/dev/null 2>&1 && systemctl --user is-active --quiet pearsheet-seeder 2>/dev/null; then
-    systemctl --user restart pearsheet-seeder && say "restarted the pearsheet-seeder service"
+  if command -v systemctl >/dev/null 2>&1 && systemctl --user is-active --quiet pearoffice-seeder 2>/dev/null; then
+    systemctl --user restart pearoffice-seeder && say "restarted the pearoffice-seeder service"
   else
     say "restart the seeder to use the new version"
   fi
@@ -91,13 +91,13 @@ update () {
 
 if [ "$1" = update ]; then update; exit $?; fi
 
-data="${PEARSHEET_SEEDER_DATA:-$HOME/.pearsheet-seeder}"
+data="${PEAROFFICE_SEEDER_DATA:-$HOME/.pearoffice-seeder}"
 mkdir -p "$data"
 # Checks in the background while the seeder (this process, after exec) runs,
 # and stops when it stops.
 watch () {
   waited=0
-  next="${PEARSHEET_UPDATE_DELAY:-60}"
+  next="${PEAROFFICE_UPDATE_DELAY:-60}"
   while kill -0 "$1" 2>/dev/null; do
     if [ "$waited" -ge "$next" ]; then check; next=$((waited + 86400)); fi
     sleep 5

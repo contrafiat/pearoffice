@@ -1,6 +1,6 @@
 // Works out the expected value of every case in
 // test/fixtures/function-corpus.js with LibreOffice, writes them to
-// test/fixtures/function-expected.json and lists where PearSheet differs.
+// test/fixtures/function-expected.json and lists where PearOffice differs.
 //
 //   node scripts/function-expectations.js
 //
@@ -16,7 +16,7 @@ const { inputs, cases } = require('../test/fixtures/function-corpus')
 const { runFunctionCorpus } = require('../test/fixtures/function-run')
 
 const root = path.join(__dirname, '..')
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pearsheet-fn-'))
+const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pearoffice-fn-'))
 const src = path.join(dir, 'cases.xlsx')
 
 // Inputs typed as a person would: numbers as numbers, TRUE as a boolean.
@@ -59,13 +59,13 @@ for (const [a1, f] of cases) {
 fs.writeFileSync(path.join(root, 'test', 'fixtures', 'function-expected.json'), JSON.stringify({ source: version, expected }, null, 1) + '\n')
 fs.rmSync(dir, { recursive: true, force: true })
 
-// Compare with PearSheet.
+// Compare with PearOffice.
 const ours = runFunctionCorpus()
 let same = 0
 const diff = []
 for (const [a1, { formula, libreoffice }] of Object.entries(expected)) {
   if (agree(ours[a1], libreoffice)) same++
-  else diff.push(a1 + '  ' + formula + '  pearsheet=' + JSON.stringify(ours[a1]) + '  libreoffice=' + JSON.stringify(libreoffice))
+  else diff.push(a1 + '  ' + formula + '  pearoffice=' + JSON.stringify(ours[a1]) + '  libreoffice=' + JSON.stringify(libreoffice))
 }
 console.log(version + ': ' + same + ' of ' + cases.length + ' agree')
 for (const d of diff) console.log(d)

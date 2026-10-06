@@ -1,4 +1,4 @@
-// "Start when the computer starts": opens PearSheet hidden in the tray at
+// "Start when the computer starts": opens PearOffice hidden in the tray at
 // login, so sheets stay reachable after a reboot.
 //
 // - Linux: an XDG autostart entry, which Electron does not manage.
@@ -16,7 +16,7 @@ function quote (s) {
   return '"' + String(s).replace(/(["\\`$])/g, '\\$1') + '"'
 }
 
-// The command that starts this copy of PearSheet: the AppImage itself when
+// The command that starts this copy of PearOffice: the AppImage itself when
 // running from one, the installed binary, or Electron plus the app folder in
 // a dev checkout.
 function launchCommand ({ packaged, execPath, appPath, appImage }) {
@@ -29,7 +29,7 @@ function desktopEntry (command) {
   return [
     '[Desktop Entry]',
     'Type=Application',
-    'Name=PearSheet',
+    'Name=PearOffice',
     'Comment=Keep your sheets online',
     'Exec=' + [...command, HIDDEN_FLAG].map(quote).join(' '),
     'Terminal=false',
@@ -42,7 +42,7 @@ function xmlEscape (s) {
   return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
-const AGENT_LABEL = 'com.peerloom.pearsheet.login'
+const AGENT_LABEL = 'com.peerloom.pearoffice.login'
 
 // macOS: open the app bundle through Launch Services, in the background, with
 // the hidden flag. A dev checkout runs Electron directly.
@@ -72,7 +72,7 @@ function launchAgent ({ packaged, execPath, appPath }) {
 function createLoginItem ({ app, platform = process.platform, autostartDir, fake = false }) {
   const home = os.homedir()
   const file = platform === 'linux'
-    ? path.join(autostartDir || path.join(process.env.XDG_CONFIG_HOME || path.join(home, '.config'), 'autostart'), 'pearsheet.desktop')
+    ? path.join(autostartDir || path.join(process.env.XDG_CONFIG_HOME || path.join(home, '.config'), 'autostart'), 'pearoffice.desktop')
     : platform === 'darwin'
       ? path.join(autostartDir || path.join(home, 'Library', 'LaunchAgents'), AGENT_LABEL + '.plist')
       : null

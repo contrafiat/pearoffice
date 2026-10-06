@@ -4,12 +4,12 @@
 // next prebuild. This plugin is the source of truth for two things:
 //
 // 1. applicationIdSuffix ".debug" on the debug buildType, so debug installs as
-//    com.pearsheet.debug and can coexist with a release com.pearsheet without a
+//    com.pearoffice.debug and can coexist with a release com.pearoffice without a
 //    signature-mismatch conflict, and a debug build can never masquerade as the
 //    release package. The suffix changes only the applicationId, not the namespace
-//    (com.pearsheet), so .MainActivity/.MainApplication and all deep-link schemes/
+//    (com.pearoffice), so .MainActivity/.MainApplication and all deep-link schemes/
 //    hosts resolve unchanged; library FileProviders keyed on ${applicationId}
-//    self-adjust to com.pearsheet.debug.provider.
+//    self-adjust to com.pearoffice.debug.provider.
 //    (Ported from pearlist/plugins/with-android-debug-app-id.js.)
 //
 // 2. debuggableVariants = [] in the react {} block, so the DEBUG variant EMBEDS the

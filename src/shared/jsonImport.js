@@ -84,7 +84,7 @@ function jsonToTabs (value) {
   let total = 0
   const count = (n) => {
     total += n
-    if (total > MAX_IMPORT_CELLS) throw new Error('This file has more than ' + MAX_IMPORT_CELLS + ' cells, which is more than PearSheet can import for now')
+    if (total > MAX_IMPORT_CELLS) throw new Error('This file has more than ' + MAX_IMPORT_CELLS + ' cells, which is more than PearOffice can import for now')
   }
 
   if (summary.length) {

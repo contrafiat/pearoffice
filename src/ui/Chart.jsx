@@ -1,5 +1,5 @@
 // Drawing a chart with ECharts (proposals/2026-10-04-charts.md): only the
-// chart types and parts PearSheet uses, drawn as SVG.
+// chart types and parts PearOffice uses, drawn as SVG.
 
 import React, { useEffect, useRef } from 'react'
 import * as echarts from 'echarts/core'

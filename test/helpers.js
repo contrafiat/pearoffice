@@ -5,7 +5,7 @@ const Corestore = require('corestore')
 
 const dirs = []
 
-function tmpDir (prefix = 'pearsheet-') {
+function tmpDir (prefix = 'pearoffice-') {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix))
   dirs.push(dir)
   return dir

@@ -15,7 +15,7 @@ set -euo pipefail
 
 WIN="${WINDOWS_VM_HOST:-ben@192.168.50.157}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-DIR="pearsheet-build"
+DIR="pearoffice-build"
 VERSION_ARG=""
 [ -n "${BUILD_VERSION:-}" ] && VERSION_ARG="'-c.extraMetadata.version=$BUILD_VERSION'"  # quoted, or PowerShell splits it at -c
 
@@ -24,10 +24,12 @@ ssh -o BatchMode=yes -o ConnectTimeout=6 "$WIN" exit || { echo "cannot reach $WI
 TAR=$(mktemp --suffix=.tar.gz)
 trap 'rm -f "$TAR"' EXIT
 echo "==> pack source"
-tar -czf "$TAR" -C "$ROOT/.." \
-  --exclude='node_modules' --exclude='pearsheet/dist' --exclude='pearsheet/desktop/dist' \
-  --exclude='pearsheet/desktop/build/resources' --exclude='pearsheet/spikes' --exclude='.git' \
-  pearsheet peerloom-core
+# Packed as pearoffice/ whatever this checkout's folder is called.
+HERE="$(basename "$ROOT")"
+tar -czf "$TAR" -C "$ROOT/.." --transform "s|^$HERE|pearoffice|" \
+  --exclude='node_modules' --exclude="$HERE/dist" --exclude="$HERE/desktop/dist" \
+  --exclude="$HERE/desktop/build/resources" --exclude="$HERE/spikes" --exclude='.git' \
+  "$HERE" peerloom-core
 scp -q "$TAR" "$WIN:$DIR.tar.gz"
 
 echo "==> install, stage, build, smoke on the VM"
@@ -44,19 +46,19 @@ if (Test-Path -LiteralPath \$target) {
 New-Item -ItemType Directory -Path \$target | Out-Null
 tar -xzf (Join-Path \$HOME '$DIR.tar.gz') -C \$target
 Set-Location (Join-Path \$target 'peerloom-core'); npm install --no-audit --no-fund --loglevel=error; if (\$LASTEXITCODE) { exit 1 }
-Set-Location (Join-Path \$target 'pearsheet'); npm install --no-audit --no-fund --loglevel=error; if (\$LASTEXITCODE) { exit 1 }
+Set-Location (Join-Path \$target 'pearoffice'); npm install --no-audit --no-fund --loglevel=error; if (\$LASTEXITCODE) { exit 1 }
 npm install --prefix desktop --no-audit --no-fund --loglevel=error; if (\$LASTEXITCODE) { exit 1 }
 node scripts/stage-desktop.js --platform win32 --arch x64; if (\$LASTEXITCODE) { exit 1 }
 Set-Location desktop
 npx electron-builder --win --x64 --publish never $VERSION_ARG; if (\$LASTEXITCODE) { exit 1 }
 Set-Location ..
-node scripts/smoke-packaged.js desktop\\dist\\win-unpacked\\PearSheet.exe; if (\$LASTEXITCODE) { exit 1 }
+node scripts/smoke-packaged.js desktop\\dist\\win-unpacked\\PearOffice.exe; if (\$LASTEXITCODE) { exit 1 }
 PSEOF
 )
 B64=$(printf '%s' "$PS" | iconv -t UTF-16LE | base64 -w0)
-ssh -o BatchMode=yes "$WIN" "powershell -NoProfile -ExecutionPolicy Bypass -EncodedCommand $B64"
+ssh -o BatchMode=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=4 "$WIN" "powershell -NoProfile -ExecutionPolicy Bypass -EncodedCommand $B64"
 
 echo "==> copy installer back"
 mkdir -p "$ROOT/desktop/dist"
-scp -q "$WIN:$DIR/pearsheet/desktop/dist/PearSheet-Setup-*.exe" "$ROOT/desktop/dist/"
+scp -q "$WIN:$DIR/pearoffice/desktop/dist/PearOffice-Setup-*.exe" "$ROOT/desktop/dist/"
 ls -la "$ROOT/desktop/dist/" | grep -i setup

@@ -28,10 +28,10 @@ const KINDS = [
 ]
 
 ;(async () => {
-  const out = process.argv[2] || fs.mkdtempSync(path.join(os.tmpdir(), 'pearsheet-charts-'))
+  const out = process.argv[2] || fs.mkdtempSync(path.join(os.tmpdir(), 'pearoffice-charts-'))
   fs.mkdirSync(out, { recursive: true })
   const testnet = await createTestnet(3)
-  const e = createSheetEngine({ corestore: new Corestore(fs.mkdtempSync(path.join(os.tmpdir(), 'pearsheet-store-'))), createSwarm: ({ keyPair }) => new Hyperswarm({ keyPair, bootstrap: testnet.bootstrap }) })
+  const e = createSheetEngine({ corestore: new Corestore(fs.mkdtempSync(path.join(os.tmpdir(), 'pearoffice-store-'))), createSwarm: ({ keyPair }) => new Hyperswarm({ keyPair, bootstrap: testnet.bootstrap }) })
   await e.init({})
   const { sheetId } = await call(e, 'sheet:create', { title: 'Charts' })
   await call(e, 'sheet:setCells', { sheetId, row: 1, col: 1, grid: [['Month', 'Rent', 'Food'], ['Jan', '1200', '400'], ['Feb', '1200', '450'], ['Mar', '1250', '380'], ['Apr', '1250', '420']] })
@@ -46,7 +46,7 @@ const KINDS = [
   await e.close()
   await testnet.destroy()
 
-  const profile = 'file://' + path.join(os.tmpdir(), 'pearsheet-lo-profile')
+  const profile = 'file://' + path.join(os.tmpdir(), 'pearoffice-lo-profile')
   execFileSync('soffice', ['--headless', '--norestore', '-env:UserInstallation=' + profile, '--convert-to', 'ods', '--outdir', out, file], { stdio: 'ignore' })
   const ods = fflate.unzipSync(fs.readFileSync(path.join(out, 'charts.ods')))
   const charts = Object.keys(ods).filter((n) => /^Object \d+\/content\.xml$/.test(n))

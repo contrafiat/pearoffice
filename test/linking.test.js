@@ -47,7 +47,7 @@ test('linking a new device and the recovery phrase', async (t) => {
 
   await t.test('a new device takes on the identity and every sheet', async () => {
     const { link } = await call(A, 'link:start')
-    assert.match(link, /^pearsheet:\/\/link\?/)
+    assert.match(link, /^pearoffice:\/\/link\?/)
     const r = await call(B, 'link:join', { link })
     assert.deepEqual(r, { restart: true, sheets: 3 })
     // The shell restarts the worklet; here, a new engine on the same store.
@@ -64,7 +64,7 @@ test('linking a new device and the recovery phrase', async (t) => {
 
   await t.test('the linked device has the same rights: owner, editor, viewer', async () => {
     const { link } = await call(B, 'sheet:invite', { sheetId: own, role: 'viewer' })
-    assert.match(link, /^pearsheet:\/\/join\?/)
+    assert.match(link, /^pearoffice:\/\/join\?/)
     await call(B, 'sheet:setCell', { sheetId: edits, row: 2, col: 1, input: 'from the second device' })
     await waitFor('Cam sees it', async () => (await grid(C, edits))['2,1'] === 'from the second device')
     await assert.rejects(call(B, 'sheet:setCell', { sheetId: views, row: 1, col: 1, input: 'x' }), /not edit/)

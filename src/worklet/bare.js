@@ -1,6 +1,6 @@
-// PearSheet Bare worklet entry. The same bundle runs on the desktop (spawned by
+// PearOffice Bare worklet entry. The same bundle runs on the desktop (spawned by
 // Electron, IPC over stdin/stdout) and later on phones (BareKit IPC).
-// @peerloom/core owns the P2P plumbing; this file wires in PearSheet's apply
+// @peerloom/core owns the P2P plumbing; this file wires in PearOffice's apply
 // rules and IPC methods. See proposals/2026-10-03-wire-protocol.md.
 
 const Hypercore = require('hypercore')

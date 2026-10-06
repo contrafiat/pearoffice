@@ -1088,7 +1088,7 @@ function importTabs (doc, payload) {
         }
       }
       // Formats read from the file's styles (src/shared/xlsxStyles.js); a
-      // value PearSheet does not allow is left out.
+      // value PearOffice does not allow is left out.
       for (const [row, col, f] of tab.styles || []) {
         const { rowId, colId } = idsAt(doc, id, row, col)
         if (!rowId || !colId) continue

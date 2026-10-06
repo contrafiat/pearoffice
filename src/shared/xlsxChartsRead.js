@@ -1,8 +1,8 @@
 // Reading charts from an imported .xlsx file (the reverse of xlsxCharts.js).
 // SheetJS Community Edition reads no charts, so this follows each sheet's
-// drawing to its chart parts and turns every chart into a PearSheet chart:
+// drawing to its chart parts and turns every chart into a PearOffice chart:
 // one data range (the block its series, names and categories sit in), the
-// type and the settings PearSheet has. Charts it cannot place are skipped.
+// type and the settings PearOffice has. Charts it cannot place are skipped.
 
 const { parseRange } = require('./charts')
 const { numToCol } = require('./a1')
@@ -45,7 +45,7 @@ function seriesRefs (ser) {
   return { name: f('tx'), cats: f('cat') || f('xVal'), vals: f('val') || f('yVal'), size: f('bubbleSize') }
 }
 
-// Turn a chart part into a PearSheet chart (without anchor and size), or null.
+// Turn a chart part into a PearOffice chart (without anchor and size), or null.
 function chartFrom (xml, sheetName) {
   const plot = first(xml, /<c:plotArea>([\s\S]*?)<\/c:plotArea>/) || ''
   const groups = [...plot.matchAll(/<c:(bar|bar3D|line|line3D|area|area3D|pie|pie3D|ofPie|doughnut|scatter|radar|bubble|bubble3D|stock)Chart>([\s\S]*?)<\/c:\1Chart>/g)]
@@ -62,7 +62,7 @@ function chartFrom (xml, sheetName) {
       const i = series.length
       const refs = seriesRefs(m[1])
       series.push(refs)
-      // A bubble series is Y then its sizes, two columns in PearSheet.
+      // A bubble series is Y then its sizes, two columns in PearOffice.
       if (refs.size) series.push({ name: null, cats: null, vals: refs.size })
       if (/^line/.test(kind) && kinds.some((k) => k === 'bar')) lineSeries.push(i)
       if (onSecond) secondAxis.push(i)

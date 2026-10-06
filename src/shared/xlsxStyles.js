@@ -268,7 +268,7 @@ function stylesFromXlsx (bytes, { unzipSync, strFromU8 }, maxCells = Infinity) {
   const baseName = attr((/<name\s[^>]*>/.exec(base) || [''])[0], 'val') || ''
   const baseColor = colorOf((/<color\s[^>]*>/.exec(base) || [null])[0], theme)
 
-  // Style number -> fmt (only the attributes PearSheet has).
+  // Style number -> fmt (only the attributes PearOffice has).
   const formats = xfs.map((xf) => {
     const f = {}
     const font = fonts[Number(attr(xf, 'fontId')) || 0] || ''

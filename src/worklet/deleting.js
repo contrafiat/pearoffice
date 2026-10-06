@@ -54,7 +54,7 @@ function createDeleting ({ engine, sheets, getSeeding, emit, log = () => {}, now
         if (core.length) { await core.clear(0, core.length); freed++ }
       } catch {} finally { await core.close().catch(() => {}) }
     }
-    const snap = engine.store.get({ name: 'pearsheet-snapshot-' + sheetId })
+    const snap = engine.store.get({ name: 'pearoffice-snapshot-' + sheetId })
     try { await snap.ready(); if (snap.length) await snap.clear(0, snap.length) } catch {} finally { await snap.close().catch(() => {}) }
     for (const key of ['groups:joined:', 'joins:pending:', 'snap:', 'moves:']) await engine.localDb.del(key + sheetId)
     await engine.localDb.put('removed:' + sheetId, { reason, at: now() })

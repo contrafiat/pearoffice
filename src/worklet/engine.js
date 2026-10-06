@@ -1,4 +1,4 @@
-// Builds the PearSheet engine on @peerloom/core. Split from bare.js so tests
+// Builds the PearOffice engine on @peerloom/core. Split from bare.js so tests
 // can build it in Node with an injected corestore and swarm.
 
 const b4a = require('b4a')
@@ -110,7 +110,7 @@ function createSheetEngine (opts = {}) {
   }
 
   engine = createGroupEngine({
-    appId: 'pearsheet',
+    appId: 'pearoffice',
     applyOps: createApplyOps({
       onUpdate: sheets.onUpdate,
       onMembership: (sheetId, type) => {
@@ -126,7 +126,7 @@ function createSheetEngine (opts = {}) {
       log
     }),
     methods,
-    // Writers are admitted only by PearSheet's own inviteUse and role ops,
+    // Writers are admitted only by PearOffice's own inviteUse and role ops,
     // never by core's pair channel: never mint core addWriter ops, and refuse
     // any that arrive.
     mintAddWriter: () => null,

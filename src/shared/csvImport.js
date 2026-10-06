@@ -101,7 +101,7 @@ function csvToTabs (text) {
       if (i < 200) (texts[j + 1] = texts[j + 1] || []).push(c[1] ? (c[1].includes('hh') ? '0000-00-00 00:00' : c[1].includes('yyyy') ? '0000-00-00' : f.trim()) : f.trim())
     })
   })
-  if (cells.length > MAX_IMPORT_CELLS) throw new Error('This file has more than ' + MAX_IMPORT_CELLS + ' cells, which is more than PearSheet can import for now')
+  if (cells.length > MAX_IMPORT_CELLS) throw new Error('This file has more than ' + MAX_IMPORT_CELLS + ' cells, which is more than PearOffice can import for now')
   if (!cells.length) throw new Error('This file has nothing to put in a sheet')
   const widths = {}
   for (const [col, list] of Object.entries(texts)) widths[col] = widthFor(list)

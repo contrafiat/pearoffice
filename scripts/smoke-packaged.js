@@ -1,6 +1,6 @@
 // Run the desktop smoke test against a packaged app instead of the checkout:
 //   node scripts/smoke-packaged.js <path to the app executable> [screenshot.png]
-// e.g. the AppImage, PearSheet.app/Contents/MacOS/PearSheet, or PearSheet.exe.
+// e.g. the AppImage, PearOffice.app/Contents/MacOS/PearOffice, or PearOffice.exe.
 const fs = require('fs')
 const os = require('os')
 const path = require('path')
@@ -8,10 +8,10 @@ const { spawn } = require('child_process')
 
 const exe = process.argv[2]
 if (!exe) { console.error('usage: node scripts/smoke-packaged.js <app executable> [shot.png]'); process.exit(2) }
-const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pearsheet-pkg-smoke-'))
+const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pearoffice-pkg-smoke-'))
 const args = process.platform === 'linux' ? ['--no-sandbox', '--disable-gpu'] : []
 const child = spawn(exe, args, {
-  env: { ...process.env, PEARSHEET_SMOKE: '1', PEARSHEET_DATA: dataDir, PEARSHEET_SMOKE_SHOT: process.argv[3] ? path.resolve(process.argv[3]) : '' },
+  env: { ...process.env, PEAROFFICE_SMOKE: '1', PEAROFFICE_DATA: dataDir, PEAROFFICE_SMOKE_SHOT: process.argv[3] ? path.resolve(process.argv[3]) : '' },
   stdio: ['ignore', 'pipe', 'pipe']
 })
 let out = ''

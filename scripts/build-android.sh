@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build the Android debug APK (standalone, com.pearsheet.debug).
+# Build the Android debug APK (standalone, com.pearoffice.debug).
 #
 # Usage: scripts/build-android.sh [x86_64|arm64-v8a]   (default x86_64, the emulator)
 # Output: android/app/build/outputs/apk/debug/app-debug.apk

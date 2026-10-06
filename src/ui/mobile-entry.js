@@ -1,11 +1,11 @@
-// Entry for the mobile WebView build. Sets up window.pearsheet on top of the
+// Entry for the mobile WebView build. Sets up window.pearoffice on top of the
 // React Native WebView bridge, then starts the same UI as the desktop.
 //
 //   UI -> shell:  ReactNativeWebView.postMessage({ id, method, args })
 //   shell -> UI:  window.__psResponse({ id, result | error })
 //                 window.__psEvent(name, data)
 
-if (!window.pearsheet) {
+if (!window.pearoffice) {
   let next = 0
   const pending = new Map()
   const subs = new Map()
@@ -19,7 +19,7 @@ if (!window.pearsheet) {
   window.__psEvent = (name, data) => {
     for (const fn of subs.get(name) || []) { try { fn(data) } catch {} }
   }
-  window.pearsheet = {
+  window.pearoffice = {
     platform: 'mobile',
     call (method, args) {
       return new Promise((resolve, reject) => {

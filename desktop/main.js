@@ -1,4 +1,4 @@
-// PearSheet desktop: Electron main process. Starts the shared Bare worklet
+// PearOffice desktop: Electron main process. Starts the shared Bare worklet
 // (the same bundle the phones will run), opens the window and relays calls and
 // events between the UI and the worklet. See proposal section 9.
 
@@ -12,29 +12,29 @@ const { createLoginItem } = require('./login')
 const { startUpdates } = require('./updates')
 const { installMenuEntry } = require('./appimage')
 
-const SMOKE = !!process.env.PEARSHEET_SMOKE
+const SMOKE = !!process.env.PEAROFFICE_SMOKE
 
 // The smoke test keeps the page's storage (zoom, theme) in its throwaway
 // folder too, so one run cannot leave settings for the next.
-if (SMOKE && process.env.PEARSHEET_DATA) app.setPath('userData', path.join(process.env.PEARSHEET_DATA, 'electron'))
+if (SMOKE && process.env.PEAROFFICE_DATA) app.setPath('userData', path.join(process.env.PEAROFFICE_DATA, 'electron'))
 
 // One running copy per data folder: the worklet holds a lock on its store.
 if (!SMOKE && !app.requestSingleInstanceLock()) app.exit(0)
 
-// pearsheet:// invite links open the app. Registration only makes sense for an
+// pearoffice:// invite links open the app. Registration only makes sense for an
 // installed copy; a dev checkout still handles links passed on the command line.
 // An AppImage first adds its own menu entry, which the link handler and the
 // taskbar icon both need.
 const ICON = path.join(__dirname, 'build', 'icon.png')
 if (!SMOKE && process.platform === 'linux' && process.env.APPIMAGE) {
-  try { installMenuEntry({ appImage: process.env.APPIMAGE, image: nativeImage.createFromPath(ICON) }) } catch (err) { console.error('[pearsheet] menu entry', err.message) }
+  try { installMenuEntry({ appImage: process.env.APPIMAGE, image: nativeImage.createFromPath(ICON) }) } catch (err) { console.error('[pearoffice] menu entry', err.message) }
 }
-if (app.isPackaged) app.setAsDefaultProtocolClient('pearsheet')
+if (app.isPackaged) app.setAsDefaultProtocolClient('pearoffice')
 
 let pendingLink = linkIn(process.argv)
 
 function linkIn (argv) {
-  return (argv || []).find((a) => typeof a === 'string' && a.startsWith('pearsheet://')) || null
+  return (argv || []).find((a) => typeof a === 'string' && a.startsWith('pearoffice://')) || null
 }
 
 function sendLink (url) {
@@ -44,7 +44,7 @@ function sendLink (url) {
 }
 
 const paths = resolvePaths({ packaged: app.isPackaged, resourcesPath: process.resourcesPath })
-const dataDir = process.env.PEARSHEET_DATA || path.join(app.getPath('userData'), 'data')
+const dataDir = process.env.PEAROFFICE_DATA || path.join(app.getPath('userData'), 'data')
 
 let win = null
 let worklet = null
@@ -65,7 +65,7 @@ let settings = readSettings()
 // Make the system's login entry match the setting. Runs on every start too,
 // so a reinstalled or moved app points the entry at itself again.
 function syncLoginItem () {
-  // Starting at login only makes sense while PearSheet stays running.
+  // Starting at login only makes sense while PearOffice stays running.
   if (!stayRunning()) settings.startAtLogin = false
   try {
     if (settings.startAtLogin) loginItem.setEnabled(true)
@@ -109,7 +109,7 @@ function showWindow () {
 }
 
 // "Keep my sheets online" (proposal section 8): with it on, closing the
-// window hides it and PearSheet keeps syncing from the tray.
+// window hides it and PearOffice keeps syncing from the tray.
 function createTray () {
   if (tray && !tray.isDestroyed()) return
   try {
@@ -118,7 +118,7 @@ function createTray () {
     log('tray failed:', err.message)
     return
   }
-  tray.setToolTip('PearSheet is running')
+  tray.setToolTip('PearOffice is running')
   setTrayMenu()
   tray.on('click', showWindow)
 }
@@ -128,17 +128,17 @@ function setTrayMenu () {
   if (!tray || tray.isDestroyed()) return
   const u = updates && updates.state().update
   tray.setContextMenu(Menu.buildFromTemplate([
-    { label: 'Open PearSheet', click: showWindow },
+    { label: 'Open PearOffice', click: showWindow },
     ...(u && u.available ? [{ label: 'Update to ' + u.latest, click: () => { updates.apply(); showWindow() } }] : []),
     { type: 'separator' },
-    { label: 'Quit PearSheet', click: () => app.quit() }
+    { label: 'Quit PearOffice', click: () => app.quit() }
   ]))
 }
 
 let updates = null
 
 function log (...args) {
-  if (!app.isPackaged || SMOKE || process.env.PEARSHEET_DEBUG) console.log('[pearsheet]', ...args)
+  if (!app.isPackaged || SMOKE || process.env.PEAROFFICE_DEBUG) console.log('[pearoffice]', ...args)
 }
 
 function startWorklet () {
@@ -177,7 +177,7 @@ ipcMain.handle('worklet:call', async (_e, method, args) => {
         return { ok: true }
       }
       const pdf = await page.webContents.printToPDF({ printBackground: true, pageSize: 'A4' })
-      const name = String((args && args.name) || 'PearSheet.pdf').replace(/[\\/:*?"<>|]/g, ' ')
+      const name = String((args && args.name) || 'PearOffice.pdf').replace(/[\\/:*?"<>|]/g, ' ')
       // The smoke test saves without asking.
       const file = SMOKE
         ? path.join(dataDir, name)
@@ -241,7 +241,7 @@ function createWindow () {
     height: 820,
     minWidth: 640,
     minHeight: 400,
-    title: 'PearSheet',
+    title: 'PearOffice',
     icon: process.platform === 'linux' ? ICON : undefined,
     // Started at login with the tray on: stay hidden until opened.
     show: !SMOKE && !(stayRunning() && loginItem.launchedAtLogin()),

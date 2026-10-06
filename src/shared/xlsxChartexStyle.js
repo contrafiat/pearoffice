@@ -1,7 +1,7 @@
 // The chart style and colour parts Excel attaches to a chart in its newer
 // format (chartex), as Excel for the web wrote them for a histogram and a
 // waterfall (2026-10-05); the two differ only in the style id (histogram 366,
-// waterfall 395). Excel for the web opened PearSheet's histogram and waterfall
+// waterfall 395). Excel for the web opened PearOffice's histogram and waterfall
 // once these were added, along with a text-box fallback and no dir attribute
 // on the data references; without the three it repaired the file and dropped
 // both charts. Which of the three it needed was not split out.

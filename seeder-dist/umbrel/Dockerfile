@@ -1,4 +1,4 @@
-# The PearSheet seeder with its web dashboard, for Umbrel and other Docker
+# The PearOffice seeder with its web dashboard, for Umbrel and other Docker
 # hosts. See proposals/2026-10-05-umbrel-seeder.md. The build context is
 # dist/umbrel.
 #
@@ -29,7 +29,7 @@ ENV SEEDER_HOST=0.0.0.0 \
     SEEDER_DATA=/data \
     SEEDER_BARE=/app/bare \
     SEEDER_BUNDLE=/app/seeder/seeder.bundle \
-    PEARSHEET_NO_UPDATE_CHECK=1
+    PEAROFFICE_NO_UPDATE_CHECK=1
 VOLUME /data
 EXPOSE 8761
 # Root, as Umbrel mounts ${APP_DATA_DIR} root-owned; compose sets

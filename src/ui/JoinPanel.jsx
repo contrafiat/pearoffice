@@ -30,11 +30,11 @@ export function JoinPanel ({ initialLink = '', onStarted, onClose, onError }) {
         <input
           autoFocus
           aria-label='Invite link'
-          placeholder='pearsheet://join?...'
+          placeholder='pearoffice://join?...'
           value={link}
           onChange={(e) => setLink(e.target.value)}
         />
-        <ScanButton prefix='pearsheet://join?' what='a PearSheet invite' onError={onError} onLink={(l) => { setLink(l); join(null, l) }} />
+        <ScanButton prefix='pearoffice://join?' what='a PearOffice invite' onError={onError} onLink={(l) => { setLink(l); join(null, l) }} />
         <div className='row end'>
           <button type='button' onClick={onClose}>Cancel</button>
           <button className='primary' type='submit' disabled={busy || !link.trim()}>{busy ? 'Joining...' : 'Join'}</button>
@@ -80,8 +80,8 @@ export function JoinProgress ({ entry, onBackground, onClose, onError }) {
         </ul>
         {!letIn && waited > BACKGROUND_AFTER_MS && (
           <p className='small'>
-            The invite connects straight to the people already in the sheet, so one of them needs to be online with PearSheet open.
-            {days ? ' Waiting for ' + days + (days === 1 ? ' day.' : ' days.') : ''} PearSheet stops waiting by itself after 7 days.
+            The invite connects straight to the people already in the sheet, so one of them needs to be online with PearOffice open.
+            {days ? ' Waiting for ' + days + (days === 1 ? ' day.' : ' days.') : ''} PearOffice stops waiting by itself after 7 days.
           </p>
         )}
         {entry.reason && <p className='warn'>Last reply: {entry.reason}</p>}

@@ -8,7 +8,7 @@ import { themePref, setThemePref } from './theme.js'
 /* global __APP_VERSION__ */
 const VERSION = typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : ''
 
-// The main open-source parts of PearSheet and their licences.
+// The main open-source parts of PearOffice and their licences.
 const CREDITS = [
   ['Yjs', 'MIT', 'merging edits'],
   ['fast-formula-parser', 'MIT', 'formulas'],
@@ -37,9 +37,9 @@ function openUrl (url) {
 // One place for your profile and this device's settings, plus About.
 export function SettingsPanel ({ me, onMe, desktop, keepOnline, startAtLogin, onSetting, onDevices, onSeeder, onClose, onError }) {
   const [mode, setMode] = useState('settings')
-  const [numPad, setNumPad] = useState(() => readPref('pearsheet:numpad') === '1')
+  const [numPad, setNumPad] = useState(() => readPref('pearoffice:numpad') === '1')
   const [theme, setTheme] = useState(themePref)
-  const [showMe, setShowMe] = useState(() => readPref('pearsheet:presence') !== '0')
+  const [showMe, setShowMe] = useState(() => readPref('pearoffice:presence') !== '0')
   const picRef = useRef(null)
   const { name, avatar, identity } = me
   const [nameDraft, setNameDraft] = useState(name || '')
@@ -55,10 +55,10 @@ export function SettingsPanel ({ me, onMe, desktop, keepOnline, startAtLogin, on
 
   return (
     <div className='panel-backdrop' onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
-      <section className='panel settings' role='dialog' aria-label={mode === 'about' ? 'About PearSheet' : 'Settings'}>
+      <section className='panel settings' role='dialog' aria-label={mode === 'about' ? 'About PearOffice' : 'Settings'}>
         <header>
           {mode === 'about' && <button className='link-button back' onClick={() => setMode('settings')}><CaretLeft size={14} /> Settings</button>}
-          <h2>{mode === 'about' ? 'About PearSheet' : 'Settings'}</h2>
+          <h2>{mode === 'about' ? 'About PearOffice' : 'Settings'}</h2>
           <button className='close' aria-label='Close' onClick={onClose}><X size={18} /></button>
         </header>
 
@@ -125,12 +125,12 @@ export function SettingsPanel ({ me, onMe, desktop, keepOnline, startAtLogin, on
                 <h3>This computer</h3>
                 <label className='check keep-online'>
                   <input type='checkbox' checked={keepOnline} onChange={(e) => onSetting({ keepOnline: e.target.checked })} />
-                  <span>Keep sheets online when closed<br /><span className='small muted'>Closing the window hides PearSheet in the tray, so people can sync with you while this computer is on.</span></span>
+                  <span>Keep sheets online when closed<br /><span className='small muted'>Closing the window hides PearOffice in the tray, so people can sync with you while this computer is on.</span></span>
                 </label>
                 {keepOnline && (
                   <label className='check start-at-login'>
                     <input type='checkbox' checked={startAtLogin} onChange={(e) => onSetting({ startAtLogin: e.target.checked })} />
-                    <span>Start when the computer starts<br /><span className='small muted'>Opens PearSheet hidden in the tray when you log in.</span></span>
+                    <span>Start when the computer starts<br /><span className='small muted'>Opens PearOffice hidden in the tray when you log in.</span></span>
                   </label>
                 )}
               </>
@@ -140,7 +140,7 @@ export function SettingsPanel ({ me, onMe, desktop, keepOnline, startAtLogin, on
               <>
                 <h3>Typing</h3>
                 <label className='check num-pad'>
-                  <input type='checkbox' checked={numPad} onChange={(e) => { setNumPad(e.target.checked); writePref('pearsheet:numpad', e.target.checked ? '1' : '0') }} />
+                  <input type='checkbox' checked={numPad} onChange={(e) => { setNumPad(e.target.checked); writePref('pearoffice:numpad', e.target.checked ? '1' : '0') }} />
                   <span>Number keypad for cells<br /><span className='small muted'>Also switches with the keypad button in the toolbar.</span></span>
                 </label>
               </>
@@ -148,7 +148,7 @@ export function SettingsPanel ({ me, onMe, desktop, keepOnline, startAtLogin, on
 
             <h3>Sharing</h3>
             <label className='check show-me'>
-              <input type='checkbox' checked={showMe} onChange={(e) => { setShowMe(e.target.checked); writePref('pearsheet:presence', e.target.checked ? '1' : '0') }} />
+              <input type='checkbox' checked={showMe} onChange={(e) => { setShowMe(e.target.checked); writePref('pearoffice:presence', e.target.checked ? '1' : '0') }} />
               <span>Show others when I have a sheet open<br /><span className='small muted'>They see which cell you are on. When this is off, you do not see them either.</span></span>
             </label>
 
@@ -160,7 +160,7 @@ export function SettingsPanel ({ me, onMe, desktop, keepOnline, startAtLogin, on
             </div>
 
             <h3>Devices</h3>
-            <p className='small'>Use PearSheet on another device as the same person, and keep your recovery phrase.</p>
+            <p className='small'>Use PearOffice on another device as the same person, and keep your recovery phrase.</p>
             <div className='row'><button className='settings-devices' onClick={onDevices}><Devices size={16} /> Devices and recovery phrase</button></div>
 
             <h3>Seeder</h3>
@@ -168,7 +168,7 @@ export function SettingsPanel ({ me, onMe, desktop, keepOnline, startAtLogin, on
             <div className='row'><button className='settings-seeder' onClick={onSeeder}><HardDrives size={16} /> Seeder</button></div>
 
             <div className='row about-row'>
-              <button className='link-button about-link' onClick={() => setMode('about')}>About PearSheet{VERSION ? ' ' + VERSION : ''}</button>
+              <button className='link-button about-link' onClick={() => setMode('about')}>About PearOffice{VERSION ? ' ' + VERSION : ''}</button>
             </div>
           </>
         )}
@@ -181,9 +181,9 @@ export function SettingsPanel ({ me, onMe, desktop, keepOnline, startAtLogin, on
             <p>Your sheets live on your devices. When you share one, it syncs straight between the devices of the people in it, encrypted, with no company server in between. A seeder you run can keep a copy online while everyone is offline, and it cannot read it.</p>
             <div className='row'><button onClick={() => openUrl('https://pears.com/')}><ArrowSquareOut size={16} /> Learn about peer-to-peer</button></div>
             <h3>Contact</h3>
-            <div className='row'><button onClick={() => openUrl('mailto:peerloomllc@proton.me?subject=%5BPearSheet%5D%20Feedback')}><EnvelopeSimple size={16} /> Email PeerLoom</button></div>
+            <div className='row'><button onClick={() => openUrl('mailto:peerloomllc@proton.me?subject=%5BPearOffice%5D%20Feedback')}><EnvelopeSimple size={16} /> Email PeerLoom</button></div>
             <h3>Open-source software</h3>
-            <p className='small'>PearSheet is built on these projects, used under their licences.</p>
+            <p className='small'>PearOffice is built on these projects, used under their licences.</p>
             <ul className='credits'>
               {CREDITS.map(([what, licence, use]) => (
                 <li key={what}><span>{what}</span><span className='muted'>{licence} · {use}</span></li>

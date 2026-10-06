@@ -131,7 +131,7 @@ class FormulaParser {
      * @param args - Arguments that pass to the function.
      * @return {*}
      */
-    // PearSheet: run `name` once per position of the blocks given at its
+    // PearOffice: run `name` once per position of the blocks given at its
     // single-value argument positions. A single row, column or value repeats
     // across the others; outside a block is #N/A. Undefined if no argument
     // there is a block.
@@ -183,7 +183,7 @@ class FormulaParser {
         // if one arg is null, it means 0 or "" depends on the function it calls
         const nullValue = this.funsNullAs0.includes(name) ? 0 : '';
 
-        // PearSheet: a block given where the function takes a single value
+        // PearOffice: a block given where the function takes a single value
         // runs it once per value (Excel 365). See src/shared/formula/lift.js.
         const lift = this.liftArgs && this.liftArgs[name];
         if (lift) {
@@ -307,7 +307,7 @@ class FormulaParser {
                 if (result.ref) {
                     result = this.retrieveRef(result);
                 }
-                // PearSheet: a reference to a cell holding an error passes the
+                // PearOffice: a reference to a cell holding an error passes the
                 // error on.
                 if (result instanceof FormulaError)
                     return result;

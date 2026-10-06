@@ -2,10 +2,10 @@ import React, { useEffect, useState } from 'react'
 import { X } from '@phosphor-icons/react'
 import { call } from './bridge.js'
 
-// "PearSheet 0.2.0 is out" on desktop (proposals/2026-10-05-update-checker.md).
+// "PearOffice 0.2.0 is out" on desktop (proposals/2026-10-05-update-checker.md).
 // The desktop shell checks for releases; this shows what it found and asks it
 // to install. Closing the bar hides it until the next version.
-const DISMISSED = 'pearsheet.update.dismissed'
+const DISMISSED = 'pearoffice.update.dismissed'
 
 function dismissedVersion () {
   try { return localStorage.getItem(DISMISSED) } catch { return null }
@@ -40,14 +40,14 @@ export function UpdateBar () {
     <button className='link-button' onClick={() => open(apply.htmlUrl || update.htmlUrl)}>Download it</button>
   )
   let body
-  if (apply.status === 'running') body = <>Downloading PearSheet {version}...</>
-  else if (apply.status === 'restarting') body = <>Installing PearSheet {version}. It will restart by itself.</>
-  else if (apply.status === 'needs-manual') body = <>PearSheet cannot update itself here. {download}</>
+  if (apply.status === 'running') body = <>Downloading PearOffice {version}...</>
+  else if (apply.status === 'restarting') body = <>Installing PearOffice {version}. It will restart by itself.</>
+  else if (apply.status === 'needs-manual') body = <>PearOffice cannot update itself here. {download}</>
   else if (apply.status === 'error') body = <>The update did not work. {download}</>
   else {
     body = (
       <>
-        PearSheet {version} is out.{' '}
+        PearOffice {version} is out.{' '}
         {update.htmlUrl && <button className='link-button' onClick={() => open(update.htmlUrl)}>See what changed</button>}
         <button className='link-button' onClick={async () => { try { setApply(await call('app:updateApply')) } catch {} }}>Update now</button>
       </>

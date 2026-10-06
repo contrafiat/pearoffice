@@ -1,5 +1,5 @@
 // Excel functions fast-formula-parser and formulajs lack, or get wrong for
-// PearSheet: XLOOKUP, XMATCH, TEXTBEFORE, TEXTAFTER, OFFSET, INDIRECT, XNPV,
+// PearOffice: XLOOKUP, XMATCH, TEXTBEFORE, TEXTAFTER, OFFSET, INDIRECT, XNPV,
 // XIRR and the database functions (DSUM...). Single answers only: a result
 // that would spill into neighbouring cells shows its first value (see
 // TODO.md, spilling).

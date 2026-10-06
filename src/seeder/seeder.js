@@ -1,4 +1,4 @@
-// The PearSheet seeder: Holepunch's blind-peer, plus the rule that it stores
+// The PearOffice seeder: Holepunch's blind-peer, plus the rule that it stores
 // only sheets a paired device registered (wire protocol proposal, section 8).
 //
 // The seeder never receives a sheet's encryption key or topic key. It gets
@@ -33,24 +33,24 @@ const hex = (buf) => b4a.toString(buf, 'hex')
 class SheetSeeder extends BlindPeer {
   constructor (dataDir, opts = {}) {
     super(dataDir + '/blind-peer', opts)
-    this.pearsheet = opts.pearsheet
+    this.pearoffice = opts.pearoffice
   }
 
   async _onaddcore (stream, record) {
-    const sheet = await this.pearsheet.admit(stream, record.referrer)
-    await this.pearsheet.track(sheet, [record.key])
+    const sheet = await this.pearoffice.admit(stream, record.referrer)
+    await this.pearoffice.track(sheet, [record.key])
     return super._onaddcore(stream, record)
   }
 
   async _onaddcores (stream, request) {
-    const sheet = await this.pearsheet.admit(stream, request.referrer)
-    await this.pearsheet.track(sheet, (request.cores || []).map((c) => c.key))
+    const sheet = await this.pearoffice.admit(stream, request.referrer)
+    await this.pearoffice.track(sheet, (request.cores || []).map((c) => c.key))
     return super._onaddcores(stream, request)
   }
 }
 
 async function createSeeder ({ dataDir, bootstrap = null, log = () => {} }) {
-  const stateStore = new Corestore(dataDir + '/pearsheet-state')
+  const stateStore = new Corestore(dataDir + '/pearoffice-state')
   const state = new Hyperbee(stateStore.get({ name: 'state' }), { keyEncoding: 'utf-8', valueEncoding: 'json' })
   await state.ready()
 
@@ -186,7 +186,7 @@ async function createSeeder ({ dataDir, bootstrap = null, log = () => {} }) {
   const dropTimer = setInterval(() => runDrops().catch((e) => log('drop sweep failed: ' + e.message)), DROP_SWEEP_MS)
   if (dropTimer.unref) dropTimer.unref()
 
-  const peer = new SheetSeeder(dataDir, { bootstrap, pearsheet: rules, trustedPubKeys: [...paired].map((k) => b4a.from(k, 'hex')) })
+  const peer = new SheetSeeder(dataDir, { bootstrap, pearoffice: rules, trustedPubKeys: [...paired].map((k) => b4a.from(k, 'hex')) })
   await peer.listen()
   const seederKey = peer.publicKey
 

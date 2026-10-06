@@ -1,10 +1,10 @@
 // End-to-end check of "Update now" (proposals/2026-10-05-update-checker.md)
-// on a Linux AppImage or a macOS PearSheet.app. Runs a copy of the built app
+// on a Linux AppImage or a macOS PearOffice.app. Runs a copy of the built app
 // against a fake newer release served locally, presses Update now through
 // the window's own bridge (over the DevTools protocol), and checks the app
 // was replaced and came back on the new version.
 //
-//   node scripts/check-update.js <old.AppImage | old PearSheet.app | installed PearSheet.exe> <release folder> <new version>
+//   node scripts/check-update.js <old.AppImage | old PearOffice.app | installed PearOffice.exe> <release folder> <new version>
 //
 // On Windows the installed copy itself is updated (the installer has one
 // place to put it), and the installer starts the new version without the
@@ -12,9 +12,9 @@
 // for the new process instead.
 //
 // The release folder holds the new build and its .sha256: on Linux
-// pearsheet-<new>-linux-x86_64.AppImage, built with
+// pearoffice-<new>-linux-x86_64.AppImage, built with
 //   (cd desktop && npx electron-builder --linux AppImage --x64 -c.extraMetadata.version=<new> -c.directories.output=<dir>)
-// on a Mac PearSheet-<new>-mac-<arch>.dmg, built signed with
+// on a Mac PearOffice-<new>-mac-<arch>.dmg, built signed with
 //   BUILD_VERSION=<new> SIGN=1 scripts/build-desktop-mac.sh <arch>
 const fs = require('fs')
 const os = require('os')
@@ -37,15 +37,15 @@ async function page (port) {
     } catch {}
     await sleep(500)
   }
-  throw new Error('no PearSheet window on port ' + port)
+  throw new Error('no PearOffice window on port ' + port)
 }
 
-// Run window.pearsheet.call(method) in the app's window.
+// Run window.pearoffice.call(method) in the app's window.
 async function bridge (port, method) {
   const ws = new WebSocket(await page(port))
   await new Promise((resolve, reject) => { ws.onopen = resolve; ws.onerror = reject })
   const reply = new Promise((resolve) => { ws.onmessage = (m) => resolve(JSON.parse(m.data)) })
-  ws.send(JSON.stringify({ id: 1, method: 'Runtime.evaluate', params: { expression: 'window.pearsheet.call(' + JSON.stringify(method) + ').then(JSON.stringify)', awaitPromise: true } }))
+  ws.send(JSON.stringify({ id: 1, method: 'Runtime.evaluate', params: { expression: 'window.pearoffice.call(' + JSON.stringify(method) + ').then(JSON.stringify)', awaitPromise: true } }))
   const r = await reply
   ws.close()
   if (!r.result || r.result.exceptionDetails) throw new Error(method + ' failed: ' + JSON.stringify(r.result && r.result.exceptionDetails))
@@ -65,24 +65,24 @@ async function until (what, fn, ms = 60000) {
 }
 
 async function main () {
-  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'pearsheet-update-check-'))
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'pearoffice-update-check-'))
   const mac = /\.app\/?$/.test(oldImage)
   const win = /\.exe$/i.test(oldImage)
-  const image = win ? oldImage : path.join(scratch, mac ? 'PearSheet.app' : 'PearSheet.AppImage')
+  const image = win ? oldImage : path.join(scratch, mac ? 'PearOffice.app' : 'PearOffice.AppImage')
   if (mac) execFileSync('ditto', [oldImage, image])
   else if (!win) { fs.copyFileSync(oldImage, image); fs.chmodSync(image, 0o755) }
-  const exe = mac ? path.join(image, 'Contents', 'MacOS', 'PearSheet') : image
+  const exe = mac ? path.join(image, 'Contents', 'MacOS', 'PearOffice') : image
   const args = mac || win ? [] : ['--no-sandbox', '--disable-gpu']
   const server = await serveRelease({ version: next, dir: path.resolve(releaseDir) })
   const port = 9300 + Math.floor(Math.random() * 500)
   const env = {
     ...process.env,
-    PEARSHEET_UPDATE_LATEST_URL: 'http://127.0.0.1:' + server.address().port + '/latest',
-    PEARSHEET_UPDATE_DELAY_MS: '500',
-    PEARSHEET_DATA: path.join(scratch, 'data'),
-    PEARSHEET_DEBUG: '1'
+    PEAROFFICE_UPDATE_LATEST_URL: 'http://127.0.0.1:' + server.address().port + '/latest',
+    PEAROFFICE_UPDATE_DELAY_MS: '500',
+    PEAROFFICE_DATA: path.join(scratch, 'data'),
+    PEAROFFICE_DEBUG: '1'
   }
-  delete env.PEARSHEET_NO_UPDATE_CHECK
+  delete env.PEAROFFICE_NO_UPDATE_CHECK
   const proc = spawn(exe, [...args, '--remote-debugging-port=' + port], { env, stdio: ['ignore', 'pipe', 'pipe'], detached: true })
   let out = ''
   proc.stdout.on('data', (d) => { out += d })
@@ -97,17 +97,17 @@ async function main () {
     if (win) {
       // While the installer runs, the file is briefly missing.
       const ps = (cmd) => execFileSync('powershell', ['-NoProfile', '-Command', cmd], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
-      await until('the installed PearSheet to be ' + next, () => ps("(Get-Item -LiteralPath '" + image + "').VersionInfo.ProductVersion").startsWith(next), 180000)
-      console.log('ok - the installer replaced PearSheet.exe with ' + next)
-      await until('the new copy to start', () => /PearSheet\.exe/i.test(ps('tasklist /FI "IMAGENAME eq PearSheet.exe"')), 60000)
-      console.log('ok - the installer started PearSheet ' + next)
+      await until('the installed PearOffice to be ' + next, () => ps("(Get-Item -LiteralPath '" + image + "').VersionInfo.ProductVersion").startsWith(next), 180000)
+      console.log('ok - the installer replaced PearOffice.exe with ' + next)
+      await until('the new copy to start', () => /PearOffice\.exe/i.test(ps('tasklist /FI "IMAGENAME eq PearOffice.exe"')), 60000)
+      console.log('ok - the installer started PearOffice ' + next)
       return
     }
     if (mac) {
       const plist = execFileSync('plutil', ['-extract', 'CFBundleShortVersionString', 'raw', path.join(image, 'Contents', 'Info.plist')], { encoding: 'utf8' }).trim()
       if (plist !== next) throw new Error('the app on disk is still ' + plist)
       execFileSync('codesign', ['--verify', '--deep', '--strict', image])
-      console.log('ok - PearSheet.app was swapped for the signed ' + next)
+      console.log('ok - PearOffice.app was swapped for the signed ' + next)
     } else {
       const sums = fs.readdirSync(releaseDir).filter((f) => f.endsWith('.AppImage.sha256')).map((f) => fs.readFileSync(path.join(releaseDir, f), 'utf8').slice(0, 64))
       if (!sums.includes(sha(image))) throw new Error('the AppImage was not replaced')
@@ -116,12 +116,12 @@ async function main () {
     }
     const after = await until('the new copy to come back', async () => { const s = await bridge(port, 'app:update'); return s.update && s.update.current === next && s })
     if (after.update.available) throw new Error('the new copy still offers an update')
-    console.log('ok - PearSheet restarted on ' + next + ' and offers nothing newer')
+    console.log('ok - PearOffice restarted on ' + next + ' and offers nothing newer')
   } catch (err) {
-    console.error(out.split('\n').filter((l) => /update|pearsheet\]/.test(l)).slice(-15).join('\n'))
+    console.error(out.split('\n').filter((l) => /update|pearoffice\]/.test(l)).slice(-15).join('\n'))
     throw err
   } finally {
-    try { execFileSync(process.platform === 'win32' ? 'taskkill' : 'pkill', process.platform === 'win32' ? ['/IM', 'PearSheet.exe', '/F'] : ['-f', scratch]) } catch {}
+    try { execFileSync(process.platform === 'win32' ? 'taskkill' : 'pkill', process.platform === 'win32' ? ['/IM', 'PearOffice.exe', '/F'] : ['-f', scratch]) } catch {}
     server.close()
     await sleep(1000)
     fs.rmSync(scratch, { recursive: true, force: true })

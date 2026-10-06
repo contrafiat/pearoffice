@@ -76,7 +76,7 @@ const ReferenceFunctions = {
         if (obj == null) {
             throw Error('COLUMNS requires one argument');
         }
-        // PearSheet: an array (a function's answer, such as FILTER) counts too.
+        // PearOffice: an array (a function's answer, such as FILTER) counts too.
         if (Array.isArray(obj) && Array.isArray(obj[0]))
             return obj[0].length;
         if (typeof obj != 'object' || Array.isArray(obj))
@@ -275,7 +275,7 @@ const ReferenceFunctions = {
         if (obj == null) {
             throw Error('ROWS requires one argument');
         }
-        // PearSheet: an array (a function's answer, such as FILTER) counts too.
+        // PearOffice: an array (a function's answer, such as FILTER) counts too.
         if (Array.isArray(obj) && Array.isArray(obj[0]))
             return obj.length;
         if (typeof obj != 'object' || Array.isArray(obj))

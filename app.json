@@ -1,15 +1,15 @@
 {
   "expo": {
-    "name": "PearSheet",
-    "slug": "pearsheet",
+    "name": "PearOffice",
+    "slug": "pearoffice",
     "version": "0.1.0",
     "newArchEnabled": true,
     "orientation": "default",
-    "scheme": "pearsheet",
+    "scheme": "pearoffice",
     "userInterfaceStyle": "automatic",
     "icon": "./assets/images/icon.png",
     "android": {
-      "package": "com.pearsheet",
+      "package": "com.pearoffice",
       "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
@@ -20,11 +20,11 @@
           "action": "VIEW",
           "data": [
             {
-              "scheme": "pearsheet",
+              "scheme": "pearoffice",
               "host": "join"
             },
             {
-              "scheme": "pearsheet",
+              "scheme": "pearoffice",
               "host": "seeder"
             }
           ],
@@ -36,14 +36,14 @@
       ]
     },
     "ios": {
-      "bundleIdentifier": "com.pearsheet",
+      "bundleIdentifier": "com.pearoffice",
       "buildNumber": "1",
       "supportsTablet": true,
       "infoPlist": {
-        "NSLocalNetworkUsageDescription": "PearSheet connects directly to the people you share sheets with, and to your own devices, on your Wi-Fi.",
+        "NSLocalNetworkUsageDescription": "PearOffice connects directly to the people you share sheets with, and to your own devices, on your Wi-Fi.",
         "NSBonjourServices": [
           "_hyperswarm._udp",
-          "_pearsheetlan._tcp"
+          "_pearofficelan._tcp"
         ]
       }
     },
@@ -64,7 +64,7 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "PearSheet uses the camera to scan invite, device and seeder QR codes.",
+          "cameraPermission": "PearOffice uses the camera to scan invite, device and seeder QR codes.",
           "microphonePermission": false,
           "recordAudioAndroid": false
         }

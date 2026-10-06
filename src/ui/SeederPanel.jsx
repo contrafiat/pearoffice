@@ -35,7 +35,7 @@ function LocalSeeder ({ onPaired, onError }) {
       {settings.runSeeder && host && !host.running && <p className='muted'>Starting the seeder...</p>}
       {host && host.running && (
         <>
-          <p className='muted small'>Holding {host.sheets} sheet{host.sheets === 1 ? '' : 's'} for {host.pairedDevices} paired device{host.pairedDevices === 1 ? '' : 's'}. It runs in the background while PearSheet is open or in the tray.</p>
+          <p className='muted small'>Holding {host.sheets} sheet{host.sheets === 1 ? '' : 's'} for {host.pairedDevices} paired device{host.pairedDevices === 1 ? '' : 's'}. It runs in the background while PearOffice is open or in the tray.</p>
           <div className='row'>
             <button type='button' onClick={async () => { try { setPairing(await call('app:seederHostPair')) } catch (err) { onError(err.message) } }}><QrIcon size={16} /> Show pairing code</button>
             <button
@@ -184,16 +184,16 @@ export function SeederPanel ({ initialLink = '', onBack = null, onClose, onError
         <p>Start the seeder, then paste the pairing link it shows. Links work for 5 minutes.</p>
         <input
           aria-label='Seeder pairing link'
-          placeholder='pearsheet://seeder?...'
+          placeholder='pearoffice://seeder?...'
           value={link}
           onChange={(e) => setLink(e.target.value)}
         />
-        <ScanButton prefix='pearsheet://seeder?' what='a PearSheet seeder code' onError={onError} onLink={(l) => { setLink(l); pair(null, l) }} />
+        <ScanButton prefix='pearoffice://seeder?' what='a PearOffice seeder code' onError={onError} onLink={(l) => { setLink(l); pair(null, l) }} />
         <div className='row end'>
           {done && <span className='muted'>Paired. Your sheets are backing up.</span>}
           <button className='primary' type='submit' disabled={busy || !link.trim()}>{busy ? 'Pairing...' : 'Pair'}</button>
         </div>
-        {window.pearsheet && window.pearsheet.platform === 'desktop' && <LocalSeeder onPaired={() => { setDone(true); load() }} onError={onError} />}
+        {window.pearoffice && window.pearoffice.platform === 'desktop' && <LocalSeeder onPaired={() => { setDone(true); load() }} onError={onError} />}
         <h3>Paired seeders</h3>
         {seeders && seeders.length === 0 && <p className='muted'>None yet.</p>}
         <ul className='people'>

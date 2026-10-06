@@ -5,7 +5,7 @@ const Collection = require('./type/collection');
 const MAX_ROW = 1048576, MAX_COLUMN = 16384;
 const {NotAllInputParsedException} = require('chevrotain');
 
-// PearSheet: element-wise operators over arrays (rows of values).
+// PearOffice: element-wise operators over arrays (rows of values).
 function mapArray(arr, fn) {
     return arr.map(row => row.map(fn));
 }
@@ -118,7 +118,7 @@ class Utils {
     _applyPrefix(prefixes, val, isArray) {
         if (this.isFormulaError(val))
             return val;
-        // PearSheet: an array operand applies the operator to each value
+        // PearOffice: an array operand applies the operator to each value
         // (Excel 365 dynamic arrays).
         if (Array.isArray(val))
             return mapArray(val, v => v instanceof FormulaError ? v : Prefix.unaryOp(prefixes, v, false));
@@ -176,7 +176,7 @@ class Utils {
             return val1;
         if (this.isFormulaError(val2))
             return val2;
-        // PearSheet: with an array on either side, apply the operator value by
+        // PearOffice: with an array on either side, apply the operator value by
         // value, broadcasting a single row, column or value (Excel 365).
         if (Array.isArray(val1) || Array.isArray(val2))
             return broadcast(Array.isArray(val1) ? val1 : [[val1]], Array.isArray(val2) ? val2 : [[val2]],

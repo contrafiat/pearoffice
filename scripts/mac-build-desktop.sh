@@ -26,9 +26,9 @@ if [ "${SIGN:-0}" = "1" ]; then
   APPLE_KEYCHAIN_PROFILE="${NOTARY_PROFILE:-pearcircle-seeder-notary}" APPLE_KEYCHAIN="$KC" \
     npx electron-builder --mac "--$ARCH" --publish never "${VERSION_ARGS[@]}"
   APPDIR=$([ "$ARCH" = "arm64" ] && echo mac-arm64 || echo mac)
-  codesign --verify --deep --strict "dist/$APPDIR/PearSheet.app" && echo "codesign ok"
-  xcrun stapler validate "dist/$APPDIR/PearSheet.app"
-  spctl -a -vv "dist/$APPDIR/PearSheet.app" 2>&1 | head -3
+  codesign --verify --deep --strict "dist/$APPDIR/PearOffice.app" && echo "codesign ok"
+  xcrun stapler validate "dist/$APPDIR/PearOffice.app"
+  spctl -a -vv "dist/$APPDIR/PearOffice.app" 2>&1 | head -3
 else
   CSC_IDENTITY_AUTO_DISCOVERY=false npx electron-builder --mac "--$ARCH" --publish never "${VERSION_ARGS[@]}"
 fi

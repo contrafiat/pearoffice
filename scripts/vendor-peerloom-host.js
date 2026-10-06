@@ -1,4 +1,4 @@
-// Copy the parts of @peerloom/host that PearSheet uses into
+// Copy the parts of @peerloom/host that PearOffice uses into
 // desktop/vendor/peerloom-host/, from the sibling checkout ../peerloom-host.
 // They use only Node built-ins (and z32 for dashboard-auth), so the desktop
 // app and the Umbrel image carry these files and not the whole package.

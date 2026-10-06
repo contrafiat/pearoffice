@@ -1,4 +1,4 @@
-// The PearSheet seeder with a web dashboard, for Umbrel and other Docker
+// The PearOffice seeder with a web dashboard, for Umbrel and other Docker
 // hosts. Starts the blind seeder as its own Bare process (src/seeder/bare.js
 // --ipc, through desktop/seeder-process.js, as the desktop app does) and
 // serves one page to see what it holds, pair a device and forget one.
@@ -37,13 +37,13 @@ const barePath = env.SEEDER_BARE || path.join(root, 'bare')
 const bundlePath = env.SEEDER_BUNDLE || path.join(root, 'seeder.bundle')
 const page = fs.readFileSync(path.join(__dirname, 'index.html'))
 
-const log = (line) => console.log('[pearsheet-seeder] ' + line)
+const log = (line) => console.log('[pearoffice-seeder] ' + line)
 
 async function main () {
   fs.mkdirSync(dataDir, { recursive: true })
   const { password, source } = resolveDashboardPassword({ password: env.SEEDER_PASSWORD, bind: host, dataDir })
   requireSafeBind(host, password, { envVar: 'SEEDER_PASSWORD' })
-  const auth = createDashboardAuth({ app: 'pearsheet_seeder', password, envVar: 'SEEDER_PASSWORD' })
+  const auth = createDashboardAuth({ app: 'pearoffice_seeder', password, envVar: 'SEEDER_PASSWORD' })
   if (source === 'generated') log('dashboard password ' + password + ' (saved in ' + path.join(dataDir, PASSWORD_FILE) + ')')
   const { FONT_CSS } = await import(pathToFileURL(path.join(root, 'src', 'ui', 'fonts.js')).href)
   const seeder = new SeederProcess({ barePath, bundlePath, dataDir, onLog: (_, line) => log(line) })
@@ -101,6 +101,6 @@ async function main () {
 }
 
 main().catch((err) => {
-  console.error('[pearsheet-seeder] failed:', err && err.message)
+  console.error('[pearoffice-seeder] failed:', err && err.message)
   process.exit(1)
 })

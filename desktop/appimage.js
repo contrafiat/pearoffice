@@ -1,7 +1,7 @@
 // A menu entry and icon for the AppImage on Linux. The .deb installs both;
 // an AppImage installs nothing, so the desktop cannot match the window to
-// an icon (Wayland shows its generic one) and pearsheet:// links have no
-// handler. The window's Wayland app id is "pearsheet-desktop", so the entry
+// an icon (Wayland shows its generic one) and pearoffice:// links have no
+// handler. The window's Wayland app id is "pearoffice-desktop", so the entry
 // takes that name. Rewritten when the AppImage moves.
 
 const fs = require('node:fs')
@@ -9,7 +9,7 @@ const os = require('node:os')
 const path = require('node:path')
 const { execFile } = require('node:child_process')
 
-const NAME = 'pearsheet-desktop'
+const NAME = 'pearoffice-desktop'
 
 function quote (s) {
   return '"' + String(s).replace(/(["\\`$])/g, '\\$1') + '"'
@@ -18,14 +18,14 @@ function quote (s) {
 function menuEntry (appImage) {
   return [
     '[Desktop Entry]',
-    'Name=PearSheet',
+    'Name=PearOffice',
     'Comment=Shared spreadsheets that sync device to device. No accounts, no servers.',
     'Exec=' + quote(appImage) + ' %U',
     'Terminal=false',
     'Type=Application',
     'Icon=' + NAME,
     'StartupWMClass=' + NAME,
-    'MimeType=x-scheme-handler/pearsheet;',
+    'MimeType=x-scheme-handler/pearoffice;',
     'Categories=Office;',
     ''
   ].join('\n')
@@ -51,7 +51,7 @@ function installMenuEntry ({ appImage, image, dataHome = process.env.XDG_DATA_HO
     fs.writeFileSync(file, entry)
     changed = true
   }
-  // So pearsheet:// links find the entry. Not every desktop has the tool.
+  // So pearoffice:// links find the entry. Not every desktop has the tool.
   if (changed) execFile('update-desktop-database', [path.dirname(file)], () => {})
   return changed
 }

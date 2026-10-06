@@ -2,6 +2,20 @@
 
 Append-only, newest on top. Per Constitution §4.
 
+## 2026-10-06 - Named PearOffice; one file shared at a time; rename first
+Tier: T0 (product scope; the rename itself is T3, see its proposal)
+Context: one app will hold sheets, documents and later slides, and nothing
+has been released yet.
+Choice: the public name is PearOffice and the internal ids use it too
+(app ids, links, channels, signing purposes, folders, repo). Sharing stays
+one file at a time. The rename goes before the first release
+(proposals/2026-10-06-rename-to-pearoffice.md).
+Alternatives: a neutral internal name with the brand picked later;
+PearDesk, PearDocs; shared folders or workspaces. PearWorks, Pear Deck and
+Pear Suite are taken.
+Consequences: test devices need a reset or a migration; the public Umbrel
+store entry has to be renamed or removed.
+
 ## 2026-10-05 - Presence: a members-only channel, nothing stored
 Tier: T2
 Context: show who has a sheet open and which cell they are on

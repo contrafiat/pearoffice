@@ -1,6 +1,6 @@
-// PearSheet mobile shell. Starts the Bare worklet (the same engine as the
+// PearOffice mobile shell. Starts the Bare worklet (the same engine as the
 // desktop), loads the same web UI into a WebView and relays calls and events
-// between them. The UI talks to window.pearsheet, set up by
+// between them. The UI talks to window.pearoffice, set up by
 // src/ui/mobile-entry.js on top of the WebView bridge.
 
 import React, { useEffect, useRef, useState } from 'react'
@@ -32,7 +32,7 @@ async function shellMethod (method, args) {
   if (method === 'app:shareFile') {
     // Export: write the file to the cache and open the share sheet (save to
     // Files or Drive, send it, ...). A WebView cannot download a blob itself.
-    const safe = String(args.name || 'PearSheet.xlsx').replace(/[\\/:*?"<>|]/g, ' ')
+    const safe = String(args.name || 'PearOffice.xlsx').replace(/[\\/:*?"<>|]/g, ' ')
     const uri = FileSystem.cacheDirectory + safe
     await FileSystem.writeAsStringAsync(uri, args.base64, { encoding: FileSystem.EncodingType.Base64 })
     await Sharing.shareAsync(uri, { mimeType: args.mime, dialogTitle: safe, UTI: UTIS[args.mime] || 'public.data' })
@@ -58,7 +58,7 @@ async function shellMethod (method, args) {
   return null
 }
 
-// The most recent pearsheet:// link, kept until the UI asks for it
+// The most recent pearoffice:// link, kept until the UI asks for it
 // (app:takeLink), so a link that arrives before the UI is listening is not lost.
 let pendingLink = null
 
@@ -165,10 +165,10 @@ export default function App () {
       .catch((err) => { if (alive) setError(String(err && err.message ? err.message : err)) })
     const onEvent = (name, data) => inject('window.__psEvent && window.__psEvent(' + JSON.stringify(name) + ',' + JSON.stringify(data ?? null) + ')')
     listeners.add(onEvent)
-    // pearsheet:// links (invites, seeder pairing) go to the UI.
+    // pearoffice:// links (invites, seeder pairing) go to the UI.
     const sendLink = (url) => {
-      if (!url || !url.startsWith('pearsheet://')) return
-      console.log('[pearsheet] link ' + url.slice(0, 40))
+      if (!url || !url.startsWith('pearoffice://')) return
+      console.log('[pearoffice] link ' + url.slice(0, 40))
       pendingLink = url
       onEvent('app:deeplink', { url })
     }
@@ -210,7 +210,7 @@ export default function App () {
   if (error) {
     return (
       <View style={[styles.center, { backgroundColor: bg }]}>
-        <Text style={{ color: dark ? '#e6e8e3' : '#1f2420', padding: 24 }}>PearSheet could not start: {error}</Text>
+        <Text style={{ color: dark ? '#e6e8e3' : '#1f2420', padding: 24 }}>PearOffice could not start: {error}</Text>
       </View>
     )
   }
@@ -264,7 +264,7 @@ function Scanner ({ onDone }) {
               barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
               onBarcodeScanned={({ data }) => { if (!read.current && data) { read.current = true; onDone(String(data)) } }}
             />
-            <View style={styles.scanHint}><Text style={styles.scanText}>Point at a PearSheet QR code</Text></View>
+            <View style={styles.scanHint}><Text style={styles.scanText}>Point at a PearOffice QR code</Text></View>
             <TouchableOpacity accessibilityRole='button' style={styles.scanCancel} onPress={() => onDone(null)}>
               <Text style={styles.scanText}>Cancel</Text>
             </TouchableOpacity>

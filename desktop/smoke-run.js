@@ -86,7 +86,7 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
     // the brackets the argument help shows; Escape leaves the cell as it was.
     await type('=su')
     await waitFor('suggestions', "!!document.querySelector('.formula-help') && document.querySelector('.formula-help').textContent.includes('SUM(')")
-    if (process.env.PEARSHEET_SMOKE_HELP_SHOT) fs.writeFileSync(process.env.PEARSHEET_SMOKE_HELP_SHOT, (await wc.capturePage()).toPNG())
+    if (process.env.PEAROFFICE_SMOKE_HELP_SHOT) fs.writeFileSync(process.env.PEAROFFICE_SMOKE_HELP_SHOT, (await wc.capturePage()).toPNG())
     result.suggested = await js("[...document.querySelectorAll('.formula-help .fname')].map((e) => e.textContent).slice(0, 3).join(',')")
     await key('Down'); await key('Down'); await key('Tab')
     await waitFor('function inserted', "(document.querySelector('.grid .editor') || {}).value === '=SUM('")
@@ -602,7 +602,7 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
 
     // Tidy up (proposals/2026-10-05-shared-compaction.md): the sheet moves to
     // a fresh copy with the same content, and the app switches to it.
-    const listBudget = "window.pearsheet.call('sheet:list', {}).then((l) => JSON.stringify(l.filter((x) => x.title === 'Household budget').map((x) => x.sheetId)))"
+    const listBudget = "window.pearoffice.call('sheet:list', {}).then((l) => JSON.stringify(l.filter((x) => x.title === 'Household budget').map((x) => x.sheetId)))"
     const beforeIds = JSON.parse(await js(listBudget))
     await more('Tidy up this sheet...')
     await waitFor('tidy panel ready', "[...document.querySelectorAll('.panel button')].some((b) => b.textContent.trim() === 'Tidy up' && !b.disabled)")
@@ -694,7 +694,7 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
     await js("document.querySelector('.panel .settings-devices').click()")
     await waitFor('devices panel again', "[...document.querySelectorAll('.panel button')].some((b) => b.textContent.trim() === 'Link a new device')")
     await js("[...document.querySelectorAll('.panel button')].find((b) => b.textContent.trim() === 'Link a new device').click()")
-    await waitFor('device link', "(document.querySelector('.panel input') || {}).value?.startsWith('pearsheet://link?')")
+    await waitFor('device link', "(document.querySelector('.panel input') || {}).value?.startsWith('pearoffice://link?')")
     await js("document.querySelector('.panel .close').click()")
     await openSettings()
     await js("document.querySelector('.panel .settings-devices').click()")
@@ -726,10 +726,10 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
     await waitFor('start at login on', "document.querySelector('.start-at-login input').checked")
     await js("document.querySelector('.panel .close').click()")
     if (process.platform === 'linux') {
-      const entry = fs.readFileSync(path.join(dataDir, 'autostart', 'pearsheet.desktop'), 'utf8')
+      const entry = fs.readFileSync(path.join(dataDir, 'autostart', 'pearoffice.desktop'), 'utf8')
       result.autostart = /^Exec=.* "--hidden"$/m.test(entry)
     } else if (process.platform === 'darwin') {
-      const agent = fs.readFileSync(path.join(dataDir, 'autostart', 'com.peerloom.pearsheet.login.plist'), 'utf8')
+      const agent = fs.readFileSync(path.join(dataDir, 'autostart', 'com.peerloom.pearoffice.login.plist'), 'utf8')
       result.autostart = agent.includes('<string>--hidden</string>')
     } else result.autostart = true
     win.close()
@@ -765,7 +765,7 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
     await js("document.querySelector('.toolbar .share').click()")
     await waitFor('share panel', "!!document.querySelector('.panel .invite-actions')")
     await js("[...document.querySelectorAll('.panel button')].find((b) => b.textContent.trim() === 'Invite to edit').click()")
-    await waitFor('invite link', "(document.querySelector('.invite-link input') || {}).value?.startsWith('pearsheet://join?')")
+    await waitFor('invite link', "(document.querySelector('.invite-link input') || {}).value?.startsWith('pearoffice://join?')")
     await waitFor('invite QR', "!!document.querySelector('.invite-link .qr svg')")
     result.inviteLink = (await js("document.querySelector('.invite-link input').value")).slice(0, 24)
     await waitFor('picture in the share panel', "!!document.querySelector('.people img.avatar')")
@@ -793,13 +793,13 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
     step('removed from this device')
 
     await sleep(300)
-    const shot = process.env.PEARSHEET_SMOKE_SHOT
+    const shot = process.env.PEAROFFICE_SMOKE_SHOT
     if (shot) {
       const image = await wc.capturePage()
       fs.writeFileSync(shot, image.toPNG())
       step('screenshot', shot)
     }
-    result.ok = result.moreChartTypes && result.importedFormats && result.keepOnline && result.avatar && result.spill && result.quickWins && result.findSort && result.fill && result.charts && result.formats && result.csvPdf && result.tabs && result.tidied && result.jsonImport && result.csvImport && result.suggested === 'SUBSTITUTE,SUBTOTAL,SUM' && result.argHelp === 'number1' && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.importedFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000 && result.pastedFormula === '=SUM(C1:C2)' && result.inviteLink === 'pearsheet://join?s=' + result.inviteLink.slice(19) && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
+    result.ok = result.moreChartTypes && result.importedFormats && result.keepOnline && result.avatar && result.spill && result.quickWins && result.findSort && result.fill && result.charts && result.formats && result.csvPdf && result.tabs && result.tidied && result.jsonImport && result.csvImport && result.suggested === 'SUBSTITUTE,SUBTOTAL,SUM' && result.argHelp === 'number1' && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.importedFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000 && result.pastedFormula === '=SUM(C1:C2)' && result.inviteLink.startsWith('pearoffice://join?s=') && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
   } catch (err) {
     result.error = err.message
     // What the page showed, to tell a UI failure from a load failure.

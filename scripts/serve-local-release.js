@@ -4,7 +4,7 @@
 //   node scripts/serve-local-release.js <version> <folder> [port]
 //
 // then point the app at it:
-//   PEARSHEET_UPDATE_LATEST_URL=http://127.0.0.1:<port>/latest
+//   PEAROFFICE_UPDATE_LATEST_URL=http://127.0.0.1:<port>/latest
 const fs = require('fs')
 const http = require('http')
 const path = require('path')
@@ -17,7 +17,7 @@ function serveRelease ({ version, dir, port = 0, host = '127.0.0.1' }) {
       const assets = fs.readdirSync(dir).filter((f) => fs.statSync(path.join(dir, f)).isFile())
         .map((name) => ({ name, browser_download_url: base + '/files/' + encodeURIComponent(name) }))
       res.writeHead(200, { 'content-type': 'application/json' })
-      return res.end(JSON.stringify({ tag_name: 'v' + version, name: 'PearSheet ' + version, draft: false, prerelease: false, html_url: base + '/release', published_at: new Date().toISOString(), assets }, null, 2))
+      return res.end(JSON.stringify({ tag_name: 'v' + version, name: 'PearOffice ' + version, draft: false, prerelease: false, html_url: base + '/release', published_at: new Date().toISOString(), assets }, null, 2))
     }
     const m = url.match(/^\/files\/([^/]+)$/)
     if (m && fs.existsSync(path.join(dir, m[1]))) {

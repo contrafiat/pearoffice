@@ -1,8 +1,8 @@
 {
-  "name": "pearsheet-desktop",
+  "name": "pearoffice-desktop",
   "version": "0.1.0",
   "private": true,
-  "description": "PearSheet desktop app (Electron). Starts the shared Bare worklet and hosts the web UI.",
+  "description": "PearOffice desktop app (Electron). Starts the shared Bare worklet and hosts the web UI.",
   "license": "MIT",
   "main": "main.js",
   "scripts": {
@@ -18,10 +18,10 @@
     "name": "PeerLoom LLC",
     "email": "support@peerloomllc.com"
   },
-  "homepage": "https://github.com/peerloomllc/pearsheet",
+  "homepage": "https://github.com/peerloomllc/pearoffice",
   "build": {
-    "appId": "com.peerloomllc.pearsheet",
-    "productName": "PearSheet",
+    "appId": "com.peerloomllc.pearoffice",
+    "productName": "PearOffice",
     "copyright": "Copyright 2026 PeerLoom LLC",
     "directories": {
       "output": "dist",
@@ -49,9 +49,9 @@
     ],
     "protocols": [
       {
-        "name": "PearSheet invite",
+        "name": "PearOffice invite",
         "schemes": [
-          "pearsheet"
+          "pearoffice"
         ]
       }
     ],
@@ -62,14 +62,14 @@
       ],
       "category": "public.app-category.productivity",
       "icon": "build/icon.png",
-      "artifactName": "PearSheet-${version}-mac-${arch}.${ext}",
+      "artifactName": "PearOffice-${version}-mac-${arch}.${ext}",
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
       "notarize": true,
       "extendInfo": {
-        "NSLocalNetworkUsageDescription": "PearSheet connects directly to the people you share sheets with, and to your own devices, on your network."
+        "NSLocalNetworkUsageDescription": "PearOffice connects directly to the people you share sheets with, and to your own devices, on your network."
       }
     },
     "linux": {
@@ -80,21 +80,21 @@
       "category": "Office",
       "desktop": {
         "entry": {
-          "StartupWMClass": "pearsheet-desktop"
+          "StartupWMClass": "pearoffice-desktop"
         }
       },
       "icon": "build/icon.png",
-      "artifactName": "pearsheet-${version}-linux-${arch}.${ext}",
+      "artifactName": "pearoffice-${version}-linux-${arch}.${ext}",
       "synopsis": "Peer-to-peer shared spreadsheets",
       "description": "Shared spreadsheets that sync device to device. No accounts, no servers."
     },
     "deb": {
-      "packageName": "pearsheet"
+      "packageName": "pearoffice"
     },
     "win": {
       "target": "nsis",
       "icon": "build/icon.ico",
-      "artifactName": "PearSheet-Setup-${version}.${ext}"
+      "artifactName": "PearOffice-Setup-${version}.${ext}"
     },
     "nsis": {
       "oneClick": true,

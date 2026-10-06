@@ -6,7 +6,7 @@
 import { useEffect, useState } from 'react'
 import { readPref, writePref } from './prefs.js'
 
-const KEY = 'pearsheet:theme'
+const KEY = 'pearoffice:theme'
 
 export function themePref () {
   const v = readPref(KEY)
@@ -22,7 +22,7 @@ export function applyTheme (pref = themePref()) {
 export function setThemePref (pref) {
   writePref(KEY, pref)
   applyTheme(pref)
-  window.dispatchEvent(new window.CustomEvent('pearsheet:theme'))
+  window.dispatchEvent(new window.CustomEvent('pearoffice:theme'))
 }
 
 // A number that changes whenever the colours do: a new choice here, or the
@@ -32,10 +32,10 @@ export function useThemeVersion () {
   useEffect(() => {
     const bump = () => setVersion((v) => v + 1)
     const media = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null
-    window.addEventListener('pearsheet:theme', bump)
+    window.addEventListener('pearoffice:theme', bump)
     if (media) media.addEventListener('change', bump)
     return () => {
-      window.removeEventListener('pearsheet:theme', bump)
+      window.removeEventListener('pearoffice:theme', bump)
       if (media) media.removeEventListener('change', bump)
     }
   }, [])

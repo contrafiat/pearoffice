@@ -189,7 +189,7 @@ function createSheets ({ emit, getBase, getLocalDb = () => null, getStore = () =
 
   function snapCore (sheetId) {
     const store = getStore()
-    return store ? store.get({ name: 'pearsheet-snapshot-' + sheetId }) : null
+    return store ? store.get({ name: 'pearoffice-snapshot-' + sheetId }) : null
   }
 
   async function readSnapshot (sheetId) {
