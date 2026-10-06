@@ -2,6 +2,20 @@
 
 Append-only, newest on top. Per Constitution §4.
 
+## 2026-10-06 - Documents: TipTap on the same file machinery
+Tier: T2
+Context: PearOffice's second file kind (proposals/2026-10-06-documents.md).
+Choice: a `doc` kind whose Yjs doc holds `meta` and a `body` XmlFragment,
+edited with TipTap and y-prosemirror; sharing, roles, seeders, moves and
+deleting reused unchanged; presence gains a text cursor. Page-width layout;
+no images in v1. Edits over 1 MB get split first, which also fixes big
+sheets losing content on a move.
+Alternatives: plain ProseMirror (more to build), Lexical (weaker Yjs
+binding, Android WebView input issues); full-width notes layout; images in
+v1.
+Consequences: old builds refuse `f=doc` invites; the shared file methods
+and file bar move out of the sheet code first.
+
 ## 2026-10-06 - Named PearOffice; one file shared at a time; rename first
 Tier: T0 (product scope; the rename itself is T3, see its proposal)
 Context: one app will hold sheets, documents and later slides, and nothing

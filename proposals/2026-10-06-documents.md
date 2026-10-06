@@ -1,6 +1,7 @@
 # Documents
 
-**Status:** draft, for Tim's review.
+**Status:** approved by Tim 2026-10-06 (TipTap; images in a follow-up;
+page-width layout).
 
 **Goal:** PearOffice can make, share and co-edit rich-text documents, using
 the same sharing, roles, seeders, moves and deleting as sheets.
@@ -133,10 +134,12 @@ stay.
    change in behavior).
 3. The document editor, presence cursors, import and export.
 
+## Decided 2026-10-06
+
+1. Editor: TipTap.
+2. Images: a follow-up after v1, once the 1 MB fix is proven.
+3. Layout: page width, like Google Docs.
+
 ## Open questions
 
-1. TipTap, or one of the alternatives?
-2. Images in v1 (stored inside the document, which makes it grow fast), or
-   in a follow-up?
-3. Page-width layout as above, or full-width like a notes app?
-4. Our own names for the file types (TODO) - settle before step 3.
+1. Our own names for the file types (TODO) - settle before step 3.
