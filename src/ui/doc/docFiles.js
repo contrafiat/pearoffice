@@ -10,7 +10,7 @@ import mammoth from 'mammoth'
 import JSZip from 'jszip'
 import { marked } from 'marked'
 import * as D from 'docx'
-import { documentExtensions, SIZES } from './extensions.js'
+import { documentExtensions, SIZES, LINE_HEIGHTS, MAX_INDENT } from './extensions.js'
 import { call } from '../bridge.js'
 import { fileName, saveFile, isMobile } from '../save.js'
 
@@ -41,20 +41,18 @@ const UNSUPPORTED = 'img, picture, video, audio, iframe, object, embed, svg, can
 
 // Tidy the HTML from any source into what the editor's parser reads: Title
 // and Subtitle, headings 4 to 6 as 3, task lists (Markdown's checkboxes and
-// our own .docx checklist marks), no footnotes or pictures.
-function tidy (html, styles) {
+// our own .docx checklist marks), no footnotes or pictures. Clipboard HTML
+// from Word, Google Docs, LibreOffice and web pages goes through the same,
+// with `paste` set (src/ui/doc/DocView.jsx).
+function tidy (html, styles, paste = false) {
+  // Word's <![if ...]> markers, which a browser drops and happy-dom keeps.
+  html = String(html).replace(/<!\[(end)?if[^\]]*\]>/gi, '')
   const doc = new window.DOMParser().parseFromString('<body>' + html + '</body>', 'text/html')
   const body = doc.body
   let dropped = false
   if (styles) applyStyles(body, styles)
-  const rename = (el, tag) => {
-    const next = doc.createElement(tag)
-    for (const a of el.attributes) next.setAttribute(a.name, a.value)
-    while (el.firstChild) next.appendChild(el.firstChild)
-    el.replaceWith(next)
-    return next
-  }
   for (const el of [...body.querySelectorAll(UNSUPPORTED)]) { dropped = true; el.remove() }
+  if (foreign(body)) dropped = true
   // Footnotes and endnotes (mammoth's markers and the list at the end).
   for (const a of [...body.querySelectorAll('a[href^="#footnote-"], a[href^="#endnote-"]')]) {
     dropped = true
@@ -66,11 +64,17 @@ function tidy (html, styles) {
     li.remove()
     if (list && !list.children.length) list.remove()
   }
-  for (const el of [...body.querySelectorAll('p.pearoffice-title, p.pearoffice-subtitle')]) {
-    el.setAttribute('data-style', el.classList.contains('pearoffice-title') ? 'title' : 'subtitle')
-    el.removeAttribute('class')
+  // Title and Subtitle: mammoth's classes, Word's MsoTitle, LibreOffice's.
+  for (const el of [...body.querySelectorAll('p[class], h1[class], h2[class]')]) {
+    const c = el.getAttribute('class')
+    const style = /(^|[\s-])(mso)?subtitle(\s|$)/i.test(c) ? 'subtitle' : /(^|[\s-])(mso)?title(\s|$)/i.test(c) ? 'title' : null
+    if (!style) continue
+    const p = el.tagName === 'P' ? el : renameEl(el, 'p')
+    p.setAttribute('data-style', style)
+    p.removeAttribute('class')
   }
-  for (const el of [...body.querySelectorAll('h4, h5, h6')]) rename(el, 'h3')
+  for (const el of [...body.querySelectorAll('h4, h5, h6')]) renameEl(el, 'h3')
+  cleanStyles(body, paste)
   for (const code of [...body.querySelectorAll('pre > code')]) {
     const last = code.lastChild
     if (last && last.nodeType === 3) last.textContent = last.textContent.replace(/\n$/, '')
@@ -111,7 +115,261 @@ function tidy (html, styles) {
     li.appendChild(p)
     run.appendChild(li)
   }
+  for (const el of [...body.querySelectorAll('input, button, select, textarea')]) el.remove()
   return { html: body.innerHTML, dropped }
+}
+
+// Clipboard HTML tidied for the editor. { html, dropped }.
+export function tidyPaste (html) {
+  return tidy(html, null, true)
+}
+
+function renameEl (el, tag) {
+  const next = el.ownerDocument.createElement(tag)
+  for (const a of el.attributes) next.setAttribute(a.name, a.value)
+  while (el.firstChild) next.appendChild(el.firstChild)
+  el.replaceWith(next)
+  return next
+}
+
+function unwrap (el) {
+  while (el.firstChild) el.before(el.firstChild)
+  el.remove()
+}
+
+// --- other programs' HTML ------------------------------------------------------
+
+const QUIET = 'script, style, noscript, template, meta, link, title, head, xml, br.Apple-interchange-newline'
+const BLOCK_TAGS = new Set(['P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI', 'UL', 'OL', 'TD', 'TH', 'TR', 'TABLE', 'TBODY', 'THEAD', 'TFOOT', 'COLGROUP', 'COL', 'DIV', 'BLOCKQUOTE', 'PRE', 'SECTION', 'ARTICLE', 'HEADER', 'FOOTER', 'MAIN', 'ASIDE', 'NAV', 'FIGURE', 'DL', 'DT', 'DD', 'BODY', 'CENTER'])
+const FONT_TAG_SIZES = [null, 8, 10, 12, 14, 18, 24, 36]
+
+// Word, Google Docs, LibreOffice and browser quirks, made plain HTML. True
+// when something with no place in a document (Word's drawings) was left out.
+function foreign (body) {
+  const doc = body.ownerDocument
+  let dropped = false
+  const walker = doc.createTreeWalker(body, 128) // comments
+  const comments = []
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) comments.push(n)
+  for (const c of comments) c.remove()
+  for (const el of [...body.querySelectorAll(QUIET)]) el.remove()
+  // Office's own tags: o:p (an empty paragraph's filler), v: drawings, the rest
+  // unwrapped.
+  for (const el of [...body.querySelectorAll('*')]) {
+    const tag = el.tagName.toLowerCase()
+    if (!tag.includes(':') || !el.isConnected) continue
+    if (tag.startsWith('v:')) { dropped = true; el.remove() } else if (tag === 'o:p') el.remove()
+    else unwrap(el)
+  }
+  // Google Docs wraps a copy in <b style="font-weight:normal" id="docs-internal-guid-...">.
+  const google = [...body.querySelectorAll('b[id^="docs-internal-guid"]')]
+  for (const b of google) unwrap(b)
+  if (google.length) googleDocs(body)
+  wordLists(body)
+  // A list straight inside a list (Google Docs, some web pages) belongs to the
+  // item before it.
+  for (const list of [...body.querySelectorAll('ul > ul, ul > ol, ol > ul, ol > ol')]) {
+    const prev = list.previousElementSibling
+    if (prev && prev.tagName === 'LI') prev.appendChild(list)
+    else {
+      const li = doc.createElement('li')
+      list.before(li)
+      li.appendChild(list)
+    }
+  }
+  // LibreOffice's <font>, and align= on blocks.
+  for (const f of [...body.querySelectorAll('font')]) {
+    const css = []
+    if (f.getAttribute('color')) css.push('color:' + f.getAttribute('color'))
+    if (f.getAttribute('face')) css.push('font-family:' + f.getAttribute('face'))
+    const n = parseInt(f.getAttribute('size'), 10)
+    if (n >= 1 && n <= 7) css.push('font-size:' + FONT_TAG_SIZES[n] + 'pt')
+    if (f.getAttribute('style')) css.push(f.getAttribute('style'))
+    const span = doc.createElement('span')
+    if (css.length) span.setAttribute('style', css.join(';'))
+    while (f.firstChild) span.appendChild(f.firstChild)
+    f.replaceWith(span)
+  }
+  for (const el of [...body.querySelectorAll('[align]')]) {
+    if (/^(P|H[1-6]|DIV|TD|TH)$/.test(el.tagName)) el.setAttribute('style', 'text-align:' + el.getAttribute('align').toLowerCase() + ';' + (el.getAttribute('style') || ''))
+    el.removeAttribute('align')
+  }
+  return dropped
+}
+
+// Google Docs: empty lines come as <br> between paragraphs, Title and
+// Subtitle only as their default sizes, checklists as role=checkbox.
+function googleDocs (body) {
+  const doc = body.ownerDocument
+  for (const br of [...body.children].filter((x) => x.tagName === 'BR')) br.replaceWith(doc.createElement('p'))
+  for (const p of [...body.querySelectorAll('p')]) {
+    if (p.closest('li, td, th')) continue
+    const spans = [...p.querySelectorAll('span')].filter((s) => s.textContent.trim() && !s.querySelector('span'))
+    if (!spans.length) continue
+    const styles = spans.map((s) => parseStyle(s.getAttribute('style')))
+    const all = (fn) => styles.every(fn)
+    if (all((st) => st.get('font-size') === '26pt')) p.setAttribute('data-style', 'title')
+    else if (all((st) => st.get('font-size') === '15pt' && /^#666(666)?$/i.test(st.get('color') || ''))) {
+      p.setAttribute('data-style', 'subtitle')
+      for (const s of spans) s.style.removeProperty('color') // the style's grey
+    }
+  }
+  for (const li of [...body.querySelectorAll('li[role="checkbox"]')]) {
+    li.parentElement.setAttribute('data-type', 'taskList')
+    li.setAttribute('data-type', 'taskItem')
+    li.setAttribute('data-checked', li.getAttribute('aria-checked') === 'true' ? 'true' : 'false')
+  }
+}
+
+// Word's lists are paragraphs with mso-list:l1 level2 in their style and the
+// bullet or number typed in a span marked mso-list:Ignore. Paragraphs in a
+// row become one list, nested by level.
+function wordLists (body) {
+  const doc = body.ownerDocument
+  const re = /mso-list:\s*l(\d+)\s+level(\d+)/i
+  const runs = []
+  for (const p of [...body.querySelectorAll('p[style]')]) {
+    if (!re.test(p.getAttribute('style'))) continue
+    const last = runs[runs.length - 1]
+    if (last && last[last.length - 1].nextElementSibling === p) last.push(p)
+    else runs.push([p])
+  }
+  for (const run of runs) {
+    const stack = [] // { list, level, ordered }
+    let anchor = null // the last list at the top
+    for (const p of run) {
+      const level = Number(re.exec(p.getAttribute('style'))[2])
+      const ignore = [...p.querySelectorAll('span[style]')].filter((s) => /mso-list:\s*ignore/i.test(s.getAttribute('style')))
+      const marker = ignore.map((s) => s.textContent).join('').replace(/[\s\u00a0]+/g, '')
+      for (const s of ignore) if (s.isConnected) s.remove()
+      const ordered = /^\(?([0-9]+|[a-z]{1,3})[.)]$/i.test(marker)
+      while (stack.length && stack[stack.length - 1].level > level) stack.pop()
+      let top = stack[stack.length - 1]
+      if (top && top.level === level && top.ordered !== ordered) { stack.pop(); top = stack[stack.length - 1] }
+      if (!top || top.level < level) {
+        const list = doc.createElement(ordered ? 'ol' : 'ul')
+        const start = /^\(?(\d+)/.exec(marker)
+        if (ordered && start && Number(start[1]) > 1) list.setAttribute('start', start[1])
+        if (top) top.list.lastElementChild.appendChild(list)
+        else {
+          if (anchor) anchor.after(list)
+          else p.before(list)
+          anchor = list
+        }
+        top = { list, level, ordered }
+        stack.push(top)
+      }
+      const li = doc.createElement('li')
+      top.list.appendChild(li)
+      p.removeAttribute('class')
+      li.appendChild(p)
+    }
+  }
+}
+
+// An inline style as a Map of property to value, read from the attribute so
+// properties a browser would drop (mso-*) are kept.
+function parseStyle (text) {
+  const out = new Map()
+  for (const part of String(text || '').split(';')) {
+    const i = part.indexOf(':')
+    if (i < 0) continue
+    out.set(part.slice(0, i).trim().toLowerCase(), part.slice(i + 1).replace(/!important/i, '').trim())
+  }
+  return out
+}
+
+const CSS_NAMES = { black: '#000000', white: '#ffffff', red: '#ff0000', green: '#008000', blue: '#0000ff', yellow: '#ffff00', cyan: '#00ffff', aqua: '#00ffff', magenta: '#ff00ff', fuchsia: '#ff00ff', gray: '#808080', grey: '#808080', silver: '#c0c0c0', lightgray: '#d3d3d3', lightgrey: '#d3d3d3', orange: '#ffa500', purple: '#800080', navy: '#000080', maroon: '#800000', teal: '#008080', olive: '#808000', lime: '#00ff00' }
+
+// A colour as #rrggbb, or null for none (transparent, inherited, unreadable).
+function cssHex (v) {
+  const s = String(v || '').trim().toLowerCase()
+  if (!s || /^(transparent|inherit|initial|unset|none|auto|currentcolor|windowtext)$/.test(s)) return null
+  const a = /^rgba\(([^)]*)\)/.exec(s)
+  if (a && Number(a[1].split(/[\s,/]+/).filter(Boolean)[3]) === 0) return null
+  const hex = hexColour(CSS_NAMES[s] || s)
+  return hex ? '#' + hex.toLowerCase() : null
+}
+
+const channels = (hex) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16))
+// Text colour worth keeping: not black and, from the clipboard, not nearly
+// black or nearly white (a web page's body text).
+function keepColour (hex, paste) {
+  if (!hex || hex === '#000000') return false
+  if (!paste) return true
+  const c = channels(hex)
+  const max = Math.max(...c)
+  const min = Math.min(...c)
+  return !((max < 80 && max - min < 24) || min > 230)
+}
+
+// A background colour as one of the editor's highlights, or null.
+function highlightOf (v) {
+  const m = /#[0-9a-f]{3,6}\b|rgba?\([^)]*\)|\b[a-z]+\b/i.exec(String(v || ''))
+  const hex = m && cssHex(m[0])
+  if (!hex || Math.min(...channels(hex)) > 240) return null
+  return WORD_HIGHLIGHTS[nearestHighlight(hex)] || null
+}
+
+function ptSize (v) {
+  const m = /^([\d.]+)(pt|px)$/i.exec(String(v || '').trim())
+  if (!m) return null
+  return nearestSize(m[2].toLowerCase() === 'px' ? Number(m[1]) * 0.75 : Number(m[1]))
+}
+
+function lineHeight (v) {
+  const m = /^([\d.]+)(%)?$/.exec(String(v || '').trim())
+  if (!m) return null
+  const n = Number(m[1]) / (m[2] ? 100 : 1)
+  const hit = LINE_HEIGHTS.find((x) => Math.abs(Number(x) - n) < 0.03)
+  return hit && hit !== '1.15' ? hit : null
+}
+
+// Keep only the inline styles the editor reads, in its terms: alignment,
+// spacing and indent on blocks; colour, size, font, bold, italic, underline,
+// strike, raised and lowered text and highlight on text. Text from the
+// clipboard keeps no size near the body's and no near-black colour.
+function cleanStyles (body, paste) {
+  const doc = body.ownerDocument
+  for (const el of [...body.querySelectorAll('[style]')]) {
+    const st = parseStyle(el.getAttribute('style'))
+    const out = []
+    if (BLOCK_TAGS.has(el.tagName)) {
+      const align = { start: 'left', end: 'right' }[st.get('text-align')] || st.get('text-align')
+      if (/^(left|center|right|justify)$/.test(align || '')) out.push('text-align:' + align)
+      const lh = lineHeight(st.get('line-height'))
+      if (lh) out.push('line-height:' + lh)
+      const ml = /^([\d.]+)(pt|px|in|cm)$/.exec(st.get('margin-left') || '')
+      if (ml && /^(P|H[1-3])$/.test(el.tagName) && !el.closest('li, td, th') && !el.hasAttribute('data-indent')) {
+        const pt = Number(ml[1]) * { pt: 1, px: 0.75, in: 72, cm: 28.35 }[ml[2]]
+        const steps = Math.min(MAX_INDENT, Math.round(pt / 36))
+        if (steps > 0) el.setAttribute('data-indent', String(steps))
+      }
+    } else {
+      const heading = !!el.closest('h1, h2, h3, h4, h5, h6, p[data-style]')
+      const link = !!el.closest('a')
+      const colour = cssHex(st.get('color'))
+      if (!link && keepColour(colour, paste)) out.push('color:' + colour)
+      const size = ptSize(st.get('font-size'))
+      if (size && !heading && size !== 11 && !(paste && size >= 10 && size <= 12)) out.push('font-size:' + size + 'pt')
+      const family = fontFamily(st.get('font-family'))
+      if (family) out.push('font-family:' + family)
+      if (st.get('font-weight') && !heading) out.push('font-weight:' + st.get('font-weight'))
+      if (/^(italic|oblique|normal)$/.test(st.get('font-style') || '')) out.push('font-style:' + st.get('font-style'))
+      const deco = (st.get('text-decoration') || st.get('text-decoration-line') || '').split(/\s+/).filter((x) => x === 'line-through' || (x === 'underline' && !link))
+      if (deco.length) out.push('text-decoration:' + deco.join(' '))
+      if (/^(super|sub)$/.test(st.get('vertical-align') || '')) out.push('vertical-align:' + st.get('vertical-align'))
+      const mark = highlightOf(st.get('background-color') || st.get('background') || st.get('mso-highlight'))
+      if (mark && !el.closest('mark')) {
+        const m = doc.createElement('mark')
+        m.setAttribute('data-color', mark)
+        while (el.firstChild) m.appendChild(el.firstChild)
+        el.appendChild(m)
+      }
+    }
+    if (out.length) el.setAttribute('style', out.join(';'))
+    else el.removeAttribute('style')
+  }
 }
 
 // --- .docx formatting --------------------------------------------------------
