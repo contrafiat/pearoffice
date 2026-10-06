@@ -762,6 +762,16 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
     // About: version and the open-source list.
     await js("document.querySelector('.panel .about-link').click()")
     await waitFor('about', "document.querySelector('.panel').textContent.includes('Open-source software') && /Version \\d/.test(document.querySelector('.panel').textContent)")
+    // Support development opens the Bitcoin sheet; back returns to About.
+    await js("[...document.querySelectorAll('.about-toggle')].find((b) => b.textContent.trim() === 'Support development').click()")
+    await waitFor('support', "!!document.querySelector('.donate-btc')")
+    if (process.env.PEAROFFICE_SMOKE_ABOUT_SHOT) { await sleep(300); fs.writeFileSync(process.env.PEAROFFICE_SMOKE_ABOUT_SHOT, (await wc.capturePage()).toPNG()) }
+    await js("document.querySelector('.donate-btc').click()")
+    await waitFor('bitcoin sheet', "document.querySelector('.panel h2').textContent === 'Bitcoin Lightning' && document.querySelector('.copy-field code').textContent === 'peerloomllc@strike.me' && document.querySelectorAll('.wallet').length === 4")
+    if (process.env.PEAROFFICE_SMOKE_BTC_SHOT) fs.writeFileSync(process.env.PEAROFFICE_SMOKE_BTC_SHOT, (await wc.capturePage()).toPNG())
+    await js("document.querySelector('.panel .back').click()")
+    await waitFor('back to about', "document.querySelector('.panel h2').textContent === 'About PearOffice'")
+    result.about = true
     await js("document.querySelector('.panel .close').click()")
     await waitFor('owner picture in the sheet list', "!!document.querySelector('.sheet-link .sheet-owner img.avatar')")
     step('profile picture')
@@ -812,7 +822,7 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
       fs.writeFileSync(shot, image.toPNG())
       step('screenshot', shot)
     }
-    result.ok = result.kinds === 'Spreadsheet, Document (soon), Slides (soon)' && result.fileIcons === result.sheetsAfter && result.moreChartTypes && result.importedFormats && result.keepOnline && result.avatar && result.spill && result.quickWins && result.findSort && result.fill && result.charts && result.formats && result.csvPdf && result.tabs && result.tidied && result.jsonImport && result.csvImport && result.suggested === 'SUBSTITUTE,SUBTOTAL,SUM' && result.argHelp === 'number1' && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.importedFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000 && result.pastedFormula === '=SUM(C1:C2)' && result.inviteLink.startsWith('pearoffice://join?s=') && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
+    result.ok = result.about && result.kinds === 'Spreadsheet, Document (soon), Slides (soon)' && result.fileIcons === result.sheetsAfter && result.moreChartTypes && result.importedFormats && result.keepOnline && result.avatar && result.spill && result.quickWins && result.findSort && result.fill && result.charts && result.formats && result.csvPdf && result.tabs && result.tidied && result.jsonImport && result.csvImport && result.suggested === 'SUBSTITUTE,SUBTOTAL,SUM' && result.argHelp === 'number1' && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.importedFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000 && result.pastedFormula === '=SUM(C1:C2)' && result.inviteLink.startsWith('pearoffice://join?s=') && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
   } catch (err) {
     result.error = err.message
     // What the page showed, to tell a UI failure from a load failure.

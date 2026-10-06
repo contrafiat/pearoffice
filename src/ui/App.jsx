@@ -10,6 +10,7 @@ import { SettingsPanel } from './SettingsPanel.jsx'
 import { UpdateBar } from './UpdateBar.jsx'
 import { applyTheme } from './theme.js'
 import { FileHome, NewPanel } from './Files.jsx'
+import { DonationReminder, donationsShown } from './About.jsx'
 import { FileArrowUp, GearSix, House, LinkSimple, List, Plus } from '@phosphor-icons/react'
 
 applyTheme()
@@ -73,7 +74,8 @@ export function App () {
   const [name, setName] = useState(null)
   const [avatar, setAvatar] = useState(null) // { data, mime, hash } or null
   const [myId, setMyId] = useState(null)
-  const [settings, setSettings] = useState(false)
+  const [settings, setSettings] = useState(false) // true, or { mode, section } to open About at a section
+  const [donateNudge, setDonateNudge] = useState(false)
   const [newFile, setNewFile] = useState(false) // the New panel, asking which kind
   // A short note at the bottom ("Joined ..."), gone after a few seconds.
   const [toast, setToast] = useState(null)
@@ -157,6 +159,17 @@ export function App () {
     else if (/^pearoffice:\/\/seeder\?/.test(url)) setSeeder(url)
     else if (/^pearoffice:\/\/link\?/.test(url)) setDevices({ link: url })
   }
+
+  // The two-week donation nudge: asked once the file list is loaded, shown
+  // once ever (marked shown as soon as it appears). Not on iOS for now.
+  const askedDonation = useRef(false)
+  useEffect(() => {
+    if (!sheets || askedDonation.current || !donationsShown()) return
+    askedDonation.current = true
+    call('donation:status').then((r) => {
+      if (r && r.due) { setDonateNudge(true); call('donation:dismiss').catch(() => {}) }
+    }).catch(() => {})
+  }, [sheets])
 
   async function create (kind) {
     setNewFile(false)
@@ -245,8 +258,10 @@ export function App () {
           onSeeder={() => { setSettings(false); setSeeder('fromSettings') }}
           onClose={() => setSettings(false)}
           onError={setError}
+          startIn={typeof settings === 'object' ? settings : null}
         />
       )}
+      {donateNudge && <DonationReminder onClose={() => setDonateNudge(false)} onDonate={() => { setDonateNudge(false); setSettings({ mode: 'about', section: 'support' }) }} />}
       {waitingJoin && sheets && sheets.find((x) => x.sheetId === waitingJoin && x.joining) && (
         <JoinProgress
           entry={sheets.find((x) => x.sheetId === waitingJoin)}

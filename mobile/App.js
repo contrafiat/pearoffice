@@ -4,7 +4,7 @@
 // src/ui/mobile-entry.js on top of the WebView bridge.
 
 import React, { useEffect, useRef, useState } from 'react'
-import { ActivityIndicator, Keyboard, Linking, Modal, Platform, StatusBar, StyleSheet, Text, TouchableOpacity, View, useColorScheme } from 'react-native'
+import { ActivityIndicator, Keyboard, Linking, Modal, Platform, Share, StatusBar, StyleSheet, Text, TouchableOpacity, View, useColorScheme } from 'react-native'
 import { CameraView, useCameraPermissions } from 'expo-camera'
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
 import { WebView } from 'react-native-webview'
@@ -50,7 +50,16 @@ async function shellMethod (method, args) {
   }
   if (method === 'app:openUrl') {
     const url = String(args.url || '')
-    if (/^(https:|mailto:)/.test(url)) await Linking.openURL(url)
+    if (/^(https:|mailto:|lightning:)/.test(url)) await Linking.openURL(url)
+    return { ok: true }
+  }
+  // Is a Lightning wallet installed (the donation sheet offers it)?
+  if (method === 'app:canOpenUrl') {
+    const url = String(args.url || '')
+    return { can: /^lightning:/.test(url) ? await Linking.canOpenURL(url).catch(() => false) : false }
+  }
+  if (method === 'app:share') {
+    await Share.share({ message: String(args.text || '') }).catch(() => {})
     return { ok: true }
   }
   if (method === 'app:setClipboard') { await Clipboard.setStringAsync(String(args.text || '')); return { ok: true } }
@@ -229,6 +238,7 @@ export default function App () {
           ref={web}
           source={{ html, baseUrl: 'https://localhost/' }}
           originWhitelist={['*']}
+          injectedJavaScriptBeforeContentLoaded={'window.__pearPlatform = ' + JSON.stringify(Platform.OS) + ';true;'}
           onMessage={onMessage}
           onLoad={() => {
             loaded.current = true
