@@ -3,7 +3,7 @@
 
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const { createSheetMethods } = require('../src/sheet/sheetMethods')
+const { createFileMethods } = require('../src/worklet/fileMethods')
 
 function fakeDb () {
   const rows = new Map()
@@ -15,7 +15,7 @@ function fakeDb () {
 }
 
 test('the donation nudge is due once, two weeks after first use', async () => {
-  const methods = createSheetMethods(null, {})
+  const methods = createFileMethods(null, {})
   const ctx = { localDb: fakeDb() }
   assert.equal((await methods['donation:status']({}, ctx)).due, false, 'not on the first day')
   const first = ctx.localDb.rows.get('donateReminder').firstUseAt

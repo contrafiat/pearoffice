@@ -1,3 +1,4 @@
+/* global Bare */
 // Builds the PearOffice engine on @peerloom/core. Split from bare.js so tests
 // can build it in Node with an injected corestore and swarm.
 
@@ -6,6 +7,7 @@ const { createGroupEngine } = require('@peerloom/core/engine')
 const { createSheets } = require('./sheets')
 const { createApplyOps } = require('./sheetWire')
 const { createSheetMethods } = require('../sheet/sheetMethods')
+const { createFileMethods } = require('./fileMethods')
 const { createJoinService } = require('./join')
 const { createSeeding } = require('./seeding')
 const { createMoves } = require('./moves')
@@ -58,8 +60,10 @@ function createSheetEngine (opts = {}) {
     }
   }
 
+  const deps = { getJoin: () => join, getMoves: () => moves, getProfiles: () => profiles }
   const methods = {
-    ...createSheetMethods(sheets, { getJoin: () => join, getMoves: () => moves, getProfiles: () => profiles }),
+    ...createFileMethods(sheets, deps),
+    ...createSheetMethods(sheets, deps),
     // Who has a sheet open (proposals/2026-10-05-presence.md).
     'sheet:presence': async ({ sheetId, ...state }) => { if (presence) presence.set(sheetId, state); return {} },
     'sheet:present': async ({ sheetId }) => ({ people: presence ? presence.list(sheetId) : [] }),
@@ -96,6 +100,8 @@ function createSheetEngine (opts = {}) {
       return { ok: true }
     }
   }
+  // The same methods under file: names, for any kind of file.
+  for (const name of ['visible', 'removeLocal', 'cancelJoin', 'deleteForEveryone']) methods['file:' + name] = methods['sheet:' + name]
 
   // Run a handler that reads what this apply batch wrote. The view shows it
   // only once the batch is done, which can take seconds on a busy device, so
