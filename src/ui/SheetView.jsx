@@ -26,7 +26,7 @@ import { Minus, ArrowCounterClockwise, ArrowClockwise, TextB, TextItalic, TextAU
 import { DeletePanel } from './DeletePanel.jsx'
 import { TidyPanel } from './TidyPanel.jsx'
 import { FormulaHelp, helpFor, insertFunction } from './FormulaHelp.jsx'
-import { exportSheet, exportCsv, printTab, isMobile } from './xlsx.js'
+import { exportSheet, exportCsv, exportJson, printTab, isMobile } from './xlsx.js'
 
 const COLOURS = ['#1f2420', '#b3261e', '#c2410c', '#a16207', '#15803d', '#0e7490', '#1d4ed8', '#7e22ce']
 const ZOOM_STEPS = [0.5, 0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5]
@@ -1013,6 +1013,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
               <li role='menuitem' onClick={() => setFinding({ replace: canEdit })}>Find and replace</li>
               {phone && window.pearsheet && <li role='menuitem' onClick={() => exportSheet(sheetId).catch((err) => onError(err.message))}>Save as an Excel file</li>}
               <li role='menuitem' onClick={() => exportCsv(view).catch((err) => onError(err.message))}>Download this tab as CSV</li>
+              <li role='menuitem' onClick={() => exportJson(sheetId).catch((err) => onError(err.message))}>Save as JSON</li>
               {!phone && <li role='menuitem' onClick={() => printTab(view, 'pdf', printCharts()).catch((err) => onError(err.message))}>Save this tab as PDF</li>}
               {!phone && <li role='menuitem' onClick={() => printTab(view, 'print', printCharts()).catch((err) => onError(err.message))}>Print this tab...</li>}
               {canEdit && <li role='menuitem' onClick={openSort}>Sort...</li>}

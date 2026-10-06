@@ -8,6 +8,7 @@ import { stylesFromXlsx } from '../shared/xlsxStyles.js'
 import { chartsFromXlsx } from '../shared/xlsxChartsRead.js'
 import { jsonFileToTabs } from '../shared/jsonImport.js'
 import { csvBytesToTabs } from '../shared/csvImport.js'
+import { sheetToJson } from '../shared/jsonExport.js'
 import { call } from './bridge.js'
 import { writePref } from './prefs.js'
 import { borderCss, fontPx, FONTS } from './cellStyle.js'
@@ -116,16 +117,25 @@ export function tabCsv (view) {
 
 export async function exportCsv (view) {
   const tab = (view.tabs.find((t) => t.id === view.tabId) || {}).name
-  const name = fileName(view.title + (view.tabs.length > 1 ? ' - ' + tab : '')) + '.csv'
-  const text = tabCsv(view)
+  return saveText(fileName(view.title + (view.tabs.length > 1 ? ' - ' + tab : '')) + '.csv', 'text/csv', tabCsv(view))
+}
+
+// The whole sheet as JSON, values only (src/shared/jsonExport.js).
+export async function exportJson (sheetId) {
+  const dump = await call('sheet:dump', { sheetId })
+  return saveText(fileName(dump.title) + '.json', 'application/json', JSON.stringify(sheetToJson(dump), null, 2) + '\n')
+}
+
+// A text file: the share sheet on phones, a download on desktop.
+async function saveText (name, mime, text) {
   if (isMobile()) {
     const bytes = new TextEncoder().encode(text)
     let bin = ''
-    for (const b of bytes) bin += String.fromCharCode(b)
-    return call('app:shareFile', { name, mime: 'text/csv', base64: btoa(bin) })
+    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000))
+    return call('app:shareFile', { name, mime, base64: btoa(bin) })
   }
   const a = document.createElement('a')
-  a.href = URL.createObjectURL(new Blob([text], { type: 'text/csv' }))
+  a.href = URL.createObjectURL(new Blob([text], { type: mime }))
   a.download = name
   document.body.appendChild(a)
   a.click()
