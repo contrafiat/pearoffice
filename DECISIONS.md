@@ -2,6 +2,21 @@
 
 Append-only, newest on top. Per Constitution §4.
 
+## 2026-10-06 - Slides: DOM slides with position keys
+Tier: T2
+Context: PearOffice's third file kind (proposals/2026-10-06-slides.md,
+notes/2026-10-06-impress-parity.md).
+Choice: a `slides` kind drawn as DOM with CSS transforms and TipTap in each
+text box; slides and objects ordered by fractional index keys; pictures in
+the existing per-writer picture cores; .pptx export (pptxgenjs) and import
+of text, shapes, pictures and layout; 4 themes; phones present and edit
+notes, text and order.
+Alternatives: a canvas renderer (Konva, Fabric); a Y.Array order with
+duplicate clean-up; shallower or no .pptx import; 1 or 8 themes; full
+editing or present-only on phones.
+Consequences: pictures.js and moves.js must find picture references in
+slides as well as documents.
+
 ## 2026-10-06 - Pictures in documents live beside the document
 Tier: T3
 Context: pictures were deferred from Documents v1
