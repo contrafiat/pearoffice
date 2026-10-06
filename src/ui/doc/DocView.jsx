@@ -13,8 +13,12 @@ import Superscript from '@tiptap/extension-superscript'
 import Typography from '@tiptap/extension-typography'
 import Placeholder from '@tiptap/extension-placeholder'
 import { CharacterCount } from '@tiptap/extensions'
+import { Extension } from '@tiptap/core'
+import { yCursorPlugin, ySyncPluginKey, absolutePositionToRelativePosition } from '@tiptap/y-tiptap'
 import { call, on } from '../bridge.js'
 import { FileBar, useMembers } from '../FileBar.jsx'
+import { colourFor } from '../Avatar.jsx'
+import { readPref } from '../prefs.js'
 import { isMobile } from '../sheet/xlsx.js'
 import { ParagraphFormat, FindReplace, findKey, changeCaseCommand, LINE_HEIGHTS } from './extensions.js'
 import {
@@ -38,6 +42,7 @@ const FONTS = [['', 'Sans'], ['serif', 'Serif'], ['monospace', 'Mono']]
 const STYLES = [['normal', 'Normal text'], ['title', 'Title'], ['subtitle', 'Subtitle'], ['h1', 'Heading 1'], ['h2', 'Heading 2'], ['h3', 'Heading 3']]
 const ALIGNS = [['left', 'Align left', TextAlignLeft], ['center', 'Centre', TextAlignCenter], ['right', 'Align right', TextAlignRight], ['justify', 'Justify', TextAlignJustify]]
 const SEND_MS = 300
+const CURSOR_MS = 150
 
 function toB64 (bytes) {
   let s = ''
@@ -124,6 +129,48 @@ export function DocView ({ sheetId, onTitleChange, onError, onGone }) {
     return () => { call('file:visible', { sheetId, visible: false }).catch(() => {}) }
   }, [sheetId, onScreen])
 
+  // Who else has this document open, and their text cursor
+  // (proposals/2026-10-06-documents.md, Presence). As in a sheet, Settings can
+  // turn this off; then this device sends nothing and sees nobody.
+  const [present, setPresent] = useState([])
+  const [sharePresence, setSharePresence] = useState(() => readPref('pearoffice:presence') !== '0')
+  useEffect(() => {
+    const pref = (e) => { if (e.detail && e.detail.key === 'pearoffice:presence') setSharePresence(e.detail.value !== '0') }
+    window.addEventListener('pearoffice:pref', pref)
+    return () => window.removeEventListener('pearoffice:pref', pref)
+  }, [])
+  const cursorRef = useRef(null)
+  const sentRef = useRef('')
+  useEffect(() => {
+    setPresent([])
+    call('sheet:present', { sheetId }).then((d) => setPresent(d.people)).catch(() => {})
+    const off = on('sheet:presence', (d) => { if (d.sheetId === sheetId) setPresent(d.people) })
+    return () => {
+      off()
+      sentRef.current = ''
+      cursorRef.current = null
+      call('sheet:presence', { sheetId, open: false }).catch(() => {})
+    }
+  }, [sheetId])
+  // Sent when it differs from the last one sent; the worklet sends at most
+  // four a second.
+  const sendPresence = useCallback(() => {
+    const msg = sharePresence && onScreen ? { open: true, cursor: cursorRef.current } : { open: false }
+    const key = JSON.stringify(msg)
+    if (key === sentRef.current) return
+    sentRef.current = key
+    call('sheet:presence', { sheetId, ...msg }).catch(() => {})
+  }, [sheetId, sharePresence, onScreen])
+  useEffect(() => { sendPresence() }, [sendPresence])
+  const sendRef = useRef(sendPresence)
+  sendRef.current = sendPresence
+  const cursorTimer = useRef(null)
+  useEffect(() => () => clearTimeout(cursorTimer.current), [])
+  const onCursor = useCallback((cursor) => {
+    cursorRef.current = cursor
+    if (!cursorTimer.current) cursorTimer.current = setTimeout(() => { cursorTimer.current = null; sendRef.current() }, CURSOR_MS)
+  }, [])
+
   // This person's edits go to the worklet a few at a time, and at once when
   // the editor loses focus, the app is hidden or the document closes.
   const canEditRef = useRef(false)
@@ -160,6 +207,13 @@ export function DocView ({ sheetId, onTitleChange, onError, onGone }) {
     }
   }, [sheetId, ydoc])
 
+  const nameOf = (identity) => {
+    const m = members.find((x) => x.identity === identity)
+    return !m ? 'Someone' : m.isMe ? 'You (other device)' : m.name || 'Unnamed'
+  }
+  const presentWhere = new Map(present.map((p) => [p.identity, 'here']))
+  const cursors = present.filter((p) => p.cursor).map((p) => ({ key: p.device, name: nameOf(p.identity), color: colourFor(p.identity), cursor: p.cursor }))
+
   if (!info) return <div className='loading'>Opening document...</div>
   if (!arrived) return <div className='loading'>Waiting for the document to arrive from the people in it...</div>
 
@@ -181,21 +235,22 @@ export function DocView ({ sheetId, onTitleChange, onError, onGone }) {
         badge={!canEdit && <span className='badge view-only'>{hasEditRole && !info.writable && !info.frozen ? 'Getting edit access...' : 'View only'}</span>}
         phone={phone}
         members={members}
-        present={[]}
+        present={presentWhere}
         onTitleChange={onTitleChange}
         onError={onError}
         onGone={onGone}
         menuItems={() => <li role='menuitem' onClick={() => setFinding(true)}>Find and replace</li>}
       />
       {note && <div className='banner info'>{note}</div>}
-      <DocEditor ydoc={ydoc} canEdit={canEdit} phone={phone} finding={finding} setFinding={setFinding} onBlur={() => flushRef.current()} />
+      <DocEditor ydoc={ydoc} canEdit={canEdit} phone={phone} finding={finding} setFinding={setFinding} onBlur={() => flushRef.current()} cursors={cursors} onCursor={onCursor} />
     </div>
   )
 }
 
-function DocEditor ({ ydoc, canEdit, phone, finding, setFinding, onBlur }) {
+function DocEditor ({ ydoc, canEdit, phone, finding, setFinding, onBlur, cursors, onCursor }) {
   const canEditRef = useRef(canEdit)
   canEditRef.current = canEdit
+  const others = useMemo(() => remoteCursors(), [ydoc])
   const editor = useEditor({
     editable: canEdit,
     extensions: [
@@ -220,12 +275,34 @@ function DocEditor ({ ydoc, canEdit, phone, finding, setFinding, onBlur }) {
       Placeholder.configure({ placeholder: () => (canEditRef.current ? 'Type here to start your document.' : 'This document is empty.') }),
       CharacterCount,
       ParagraphFormat,
-      FindReplace
+      FindReplace,
+      RemoteCursors.configure({ others })
     ],
     editorProps: { attributes: { class: 'doc-body', 'aria-label': 'Document', spellcheck: 'true' } },
     onBlur
   }, [ydoc])
   useEffect(() => { if (editor) editor.setEditable(canEdit) }, [editor, canEdit])
+
+  // The others' cursors in, this person's cursor out.
+  const cursorsKey = JSON.stringify(cursors)
+  useEffect(() => { others.set(cursors) }, [others, cursorsKey])
+  const onCursorRef = useRef(onCursor)
+  onCursorRef.current = onCursor
+  useEffect(() => {
+    if (!editor) return
+    let redraw = null
+    const report = ({ transaction }) => {
+      if (transaction && !transaction.docChanged && !transaction.selectionSet) return
+      // The cursor plugin hides the others' cursors after this person adds or
+      // removes a paragraph, until the mapping catches up: draw them again.
+      if (transaction && transaction.docChanged && !redraw) redraw = setTimeout(() => { redraw = null; others.refresh() }, 0)
+      const c = cursorOf(editor.state)
+      if (c) onCursorRef.current(c)
+    }
+    report({})
+    editor.on('transaction', report)
+    return () => { clearTimeout(redraw); editor.off('transaction', report) }
+  }, [editor, others])
 
   const s = useEditorState({
     editor,
@@ -397,6 +474,68 @@ function DocEditor ({ ydoc, canEdit, phone, finding, setFinding, onBlur }) {
     </div>
   )
 }
+
+// This person's selection as Yjs relative positions (base64), which stay put
+// while others edit. Null until the editor is bound to the document.
+function cursorOf (state) {
+  const y = ySyncPluginKey.getState(state)
+  if (!y || !y.binding || !y.binding.mapping.size) return null
+  const { anchor, head } = state.selection
+  const enc = (p) => toB64(Y.encodeRelativePosition(absolutePositionToRelativePosition(p, y.type, y.binding.mapping)))
+  try { return { anchor: enc(anchor), head: enc(head) } } catch { return null }
+}
+
+// The others' cursors, in the shape y-tiptap's cursor plugin reads from a Yjs
+// Awareness: a numeric id per device, { user, cursor } with JSON relative
+// positions, and a 'change' event. Presence carries the states instead of an
+// awareness channel, so this holds no local state of its own.
+function remoteCursors () {
+  const states = new Map()
+  const ids = new Map() // device -> id
+  const listeners = new Set()
+  let local = {}
+  const decode = (b64) => Y.relativePositionToJSON(Y.decodeRelativePosition(fromB64(b64)))
+  return {
+    getStates: () => states,
+    getLocalState: () => local,
+    setLocalStateField: (k, v) => { local = { ...local, [k]: v } },
+    on: (e, fn) => { if (e === 'change') listeners.add(fn) },
+    off: (e, fn) => { listeners.delete(fn) },
+    refresh () { for (const fn of listeners) fn() },
+    set (list) {
+      states.clear()
+      for (const p of list) {
+        if (!ids.has(p.key)) ids.set(p.key, -1 - ids.size) // never a Yjs client id
+        try {
+          states.set(ids.get(p.key), { user: { name: p.name, color: p.color }, cursor: { anchor: decode(p.cursor.anchor), head: decode(p.cursor.head) } })
+        } catch {}
+      }
+      this.refresh()
+    }
+  }
+}
+
+function caret (user) {
+  const el = document.createElement('span')
+  el.className = 'doc-caret'
+  el.style.setProperty('--who', user.color)
+  const tag = document.createElement('span')
+  tag.className = 'presence-tag'
+  tag.textContent = user.name
+  el.append('\u2060', tag, '\u2060')
+  return el
+}
+
+const RemoteCursors = Extension.create({
+  name: 'remoteCursors',
+  addOptions: () => ({ others: null }),
+  addProseMirrorPlugins () {
+    return [yCursorPlugin(this.options.others, {
+      cursorBuilder: caret,
+      selectionBuilder: (user) => ({ class: 'doc-remote-selection', style: 'background-color: ' + user.color + '40' })
+    })]
+  }
+})
 
 // Tab and Shift+Tab, as buttons: deeper in a list, or the paragraph's indent.
 function indent (editor) {

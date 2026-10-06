@@ -880,9 +880,20 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
     await js("[...document.querySelectorAll('.file-card')].find((c) => c.querySelector('.file-title').textContent === 'Smoke notes').click()")
     await waitFor('doc reopened', "!!document.querySelector('.doc-body') && document.querySelector('.doc-body').textContent.includes('Hello world') && (document.querySelector('.doc-body p strong') || {}).textContent === 'world' && !!document.querySelector('.doc-body table')")
     result.docReopened = await js("(() => { const p = [...document.querySelectorAll('.doc-body p')].find((x) => x.textContent === 'Hello world'); return !!p && p.style.textAlign === 'center' && [...p.querySelectorAll('span')].some((x) => x.style.fontSize === '18pt') })()")
+    // Others' cursors: one device only, so play a presence event from someone
+    // else whose cursor is at the end of the document (a Yjs relative position
+    // for the end of 'body').
+    const docId = await js("window.pearoffice.call('sheet:list', {}).then((l) => l.find((x) => x.title === 'Smoke notes').sheetId)")
+    const endOfBody = 'AQRib2R5AA=='
+    const someone = { identity: 'ab'.repeat(32), device: 'cd'.repeat(32), tab: null, row: null, col: null, editing: false, cursor: { anchor: endOfBody, head: endOfBody } }
+    wc.send('worklet:event', { name: 'sheet:presence', data: { sheetId: docId, people: [someone] } })
+    await waitFor('remote caret', "(document.querySelector('.doc-body .doc-caret .presence-tag') || {}).textContent === 'Someone'")
+    result.docCursors = await js("!document.querySelector('.banner[role=alert]') && document.querySelector('.doc-body').editor.state.plugins.some((p) => p.key === 'yjs-cursor$')")
     if (process.env.PEAROFFICE_SMOKE_DOC_SHOT) { await sleep(300); fs.writeFileSync(process.env.PEAROFFICE_SMOKE_DOC_SHOT, (await wc.capturePage()).toPNG()) }
+    wc.send('worklet:event', { name: 'sheet:presence', data: { sheetId: docId, people: [] } })
+    await waitFor('remote caret gone', "!document.querySelector('.doc-caret')")
     step('document')
-    result.ok = result.about && result.donation && result.kinds === 'Spreadsheet, Document, Slides (soon)' && result.docCard && result.docReopened && result.docWords === '10 words' && result.fileIcons === result.sheetsAfter && result.moreChartTypes && result.importedFormats && result.keepOnline && result.avatar && result.spill && result.quickWins && result.findSort && result.fill && result.charts && result.formats && result.csvPdf && result.tabs && result.tidied && result.jsonImport && result.csvImport && result.suggested === 'SUBSTITUTE,SUBTOTAL,SUM' && result.argHelp === 'number1' && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.importedFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000 && result.pastedFormula === '=SUM(C1:C2)' && result.inviteLink.startsWith('pearoffice://join?s=') && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
+    result.ok = result.about && result.donation && result.docCursors && result.kinds === 'Spreadsheet, Document, Slides (soon)' && result.docCard && result.docReopened && result.docWords === '10 words' && result.fileIcons === result.sheetsAfter && result.moreChartTypes && result.importedFormats && result.keepOnline && result.avatar && result.spill && result.quickWins && result.findSort && result.fill && result.charts && result.formats && result.csvPdf && result.tabs && result.tidied && result.jsonImport && result.csvImport && result.suggested === 'SUBSTITUTE,SUBTOTAL,SUM' && result.argHelp === 'number1' && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.importedFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000 && result.pastedFormula === '=SUM(C1:C2)' && result.inviteLink.startsWith('pearoffice://join?s=') && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
   } catch (err) {
     result.error = err.message
     // What the page showed, to tell a UI failure from a load failure.

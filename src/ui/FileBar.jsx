@@ -48,7 +48,7 @@ export function FileBar ({ sheetId, noun, title, myRole, frozen, canEdit, badge,
         />
         {badge}
         {children}
-        {members.length > 1 && <PeopleStack sheetId={sheetId} members={members} present={present} max={phone ? 2 : 3} size={26} onClick={() => setSharing(true)} />}
+        {members.length > 1 && <PeopleStack sheetId={sheetId} members={members} present={present} max={phone ? 2 : 3} size={26} noun={noun} onClick={() => setSharing(true)} />}
         {!phone && <button className='share' onClick={() => setSharing(true)}>Share</button>}
         {phone && members.length <= 1 && <button className='share-icon icon-button' aria-label='Share' title='Share' onClick={() => setSharing(true)}><UserPlus size={ICON} /></button>}
         <span className='more'>
