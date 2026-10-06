@@ -2,7 +2,7 @@
 // (the same bundle the phones will run), opens the window and relays calls and
 // events between the UI and the worklet. See proposal section 9.
 
-const { app, BrowserWindow, Tray, Menu, ipcMain, shell, clipboard, dialog } = require('electron')
+const { app, BrowserWindow, Tray, Menu, ipcMain, shell, clipboard, dialog, nativeImage } = require('electron')
 const path = require('node:path')
 const fs = require('node:fs')
 const { Worklet } = require('./worklet')
@@ -10,6 +10,7 @@ const { SeederProcess } = require('./seeder-process')
 const { resolvePaths } = require('./paths')
 const { createLoginItem } = require('./login')
 const { startUpdates } = require('./updates')
+const { installMenuEntry } = require('./appimage')
 
 const SMOKE = !!process.env.PEARSHEET_SMOKE
 
@@ -18,6 +19,12 @@ if (!SMOKE && !app.requestSingleInstanceLock()) app.exit(0)
 
 // pearsheet:// invite links open the app. Registration only makes sense for an
 // installed copy; a dev checkout still handles links passed on the command line.
+// An AppImage first adds its own menu entry, which the link handler and the
+// taskbar icon both need.
+const ICON = path.join(__dirname, 'build', 'icon.png')
+if (!SMOKE && process.platform === 'linux' && process.env.APPIMAGE) {
+  try { installMenuEntry({ appImage: process.env.APPIMAGE, image: nativeImage.createFromPath(ICON) }) } catch (err) { console.error('[pearsheet] menu entry', err.message) }
+}
 if (app.isPackaged) app.setAsDefaultProtocolClient('pearsheet')
 
 let pendingLink = linkIn(process.argv)
@@ -102,7 +109,7 @@ function showWindow () {
 function createTray () {
   if (tray && !tray.isDestroyed()) return
   try {
-    tray = new Tray(path.join(__dirname, 'build', 'icon.png'))
+    tray = new Tray(ICON)
   } catch (err) {
     log('tray failed:', err.message)
     return
@@ -231,6 +238,7 @@ function createWindow () {
     minWidth: 640,
     minHeight: 400,
     title: 'PearSheet',
+    icon: process.platform === 'linux' ? ICON : undefined,
     // Started at login with the tray on: stay hidden until opened.
     show: !SMOKE && !(stayRunning() && loginItem.launchedAtLogin()),
     backgroundColor: '#f7f7f4',

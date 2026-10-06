@@ -34,6 +34,7 @@
       "seeder-process.js",
       "paths.js",
       "login.js",
+      "appimage.js",
       "updates.js",
       "vendor/**",
       "smoke-run.js",
@@ -77,6 +78,11 @@
         "deb"
       ],
       "category": "Office",
+      "desktop": {
+        "entry": {
+          "StartupWMClass": "pearsheet-desktop"
+        }
+      },
       "icon": "build/icon.png",
       "artifactName": "pearsheet-${version}-linux-${arch}.${ext}",
       "synopsis": "Peer-to-peer shared spreadsheets",
