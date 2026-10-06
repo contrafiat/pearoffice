@@ -16,6 +16,7 @@ import Superscript from '@tiptap/extension-superscript'
 
 export const MAX_INDENT = 8
 export const LINE_HEIGHTS = ['1', '1.15', '1.5', '2']
+export const SIZES = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36] // points
 const BLOCKS = ['paragraph', 'heading']
 
 // Set an attribute on every paragraph and heading in the selection.
