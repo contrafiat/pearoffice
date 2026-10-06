@@ -7,8 +7,11 @@ items), drawing object toolbar (37) and text formatting toolbar (43),
 compared with what Slides v1 plans in `proposals/2026-10-06-slides.md`
 (a draft). PowerPoint (ribbon tabs Home, Insert, Draw, Design, Transitions,
 Animations, Slide Show, Record, Review, View) and Google Slides (menus File,
-Edit, View, Insert, Format, Slide, Arrange, Tools, Extensions) are from
-memory, not checked against a live copy.
+Edit, View, Insert, Format, Slide, Arrange, Tools, Extensions, Help) were
+written from memory, then checked on 2026-10-06 against Microsoft's and
+Google's help pages and the Google Workspace Updates blog (not a live copy).
+Ten cells changed. PowerPoint's lack of a commenter role is likely but no
+page says so outright.
 
 Each gap has a size (S, M, L) and **P** when it needs a proposal first: it
 stores something in the shared file that every device must agree on. For
@@ -42,7 +45,7 @@ slide, selection and text cursor shown; sharing, roles, devices, seeder.
 | Background colour or picture for one slide (v1 takes it from the theme) | Slide > Set Background Image | Format Background | Slide > Change background | S | P |
 | Hide a slide so the show skips it | Slide > Hide Slide | Hide Slide | Slide > Skip slide | S | P |
 | Slide numbers, date and footer text | Insert > Header and Footer | Insert > Header & Footer | Insert > Slide numbers | S | P |
-| Crop a picture | Format > Image > Crop | Picture Format > Crop | Format options > Crop | M | P |
+| Crop a picture | Format > Image > Crop | Picture Format > Crop | Crop button on the toolbar | M | P |
 | Shadow and transparency on shapes and pictures | Format > Shadow | Shape Format | Format options | S | P |
 | Copy and paste slides and objects between presentations | Edit > Paste | yes | yes | S | |
 | Paste from PowerPoint or Google Slides keeping text formatting | Paste Special | yes | yes | M | |
@@ -61,9 +64,9 @@ slide, selection and text cursor shown; sharing, roles, devices, seeder.
 | Editing masters and layouts (logo on every slide, own layouts) | View > Master Slide | View > Slide Master | Slide > Edit theme | L | P |
 | More themes; own theme colours and fonts | Format > Theme | Design | Slide > Change theme | M | P |
 | More shapes: callouts, stars, flowchart, block arrows | Insert > Shape (6 groups) | Insert > Shapes | Insert > Shape | M | P |
-| Connectors that stay attached when shapes move | Gluepoints, connectors toolbar | Elbow connectors | Line > Elbow connector | M | P |
+| Connectors that stay attached when shapes move | Gluepoints, connectors toolbar | Elbow connectors | Insert > Line > Elbow connector | M | P |
 | Icons library | Gallery | Insert > Icons | add-ons | M | |
-| Video and audio | Insert > Media | Insert > Video | Insert > Video | L | P |
+| Video and audio | Insert > Media | Insert > Video, Audio | Insert > Video, Audio | L | P |
 | Slide sorter: a grid of all slides for reordering | View > Slide Sorter | View > Slide Sorter | Grid view | S | |
 | Outline view: edit every slide's titles and bullets as one text | View > Outline | View > Outline | no | M | |
 | Sections in the slide list | no | Add Section | no | S | P |
@@ -71,8 +74,8 @@ slide, selection and text cursor shown; sharing, roles, devices, seeder.
 | Insert slides from another file | Slide > Insert Slide from File | Reuse Slides | Import slides | M | |
 | 4:3 and custom slide sizes when creating (import keeps them in v1) | Slide > Format Slide | Design > Slide Size | File > Page setup | S | P |
 | Fields: slide title, slide count, author | Insert > Field | Insert > Text | no | S | P |
-| Equations | Insert > OLE Object > Formula | Insert > Equation | Insert > Equation | M | P |
-| Templates to start from | File > Templates | New | Template gallery | M | |
+| Equations | Insert > OLE Object > Formula | Insert > Equation | no (add-ons) | M | P |
+| Templates to start from | File > Templates | New | Template gallery, sidebar | M | |
 | Export each slide as PNG; import and export .odp | File > Export | Save As | Download | M | |
 | QR code of a link on a slide (`src/shared/qr.js` exists) | Insert > OLE > QR and Barcode | no | add-on | S | P |
 
@@ -81,7 +84,7 @@ slide, selection and text cursor shown; sharing, roles, devices, seeder.
 | Gap | Impress | PowerPoint | Slides | Size | P |
 | --- | --- | --- | --- | --- | --- |
 | **Comments** on a slide or object, replies, resolve | Insert > Comment | Review > Comment | Insert > Comment | L | P |
-| A "commenter" role that can comment but not edit | no | yes | yes | M | P (T3: roles) |
+| A "commenter" role that can comment but not edit | no | no (Word only) | yes | M | P (T3: roles) |
 | Version history: see and restore an earlier version | File > Versions | Version history | Version history | L | P |
 | Follow a person: jump to the slide they are on | no | no | click avatar | S | |
 | Follow along: viewers' screens follow the presenter's slide | no | PowerPoint Live | no | M | P (presence) |
@@ -93,7 +96,7 @@ slide, selection and text cursor shown; sharing, roles, devices, seeder.
 | Gap | Impress | PowerPoint | Slides | Size | P |
 | --- | --- | --- | --- | --- | --- |
 | Use a phone as a remote for the computer that presents | Slide Show > Impress Remote | no (retired) | no | M | P |
-| Laser pointer and pen while presenting | pen | Laser, Pen | laser | S | |
+| Laser pointer and pen while presenting | pen | Laser, Pen | laser, pen | S | |
 | Rehearse timings; slides advance on their own | Slide Show > Rehearse Timings | Rehearse Timings | Auto-advance | M | P |
 | Loop as a kiosk | Slide Show Settings | Set Up Slide Show | Auto-advance > Loop | S | P |
 | Custom shows (a chosen subset in a chosen order) | Slide Show > Custom Slide Show | Custom Slide Show | no | M | P |
@@ -110,13 +113,13 @@ slide, selection and text cursor shown; sharing, roles, devices, seeder.
 | Point editing of curves, freeform drawing | Toggle Point Edit Mode | Edit Points, Draw | Scribble | A drawing tool; later if people ask. |
 | SmartArt | no | Insert > SmartArt | Diagram | Layout engine of its own; imported as plain shapes at best. |
 | Morph and other advanced transitions | no | Morph | no | Needs animations first. |
-| Recording narration, export as video | no | Record, Export > Video | no | Large; media capture and encoding. |
+| Recording narration, export as video | no | Record, Export > Video | Record (through Vids) | Large; media capture and encoding. |
 | Live captions, subtitles, audience Q&A | no | Subtitles | Captions, Q&A | Need a speech service or a web page for the audience. |
 | Design suggestions, AI rewrite | no | Designer, Copilot | Help me create | Needs a service; against no-cloud. |
 | Form controls | Insert > Form Control | Developer | no | Forms on slides are rare. |
 | Macros and extensions | Tools > Macros | yes | Extensions | Runs code from a shared file; a security risk in a P2P app. |
 | OLE objects, photo album, scanning, image map | Insert, Tools | yes | no | Desktop-office features tied to one computer. |
-| Summary slide, expand slide | Slide > Summary Slide | no | no | Rare. |
+| Summary slide, expand slide | Slide > Summary Slide | Insert > Zoom > Summary Zoom | no | Rare. |
 | Digital signatures, check-in and check-out, remote files | File menu | yes | no | Assume a server or a single owner. |
 | Hyphenation, Chinese and Hangul conversion, thesaurus | Tools > Language | Review | no | Rare language tools. |
 | Redact, minimize presentation, colour replacer | Tools | no | no | Specialist. |
