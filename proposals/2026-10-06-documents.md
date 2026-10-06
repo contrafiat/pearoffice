@@ -142,4 +142,5 @@ stay.
 
 ## Open questions
 
-1. Our own names for the file types (TODO) - settle before step 3.
+None. File types keep plain names: Spreadsheet, Document, Slides
+(decided 2026-10-06).
