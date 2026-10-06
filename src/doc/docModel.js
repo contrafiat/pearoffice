@@ -2,11 +2,19 @@
 // the Yjs doc"): `meta` (title, kind 'doc', schema version) and `body`, a
 // Y.XmlFragment in the editor's schema. The editor (TipTap's Collaboration
 // extension, field 'body') reads and writes `body` directly.
+//
+// Versions: 1 is the first schema; 2 adds pictures (image nodes,
+// proposals/2026-10-06-document-images.md). A document becomes 2 when its
+// first picture goes in, so documents without pictures still open in
+// builds that know only 1. VERSION is the newest this build knows.
 
 const Y = require('yjs')
 
-const VERSION = 1
+const VERSION = 2
+const FIRST_VERSION = 1
+const PICTURES_VERSION = 2
 const FIELD = 'body'
+const IMAGE = 'image'
 
 function capture (doc, fn) {
   let update = null
@@ -25,7 +33,7 @@ function initDoc (doc, { title = 'Untitled document' } = {}) {
     const meta = doc.getMap('meta')
     meta.set('title', title)
     meta.set('kind', 'doc')
-    meta.set('version', VERSION)
+    meta.set('version', FIRST_VERSION)
   })
 }
 
@@ -34,7 +42,27 @@ function body (doc) {
 }
 
 function version (doc) {
-  return doc.getMap('meta').get('version') || VERSION
+  return doc.getMap('meta').get('version') || FIRST_VERSION
+}
+
+// Raise the schema version to at least `v`. Call inside a transaction.
+function raiseVersion (doc, v) {
+  const meta = doc.getMap('meta')
+  if ((meta.get('version') || FIRST_VERSION) < v) meta.set('version', v)
+}
+
+// Every image node in the body, in document order.
+function images (doc) {
+  const out = []
+  const walk = (node) => {
+    for (const child of node.toArray()) {
+      if (!(child instanceof Y.XmlElement)) continue
+      if (child.nodeName === IMAGE) out.push(child)
+      else walk(child)
+    }
+  }
+  walk(body(doc))
+  return out
 }
 
 // The body as plain text, one line per block (paragraph, heading, list item,
@@ -58,4 +86,4 @@ function plainText (doc) {
   return lines.join('\n')
 }
 
-module.exports = { VERSION, FIELD, initDoc, body, version, plainText }
+module.exports = { VERSION, FIRST_VERSION, PICTURES_VERSION, FIELD, IMAGE, capture, initDoc, body, version, raiseVersion, images, plainText }

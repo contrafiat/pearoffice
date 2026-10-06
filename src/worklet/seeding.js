@@ -6,6 +6,10 @@
 //   only those, through blind-peering. A seeder never learns about sheets it
 //   is not listed in.
 //
+// - A document's picture cores (pictures.js) are registered with the same
+//   seeders, with the file's base key as referrer, so the seeder files them
+//   under the file and drops them with it.
+//
 // blind-peering sends core keys and lengths. It never sends the encryption
 // key or the topic key.
 
@@ -20,9 +24,10 @@ const m = require('./membership')
 const hex = (buf) => b4a.toString(buf, 'hex')
 const SWEEP_MS = 5000
 
-function createSeeding ({ engine, log = () => {} }) {
+function createSeeding ({ engine, getPictures = () => null, log = () => {} }) {
   let peering = null
   const registered = new Map() // sheetId -> seeder keys registered with `peering`
+  const registeredCores = new Map() // picture core key -> seeder keys and length registered
   const seen = new Map() // sheetId -> the sheet's seeder list when last swept
   let sweepTimer = null
   let sweeping = null
@@ -44,6 +49,7 @@ function createSeeding ({ engine, log = () => {} }) {
     const old = peering
     makePeering()
     registered.clear()
+    registeredCores.clear()
     if (old) await old.close().catch(() => {})
   }
 
@@ -76,10 +82,22 @@ function createSeeding ({ engine, log = () => {} }) {
       requestDrop({ bootstrap: hex(base.key), seederKeys: removed, afterMs: DROP_GRACE_MS }).catch(() => {})
       rebuildNeeded = true
     }
-    if (rebuildNeeded || !keys.length || registered.get(sheetId) === id) return
-    registered.set(sheetId, id)
-    peering.addAutobaseBackground(base, { keys: keys.map((k) => b4a.from(k, 'hex')), pick: keys.length })
-    log('registered ' + sheetId.slice(0, 8) + ' with ' + keys.length + ' seeder(s)')
+    if (rebuildNeeded || !keys.length) return
+    if (registered.get(sheetId) !== id) {
+      registered.set(sheetId, id)
+      peering.addAutobaseBackground(base, { keys: keys.map((k) => b4a.from(k, 'hex')), pick: keys.length })
+      log('registered ' + sheetId.slice(0, 8) + ' with ' + keys.length + ' seeder(s)')
+    }
+    // Picture cores, again whenever one grew (a new picture).
+    const pictures = getPictures()
+    for (const core of pictures ? await pictures.cores(sheetId) : []) {
+      if (core.closing || core.closed || !core.length) continue
+      const k = hex(core.key)
+      const at = id + '@' + core.length
+      if (registeredCores.get(k) === at) continue
+      registeredCores.set(k, at)
+      peering.addCoreBackground(core, { referrer: base.key, keys: keys.map((x) => b4a.from(x, 'hex')), pick: keys.length })
+    }
   }
 
   async function sweepAll () {

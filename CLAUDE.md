@@ -61,7 +61,7 @@ Code that works for any kind of file sits apart from each editor's own
 
 - `src/shared/` - runs anywhere, for any file: `ids.js`, `phrase.js`
   (recovery phrase), `qr.js`, Bare shims.
-- `src/doc/` and `src/ui/doc/` - documents (proposals/2026-10-06-documents.md): `docModel.js` (the Yjs doc: `meta`, `body`), `docMethods.js` (`doc:create`, `doc:state`, `doc:update`), `DocView.jsx` (TipTap 3 editor), `docFiles.js` (import .docx/.md/.txt/.html, export .docx/.md/.txt/PDF; `node scripts/check-doc-export.js [dir]` has LibreOffice read an exported .docx). The editor keeps a Yjs replica and sends batched updates; `doc:updated` brings others' edits.
+- `src/doc/` and `src/ui/doc/` - documents (proposals/2026-10-06-documents.md): `docModel.js` (the Yjs doc: `meta`, `body`), `docMethods.js` (`doc:create`, `doc:state`, `doc:update`), `DocView.jsx` (TipTap 3 editor), `docFiles.js` (import .docx/.md/.txt/.html, export .docx/.md/.txt/PDF, pictures included; `node scripts/check-doc-export.js [dir]` has LibreOffice read an exported .docx), `pictures.js` (shrinking before upload, the per-document picture cache, the picture node view). Pictures are `image` nodes (`extensions.js`, `Picture`) and move a document to schema version 2 (`docModel.js`); `doc:addPicture` and `doc:picture` are in `docMethods.js`. The editor keeps a Yjs replica and sends batched updates; `doc:updated` brings others' edits.
 - `src/sheet/` - the spreadsheet, runs anywhere (Bare, Node, browser):
   `sheetModel.js` (the Yjs document), `refs.js` (A1 <-> id formula
   references), `formula/` (evaluator, deterministic maths, formulajs fills,
@@ -75,6 +75,13 @@ Code that works for any kind of file sits apart from each editor's own
   `linking.js` (linking a person's devices, recovery phrase),
   `presence.js` (who has a sheet open, and their cell),
   `profiles.js` (your name and picture in every sheet), `fileMethods.js` (`file:*` IPC for any kind of file; `sheet:*` names kept as aliases),
+  `pictures.js` (pictures in documents: a Hyperblobs picture core per
+  writer device per file, `pictures/<fileId>`, encrypted with a keyed
+  BLAKE2b of `pearoffice/pictures/1` under the file key; the document holds
+  only `<core key>:<blob id>` and the bytes' hash; every member fetches
+  every referenced picture; `seeding.js` registers the cores with the
+  file's seeders, referrer the base key; moves copy the live ones under
+  the new key; proposals/2026-10-06-document-images.md),
   `sheets.js` (live documents).
 - Charts (proposals/2026-10-04-charts.md): `src/sheet/charts.js` (data
   ranges, series, first guess), stored per tab in the root map

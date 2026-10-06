@@ -6,6 +6,7 @@ import Typography from '@tiptap/extension-typography'
 import Placeholder from '@tiptap/extension-placeholder'
 import { CharacterCount } from '@tiptap/extensions'
 import { Extension } from '@tiptap/core'
+import { NodeSelection } from '@tiptap/pm/state'
 import { yCursorPlugin, ySyncPluginKey, absolutePositionToRelativePosition } from '@tiptap/y-tiptap'
 import { call, on } from '../bridge.js'
 import { FileBar, useMembers } from '../FileBar.jsx'
@@ -15,11 +16,12 @@ import { isMobile } from '../sheet/xlsx.js'
 import { exportDocument, tidyPaste } from './docFiles.js'
 import { Outline } from './Outline.jsx'
 import { documentExtensions, FindReplace, findKey, changeCaseCommand, LINE_HEIGHTS, SIZES } from './extensions.js'
+import { PictureView, pictureCache, preparePicture, isPicture, toB64, fromB64 } from './pictures.js'
 import {
   ArrowCounterClockwise, ArrowClockwise, TextB, TextItalic, TextUnderline, TextStrikethrough, TextAUnderline, Highlighter,
   TextSuperscript, TextSubscript, TextAlignLeft, TextAlignCenter, TextAlignRight, TextAlignJustify, ArrowsDownUp,
   ListBullets, ListNumbers, ListChecks, TextOutdent, TextIndent, LinkSimple, Quotes, CodeBlock, Minus, Table,
-  TextAa, Eraser, MagnifyingGlass, CaretUp, CaretDown, X, Check, TreeView
+  TextAa, Eraser, MagnifyingGlass, CaretUp, CaretDown, X, Check, TreeView, Image as ImageIcon, Trash
 } from '@phosphor-icons/react'
 
 // The document editor (proposals/2026-10-06-documents.md). It keeps its own
@@ -39,22 +41,12 @@ const CURSOR_MS = 150
 const TOAST_MS = 5000
 const OUTLINE_PREF = 'pearoffice:docOutline'
 
-function toB64 (bytes) {
-  let s = ''
-  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000))
-  return btoa(s)
-}
-
-function fromB64 (b64) {
-  const s = atob(b64)
-  const out = new Uint8Array(s.length)
-  for (let i = 0; i < s.length; i++) out[i] = s.charCodeAt(i)
-  return out
-}
-
 export function DocView ({ sheetId, onTitleChange, onError, onGone }) {
   const ydoc = useMemo(() => new Y.Doc(), [sheetId])
   useEffect(() => () => ydoc.destroy(), [ydoc])
+  // Pictures fetched for this document, kept while it is open.
+  const pictures = useMemo(() => pictureCache(async (a) => fromB64((await call('doc:picture', { sheetId, ref: a.ref, hash: a.hash })).data)), [sheetId])
+  useEffect(() => () => pictures.clear(), [pictures])
   const [info, setInfo] = useState(null) // doc:state without the state
   const [title, setTitle] = useState('')
   const [arrived, setArrived] = useState(false) // the content is here
@@ -243,7 +235,7 @@ export function DocView ({ sheetId, onTitleChange, onError, onGone }) {
         onError={onError}
         onGone={onGone}
         menuItems={() => {
-          const save = (format) => exportDocument(ydoc, title, format).catch((err) => onError(err.message))
+          const save = (format) => exportDocument(ydoc, title, format, sheetId).catch((err) => onError(err.message))
           return (
             <>
               <li role='menuitem' onClick={() => setFinding(true)}>Find and replace</li>
@@ -259,12 +251,12 @@ export function DocView ({ sheetId, onTitleChange, onError, onGone }) {
         }}
       />
       {note && <div className='banner info'>{note}</div>}
-      <DocEditor ydoc={ydoc} canEdit={canEdit} phone={phone} finding={finding} setFinding={setFinding} outline={outline} toggleOutline={toggleOutline} editorRef={editorRef} onBlur={() => flushRef.current()} cursors={cursors} onCursor={onCursor} />
+      <DocEditor sheetId={sheetId} pictures={pictures} ydoc={ydoc} canEdit={canEdit} phone={phone} finding={finding} setFinding={setFinding} outline={outline} toggleOutline={toggleOutline} editorRef={editorRef} onBlur={() => flushRef.current()} cursors={cursors} onCursor={onCursor} />
     </div>
   )
 }
 
-function DocEditor ({ ydoc, canEdit, phone, finding, setFinding, outline, toggleOutline, editorRef, onBlur, cursors, onCursor }) {
+function DocEditor ({ sheetId, pictures, ydoc, canEdit, phone, finding, setFinding, outline, toggleOutline, editorRef, onBlur, cursors, onCursor }) {
   const canEditRef = useRef(canEdit)
   canEditRef.current = canEdit
   // A short note when a paste left something out.
@@ -278,10 +270,28 @@ function DocEditor ({ ydoc, canEdit, phone, finding, setFinding, outline, toggle
     toastTimer.current = setTimeout(() => setToast(null), TOAST_MS)
   }
   const others = useMemo(() => remoteCursors(), [ydoc])
+  // Pictures from a file, the clipboard or a drop: shrunk, stored, then put
+  // in at `at` (or the cursor).
+  const addRef = useRef(null)
+  addRef.current = async (files, at = null) => {
+    const list = [...files].filter((f) => isPicture(f.type))
+    if (!list.length) { showToast.current('This kind of picture cannot be added.'); return }
+    for (const file of list) {
+      try {
+        const p = await preparePicture(file)
+        const a = await call('doc:addPicture', { sheetId, bytes: toB64(p.bytes), mime: p.mime, width: p.w, height: p.h })
+        pictures.put(a.ref, p.bytes, p.mime)
+        const node = { type: 'image', attrs: { ref: a.ref, hash: a.hash, mime: a.mime, w: a.w, h: a.h } }
+        const c = editorRef.current.chain().focus()
+        ;(at === null ? c.insertContent(node) : c.insertContentAt(at, node)).run()
+      } catch (err) { showToast.current(err.message) }
+    }
+  }
   const editor = useEditor({
     editable: canEdit,
     extensions: [
-      ...documentExtensions(),
+      ...documentExtensions().filter((x) => x.name !== 'image'),
+      PictureView.configure({ cache: pictures }),
       Collaboration.configure({ document: ydoc, field: 'body' }),
       Typography,
       Placeholder.configure({ placeholder: () => (canEditRef.current ? 'Type here to start your document.' : 'This document is empty.') }),
@@ -298,6 +308,24 @@ function DocEditor ({ ydoc, canEdit, phone, finding, setFinding, outline, toggle
         const t = tidyPaste(html)
         if (t.dropped) showToast.current('Some parts of what you pasted, such as pictures, were left out.')
         return t.html
+      },
+      // A copied picture (a screenshot, say) or a picture file.
+      handlePaste: (view, event) => {
+        const files = [...((event.clipboardData && event.clipboardData.files) || [])].filter((f) => /^image\//.test(f.type))
+        if (!files.length || /data-pm-slice/.test(event.clipboardData.getData('text/html'))) return false
+        if (!canEditRef.current) return true
+        event.preventDefault()
+        addRef.current(files)
+        return true
+      },
+      handleDrop: (view, event, slice, moved) => {
+        const files = [...((event.dataTransfer && event.dataTransfer.files) || [])]
+        if (moved || !files.length) return false
+        event.preventDefault()
+        if (!canEditRef.current) return true
+        const at = view.posAtCoords({ left: event.clientX, top: event.clientY })
+        addRef.current(files, at ? at.pos : null)
+        return true
       }
     },
     onBlur
@@ -359,6 +387,7 @@ function DocEditor ({ ydoc, canEdit, phone, finding, setFinding, outline, toggle
         quote: ed.isActive('blockquote'),
         code: ed.isActive('codeBlock'),
         table: ed.isActive('table'),
+        picture: ed.state.selection instanceof NodeSelection && ed.state.selection.node.type.name === 'image' ? { pos: ed.state.selection.from, align: ed.state.selection.node.attrs.align || 'center', alt: ed.state.selection.node.attrs.alt || '' } : null,
         empty: ed.state.selection.empty,
         words: ed.storage.characterCount.words(),
         chars: ed.storage.characterCount.characters(),
@@ -377,6 +406,20 @@ function DocEditor ({ ydoc, canEdit, phone, finding, setFinding, outline, toggle
     setMenu({ kind, top: r.bottom + 4, left: Math.max(4, Math.min(r.left, window.innerWidth - 200)) })
   }
   const run = (fn) => { setMenu(null); fn(editor.chain().focus()).run() }
+
+  // Insert a picture: the file picker here, the shell's on a phone.
+  const fileRef = useRef(null)
+  async function pickPicture () {
+    if (!phone) { fileRef.current.click(); return }
+    try {
+      const picked = await call('app:pickFile', { images: true })
+      if (!picked || picked.canceled) return
+      const type = picked.mime || ({ png: 'image/png', gif: 'image/gif', webp: 'image/webp', heic: 'image/heic' }[(/\.([^.]+)$/.exec(picked.name || '') || [])[1]?.toLowerCase()] || 'image/jpeg')
+      await addRef.current([new File([fromB64(picked.base64)], picked.name || 'picture', { type })])
+    } catch (err) { showToast.current(err.message) }
+  }
+  // The selected picture's bubble follows it when the page scrolls.
+  const [, rescrolled] = useState(0)
 
   // Ctrl+F (Cmd+F) opens find, as in the sheet.
   const onKeyDown = (e) => {
@@ -434,6 +477,8 @@ function DocEditor ({ ydoc, canEdit, phone, finding, setFinding, outline, toggle
         {btn('Quote', Quotes, s.quote, () => editor.chain().focus().toggleBlockquote().run())}
         {btn('Code block', CodeBlock, s.code, () => editor.chain().focus().toggleCodeBlock().run())}
         {btn('Horizontal line', Minus, undefined, () => editor.chain().focus().setHorizontalRule().run())}
+        {btn('Insert a picture', ImageIcon, undefined, pickPicture, { className: 'picture-button' })}
+        <input ref={fileRef} type='file' accept='image/*' multiple hidden className='picture-input' onChange={(e) => { const files = [...e.target.files]; e.target.value = ''; if (files.length) addRef.current(files) }} />
         {btn('Table', Table, s.table, (e) => (s.table ? openMenu('table', e.currentTarget) : editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()), { 'aria-haspopup': s.table ? 'menu' : undefined, className: 'table-button' + (s.table ? ' on' : '') })}
         <span className='sep' />
         {btn('Change case', TextAa, undefined, (e) => openMenu('case', e.currentTarget), { 'aria-haspopup': 'menu', disabled: s.empty })}
@@ -484,11 +529,12 @@ function DocEditor ({ ydoc, canEdit, phone, finding, setFinding, outline, toggle
           <li role='menuitem' onClick={() => run((c) => c.command(changeCaseCommand('title')))}>Title Case</li>
         </ul>
       )}
+      {s.picture && canEdit && !menu && <PictureBubble editor={editor} picture={s.picture} />}
       {linking !== null && canEdit && <LinkBar editor={editor} initial={linking} onClose={() => setLinking(null)} />}
       {finding && <FindBar editor={editor} canEdit={canEdit} onClose={() => { editor.commands.setFind({ query: '' }); setFinding(false) }} />}
       <div className='doc-row'>
         {outline && <Outline editor={editor} phone={phone} onClose={toggleOutline} />}
-        <div className='doc-scroll' onMouseDown={(e) => { if (e.target === e.currentTarget) editor.commands.focus('end') }}>
+        <div className='doc-scroll' onScroll={() => { if (s.picture) rescrolled((n) => n + 1) }} onMouseDown={(e) => { if (e.target === e.currentTarget) editor.commands.focus('end') }}>
           <div className='doc-page'>
             <EditorContent editor={editor} />
           </div>
@@ -565,6 +611,36 @@ const RemoteCursors = Extension.create({
     })]
   }
 })
+
+// Alignment, alt text and delete for the selected picture, just above it.
+function PictureBubble ({ editor, picture }) {
+  const [alt, setAlt] = useState(picture.alt)
+  useEffect(() => setAlt(picture.alt), [picture.pos, picture.alt])
+  const dom = editor.view.nodeDOM(picture.pos)
+  if (!dom || !dom.getBoundingClientRect) return null
+  const frame = dom.querySelector('.doc-picture-frame') || dom
+  const r = frame.getBoundingClientRect()
+  const top = r.top > 120 ? r.top - 48 : Math.min(r.bottom + 8, window.innerHeight - 48)
+  const set = (attrs) => editor.chain().setNodeSelection(picture.pos).updateAttributes('image', attrs).setNodeSelection(picture.pos).run()
+  const saveAlt = () => { if (alt !== picture.alt) set({ alt: alt.trim() }) }
+  const keep = (e) => e.preventDefault()
+  return (
+    <div className='picture-bubble' role='toolbar' aria-label='Picture' style={{ top, left: r.left + r.width / 2 }}>
+      {[['left', 'Align left', TextAlignLeft], ['center', 'Centre', TextAlignCenter], ['right', 'Align right', TextAlignRight]].map(([v, label, Icon]) => (
+        <button key={v} title={label} aria-label={label} aria-pressed={picture.align === v} className={'picture-align-' + v + (picture.align === v ? ' on' : '')} onMouseDown={keep} onClick={() => set({ align: v })}><Icon size={18} /></button>
+      ))}
+      <input
+        aria-label='Alt text'
+        placeholder='Describe the picture.'
+        value={alt}
+        onChange={(e) => setAlt(e.target.value)}
+        onBlur={saveAlt}
+        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); saveAlt() } if (e.key === 'Escape') { e.preventDefault(); setAlt(picture.alt); editor.commands.focus() } }}
+      />
+      <button title='Delete the picture' aria-label='Delete the picture' onMouseDown={keep} onClick={() => editor.chain().focus().setNodeSelection(picture.pos).deleteSelection().run()}><Trash size={18} /></button>
+    </div>
+  )
+}
 
 // The clipboard's text, pasted without its formatting. Read through the app
 // (desktop/main.js, mobile/App.js), which needs no permission prompt.

@@ -13,6 +13,12 @@
 // only its copy of the old sheet holds (edits made offline or during the
 // move), so nothing typed in the old sheet is lost.
 //
+// Pictures (proposals/2026-10-06-document-images.md): the owner copies every
+// picture still in the document into its picture core for the new file
+// (under the new key) and points the references there; a move waits until
+// the owner's device has them all. A follower does the same for pictures it
+// added offline, from its own old core.
+//
 // Local records:
 //   moves:<oldSheetId>  { to: newSheetId | null, removed: bool, reason, carried, at }
 
@@ -21,11 +27,12 @@ const { defaultEncodeInvite } = require('@peerloom/core/engine')
 const model = require('../sheet/sheetModel')
 const m = require('./membership')
 const { yOps } = require('./yOps')
+const { parseRef } = require('./pictures')
 
 const hex = (buf) => b4a.toString(buf, 'hex')
 const DEVICE_RESEND_MS = 3000
 
-function createMoves ({ engine, sheets, getJoin, getDeleting = () => null, emit, log = () => {} }) {
+function createMoves ({ engine, sheets, getJoin, getDeleting = () => null, getPictures = () => null, emit, log = () => {} }) {
   const following = new Map() // newSheetId -> { timer, device }
 
   async function viewGet (sheetId, key) {
@@ -92,7 +99,16 @@ function createMoves ({ engine, sheets, getJoin, getDeleting = () => null, emit,
     const me = hex(engine.identity.publicKey)
     const old = await sheets.load(oldId)
     const title = model.title(old.guarded.doc)
-    const state = model.encodeState(old.guarded.doc)
+    const pictures = model.kind(old.guarded.doc) === 'doc' ? getPictures() : null
+    if (pictures) {
+      const missing = await pictures.ensureAll(oldId, old.guarded.doc)
+      if (missing.length) {
+        const n = missing.length
+        const alts = missing.map((x) => x.alt).filter(Boolean).join(', ')
+        throw new Error((n === 1 ? 'A picture in this document is' : n + ' pictures in this document are') + ' not on this device yet' + (alts ? ' (' + alts + ')' : '') + '. Try again once ' + (n === 1 ? 'it has' : 'they have') + ' arrived.')
+      }
+    }
+    let state = model.encodeState(old.guarded.doc)
 
     // 1. The new sheet, founded by this device.
     const created = await engine.createGroup({ name: title })
@@ -100,6 +116,14 @@ function createMoves ({ engine, sheets, getJoin, getDeleting = () => null, emit,
     const base = engine.bases.get(newId)
     const entry = sheets.entryFor(newId)
     entry.loading = Promise.resolve()
+    // The pictures, copied under the new file's key.
+    if (pictures) {
+      const scratch = model.createDoc()
+      try {
+        model.applyUpdate(scratch, state)
+        if (await pictures.rehome(oldId, newId, scratch)) state = model.encodeState(scratch)
+      } finally { scratch.destroy() }
+    }
     const ownerRec = remaining.find((x) => x.identity === me)
     for (const op of m.foundingOps({ sheetId: newId, identity: engine.identity, writerKey: hex(base.local.key), name: ownerRec ? ownerRec.name : '' })) {
       await engine.append(newId, op)
@@ -215,11 +239,24 @@ function createMoves ({ engine, sheets, getJoin, getDeleting = () => null, emit,
       if (saved) { try { model.applyUpdate(source, saved) } catch {} }
       const missing = model.missingFrom(source, into.guarded.doc)
       source.destroy()
-      if (missing) {
-        model.applyUpdate(into.guarded.doc, missing)
-        sheets.noteLocal(newId, missing)
-        for (const op of yOps(missing)) await engine.append(newId, op)
-        log('carried ' + missing.byteLength + ' bytes from ' + oldId.slice(0, 8) + ' to ' + newId.slice(0, 8))
+      // The offline edits and, in the same update, pictures this device
+      // added that are still in its old picture core moved to its new one:
+      // the others never see a reference this file cannot read.
+      const pictures = getPictures()
+      const scratch = model.createDoc()
+      model.applyUpdate(scratch, model.encodeState(into.guarded.doc))
+      if (missing) model.applyUpdate(scratch, missing)
+      if (pictures && model.kind(scratch) === 'doc') {
+        const mine = await pictures.ownKey(oldId)
+        await pictures.rehome(oldId, newId, scratch, (ref) => parseRef(ref).key === mine)
+      }
+      const update = model.missingFrom(scratch, into.guarded.doc)
+      scratch.destroy()
+      if (update) {
+        model.applyUpdate(into.guarded.doc, update)
+        sheets.noteLocal(newId, update)
+        for (const op of yOps(update)) await engine.append(newId, op)
+        log('carried ' + update.byteLength + ' bytes from ' + oldId.slice(0, 8) + ' to ' + newId.slice(0, 8))
       }
     }
     await engine.localDb.put('moves:' + oldId, { ...rec, carried: true })

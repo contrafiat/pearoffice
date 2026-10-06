@@ -2,7 +2,7 @@
 // paragraphs and headings (indent, line spacing, space after, Title and
 // Subtitle), and find and replace over the text.
 
-import { Extension } from '@tiptap/core'
+import { Extension, Node, mergeAttributes } from '@tiptap/core'
 import { Plugin, PluginKey, TextSelection } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import StarterKit from '@tiptap/starter-kit'
@@ -121,6 +121,62 @@ export const ParagraphFormat = Extension.create({
   }
 })
 
+// --- pictures -----------------------------------------------------------------
+
+// A picture (proposals/2026-10-06-document-images.md): a block node holding a
+// reference to the bytes in a picture core (src/worklet/pictures.js), never
+// the bytes. w and h are the picture's pixels, so the page lays out before
+// it arrives; width is a percentage of the page (null: natural size); align
+// is left, center or right. Needs document schema version 2.
+export const PICTURE_ALIGNS = ['left', 'center', 'right']
+const num = (v) => { const n = parseInt(v, 10); return n > 0 ? n : null }
+const attr = (name, parse = (v) => v || null) => ({
+  default: null,
+  parseHTML: (el) => parse(el.getAttribute('data-' + name)),
+  renderHTML: (a) => (a[name] == null ? {} : { ['data-' + name]: a[name] })
+})
+
+export const Picture = Node.create({
+  name: 'image',
+  group: 'block',
+  atom: true,
+  draggable: true,
+  selectable: true,
+
+  addAttributes () {
+    return {
+      ref: attr('ref'),
+      hash: attr('hash'),
+      mime: attr('mime'),
+      w: attr('w', num),
+      h: attr('h', num),
+      width: {
+        default: null,
+        parseHTML: (el) => { const n = num(el.getAttribute('data-width')); return n ? Math.max(10, Math.min(100, n)) : null },
+        renderHTML: (a) => (a.width ? { 'data-width': a.width } : {})
+      },
+      align: {
+        default: 'center',
+        parseHTML: (el) => (PICTURE_ALIGNS.includes(el.getAttribute('data-align')) ? el.getAttribute('data-align') : 'center'),
+        renderHTML: (a) => ({ 'data-align': a.align || 'center' })
+      },
+      alt: {
+        default: '',
+        parseHTML: (el) => el.getAttribute('alt') || '',
+        renderHTML: (a) => (a.alt ? { alt: a.alt } : {})
+      }
+    }
+  },
+
+  parseHTML () {
+    return [{ tag: 'img[data-ref]' }]
+  },
+
+  renderHTML ({ HTMLAttributes }) {
+    return ['img', mergeAttributes({ class: 'doc-picture' }, HTMLAttributes)]
+  }
+})
+
 // The extensions that make up the document's schema. The editor adds its own
 // (Collaboration, cursors, find, placeholder) on top; import and export use
 // these alone, so both read and write the same nodes and marks.
@@ -142,7 +198,8 @@ export function documentExtensions () {
     TextAlign.configure({ types: ['heading', 'paragraph'] }),
     Subscript,
     Superscript,
-    ParagraphFormat
+    ParagraphFormat,
+    Picture
   ]
 }
 
