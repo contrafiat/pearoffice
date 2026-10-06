@@ -56,7 +56,7 @@ node scripts/smoke-packaged.js desktop\\dist\\win-unpacked\\PearOffice.exe; if (
 PSEOF
 )
 B64=$(printf '%s' "$PS" | iconv -t UTF-16LE | base64 -w0)
-ssh -o BatchMode=yes "$WIN" "powershell -NoProfile -ExecutionPolicy Bypass -EncodedCommand $B64"
+ssh -o BatchMode=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=4 "$WIN" "powershell -NoProfile -ExecutionPolicy Bypass -EncodedCommand $B64"
 
 echo "==> copy installer back"
 mkdir -p "$ROOT/desktop/dist"
