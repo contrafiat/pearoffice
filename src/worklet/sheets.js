@@ -33,9 +33,9 @@ class GuardedDoc {
     this.skipped = 0
   }
 
-  apply (update) {
+  apply (update, origin = 'remote') {
     try {
-      Y.applyUpdate(this.shadow, update, 'remote')
+      Y.applyUpdate(this.shadow, update, origin)
     } catch {
       this.skipped++
       this.shadow.destroy()
@@ -43,7 +43,7 @@ class GuardedDoc {
       Y.applyUpdate(this.shadow, Y.encodeStateAsUpdate(this.doc), 'remote')
       return false
     }
-    Y.applyUpdate(this.doc, update, 'remote')
+    Y.applyUpdate(this.doc, update, origin)
     return true
   }
 
@@ -72,10 +72,25 @@ function createSheets ({ emit, getBase, getLocalDb = () => null, getStore = () =
   function entryFor (sheetId) {
     let e = open.get(sheetId)
     if (!e) {
-      e = { guarded: new GuardedDoc(), loading: null, values: null, timer: null, undo: null }
+      e = { guarded: new GuardedDoc(), loading: null, values: null, timer: null, undo: null, docOut: null }
       open.set(sheetId, e)
+      e.guarded.doc.on('update', (update, origin) => sendDoc(sheetId, e, update, origin))
     }
     return e
+  }
+
+  // A document open in the UI keeps its own copy (src/ui/doc/DocView.jsx):
+  // send it every change that did not come from it, a few at a time.
+  function sendDoc (sheetId, e, update, origin) {
+    if (!e.docOpen || origin === 'ui') return
+    if (e.docOut) { e.docOut.push(update); return }
+    e.docOut = [update]
+    setTimeout(() => {
+      const list = e.docOut
+      e.docOut = null
+      const merged = list.length === 1 ? list[0] : Y.mergeUpdates(list)
+      emit('doc:updated', { sheetId, update: b4a.toString(merged, 'base64') })
+    }, 20)
   }
 
   // Tell the UI a sheet changed (also used once a background load is done).
@@ -252,7 +267,10 @@ function createSheets ({ emit, getBase, getLocalDb = () => null, getStore = () =
 
   function trackUndo (e) {
     const doc = e.guarded.doc
-    const scope = [doc.getMap('meta'), doc.getArray('tabs'), ...model.tabIds(doc).map((id) => doc.getMap('tab:' + id))]
+    // A document's editor keeps its own undo (src/ui/doc/DocView.jsx).
+    const scope = model.kind(doc) === 'doc'
+      ? [doc.getMap('meta')]
+      : [doc.getMap('meta'), doc.getArray('tabs'), ...model.tabIds(doc).map((id) => doc.getMap('tab:' + id))]
     // captureTimeout 0: every edit is its own undo step. The default (500 ms)
     // merged an edit with the one before it, so undoing a bold also removed
     // the formula typed just before.
@@ -281,6 +299,7 @@ function createSheets ({ emit, getBase, getLocalDb = () => null, getStore = () =
   }
 
   function values (e) {
+    if (model.kind(e.guarded.doc) === 'doc') return new Map() // no formulas in a document
     if (!e.values) e.values = evaluateSheet(e.guarded.doc)
     return e.values
   }

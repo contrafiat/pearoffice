@@ -23,6 +23,11 @@ A page-width document like Google Docs, without page breaks while editing:
 - Word count
 - Live co-editing with everyone's cursor and selection, in their colour
 - Import .docx, .md and .txt. Export .docx, .md, .txt and PDF
+- Added 2026-10-06 after the parity check (`notes/2026-10-06-writer-parity.md`),
+  while it costs no schema bump: alignment, font size and font, line
+  spacing, paragraph indent, superscript and subscript, Title and Subtitle
+  styles; and, storing nothing new, clear formatting, change case, smart
+  typing, placeholder text and character count
 
 Later, each with its own proposal if it touches the wire: images, comments
 and suggestions, page breaks and headers, footnotes, a table of contents.

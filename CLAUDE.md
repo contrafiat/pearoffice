@@ -56,11 +56,12 @@ See `TODO.md`.
 ## Layout
 
 Code that works for any kind of file sits apart from each editor's own
-(proposals/2026-10-06-rename-to-pearoffice.md, step 3). Documents will get
+(proposals/2026-10-06-rename-to-pearoffice.md, step 3). Documents have
 `src/doc/` and `src/ui/doc/` the same way.
 
 - `src/shared/` - runs anywhere, for any file: `ids.js`, `phrase.js`
   (recovery phrase), `qr.js`, Bare shims.
+- `src/doc/` and `src/ui/doc/` - documents (proposals/2026-10-06-documents.md): `docModel.js` (the Yjs doc: `meta`, `body`), `docMethods.js` (`doc:create`, `doc:state`, `doc:update`), `DocView.jsx` (TipTap 3 editor; the UI keeps a Yjs replica and sends batched updates, `doc:updated` brings others' edits).
 - `src/sheet/` - the spreadsheet, runs anywhere (Bare, Node, browser):
   `sheetModel.js` (the Yjs document), `refs.js` (A1 <-> id formula
   references), `formula/` (evaluator, deterministic maths, formulajs fills,

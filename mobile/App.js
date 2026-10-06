@@ -17,7 +17,7 @@ import * as Clipboard from 'expo-clipboard'
 import b4a from 'b4a'
 import { requestLocalNetworkPermission } from '../modules/local-network'
 
-const ALLOWED = /^(sheet|file|app|seeder|link|donation):[A-Za-z]+$/
+const ALLOWED = /^(sheet|file|doc|app|seeder|link|donation):[A-Za-z]+$/
 // iOS file types for the share sheet, by MIME type.
 const UTIS = {
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'org.openxmlformats.spreadsheetml.sheet',
@@ -211,6 +211,8 @@ export default function App () {
       return reply({ error: String(err && err.message ? err.message : err) })
     }
     if (typeof method !== 'string' || !ALLOWED.test(method)) return reply({ error: 'bad method' })
+    // Wait for init: a method called earlier finds no local database yet.
+    await startWorklet().catch(() => {})
     const res = await callWorklet(method, args || {})
     reply(res.error ? { error: res.error } : { result: res.result ?? null })
   }
