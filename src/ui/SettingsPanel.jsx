@@ -39,6 +39,7 @@ export function SettingsPanel ({ me, onMe, desktop, keepOnline, startAtLogin, on
   const [mode, setMode] = useState('settings')
   const [numPad, setNumPad] = useState(() => readPref('pearsheet:numpad') === '1')
   const [theme, setTheme] = useState(themePref)
+  const [showMe, setShowMe] = useState(() => readPref('pearsheet:presence') !== '0')
   const picRef = useRef(null)
   const { name, avatar, identity } = me
   const [nameDraft, setNameDraft] = useState(name || '')
@@ -144,6 +145,12 @@ export function SettingsPanel ({ me, onMe, desktop, keepOnline, startAtLogin, on
                 </label>
               </>
             )}
+
+            <h3>Sharing</h3>
+            <label className='check show-me'>
+              <input type='checkbox' checked={showMe} onChange={(e) => { setShowMe(e.target.checked); writePref('pearsheet:presence', e.target.checked ? '1' : '0') }} />
+              <span>Show others when I have a sheet open<br /><span className='small muted'>They see which cell you are on. When this is off, you do not see them either.</span></span>
+            </label>
 
             <h3>Appearance</h3>
             <div className='row theme-choice' role='group' aria-label='Appearance'>

@@ -43,7 +43,8 @@ from their device and the owner can delete it for everyone, seeder included
 (proposals/2026-10-05-shared-compaction.md), and any move now carries
 edits made offline. A seeder can be taken off a sheet,
 a device can stop using one and a seeder can forget a device
-(proposals/2026-10-04-stop-backing-up.md). People have profile pictures,
+(proposals/2026-10-04-stop-backing-up.md). Members see who else has a sheet open and which cell they are on
+(proposals/2026-10-05-presence.md). People have profile pictures,
 stored inside each sheet (proposals/2026-10-04-profiles-with-avatars.md).
 On desktop, PearSheet can start hidden in the tray at login
 (`desktop/login.js`; XDG autostart on Linux, a LaunchAgent on macOS, login
@@ -61,6 +62,7 @@ See `TODO.md`.
   ops, built and checked), `join.js` (the `pearsheet/join/1` handshake),
   `moves.js` (removal by moving to fresh keys), `seeding.js` (seeder client),
   `linking.js` (linking a person's devices, recovery phrase),
+  `presence.js` (who has a sheet open, and their cell),
   `profiles.js` (your name and picture in every sheet),
   `sheetMethods.js` (IPC), `sheets.js` (live documents).
 - Charts (proposals/2026-10-04-charts.md): `src/shared/charts.js` (data

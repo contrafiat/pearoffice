@@ -12,6 +12,7 @@ const { createMoves } = require('./moves')
 const { createLinking } = require('./linking')
 const { createDeleting } = require('./deleting')
 const { createProfiles } = require('./profiles')
+const { createPresence } = require('./presence')
 
 function createSheetEngine (opts = {}) {
   const { createSwarm: makeSwarm, log = () => {}, ...rest } = opts
@@ -22,6 +23,7 @@ function createSheetEngine (opts = {}) {
   let linking = null
   let deleting = null
   let profiles = null
+  let presence = null
   const emit = (event, data) => engine && engine.emit(event, data)
 
   const sheets = createSheets({
@@ -55,6 +57,9 @@ function createSheetEngine (opts = {}) {
 
   const methods = {
     ...createSheetMethods(sheets, { getJoin: () => join, getMoves: () => moves, getProfiles: () => profiles }),
+    // Who has a sheet open (proposals/2026-10-05-presence.md).
+    'sheet:presence': async ({ sheetId, ...state }) => { if (presence) presence.set(sheetId, state); return {} },
+    'sheet:present': async ({ sheetId }) => ({ people: presence ? presence.list(sheetId) : [] }),
     'seeder:pair': async ({ link }) => seeding.pair(link),
     'seeder:list': async () => seeding.list(),
     'seeder:sheet': async ({ sheetId }) => seeding.sheetSeeders(sheetId),
@@ -110,6 +115,7 @@ function createSheetEngine (opts = {}) {
       onUpdate: sheets.onUpdate,
       onMembership: (sheetId, type) => {
         emit('sheet:members', { sheetId })
+        if (presence) setTimeout(() => presence.recheck(sheetId).catch(() => {}), 200)
         // The view shows the change only once this apply batch is done.
         if ((type === 'seeder' || type === 'seederOff') && seeding) setTimeout(() => seeding.sweep().catch(() => {}), 200)
         if (type === 'move' && moves) untilShown('move:' + sheetId, () => moves.onMoved(sheetId))
@@ -131,8 +137,9 @@ function createSheetEngine (opts = {}) {
       const swarm = makeSwarm ? makeSwarm(args) : new (require('hyperswarm'))(args)
       profiles = createProfiles({ engine, getJoin: () => join, emit, log })
       join = createJoinService({ engine, emit, onProfile: (sheetId, op) => profiles.take(sheetId, op), log })
-      // Let core attach replication first, then add our channel.
-      swarm.on('connection', (conn) => { Promise.resolve().then(() => { join.onConnection(conn); if (linking) linking.listen(conn) }) })
+      presence = createPresence({ engine, emit, log })
+      // Let core attach replication first, then add our channels.
+      swarm.on('connection', (conn) => { Promise.resolve().then(() => { join.onConnection(conn); presence.onConnection(conn); if (linking) linking.listen(conn) }) })
       setTimeout(() => join.resume().catch((e) => log('resume joins failed: ' + e.message)), 0)
       seeding = createSeeding({ engine, log })
       setTimeout(() => seeding.start(), 0)
@@ -164,6 +171,7 @@ function createSheetEngine (opts = {}) {
     if (deleting) deleting.close()
     if (linking) linking.close()
     if (profiles) profiles.close()
+    if (presence) presence.close()
     return coreClose()
   }
   engine.sheets = sheets
@@ -174,6 +182,7 @@ function createSheetEngine (opts = {}) {
   Object.defineProperty(engine, 'seeding', { get: () => seeding })
   Object.defineProperty(engine, 'deleting', { get: () => deleting })
   Object.defineProperty(engine, 'profiles', { get: () => profiles })
+  Object.defineProperty(engine, 'presence', { get: () => presence })
   return engine
 }
 

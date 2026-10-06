@@ -680,3 +680,12 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 .tabbar .zoom button:hover:not(:disabled) { background: var(--line); color: var(--ink); }
 .tabbar .zoom button:disabled { opacity: 0.4; cursor: default; }
 .tabbar .zoom .zoom-level { min-width: 42px; font-variant-numeric: tabular-nums; }
+
+/* Others with the sheet open: their cell and name (proposals/2026-10-05-presence.md). */
+.presence { position: absolute; border: 2px solid var(--who); pointer-events: none; margin: -1px 0 0 -1px; z-index: 1; }
+.presence.typing { border-style: dashed; }
+.presence-tag { position: absolute; left: -2px; bottom: 100%; background: var(--who); color: #fff; font-size: 11px; line-height: 16px; padding: 0 5px; border-radius: 4px 4px 4px 0; white-space: nowrap; max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
+.people-stack .present .avatar { box-shadow: 0 0 0 2px var(--panel), 0 0 0 4px #3c9a5f; }
+.people-stack .stack-item { display: inline-flex; border-radius: 50%; }
+.people-stack .stack-item + .stack-item, .people-stack .stack-item + .more-people { margin-left: -8px; }
+.presence.first-row .presence-tag { bottom: auto; top: 100%; border-radius: 0 4px 4px 4px; }
