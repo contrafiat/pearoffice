@@ -995,7 +995,74 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
       docPdf.length > 1000 && docPdf.slice(0, 4).toString() === '%PDF'
     if (!result.docExport) throw new Error('document export: ' + JSON.stringify({ docx: docxOut.length, media: docMedia, md: mdOut.slice(0, 200), pdf: docPdf.length }))
     step('document export')
-    result.ok = result.docPicture && result.docPaste && result.docOutline && result.docImport && result.docImportNotice && result.docExport && result.about && result.donation && result.docCursors && result.kinds === 'Spreadsheet, Document, Slides (soon)' && result.docCard && result.docReopened && result.docWords === '10 words' && result.fileIcons === result.sheetsAfter && result.moreChartTypes && result.importedFormats && result.keepOnline && result.avatar && result.spill && result.quickWins && result.findSort && result.fill && result.charts && result.formats && result.csvPdf && result.tabs && result.tidied && result.jsonImport && result.csvImport && result.suggested === 'SUBSTITUTE,SUBTOTAL,SUM' && result.argHelp === 'number1' && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.importedFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000 && result.pastedFormula === '=SUM(C1:C2)' && result.inviteLink.startsWith('pearoffice://join?s=') && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
+
+    // Copy the picture from this document and paste it into "Smoke notes":
+    // it is stored again there, so the new node points at that file's own
+    // picture core and shows.
+    const srcRef = await js("(() => { let a = null; document.querySelector('.doc-body').editor.state.doc.descendants((n) => { if (n.type.name === 'image') a = n.attrs.ref }); return a })()")
+    const copiedHtml = await js(`(() => {
+      const ed = document.querySelector('.doc-body').editor
+      let at = null
+      ed.state.doc.descendants((n, p) => { if (n.type.name === 'image') at = p })
+      ed.chain().focus().setNodeSelection(at).run()
+      const dt = new DataTransfer()
+      document.querySelector('.doc-body').dispatchEvent(new ClipboardEvent('copy', { clipboardData: dt, bubbles: true, cancelable: true }))
+      return dt.getData('text/html')
+    })()`)
+    if (!/data-file="[^"]+"/.test(copiedHtml)) throw new Error('copied picture has no data-file: ' + copiedHtml.slice(0, 300))
+    await js("document.querySelector('.sheet-link.all-files').click()")
+    await js("[...document.querySelectorAll('.file-card')].find((c) => c.querySelector('.file-title').textContent === 'Smoke notes').click()")
+    await waitFor('notes open', "document.querySelector('.toolbar .title').value === 'Smoke notes' && !!document.querySelector('.doc-body') && document.querySelector('.doc-body').textContent.includes('Hello world')")
+    await js(`(() => {
+      const ed = document.querySelector('.doc-body').editor
+      ed.chain().insertContentAt(ed.state.doc.content.size, { type: 'paragraph' }).focus('end').run()
+      const dt = new DataTransfer()
+      dt.setData('text/html', ${JSON.stringify(copiedHtml)})
+      dt.setData('text/plain', '')
+      document.querySelector('.doc-body').dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }))
+    })()`)
+    const pastedRef = "(() => { let a = null; document.querySelector('.doc-body').editor.state.doc.descendants((n) => { if (n.type.name === 'image') a = n.attrs.ref }); return a })()"
+    await waitFor('pasted picture moved', `(() => { const r = ${pastedRef}; return !!r && r !== ${JSON.stringify(srcRef)} })()`)
+    await waitFor('pasted picture shown', "(() => { const i = document.querySelector('.doc-body .doc-picture-frame img'); return !!i && !i.hidden && i.complete && i.naturalWidth > 0 })()")
+    const notesId = await js("window.pearoffice.call('sheet:list', {}).then((l) => l.find((x) => x.title === 'Smoke notes').sheetId)")
+    const newRef = await js(pastedRef)
+    // doc:picture answers only for a picture core of this file, once the
+    // editor has sent the edit.
+    await waitFor('pasted picture saved', `window.pearoffice.call('doc:picture', { sheetId: ${JSON.stringify(notesId)}, ref: ${JSON.stringify(newRef)} }).then((r) => r.data.length > 0, () => false)`).catch(() => {})
+    const fromNotes = await js(`window.pearoffice.call('doc:picture', { sheetId: ${JSON.stringify(notesId)}, ref: ${JSON.stringify(newRef)} }).then((r) => r.data.length > 0, () => false)`)
+    result.docPictureCopy = fromNotes && newRef.split(':')[0] !== srcRef.split(':')[0]
+    if (!result.docPictureCopy) throw new Error('picture copy: ' + JSON.stringify({ srcRef, newRef, fromNotes }))
+    // Cut it from "Smoke notes" and paste it back into "Smoke import": it
+    // goes into that file's own picture core (the one srcRef is in).
+    const cutHtml = await js(`(() => {
+      const ed = document.querySelector('.doc-body').editor
+      let at = null
+      ed.state.doc.descendants((n, p) => { if (n.type.name === 'image') at = p })
+      ed.chain().focus().setNodeSelection(at).run()
+      const dt = new DataTransfer()
+      document.querySelector('.doc-body').dispatchEvent(new ClipboardEvent('cut', { clipboardData: dt, bubbles: true, cancelable: true }))
+      return dt.getData('text/html')
+    })()`)
+    await waitFor('picture cut', "!document.querySelector('.doc-body .doc-picture-frame')")
+    await sleep(600) // the cut is sent a moment later
+    await js("document.querySelector('.sheet-link.all-files').click()")
+    await js("[...document.querySelectorAll('.file-card')].find((c) => c.querySelector('.file-title').textContent === 'Smoke import').click()")
+    await waitFor('import open', "document.querySelector('.toolbar .title').value === 'Smoke import' && document.querySelectorAll('.doc-body .doc-picture-frame').length === 1")
+    await js(`(() => {
+      const ed = document.querySelector('.doc-body').editor
+      ed.chain().insertContentAt(ed.state.doc.content.size, { type: 'paragraph' }).focus('end').run()
+      const dt = new DataTransfer()
+      dt.setData('text/html', ${JSON.stringify(cutHtml)})
+      document.querySelector('.doc-body').dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }))
+    })()`)
+    const keysHere = "(() => { const k = []; document.querySelector('.doc-body').editor.state.doc.descendants((n) => { if (n.type.name === 'image') k.push(n.attrs.ref.split(':')[0]) }); return k.join(',') })()"
+    const srcKey = srcRef.split(':')[0]
+    await waitFor('cut picture moved', `${keysHere} === ${JSON.stringify(srcKey + ',' + srcKey)}`)
+    await waitFor('cut picture shown', "(() => { const i = [...document.querySelectorAll('.doc-body .doc-picture-frame img')]; return i.length === 2 && i.every((x) => !x.hidden && x.complete && x.naturalWidth > 0) })()")
+    result.docPictureCut = true
+    await sleep(600)
+    step('document picture copy and cut')
+    result.ok = result.docPicture && result.docPictureCopy && result.docPictureCut && result.docPaste && result.docOutline && result.docImport && result.docImportNotice && result.docExport && result.about && result.donation && result.docCursors && result.kinds === 'Spreadsheet, Document, Slides (soon)' && result.docCard && result.docReopened && result.docWords === '10 words' && result.fileIcons === result.sheetsAfter && result.moreChartTypes && result.importedFormats && result.keepOnline && result.avatar && result.spill && result.quickWins && result.findSort && result.fill && result.charts && result.formats && result.csvPdf && result.tabs && result.tidied && result.jsonImport && result.csvImport && result.suggested === 'SUBSTITUTE,SUBTOTAL,SUM' && result.argHelp === 'number1' && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.importedFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000 && result.pastedFormula === '=SUM(C1:C2)' && result.inviteLink.startsWith('pearoffice://join?s=') && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
   } catch (err) {
     result.error = err.message
     // What the page showed, to tell a UI failure from a load failure.

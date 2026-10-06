@@ -2,7 +2,9 @@
 // shrinking before upload, a cache of fetched pictures for the open
 // document and the node view that draws, loads and resizes a picture.
 
+import { DOMSerializer } from '@tiptap/pm/model'
 import { Picture } from './extensions.js'
+import { call } from '../bridge.js'
 
 export const MAX_BYTES = 1024 * 1024 // src/worklet/pictures.js
 export const TOO_BIG = 'This picture is too big to add, even after shrinking it. Try a smaller one.'
@@ -106,28 +108,121 @@ export async function wordPicture (bytes, mime) {
   return { bytes: new Uint8Array(await jpeg.arrayBuffer()), mime: 'image/jpeg' }
 }
 
-// Fetched pictures for one open document, as object URLs: ref -> Promise<url>.
-// A failed fetch is forgotten, so it can be tried again.
+// Fetched pictures for one open document, as object URLs: ref -> Promise<url>,
+// with the bytes kept as a Blob for copying. A failed fetch is forgotten, so
+// it can be tried again.
 export function pictureCache (fetchBytes) {
-  const urls = new Map()
+  const blobs = new Map() // ref -> Promise<Blob>
+  const urls = new Map() // ref -> Promise<url>
+  const blobOf = (bytes, mime) => new Blob([bytes], { type: MIMES.includes(mime) ? mime : 'application/octet-stream' })
+  const keep = (ref, b) => {
+    const u = b.then((x) => URL.createObjectURL(x))
+    blobs.set(ref, b)
+    urls.set(ref, u)
+    u.catch(() => { if (urls.get(ref) === u) { urls.delete(ref); blobs.delete(ref) } })
+  }
   return {
     get (attrs) {
-      if (!urls.has(attrs.ref)) {
-        const p = fetchBytes(attrs).then((bytes) => URL.createObjectURL(new Blob([bytes], { type: MIMES.includes(attrs.mime) ? attrs.mime : 'application/octet-stream' })))
-        p.catch(() => { if (urls.get(attrs.ref) === p) urls.delete(attrs.ref) })
-        urls.set(attrs.ref, p)
-      }
+      if (!urls.has(attrs.ref)) keep(attrs.ref, fetchBytes(attrs).then((bytes) => blobOf(bytes, attrs.mime)))
       return urls.get(attrs.ref)
+    },
+    // The picture's bytes as a Blob, fetched if need be.
+    blob (attrs) {
+      this.get(attrs)
+      return blobs.get(attrs.ref)
     },
     // Bytes this device just stored: no need to fetch them back.
     put (ref, bytes, mime) {
-      if (!urls.has(ref)) urls.set(ref, Promise.resolve(URL.createObjectURL(new Blob([bytes], { type: mime }))))
+      if (!urls.has(ref)) keep(ref, Promise.resolve(blobOf(bytes, mime)))
     },
     clear () {
       for (const p of urls.values()) p.then((u) => URL.revokeObjectURL(u), () => {})
       urls.clear()
+      blobs.clear()
     }
   }
+}
+
+// --- copying pictures between documents --------------------------------------
+
+// A picture's reference names a core of its own file, encrypted with that
+// file's key, so a picture pasted into another document must be stored
+// again there. The clipboard says which file a copied picture came from
+// (data-file on its <img>), and the pictures of the last copy or cut are
+// kept here for the session: the first document may be closed by the time
+// of the paste, or the cut may have taken the picture out of it.
+const copied = new Map() // ref -> Promise<Blob | null>
+
+// A copy or cut: remember its pictures' bytes. `cache` is the document's.
+export function noteCopied (pictures, cache) {
+  if (!pictures.length) return
+  copied.clear()
+  for (const a of pictures) {
+    if (!a.ref) continue
+    const b = Promise.resolve(cache.blob(a)).catch(() => null)
+    copied.set(a.ref, b)
+  }
+}
+
+// What the editor writes to the clipboard, with data-file=<sheetId> on each
+// picture. `getSchema` gives the editor's schema at copy time.
+export function pictureClipboard (getSchema, sheetId) {
+  return {
+    serializeFragment (fragment, options, target) {
+      const base = DOMSerializer.fromSchema(getSchema())
+      const image = base.nodes.image
+      const nodes = { ...base.nodes }
+      if (image) {
+        nodes.image = (node) => {
+          const spec = image(node)
+          if (!Array.isArray(spec) || !spec[1] || typeof spec[1] !== 'object' || Array.isArray(spec[1])) return spec
+          return [spec[0], { ...spec[1], 'data-file': sheetId }, ...spec.slice(2)]
+        }
+      }
+      return new DOMSerializer(nodes, base.marks).serializeFragment(fragment, options, target)
+    }
+  }
+}
+
+// The pictures in pasted editor HTML that came from another file:
+// [{ ref, hash, mime, w, h, file }], one per reference. A picture with no
+// data-file (copied before this was added) is taken to be from this file.
+export function foreignPictures (html, sheetId) {
+  if (!/data-file=/.test(html || '')) return []
+  const page = new window.DOMParser().parseFromString(html, 'text/html')
+  const out = new Map()
+  for (const el of page.querySelectorAll('img[data-ref][data-file]')) {
+    const file = el.getAttribute('data-file')
+    const ref = el.getAttribute('data-ref')
+    if (!file || file === sheetId || out.has(ref)) continue
+    const n = (k) => parseInt(el.getAttribute(k), 10) || 1
+    out.set(ref, { ref, hash: el.getAttribute('data-hash') || '', mime: el.getAttribute('data-mime') || '', w: n('data-w'), h: n('data-h'), file })
+  }
+  return [...out.values()]
+}
+
+// Store pictures pasted from another file in this one (doc:addPicture,
+// which points any nodes already saved with the old reference at the new
+// one). The bytes come from the file they were copied from, if this device
+// has it, or from the last copy. Resolves to { done: Map(old ref ->
+// { ref, hash, mime, w, h, bytes }), lost }: lost when some could not be found.
+export async function adoptPictures (found, { sheetId, call: send = call, clip = copied } = {}) {
+  const done = new Map()
+  let lost = false
+  for (const p of found) {
+    let bytes = null
+    try { bytes = fromB64((await send('doc:picture', { sheetId: p.file, ref: p.ref, hash: p.hash })).data) } catch {}
+    if (!bytes && clip.has(p.ref)) {
+      const blob = await clip.get(p.ref)
+      if (blob) bytes = new Uint8Array(await blob.arrayBuffer())
+    }
+    if (!bytes || !MIMES.includes(p.mime)) { lost = true; continue }
+    try {
+      const a = await send('doc:addPicture', { sheetId, bytes: toB64(bytes), mime: p.mime, width: p.w, height: p.h, replace: p.ref })
+      done.set(p.ref, { ref: a.ref, hash: a.hash, mime: a.mime, w: a.w, h: a.h, bytes })
+    } catch { lost = true }
+  }
+  return { done, lost }
 }
 
 // The picture node with its view: a grey box with "Picture loading" until the

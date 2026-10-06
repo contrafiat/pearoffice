@@ -16,12 +16,12 @@ import { isMobile } from '../sheet/xlsx.js'
 import { exportDocument, tidyPaste } from './docFiles.js'
 import { Outline } from './Outline.jsx'
 import { documentExtensions, FindReplace, findKey, changeCaseCommand, LINE_HEIGHTS, SIZES } from './extensions.js'
-import { PictureView, pictureCache, preparePicture, isPicture, toB64, fromB64 } from './pictures.js'
+import { PictureView, pictureCache, preparePicture, isPicture, toB64, fromB64, noteCopied, pictureClipboard, foreignPictures, adoptPictures } from './pictures.js'
 import {
   ArrowCounterClockwise, ArrowClockwise, TextB, TextItalic, TextUnderline, TextStrikethrough, TextAUnderline, Highlighter,
   TextSuperscript, TextSubscript, TextAlignLeft, TextAlignCenter, TextAlignRight, TextAlignJustify, ArrowsDownUp,
   ListBullets, ListNumbers, ListChecks, TextOutdent, TextIndent, LinkSimple, Quotes, CodeBlock, Minus, Table,
-  TextAa, Eraser, MagnifyingGlass, CaretUp, CaretDown, X, Check, TreeView, Image as ImageIcon, Trash
+  TextAa, Eraser, MagnifyingGlass, CaretUp, CaretDown, X, Check, TreeView, Image as ImageIcon, Images, FileImage, Trash
 } from '@phosphor-icons/react'
 
 // The document editor (proposals/2026-10-06-documents.md). It keeps its own
@@ -287,6 +287,30 @@ function DocEditor ({ sheetId, pictures, ydoc, canEdit, phone, finding, setFindi
       } catch (err) { showToast.current(err.message) }
     }
   }
+  // Pictures pasted from another document: stored again in this one, and
+  // the pasted nodes pointed at the new copies.
+  const adoptRef = useRef(null)
+  adoptRef.current = async (found) => {
+    const r = await adoptPictures(found, { sheetId })
+    const ed = editorRef.current
+    if (r.done.size && ed && !ed.isDestroyed) {
+      for (const a of r.done.values()) pictures.put(a.ref, a.bytes, a.mime)
+      const tr = ed.state.tr
+      ed.state.doc.descendants((n, pos) => {
+        const a = n.type.name === 'image' && r.done.get(n.attrs.ref)
+        if (a) tr.setNodeMarkup(pos, undefined, { ...n.attrs, ref: a.ref, hash: a.hash, mime: a.mime, w: a.w, h: a.h })
+      })
+      if (tr.docChanged) ed.view.dispatch(tr.setMeta('addToHistory', false))
+    }
+    if (r.lost) showToast.current('Some parts of what you pasted, such as pictures, were left out.')
+  }
+  // A copy or cut keeps its pictures' bytes for a paste into another document.
+  const noteCopy = (view) => {
+    const list = []
+    view.state.selection.content().content.descendants((n) => { if (n.type.name === 'image') list.push(n.attrs) })
+    noteCopied(list, pictures)
+    return false
+  }
   const editor = useEditor({
     editable: canEdit,
     extensions: [
@@ -309,8 +333,18 @@ function DocEditor ({ sheetId, pictures, ydoc, canEdit, phone, finding, setFindi
         if (t.dropped) showToast.current('Some parts of what you pasted, such as pictures, were left out.')
         return t.html
       },
-      // A copied picture (a screenshot, say) or a picture file.
+      // Pictures copied from here say which file they came from.
+      clipboardSerializer: pictureClipboard(() => editorRef.current.schema, sheetId),
+      handleDOMEvents: { copy: noteCopy, cut: noteCopy },
+      // A copied picture (a screenshot, say) or a picture file. Pictures
+      // copied from another document are stored again in this one.
       handlePaste: (view, event) => {
+        const html = (event.clipboardData && event.clipboardData.getData('text/html')) || ''
+        if (/data-pm-slice/.test(html)) {
+          const found = canEditRef.current ? foreignPictures(html, sheetId) : []
+          if (found.length) setTimeout(() => adoptRef.current(found).catch(() => {}), 0)
+          return false
+        }
         const files = [...((event.clipboardData && event.clipboardData.files) || [])].filter((f) => /^image\//.test(f.type))
         if (!files.length || /data-pm-slice/.test(event.clipboardData.getData('text/html'))) return false
         if (!canEditRef.current) return true
@@ -407,12 +441,17 @@ function DocEditor ({ sheetId, pictures, ydoc, canEdit, phone, finding, setFindi
   }
   const run = (fn) => { setMenu(null); fn(editor.chain().focus()).run() }
 
-  // Insert a picture: the file picker here, the shell's on a phone.
+  // Insert a picture: the file picker here. On a phone, a menu: the
+  // system photo picker or the shell's file picker.
   const fileRef = useRef(null)
-  async function pickPicture () {
+  function pickPicture (e) {
     if (!phone) { fileRef.current.click(); return }
+    openMenu('picture', e.currentTarget)
+  }
+  async function pickFrom (source) {
+    setMenu(null)
     try {
-      const picked = await call('app:pickFile', { images: true })
+      const picked = await call('app:pickFile', { images: true, source })
       if (!picked || picked.canceled) return
       const type = picked.mime || ({ png: 'image/png', gif: 'image/gif', webp: 'image/webp', heic: 'image/heic' }[(/\.([^.]+)$/.exec(picked.name || '') || [])[1]?.toLowerCase()] || 'image/jpeg')
       await addRef.current([new File([fromB64(picked.base64)], picked.name || 'picture', { type })])
@@ -477,7 +516,7 @@ function DocEditor ({ sheetId, pictures, ydoc, canEdit, phone, finding, setFindi
         {btn('Quote', Quotes, s.quote, () => editor.chain().focus().toggleBlockquote().run())}
         {btn('Code block', CodeBlock, s.code, () => editor.chain().focus().toggleCodeBlock().run())}
         {btn('Horizontal line', Minus, undefined, () => editor.chain().focus().setHorizontalRule().run())}
-        {btn('Insert a picture', ImageIcon, undefined, pickPicture, { className: 'picture-button' })}
+        {btn('Insert a picture', ImageIcon, undefined, pickPicture, { className: 'picture-button', 'aria-haspopup': phone ? 'menu' : undefined })}
         <input ref={fileRef} type='file' accept='image/*' multiple hidden className='picture-input' onChange={(e) => { const files = [...e.target.files]; e.target.value = ''; if (files.length) addRef.current(files) }} />
         {btn('Table', Table, s.table, (e) => (s.table ? openMenu('table', e.currentTarget) : editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()), { 'aria-haspopup': s.table ? 'menu' : undefined, className: 'table-button' + (s.table ? ' on' : '') })}
         <span className='sep' />
@@ -494,6 +533,12 @@ function DocEditor ({ sheetId, pictures, ydoc, canEdit, phone, finding, setFindi
           ))}
           <button className='swatch none' title='None' aria-label='None' onClick={() => run((ch) => (menu.kind === 'color' ? ch.unsetColor() : ch.unsetHighlight()))}>×</button>
         </span>
+      )}
+      {menu && menu.kind === 'picture' && (
+        <ul className='menu doc-pop' role='menu' style={{ top: menu.top, left: menu.left }}>
+          <li role='menuitem' className='picture-photo' onClick={() => pickFrom('photos')}><Images size={16} /> Choose a photo</li>
+          <li role='menuitem' className='picture-file' onClick={() => pickFrom('files')}><FileImage size={16} /> Choose a file</li>
+        </ul>
       )}
       {menu && menu.kind === 'align' && (
         <ul className='menu doc-pop' role='menu' style={{ top: menu.top, left: menu.left }}>
