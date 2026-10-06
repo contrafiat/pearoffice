@@ -224,6 +224,28 @@ test('LibreOffice: font tags, align attributes and nested lists', async () => {
   assert.equal(json.content[2].attrs.lineHeight, '1.5')
 })
 
+// What LibreOffice 26.2 writes for Title, Subtitle, Quotations and
+// Preformatted Text: no style names, only the styles' default looks.
+const LIBRE_STYLES = '<meta name="generator" content="LibreOffice 26.2.6.3 (Linux)"/>' +
+  '<p align="center" style="line-height: 100%; margin-top: 0.17in; margin-bottom: 0.08in; page-break-after: avoid"><font face="Liberation Sans, sans-serif"><font size="6" style="font-size: 28pt"><b>My title</b></font></font></p>' +
+  '<p align="center" style="margin-top: 0.04in; margin-bottom: 0.08in; line-height: 100%; page-break-after: avoid"><font face="Liberation Sans, sans-serif"><font size="5" style="font-size: 18pt">My subtitle</font></font></p>' +
+  '<p align="center" style="line-height: 100%; margin-bottom: 0in"><font size="5" style="font-size: 18pt">Big, centred</font> and normal</p>' +
+  '<blockquote>A quote here</blockquote>' +
+  '<pre>let a = 1</pre>'
+
+test('LibreOffice: Title, Subtitle, quotes and code by their default looks', async () => {
+  const { json } = await paste(LIBRE_STYLES)
+  assert.equal(outline(json), [
+    'title:center=My title',
+    'subtitle:center=My subtitle',
+    'p:center=Big, centred and normal',
+    'quote',
+    'p=A quote here',
+    'codeBlock=let a = 1'
+  ].join('\n'))
+  assert.equal(runs(json).slice(0, 2).join(' | '), 'My title | My subtitle')
+})
+
 test('a paste with nothing left out says so', async () => {
   const { dropped } = await paste('<p>Just <b>text</b></p>')
   assert.equal(dropped, false)

@@ -74,6 +74,17 @@ function find (json, pred) {
   return hit
 }
 
+test('a Markdown list mixing bullets and tasks keeps each as it was', async () => {
+  const f = await load()
+  const { json } = await f.fileToJson('Mixed.md', enc('- Plain one\n- [ ] Task\n- Plain two\n- [x] Done\n'))
+  assert.equal(types(json), 'bulletList,taskList,bulletList,taskList')
+  assert.equal(json.content.map((l) => blocks(l).join('|')).join(' / '), 'Plain one / Task / Plain two / Done')
+  assert.equal(String(json.content[3].content[0].attrs.checked), 'true')
+  const md = f.toMarkdown(json)
+  assert.equal((md.match(/- \[[ x]\] /g) || []).length, 2)
+  assert.ok(md.includes('- Plain one') && md.includes('- Plain two'))
+})
+
 test('a Markdown file becomes the editor\'s nodes', async () => {
   const f = await load()
   const { json, dropped } = await f.fileToJson('Plan.md', enc(MD))
