@@ -18,9 +18,9 @@ const { identityFromSeed, seedToPhrase, phraseToSeed } = require('../shared/phra
 const { defaultEncodeInvite } = require('@peerloom/core/engine')
 const { inviteKeyPair, cleanName, checkAvatar } = require('./membership')
 
-const PROTOCOL = 'pearsheet/link/1'
-const NAMESPACE = 'pearsheet/link/v1'
-const PURPOSE = 'pearsheet/link/v1'
+const PROTOCOL = 'pearoffice/link/1'
+const NAMESPACE = 'pearoffice/link/v1'
+const PURPOSE = 'pearoffice/link/v1'
 const LINK_WINDOW_MS = 5 * 60 * 1000
 const hex = (buf) => b4a.toString(buf, 'hex')
 
@@ -38,10 +38,10 @@ function linkTopic (rv) {
 }
 
 function parseLink (link) {
-  const m = /^pearsheet:\/\/link\?(.+)$/.exec(String(link).trim())
-  if (!m) throw new Error('That is not a PearSheet device link')
+  const m = /^pearoffice:\/\/link\?(.+)$/.exec(String(link).trim())
+  if (!m) throw new Error('That is not a PearOffice device link')
   const q = new URLSearchParams(m[1])
-  if (q.get('v') !== '1') throw new Error('This link needs a newer version of PearSheet')
+  if (q.get('v') !== '1') throw new Error('This link needs a newer version of PearOffice')
   const rv = fromB64url(q.get('rv') || '')
   const secret = fromB64url(q.get('k') || '')
   const a = q.get('a') || ''
@@ -84,7 +84,7 @@ function createLinking ({ engine, log = () => {}, now = () => Date.now() }) {
     if (active.timer.unref) active.timer.unref()
     engine.swarm.join(topic, { server: true, client: false })
     for (const conn of engine.swarm.connections) listen(conn)
-    const link = 'pearsheet://link?' + new URLSearchParams({ rv: b64url(rv), k: b64url(secret), a: hex(engine.swarm.keyPair.publicKey), v: '1' }).toString()
+    const link = 'pearoffice://link?' + new URLSearchParams({ rv: b64url(rv), k: b64url(secret), a: hex(engine.swarm.keyPair.publicKey), v: '1' }).toString()
     return { link, expiresAt: active.expiresAt }
   }
 
@@ -171,7 +171,7 @@ function createLinking ({ engine, log = () => {}, now = () => Date.now() }) {
           })
           ch.open()
         }
-        const timer = setTimeout(() => finish(new Error('Could not reach your other device. Keep PearSheet open on it and try again.')), timeoutMs)
+        const timer = setTimeout(() => finish(new Error('Could not reach your other device. Keep PearOffice open on it and try again.')), timeoutMs)
         swarm.on('connection', onConnection)
         for (const conn of swarm.connections) onConnection(conn)
         const discovery = swarm.join(topic, { server: false, client: true })

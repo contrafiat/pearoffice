@@ -133,10 +133,10 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
     shownTitle.current = title
   }, [title])
   // Phone settings, remembered on this device only.
-  const [zoom, setZoomState] = useState(() => Number(readPref('pearsheet:zoom')) || 1)
-  const [numPad, setNumPadState] = useState(() => readPref('pearsheet:numpad') === '1')
-  const setZoom = (z) => { setZoomState(z); writePref('pearsheet:zoom', String(Math.round(z * 100) / 100)) }
-  const setNumPad = (on) => { setNumPadState(on); writePref('pearsheet:numpad', on ? '1' : '0') }
+  const [zoom, setZoomState] = useState(() => Number(readPref('pearoffice:zoom')) || 1)
+  const [numPad, setNumPadState] = useState(() => readPref('pearoffice:numpad') === '1')
+  const setZoom = (z) => { setZoomState(z); writePref('pearoffice:zoom', String(Math.round(z * 100) / 100)) }
+  const setNumPad = (on) => { setNumPadState(on); writePref('pearoffice:numpad', on ? '1' : '0') }
   // The zoom buttons and Ctrl +, - and 0 step through these.
   const zoomStep = (dir) => {
     const z = dir > 0 ? ZOOM_STEPS.find((x) => x > zoom + 0.001) : [...ZOOM_STEPS].reverse().find((x) => x < zoom - 0.001)
@@ -158,9 +158,9 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
   }, [])
   // Changed in Settings while this sheet is open.
   useEffect(() => {
-    const onPref = (e) => { if (e.detail && e.detail.key === 'pearsheet:numpad') setNumPadState(e.detail.value === '1') }
-    window.addEventListener('pearsheet:pref', onPref)
-    return () => window.removeEventListener('pearsheet:pref', onPref)
+    const onPref = (e) => { if (e.detail && e.detail.key === 'pearoffice:numpad') setNumPadState(e.detail.value === '1') }
+    window.addEventListener('pearoffice:pref', onPref)
+    return () => window.removeEventListener('pearoffice:pref', onPref)
   }, [])
   const [deleting, setDeleting] = useState(null) // 'local' | 'everyone' | null
   const [tidying, setTidying] = useState(false)
@@ -211,14 +211,14 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
   // This device says where it is while the sheet is on screen, unless
   // Settings turned that off; then it sees nobody either.
   const [present, setPresent] = useState([])
-  const [sharePresence, setSharePresence] = useState(() => readPref('pearsheet:presence') !== '0')
+  const [sharePresence, setSharePresence] = useState(() => readPref('pearoffice:presence') !== '0')
   const [onScreen, setOnScreen] = useState(() => document.visibilityState !== 'hidden')
   useEffect(() => {
     const vis = () => setOnScreen(document.visibilityState !== 'hidden')
-    const pref = (e) => { if (e.detail && e.detail.key === 'pearsheet:presence') setSharePresence(e.detail.value !== '0') }
+    const pref = (e) => { if (e.detail && e.detail.key === 'pearoffice:presence') setSharePresence(e.detail.value !== '0') }
     document.addEventListener('visibilitychange', vis)
-    window.addEventListener('pearsheet:pref', pref)
-    return () => { document.removeEventListener('visibilitychange', vis); window.removeEventListener('pearsheet:pref', pref) }
+    window.addEventListener('pearoffice:pref', pref)
+    return () => { document.removeEventListener('visibilitychange', vis); window.removeEventListener('pearoffice:pref', pref) }
   }, [])
   useEffect(() => {
     setPresent([])
@@ -282,7 +282,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
     const tab = view && p.tab !== viewTab && view.tabs.find((t) => t.id === p.tab)
     presentWhere.set(p.identity, tab ? 'on ' + tab.name : 'here')
   }
-  const filterKey = 'pearsheet:filter:' + sheetId + ':' + viewTab
+  const filterKey = 'pearoffice:filter:' + sheetId + ':' + viewTab
   const [filter, setFilterState] = useState(null)
   useEffect(() => {
     if (!viewTab) return
@@ -458,7 +458,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
   }
 
   // The selection as clipboard text; remembers the inputs so a paste back
-  // into PearSheet keeps formulas.
+  // into PearOffice keeps formulas.
   function copyText (cut) {
     const text = toTsv(rangeGrid((cell) => (cell ? cell.display : '')))
     clip.current = {
@@ -507,7 +507,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
   // rows into columns.
   function pasteText (text, mode = null) {
     const ours = clip.current && clip.current.text === text ? clip.current : null
-    // From inside PearSheet: paste what was typed, moving relative references
+    // From inside PearOffice: paste what was typed, moving relative references
     // as Excel does. From elsewhere: paste the text.
     let source = ours ? (mode === 'values' ? ours.values : ours.inputs) : fromTsv(text)
     if (mode === 'values') source = source.map((line) => line.map((v) => (typeof v === 'string' && /^[='"]/.test(v) ? "'" + v : v)))
@@ -1035,7 +1035,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
             </>
           )}
         </div>
-        {window.pearsheet && !phone && (
+        {window.pearoffice && !phone && (
           <button className='export icon-button' title='Save a copy as an Excel file' aria-label='Export' onClick={() => exportSheet(sheetId).catch((err) => onError(err.message))}><FileXls size={ICON} /></button>
         )}
         {/* Phones keep the title readable: Find and Export move into More,
@@ -1049,7 +1049,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
           {more && (
             <ul className='menu more-menu' role='menu' onClick={() => setMore(false)}>
               <li role='menuitem' onClick={() => setFinding({ replace: canEdit })}>Find and replace</li>
-              {phone && window.pearsheet && <li role='menuitem' onClick={() => exportSheet(sheetId).catch((err) => onError(err.message))}>Save as an Excel file</li>}
+              {phone && window.pearoffice && <li role='menuitem' onClick={() => exportSheet(sheetId).catch((err) => onError(err.message))}>Save as an Excel file</li>}
               <li role='menuitem' onClick={() => exportCsv(view).catch((err) => onError(err.message))}>Download this tab as CSV</li>
               <li role='menuitem' onClick={() => exportJson(sheetId).catch((err) => onError(err.message))}>Save as JSON</li>
               {!phone && <li role='menuitem' onClick={() => printTab(view, 'pdf', printCharts()).catch((err) => onError(err.message))}>Save this tab as PDF</li>}

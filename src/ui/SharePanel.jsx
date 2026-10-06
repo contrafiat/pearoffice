@@ -86,7 +86,7 @@ export function SharePanel ({ sheetId, onClose, onError }) {
                     </div>
                     <div className='pairing'>
                       <QrCode value={link.link} label='Invite QR code' />
-                      <p className='muted small'>Or scan this with PearSheet on their phone.</p>
+                      <p className='muted small'>Or scan this with PearOffice on their phone.</p>
                     </div>
                   </div>
                 )}

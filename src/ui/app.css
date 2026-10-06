@@ -462,14 +462,14 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 .join-sheet.import { display: inline-flex; }
 
 /* Phones: panels slide up from the bottom, with a drag handle. */
-@keyframes pearsheet-sheet-up { from { transform: translateY(100%); } to { transform: none; } }
-@keyframes pearsheet-fade-in { from { background: rgb(0 0 0 / 0); } }
+@keyframes pearoffice-sheet-up { from { transform: translateY(100%); } to { transform: none; } }
+@keyframes pearoffice-fade-in { from { background: rgb(0 0 0 / 0); } }
 @media (max-width: 720px) {
-  .panel-backdrop { align-items: flex-end; padding: 0 0 var(--kb, 0px); animation: pearsheet-fade-in 0.24s ease; background: rgb(0 0 0 / 0.45); }
+  .panel-backdrop { align-items: flex-end; padding: 0 0 var(--kb, 0px); animation: pearoffice-fade-in 0.24s ease; background: rgb(0 0 0 / 0.45); }
   .panel {
     width: 100%; max-height: calc(88vh - var(--kb, 0px)); border-radius: 16px 16px 0 0; border-bottom: 0;
     padding: 8px 18px calc(22px + env(safe-area-inset-bottom));
-    animation: pearsheet-sheet-up 0.26s cubic-bezier(0.32, 0.72, 0, 1);
+    animation: pearoffice-sheet-up 0.26s cubic-bezier(0.32, 0.72, 0, 1);
   }
   .panel::before { content: ''; flex: none; width: 36px; height: 4px; border-radius: 2px; background: var(--line-strong); margin: 4px auto 2px; }
   .empty-actions { flex-direction: column; align-items: stretch; }
@@ -634,7 +634,7 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 .names-panel .name-go { flex: 1; min-width: 0; text-align: left; text-decoration: none; color: var(--ink); display: flex; gap: 8px; align-items: baseline; padding: 4px 0; overflow: hidden; }
 .names-panel .name-go .muted { margin: 0; font-size: 12px; }
 
-/* Long press opens PearSheet's menus, not the system's text callout. */
+/* Long press opens PearOffice's menus, not the system's text callout. */
 .grid { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
 .grid .editor { -webkit-user-select: text; user-select: text; }
 
@@ -646,8 +646,8 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 .tabbar .filter-status { display: flex; align-items: center; font-size: 12px; white-space: nowrap; padding: 0 6px; }
 
 /* Joining (progress panel, background pill, the "Joined" note) */
-@keyframes pearsheet-spin { to { transform: rotate(360deg); } }
-.spin, .join-spinner { animation: pearsheet-spin 1s linear infinite; }
+@keyframes pearoffice-spin { to { transform: rotate(360deg); } }
+.spin, .join-spinner { animation: pearoffice-spin 1s linear infinite; }
 .join-spinner { align-self: center; color: var(--pear); margin: 4px 0; }
 .join-steps { list-style: none; margin: 0 auto; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .join-steps li { display: flex; align-items: center; gap: 8px; color: var(--muted); }

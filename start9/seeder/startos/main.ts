@@ -3,11 +3,11 @@ import { sdk } from './sdk'
 import { uiPort } from './utils'
 
 // The seeder and its dashboard (seeder-dist/umbrel/server.js in the
-// PearSheet repo). The dashboard asks for a password, made on first start and
+// PearOffice repo). The dashboard asks for a password, made on first start and
 // saved in the data volume (the "Show password" action reads it). Update
 // checks are off: StartOS updates the package.
 export const main = sdk.setupMain(async ({ effects }) => {
-  console.info(i18n('Starting the PearSheet seeder'))
+  console.info(i18n('Starting the PearOffice seeder'))
   return sdk.Daemons.of(effects).addDaemon('seeder', {
     subcontainer: sdk.SubContainer.of(
       effects,
@@ -28,7 +28,7 @@ export const main = sdk.setupMain(async ({ effects }) => {
         SEEDER_DATA: '/data',
         SEEDER_BARE: '/app/bare',
         SEEDER_BUNDLE: '/app/seeder/seeder.bundle',
-        PEARSHEET_NO_UPDATE_CHECK: '1',
+        PEAROFFICE_NO_UPDATE_CHECK: '1',
       },
       runAsInit: true,
     },

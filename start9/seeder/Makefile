@@ -1,4 +1,4 @@
-# Build the PearSheet seeder package for StartOS 0.4: `make` (run it twice
+# Build the PearOffice seeder package for StartOS 0.4: `make` (run it twice
 # after changing the manifest; the SDK reads its file list before building).
 # Needs the 0.4 CLI as `start-cli` on PATH (`make` puts start-cli-1.1.0 there
 # through bin/) and a signing workspace in ../.startos (gitignored).

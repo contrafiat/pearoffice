@@ -72,7 +72,7 @@ export function App () {
   const [devices, setDevices] = useState(null) // { link } | { startWith } | {} when open
   const [nudge, setNudge] = useState(false)
   const [notice, setNotice] = useState(null)
-  const desktop = !!(window.pearsheet && window.pearsheet.platform === 'desktop')
+  const desktop = !!(window.pearoffice && window.pearoffice.platform === 'desktop')
   const [keepOnline, setKeepOnline] = useState(null)
   const [startAtLogin, setStartAtLogin] = useState(false)
 
@@ -109,7 +109,7 @@ export function App () {
     loadMe()
     if (desktop) call('app:settings').then((s) => { setKeepOnline(!!s.keepOnline); setStartAtLogin(!!s.startAtLogin) }).catch(() => {})
     const offs = [
-      on('worklet:exit', () => setError('The sync engine stopped. Restart PearSheet.')),
+      on('worklet:exit', () => setError('The sync engine stopped. Restart PearOffice.')),
       on('join:progress', refresh),
       on('sheet:joined', async ({ sheetId }) => {
         const list = await refresh()
@@ -121,7 +121,7 @@ export function App () {
       // A sheet moved to fresh keys: follow it if it is the one on screen.
       on('sheet:moved', async ({ from, to }) => { await refresh(); setCurrent((c) => (c === from ? to : c)) }),
       on('sheet:removed', refresh),
-      on('sheet:tidied', () => setNotice('PearSheet tidied up a long sheet: devices now keep it as it is, not every change ever made.')),
+      on('sheet:tidied', () => setNotice('PearOffice tidied up a long sheet: devices now keep it as it is, not every change ever made.')),
       // Any edit or membership change anywhere: titles, roles and people in
       // the sidebar stay live. Batched, since edits arrive in bursts.
       on('sheet:changed', refreshSoon),
@@ -131,7 +131,7 @@ export function App () {
       // A sheet left this device (removed here, deleted by its owner, or an
       // old copy after a move).
       on('sheet:gone', async ({ sheetId }) => { forget(sheetId); await refresh() }),
-      on('join:gaveUp', async () => { setNotice('PearSheet stopped waiting to join a sheet after 7 days. Ask for a new invite.'); await refresh() }),
+      on('join:gaveUp', async () => { setNotice('PearOffice stopped waiting to join a sheet after 7 days. Ask for a new invite.'); await refresh() }),
       on('sheet:deleted', ({ title }) => setNotice('"' + (title || 'A sheet') + '" was deleted by its owner.')),
       on('app:deeplink', ({ url }) => { call('app:takeLink').catch(() => {}); openLink(url) })
     ]
@@ -141,9 +141,9 @@ export function App () {
   }, [refresh, refreshSoon])
 
   function openLink (url) {
-    if (/^pearsheet:\/\/join\?/.test(url)) setJoining(url)
-    else if (/^pearsheet:\/\/seeder\?/.test(url)) setSeeder(url)
-    else if (/^pearsheet:\/\/link\?/.test(url)) setDevices({ link: url })
+    if (/^pearoffice:\/\/join\?/.test(url)) setJoining(url)
+    else if (/^pearoffice:\/\/seeder\?/.test(url)) setSeeder(url)
+    else if (/^pearoffice:\/\/link\?/.test(url)) setDevices({ link: url })
   }
 
   async function create () {
@@ -170,7 +170,7 @@ export function App () {
       <aside className='sidebar' onClick={(e) => { if (e.target.closest('button')) setNavOpen(false) }}>
         <div className='brand'>
           <span className='brand-mark' aria-hidden='true' />
-          PearSheet
+          PearOffice
         </div>
         <button className='new-sheet' onClick={create}><Plus size={16} /> New sheet</button>
         <button className='join-sheet' onClick={() => setJoining('')}><LinkSimple size={16} /> Join with a link</button>

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>PearSheet Seeder</title>
+<title>PearOffice Seeder</title>
 <link rel="stylesheet" href="fonts.css">
 <style>
   :root {
@@ -57,12 +57,12 @@
 </head>
 <body>
 <main>
-  <h1>PearSheet Seeder</h1>
+  <h1>PearOffice Seeder</h1>
   <p class="muted center">Keeps your shared sheets online when every device is off. It stores them encrypted and cannot read them.</p>
 
   <form class="card" id="login" hidden>
     <h2 style="margin-top:0">Enter the password</h2>
-    <p class="muted small center">On Umbrel it is shown next to PearSheet Seeder in your apps. Elsewhere it is in the seeder's log and in its data folder.</p>
+    <p class="muted small center">On Umbrel it is shown next to PearOffice Seeder in your apps. Elsewhere it is in the seeder's log and in its data folder.</p>
     <div class="link">
       <input id="password" type="password" autocomplete="current-password" aria-label="Password">
       <button class="primary" id="unlock" type="submit">Unlock</button>
@@ -83,7 +83,7 @@
   <div class="card" id="pairing" hidden>
     <h2 style="margin-top:0">Pair a device</h2>
     <div class="qr" id="qr"></div>
-    <p class="muted small center">In PearSheet, open Seeder and scan this code, or paste the link. <span id="left"></span></p>
+    <p class="muted small center">In PearOffice, open Seeder and scan this code, or paste the link. <span id="left"></span></p>
     <div class="link">
       <input id="link" readonly aria-label="Pairing link">
       <button id="copy" aria-label="Copy link"><svg class="icon" viewBox="0 0 256 256"><path id="copy-icon" d="M216,32H88a8,8,0,0,0-8,8V80H40a8,8,0,0,0-8,8V216a8,8,0,0,0,8,8H168a8,8,0,0,0,8-8V176h40a8,8,0,0,0,8-8V40A8,8,0,0,0,216,32ZM160,208H48V96H160Zm48-48H176V88a8,8,0,0,0-8-8H96V48H208Z"/></svg></button>

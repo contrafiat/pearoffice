@@ -1,4 +1,4 @@
-# PearSheet
+# PearOffice
 
 Private, peer-to-peer shared spreadsheets. No accounts, no servers, no cloud.
 Share a sheet with family or a small team and edit it together, device to
@@ -14,7 +14,7 @@ for the decisions made so far.
 ## Why P2P
 
 Excel, Google Sheets, Proton, Collabora and OnlyOffice all share and co-edit
-through a server. PearSheet syncs edits directly between the people sharing a
+through a server. PearOffice syncs edits directly between the people sharing a
 sheet. An optional blind seeder (an always-on device you own) keeps an
 encrypted copy so collaborators do not need to be online at the same time, and
 it cannot read the sheets it holds.

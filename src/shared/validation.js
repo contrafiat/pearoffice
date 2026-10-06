@@ -136,7 +136,7 @@ function fromSerial (kind, n) {
   return String(n)
 }
 
-// A worksheet's XML -> [{ range, ...rule }] for the kinds PearSheet has.
+// A worksheet's XML -> [{ range, ...rule }] for the kinds PearOffice has.
 function fromXlsx (xml) {
   const out = []
   const kindOf = Object.fromEntries(Object.entries(XLSX_TYPE).map(([k, v]) => [v, k]))

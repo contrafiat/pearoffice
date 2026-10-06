@@ -66,7 +66,7 @@ test('presence between members, and nothing for anyone else', async (t) => {
     const fromStranger = connTo(owner, stranger)
     const fromEditor = connTo(owner, editor)
     const hello = (who, { device = who.swarm.keyPair.publicKey, at = Date.now(), identity = who.identity.publicKey } = {}) =>
-      ({ t: 'hello', ...signValue({ purpose: 'pearsheet/presence/v1', sheetId, identity: hex(identity), device: hex(device), at }, who.identity.secretKey) })
+      ({ t: 'hello', ...signValue({ purpose: 'pearoffice/presence/v1', sheetId, identity: hex(identity), device: hex(device), at }, who.identity.secretKey) })
     const check = (ch, msg) => owner.presence._checkHello(ch, sheetId, msg)
     assert.equal(await check(fromEditor, hello(editor)), true, 'the real editor passes')
     assert.equal(await check(fromStranger, hello(stranger)), false, 'signed properly, but not a member')

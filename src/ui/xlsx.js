@@ -14,7 +14,7 @@ import { writePref } from './prefs.js'
 import { borderCss, fontPx, FONTS } from './cellStyle.js'
 
 const MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-export const isMobile = () => !!(window.pearsheet && window.pearsheet.platform === 'mobile')
+export const isMobile = () => !!(window.pearoffice && window.pearoffice.platform === 'mobile')
 
 function importWorkbook (wb, name, bytes) {
   const { tabs, names } = workbookToTabs(XLSX, wb)
@@ -34,7 +34,7 @@ function importWorkbook (wb, name, bytes) {
       try {
         const v = await call('sheet:view', { sheetId: r.sheetId })
         ranges.forEach((box, i) => {
-          if (box && v.tabs[i]) writePref('pearsheet:filter:' + r.sheetId + ':' + v.tabs[i].id, JSON.stringify({ r1: box.s.r + 1, c1: box.s.c + 1, c2: box.e.c + 1, cols: {} }))
+          if (box && v.tabs[i]) writePref('pearoffice:filter:' + r.sheetId + ':' + v.tabs[i].id, JSON.stringify({ r1: box.s.r + 1, c1: box.s.c + 1, c2: box.e.c + 1, cols: {} }))
         })
       } catch {}
     }
@@ -73,7 +73,7 @@ export async function pickAndImport () {
 export async function exportSheet (sheetId) {
   const dump = await call('sheet:dump', { sheetId })
   const bytes = workbookBytes(XLSX, fflate, dump)
-  const name = (dump.title || 'PearSheet').replace(/[\\/:*?"<>|]/g, ' ') + '.xlsx'
+  const name = (dump.title || 'PearOffice').replace(/[\\/:*?"<>|]/g, ' ') + '.xlsx'
   if (isMobile()) {
     let bin = ''
     for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000))
@@ -99,7 +99,7 @@ function usedBlock (view) {
   return { rows, cols, at }
 }
 
-const fileName = (s) => String(s || 'PearSheet').replace(/[\\/:*?"<>|]/g, ' ')
+const fileName = (s) => String(s || 'PearOffice').replace(/[\\/:*?"<>|]/g, ' ')
 
 // What the cells show, comma-separated, with a byte order mark so Excel
 // reads it as UTF-8.

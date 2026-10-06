@@ -1,9 +1,9 @@
 // The bridge the web UI talks through. The mobile WebView will expose the same
-// `window.pearsheet` shape, so the UI never knows which shell it runs in.
+// `window.pearoffice` shape, so the UI never knows which shell it runs in.
 
 const { contextBridge, ipcRenderer } = require('electron')
 
-contextBridge.exposeInMainWorld('pearsheet', {
+contextBridge.exposeInMainWorld('pearoffice', {
   call: (method, args) => ipcRenderer.invoke('worklet:call', method, args),
   on: (event, fn) => {
     const listener = (_e, msg) => { if (msg.name === event) fn(msg.data) }

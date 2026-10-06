@@ -13,7 +13,7 @@ execFileSync(process.execPath, [path.join(root, 'scripts', 'build-worklet.js')],
 execFileSync(process.execPath, [path.join(root, 'scripts', 'build-seeder.js')], { stdio: 'inherit' })
 require(path.join(root, 'scripts', 'bare.js')).barePath() // fixes the execute bit
 
-const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pearsheet-smoke-'))
+const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pearoffice-smoke-'))
 const electron = require(path.join(__dirname, 'node_modules', 'electron'))
 const shot = process.argv[2] ? path.resolve(process.argv[2]) : ''
 const args = [__dirname]
@@ -22,7 +22,7 @@ const args = [__dirname]
 if (process.platform === 'linux') args.unshift('--no-sandbox', '--disable-gpu')
 
 const child = spawn(electron, args, {
-  env: { ...process.env, PEARSHEET_SMOKE: '1', PEARSHEET_DATA: dataDir, PEARSHEET_SMOKE_SHOT: shot },
+  env: { ...process.env, PEAROFFICE_SMOKE: '1', PEAROFFICE_DATA: dataDir, PEAROFFICE_SMOKE_SHOT: shot },
   stdio: ['ignore', 'pipe', 'inherit']
 })
 let out = ''

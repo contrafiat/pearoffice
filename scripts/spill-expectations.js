@@ -1,11 +1,11 @@
 // Recalculates the spill corpus (test/fixtures/spill-corpus.js) in
 // LibreOffice and writes the blocks it gives to
-// test/fixtures/spill-expected.json, then lists where PearSheet differs.
+// test/fixtures/spill-expected.json, then lists where PearOffice differs.
 // Needs `soffice`. Usage: node scripts/spill-expectations.js [lift]
 // With `lift`, the same for test/fixtures/lift-corpus.js, where every
 // answer must be two cells (a column of two).
 //
-// Each formula is written as a dynamic array over the block PearSheet
+// Each formula is written as a dynamic array over the block PearOffice
 // spills, so LibreOffice computes the same block. A block of a different
 // size in LibreOffice shows up as #N/A padding or missing values.
 
@@ -21,7 +21,7 @@ const { toFile } = require('../src/shared/xlsxMap')
 const { xlfn } = require('./xlfn')
 
 const root = path.join(__dirname, '..')
-const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pearsheet-spill-'))
+const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pearoffice-spill-'))
 const src = path.join(dir, corpus + '.xlsx')
 const ours = runSpillCorpus(corpus)
 // The lift corpus checks the shape too: every answer is a column of two.
@@ -71,6 +71,6 @@ const sameBlock = (a, b) => a.length === b.length && a.every((line, i) => line.l
 let same = 0
 for (const [a1, { formula, libreoffice }] of Object.entries(expected)) {
   if (sameBlock(ours[a1], libreoffice)) same++
-  else console.log(a1 + '  ' + formula + '\n  pearsheet   ' + JSON.stringify(ours[a1]) + '\n  libreoffice ' + JSON.stringify(libreoffice))
+  else console.log(a1 + '  ' + formula + '\n  pearoffice   ' + JSON.stringify(ours[a1]) + '\n  libreoffice ' + JSON.stringify(libreoffice))
 }
 console.log(same + ' of ' + cases.length + ' match ' + version)

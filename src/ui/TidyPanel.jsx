@@ -36,7 +36,7 @@ export function TidyPanel ({ sheetId, title, onDone, onClose, onError }) {
           <strong>{title || 'This sheet'}</strong> keeps every change ever made to it
           {history ? <> ({history.updates.toLocaleString()} so far)</> : null}. Tidying up keeps only the sheet as it is now, so every device uses less space and new people join faster.
         </p>
-        <p className='muted small'>Everyone stays in the sheet and their devices follow by themselves. Undo history starts again. PearSheet also does this by itself once a sheet passes 50,000 changes.</p>
+        <p className='muted small'>Everyone stays in the sheet and their devices follow by themselves. Undo history starts again. PearOffice also does this by itself once a sheet passes 50,000 changes.</p>
         {blocked && <p className='small'>An invite link for this sheet has not been used yet, and tidying up would stop it working. Cancel it in Share first, or wait until it has been used.</p>}
         <div className='row end'>
           <button onClick={onClose}>Not now</button>

@@ -1,4 +1,4 @@
-// Converting between SheetJS workbooks and PearSheet sheets. Pure functions;
+// Converting between SheetJS workbooks and PearOffice sheets. Pure functions;
 // the SheetJS library is passed in, so the UI can use its bundled copy and
 // tests can use Node's.
 //
@@ -27,7 +27,7 @@ const MAX_IMPORT_CELLS = 200000
 
 // In .xlsx files, functions newer than Excel 2007 carry an _xlfn. prefix and
 // the first dynamic-array functions also _xlws. (spilling formulas,
-// proposals/2026-10-04-spilling-formulas.md). PearSheet stores plain names.
+// proposals/2026-10-04-spilling-formulas.md). PearOffice stores plain names.
 const XLWS = new Set(['FILTER', 'SORT'])
 const XLFN = new Set(['ANCHORARRAY', 'SORTBY', 'UNIQUE', 'SEQUENCE', 'TEXTSPLIT', 'TAKE', 'DROP', 'VSTACK', 'HSTACK', 'TOCOL', 'TOROW',
   'CHOOSEROWS', 'CHOOSECOLS', 'WRAPROWS', 'WRAPCOLS', 'EXPAND', 'RANDARRAY', 'XLOOKUP', 'XMATCH', 'TEXTBEFORE', 'TEXTAFTER'])
@@ -40,7 +40,7 @@ const SPILL_REF = /((?:'(?:[^']|'')+'|[A-Za-z_][\w.]*)!)?(\$?[A-Za-z]{1,3}\$?\d+
 const ANCHOR = /ANCHORARRAY\(((?:'(?:[^']|'')+'|[A-Za-z_][\w.]*)!)?(\$?[A-Za-z]{1,3}\$?\d+)\)/gi
 const toFile = (f) => mapNames(f, (p) => p.replace(SPILL_REF, (m, sheet, cell) => 'ANCHORARRAY(' + (sheet || '') + cell + ')').replace(/\b([A-Z][A-Z0-9.]*)\(/g, (m, name) => (XLWS.has(name) ? '_xlfn._xlws.' + name + '(' : XLFN.has(name) ? '_xlfn.' + name + '(' : m)))
 const fromFile = (f) => mapNames(f, (p) => p.replace(/_xl(fn|ws)\./gi, '').replace(ANCHOR, (m, sheet, cell) => (sheet || '') + cell + '#'))
-// Excel's error codes. PearSheet's own #CIRCULAR! has none; Excel recomputes
+// Excel's error codes. PearOffice's own #CIRCULAR! has none; Excel recomputes
 // formula cells on open anyway.
 const ERROR_CODES = { '#NULL!': 0x00, '#DIV/0!': 0x07, '#VALUE!': 0x0F, '#REF!': 0x17, '#NAME?': 0x1D, '#NUM!': 0x24, '#N/A': 0x2A }
 const NUMBERISH = /^[+-]?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?$/i
@@ -100,7 +100,7 @@ function workbookToTabs (XLSX, wb) {
       else continue // 'z' stub cells
       const num = cell.z && cell.z !== 'General' ? String(cell.z) : undefined
       cells.push(num ? [row, col, input, num] : [row, col, input])
-      if (++total > MAX_IMPORT_CELLS) throw new Error('This file has more than ' + MAX_IMPORT_CELLS + ' cells, which is more than PearSheet can import for now')
+      if (++total > MAX_IMPORT_CELLS) throw new Error('This file has more than ' + MAX_IMPORT_CELLS + ' cells, which is more than PearOffice can import for now')
     }
     const widths = {}
     for (const [i, w] of (ws['!cols'] || []).entries()) {

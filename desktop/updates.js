@@ -1,36 +1,36 @@
 // Update checks for the desktop app (proposals/2026-10-05-update-checker.md).
 // The checking and installing live in @peerloom/host, copied into vendor/ by
-// scripts/vendor-peerloom-host.js; this file gives them PearSheet's names and
+// scripts/vendor-peerloom-host.js; this file gives them PearOffice's names and
 // tells the app how to restart.
 //
-// Off in development runs and the smoke test unless PEARSHEET_UPDATE_LATEST_URL
+// Off in development runs and the smoke test unless PEAROFFICE_UPDATE_LATEST_URL
 // points at a test release (scripts/serve-local-release.js), and off with
-// PEARSHEET_NO_UPDATE_CHECK=1 or inside a container.
+// PEAROFFICE_NO_UPDATE_CHECK=1 or inside a container.
 
 const { createUpdateChecker } = require('./vendor/peerloom-host/update-check')
 const { UpdateApplier } = require('./vendor/peerloom-host/update-apply')
 
 const CONFIG = {
-  name: 'PearSheet',
-  slug: 'pearsheet',
-  repo: 'peerloomllc/pearsheet-releases',
-  envPrefix: 'PEARSHEET',
+  name: 'PearOffice',
+  slug: 'pearoffice',
+  repo: 'peerloomllc/pearoffice-releases',
+  envPrefix: 'PEAROFFICE',
   // The names electron-builder gives them (desktop/package.json).
   assets: {
-    win32: /^PearSheet-Setup-.*\.exe$/i,
+    win32: /^PearOffice-Setup-.*\.exe$/i,
     darwinArm64: /-mac-arm64\.dmg$/i,
     darwinX64: /-mac-x64\.dmg$/i,
-    appImage: /^pearsheet-.*\.AppImage$/i,
-    deb: /^pearsheet-.*\.deb$/i
+    appImage: /^pearoffice-.*\.AppImage$/i,
+    deb: /^pearoffice-.*\.deb$/i
   },
-  mac: { appBundle: 'PearSheet.app', teamId: 'G79ALD29NA', daemonPlist: null, hostArgv: null },
+  mac: { appBundle: 'PearOffice.app', teamId: 'G79ALD29NA', daemonPlist: null, hostArgv: null },
   linux: { unit: null, debHelper: null },
   // electron-builder's one-click installer: silent, then start the new version.
   windows: { service: null, installerArgs: ['/S', '--force-run'] }
 }
 
 // A minute after start, then hourly.
-const FIRST_DELAY_MS = Number(process.env.PEARSHEET_UPDATE_DELAY_MS || 60 * 1000)
+const FIRST_DELAY_MS = Number(process.env.PEAROFFICE_UPDATE_DELAY_MS || 60 * 1000)
 
 // An AppImage runs from a mount that goes away when it exits, so Electron's
 // own relaunch (a helper inside that mount) never starts the new file. A
@@ -50,13 +50,13 @@ function relaunch (app) {
     if (kept) env[k] = kept
   }
   const fs = require('node:fs')
-  const out = process.env.PEARSHEET_DEBUG ? fs.openSync(require('node:path').join(require('node:os').tmpdir(), 'pearsheet-relaunch.log'), 'a') : 'ignore'
+  const out = process.env.PEAROFFICE_DEBUG ? fs.openSync(require('node:path').join(require('node:os').tmpdir(), 'pearoffice-relaunch.log'), 'a') : 'ignore'
   const { spawn } = require('node:child_process')
   spawn('/bin/sh', ['-c', 'for f in /proc/$$/fd/*; do n=${f##*/}; [ "$n" -gt 2 ] 2>/dev/null && eval "exec $n>&-"; done; while kill -0 "$0" 2>/dev/null; do sleep 0.3; done; sleep 1; exec "$@"', String(process.pid), image, ...process.argv.slice(1)], { detached: true, stdio: ['ignore', out, out], env }).unref()
 }
 
 function startUpdates ({ app, log, onChange }) {
-  const testing = !!process.env.PEARSHEET_UPDATE_LATEST_URL
+  const testing = !!process.env.PEAROFFICE_UPDATE_LATEST_URL
   if (!app.isPackaged && !testing) return null
   const { checker, reason } = createUpdateChecker({
     config: CONFIG,

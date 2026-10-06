@@ -18,18 +18,18 @@ const HEX64 = /^[0-9a-f]{64}$/
 const HEX32 = /^[0-9a-f]{32}$/
 
 const P = {
-  member: 'pearsheet/member/v1',
-  device: 'pearsheet/device/v1',
-  invite: 'pearsheet/invite/v1',
-  cancel: 'pearsheet/invite-cancel/v1',
-  join: 'pearsheet/join/v1',
-  role: 'pearsheet/role/v1',
-  name: 'pearsheet/name/v1',
-  avatar: 'pearsheet/avatar/v1',
-  seeder: 'pearsheet/seeder/v1',
-  seederOff: 'pearsheet/seeder-off/v1',
-  move: 'pearsheet/move/v1',
-  delete: 'pearsheet/delete/v1'
+  member: 'pearoffice/member/v1',
+  device: 'pearoffice/device/v1',
+  invite: 'pearoffice/invite/v1',
+  cancel: 'pearoffice/invite-cancel/v1',
+  join: 'pearoffice/join/v1',
+  role: 'pearoffice/role/v1',
+  name: 'pearoffice/name/v1',
+  avatar: 'pearoffice/avatar/v1',
+  seeder: 'pearoffice/seeder/v1',
+  seederOff: 'pearoffice/seeder-off/v1',
+  move: 'pearoffice/move/v1',
+  delete: 'pearoffice/delete/v1'
 }
 
 const hex = (buf) => b4a.toString(buf, 'hex')
@@ -210,15 +210,15 @@ function cleanName (name) {
 
 function inviteLink ({ sheetId, groupKey, inviteId, seed, owner, role }) {
   const q = new URLSearchParams({ s: sheetId, t: groupKey, i: inviteId, k: b64url(seed), o: owner, r: role, v: '1' })
-  return 'pearsheet://join?' + q.toString()
+  return 'pearoffice://join?' + q.toString()
 }
 
 function parseInviteLink (link) {
-  const m = /^pearsheet:\/\/join\?(.+)$/.exec(String(link).trim())
-  if (!m) throw new Error('That is not a PearSheet invite link')
+  const m = /^pearoffice:\/\/join\?(.+)$/.exec(String(link).trim())
+  if (!m) throw new Error('That is not a PearOffice invite link')
   const q = new URLSearchParams(m[1])
   const out = { sheetId: q.get('s'), groupKey: q.get('t'), inviteId: q.get('i'), seed: q.get('k') ? fromB64url(q.get('k')) : null, owner: q.get('o'), role: q.get('r'), v: q.get('v') }
-  if (out.v !== '1') throw new Error('This invite needs a newer version of PearSheet')
+  if (out.v !== '1') throw new Error('This invite needs a newer version of PearOffice')
   if (!out.sheetId || !HEX64.test(out.groupKey || '') || !HEX32.test(out.inviteId || '') || !out.seed || out.seed.length !== 32 || !HEX64.test(out.owner || '')) {
     throw new Error('This invite link is damaged')
   }

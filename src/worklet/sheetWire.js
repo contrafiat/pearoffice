@@ -1,4 +1,4 @@
-// Autobase apply rules for PearSheet ops (wire protocol proposal, section 4).
+// Autobase apply rules for PearOffice ops (wire protocol proposal, section 4).
 //
 // Membership ops live in membership.js. `y` carries one Yjs update and is
 // accepted only from a device whose identity is an owner or editor.

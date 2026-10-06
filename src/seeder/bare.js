@@ -1,4 +1,4 @@
-// PearSheet seeder, run with the Bare runtime:
+// PearOffice seeder, run with the Bare runtime:
 //
 //   bare seeder.bundle --data <folder>          interactive: prints the key and a
 //                                               pairing link with a QR code; type
@@ -34,7 +34,7 @@ if (!dataDir || (forgetIndex !== -1 && !/^[0-9a-f]{64}$/.test(forgetOnStart || '
 
 const fs = require('bare-fs')
 const send = (obj) => fs.writeSync(1, JSON.stringify(obj) + '\n')
-const say = ipc ? (line) => send({ event: 'log', data: line }) : (line) => console.log('[pearsheet-seeder] ' + line)
+const say = ipc ? (line) => send({ event: 'log', data: line }) : (line) => console.log('[pearoffice-seeder] ' + line)
 
 async function main () {
   const seeder = await createSeeder({ dataDir, log: say })
@@ -78,7 +78,7 @@ async function main () {
     say('seeder key ' + b4a.toString(seeder.seederKey, 'hex'))
     const show = () => {
       const { link, expiresAt } = seeder.openPairing()
-      say('pair a device within 5 minutes: scan this, or paste the link in PearSheet > Seeder')
+      say('pair a device within 5 minutes: scan this, or paste the link in PearOffice > Seeder')
       console.log(toTerminal(link))
       console.log(link)
       say('window closes at ' + new Date(expiresAt).toISOString())
@@ -118,6 +118,6 @@ async function main () {
 }
 
 main().catch((err) => {
-  console.error('[pearsheet-seeder] failed:', err && err.message)
+  console.error('[pearoffice-seeder] failed:', err && err.message)
   Bare.exit(1)
 })

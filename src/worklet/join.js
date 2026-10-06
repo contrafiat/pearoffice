@@ -1,4 +1,4 @@
-// The join handshake, Protomux channel `pearsheet/join/1` (wire protocol
+// The join handshake, Protomux channel `pearoffice/join/1` (wire protocol
 // proposal, section 5). The invite link never contains the encryption key. A
 // member hands it over only after checking the invite.
 //
@@ -25,8 +25,8 @@ const { topicForKey } = require('@peerloom/core/swarm')
 const { defaultEncodeInvite } = require('@peerloom/core/engine')
 const m = require('./membership')
 
-const PROTOCOL = 'pearsheet/join/1'
-const REQUEST_PURPOSE = 'pearsheet/join-request/v1'
+const PROTOCOL = 'pearoffice/join/1'
+const REQUEST_PURPOSE = 'pearoffice/join-request/v1'
 const CLAIM_RESEND_MS = 3000
 // Hyperswarm looks a topic up once and then waits minutes before looking
 // again. A joiner that looked before any member had announced would sit idle,

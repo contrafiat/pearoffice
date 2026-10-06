@@ -1,5 +1,5 @@
 // Who has a sheet open, and which cell they are on: Protomux channel
-// `pearsheet/presence/1` (proposals/2026-10-05-presence.md). Kept in memory
+// `pearoffice/presence/1` (proposals/2026-10-05-presence.md). Kept in memory
 // only; nothing here is stored.
 //
 //   hello  { t, sheetId, identity, device, at, sig }   once, when the channel opens
@@ -16,8 +16,8 @@ const c = require('compact-encoding')
 const b4a = require('b4a')
 const { signValue, verifyValueWithSigner } = require('@peerloom/core/records')
 
-const PROTOCOL = 'pearsheet/presence/1'
-const PURPOSE = 'pearsheet/presence/v1'
+const PROTOCOL = 'pearoffice/presence/1'
+const PURPOSE = 'pearoffice/presence/v1'
 const HELLO_MAX_AGE_MS = 10 * 60 * 1000
 const SEND_EVERY_MS = 250 // at most 4 states a second
 const HEARTBEAT_MS = 20000

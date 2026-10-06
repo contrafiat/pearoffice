@@ -26,5 +26,5 @@ test('a mistyped or unknown word is caught', () => {
   ;[swapped[3], swapped[4]] = [swapped[4], swapped[3]]
   assert.throws(() => phraseToSeed(swapped.join(' ')), /do not check out/)
   assert.throws(() => phraseToSeed(words.slice(0, 23).join(' ')), /24 words/)
-  assert.throws(() => phraseToSeed([...words.slice(0, 23), 'pearsheet'].join(' ')), /Word 24/)
+  assert.throws(() => phraseToSeed([...words.slice(0, 23), 'pearoffice'].join(' ')), /Word 24/)
 })

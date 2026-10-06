@@ -1,4 +1,4 @@
-// Two PearSheet engines over a local DHT testnet: create, invite, join,
+// Two PearOffice engines over a local DHT testnet: create, invite, join,
 // concurrent edits on both sides, convergence, restart.
 
 const test = require('node:test')

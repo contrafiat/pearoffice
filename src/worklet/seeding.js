@@ -208,7 +208,7 @@ function createSeeding ({ engine, log = () => {} }) {
     return results
   }
 
-  // One request to a seeder on `pearsheet/seeder/1`, over a direct connection.
+  // One request to a seeder on `pearoffice/seeder/1`, over a direct connection.
   function ask (seederKey, request, timeoutMs = 20000) {
     return new Promise((resolve, reject) => {
       const socket = engine.swarm.dht.connect(b4a.from(seederKey, 'hex'), { keyPair: engine.swarm.keyPair })

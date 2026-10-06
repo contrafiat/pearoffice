@@ -2,7 +2,7 @@
 # Build and smoke-test the macOS desktop app on the Mac Mini over SSH.
 #
 # Syncs this repo and ../peerloom-core to an isolated folder on the Mac
-# (~/peerloomllc/pearsheet-build, so other apps' copies are untouched),
+# (~/peerloomllc/pearoffice-build, so other apps' copies are untouched),
 # installs, stages the resources for darwin-<arch>, runs electron-builder,
 # runs the packaged smoke test there and copies the dmg and zip back to
 # desktop/dist/.
@@ -17,7 +17,7 @@ set -euo pipefail
 
 ARCH="${1:-arm64}"
 MAC="${MAC_MINI_HOST:-Tims-Mac-mini.local}"
-REMOTE="peerloomllc/pearsheet-build"
+REMOTE="peerloomllc/pearoffice-build"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RSYNC_PATH="/opt/homebrew/bin/rsync"
 
@@ -25,19 +25,19 @@ ssh -o BatchMode=yes -o ConnectTimeout=6 "$MAC" exit || { echo "cannot reach $MA
 
 EXCLUDES=(--exclude node_modules --exclude dist --exclude 'desktop/dist' --exclude 'desktop/build/resources' --exclude '.git' --exclude 'spikes/*/tmp' --exclude 'spikes/*/pack')
 echo "==> sync source"
-ssh -o BatchMode=yes "$MAC" "mkdir -p ~/$REMOTE/pearsheet ~/$REMOTE/peerloom-core"
-rsync -a --delete --rsync-path="$RSYNC_PATH" "${EXCLUDES[@]}" "$ROOT/" "$MAC:$REMOTE/pearsheet/"
+ssh -o BatchMode=yes "$MAC" "mkdir -p ~/$REMOTE/pearoffice ~/$REMOTE/peerloom-core"
+rsync -a --delete --rsync-path="$RSYNC_PATH" "${EXCLUDES[@]}" "$ROOT/" "$MAC:$REMOTE/pearoffice/"
 rsync -a --delete --rsync-path="$RSYNC_PATH" --exclude node_modules --exclude .git "$ROOT/../peerloom-core/" "$MAC:$REMOTE/peerloom-core/"
 
 echo "==> install, stage, build on the Mac ($ARCH, SIGN=${SIGN:-0})"
-ssh -o BatchMode=yes "$MAC" "zsh -lc 'cd ~/$REMOTE/pearsheet && ARCH=$ARCH BUILD_VERSION=${BUILD_VERSION:-} SIGN=${SIGN:-0} NOTARY_PROFILE=${NOTARY_PROFILE:-pearcircle-seeder-notary} ./scripts/mac-build-desktop.sh'"
+ssh -o BatchMode=yes "$MAC" "zsh -lc 'cd ~/$REMOTE/pearoffice && ARCH=$ARCH BUILD_VERSION=${BUILD_VERSION:-} SIGN=${SIGN:-0} NOTARY_PROFILE=${NOTARY_PROFILE:-pearcircle-seeder-notary} ./scripts/mac-build-desktop.sh'"
 
 echo "==> packaged smoke on the Mac"
 APP_DIR=$([ "$ARCH" = "arm64" ] && echo mac-arm64 || echo mac)
-ssh -o BatchMode=yes "$MAC" "zsh -lc 'cd ~/$REMOTE/pearsheet && node scripts/smoke-packaged.js desktop/dist/$APP_DIR/PearSheet.app/Contents/MacOS/PearSheet /tmp/pearsheet-mac-smoke.png'"
+ssh -o BatchMode=yes "$MAC" "zsh -lc 'cd ~/$REMOTE/pearoffice && node scripts/smoke-packaged.js desktop/dist/$APP_DIR/PearOffice.app/Contents/MacOS/PearOffice /tmp/pearoffice-mac-smoke.png'"
 
 echo "==> copy installers back"
 mkdir -p "$ROOT/desktop/dist"
-scp -q "$MAC:$REMOTE/pearsheet/desktop/dist/*.dmg" "$MAC:$REMOTE/pearsheet/desktop/dist/*.zip" "$ROOT/desktop/dist/"
-scp -q "$MAC:/tmp/pearsheet-mac-smoke.png" "$ROOT/desktop/dist/mac-smoke-$ARCH.png" || true
+scp -q "$MAC:$REMOTE/pearoffice/desktop/dist/*.dmg" "$MAC:$REMOTE/pearoffice/desktop/dist/*.zip" "$ROOT/desktop/dist/"
+scp -q "$MAC:/tmp/pearoffice-mac-smoke.png" "$ROOT/desktop/dist/mac-smoke-$ARCH.png" || true
 ls -la "$ROOT/desktop/dist/" | grep -E 'mac|dmg'

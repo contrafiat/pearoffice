@@ -28,7 +28,7 @@ async function main () {
 
   require('./build-worklet')
   const bundle = path.join(root, 'dist', 'worklet', 'worklet.bundle')
-  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pearsheet-bare-'))
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pearoffice-bare-'))
   const proc = spawn(bare, [bundle], { stdio: ['pipe', 'pipe', 'inherit'] })
   let buf = ''
   let nextId = 1
@@ -75,7 +75,7 @@ async function main () {
 
 async function seederCheck (bare) {
   require('./build-seeder')
-  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pearsheet-seeder-'))
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pearoffice-seeder-'))
   const proc = spawn(bare, [path.join(root, 'dist', 'seeder', 'seeder.bundle'), '--data', dataDir], { stdio: ['pipe', 'pipe', 'inherit'] })
   let out = ''
   try {
@@ -83,7 +83,7 @@ async function seederCheck (bare) {
       const t = setTimeout(() => reject(new Error('seeder did not print a pairing link')), 30000)
       proc.stdout.on('data', (d) => {
         out += d
-        if (/pearsheet:\/\/seeder\?rv=/.test(out) && !out.includes('status-asked')) {
+        if (/pearoffice:\/\/seeder\?rv=/.test(out) && !out.includes('status-asked')) {
           out += 'status-asked'
           proc.stdin.write('status\n')
         }
@@ -104,7 +104,7 @@ async function dashboardCheck () {
   const arch = process.arch === 'arm64' ? 'arm64' : 'amd64'
   execFileSync(process.execPath, [path.join(root, 'scripts', 'stage-umbrel.js'), arch], { stdio: 'inherit' })
   const app = path.join(root, 'dist', 'umbrel', arch)
-  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pearsheet-dashboard-'))
+  const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pearoffice-dashboard-'))
   const env = { ...process.env, SEEDER_DATA: dataDir, SEEDER_PORT: '0', SEEDER_PASSWORD: 'test-pass', SEEDER_BARE: path.join(app, 'bare'), SEEDER_BUNDLE: path.join(app, 'seeder', 'seeder.bundle') }
   const proc = spawn(process.execPath, [path.join(app, 'seeder-dist', 'umbrel', 'server.js')], { env, stdio: ['ignore', 'pipe', 'inherit'] })
   try {
@@ -125,7 +125,7 @@ async function dashboardCheck () {
     }
     const post = (url, body) => get(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body || {}) })
     const check = (ok, what) => { if (!ok) throw new Error('dashboard: ' + what) }
-    check((await get('/')).text.includes('PearSheet Seeder'), 'page')
+    check((await get('/')).text.includes('PearOffice Seeder'), 'page')
     check((await get('/fonts.css')).text.includes('Manrope'), 'font')
     check((await get('/api/status')).status === 401, 'status needs the password')
     check((await post('/api/pair')).status === 401, 'pairing needs the password')
@@ -135,7 +135,7 @@ async function dashboardCheck () {
     cookie = login.setCookie.split(';')[0]
     check(JSON.parse((await get('/api/status')).text).pairedDevices === 0, 'status')
     const pair = JSON.parse((await post('/api/pair')).text)
-    check(/^pearsheet:\/\/seeder\?rv=/.test(pair.link) && pair.svg.startsWith('<svg') && pair.expiresAt > pair.now, 'pairing')
+    check(/^pearoffice:\/\/seeder\?rv=/.test(pair.link) && pair.svg.startsWith('<svg') && pair.expiresAt > pair.now, 'pairing')
     check(JSON.parse((await get('/api/status')).text).pairing.link === pair.link, 'pairing in status')
     check((await get('/api/devices')).text === '[]', 'devices')
     const forget = await post('/api/forget', { deviceKey: 'abcdef0123' })

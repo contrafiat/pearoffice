@@ -348,7 +348,7 @@ function toXlsx (rules, dxfId) {
 }
 
 // A worksheet's XML -> [{ range, ...rule }] in priority order, for the
-// kinds PearSheet has. dxfs: the workbook's dxf styles in order.
+// kinds PearOffice has. dxfs: the workbook's dxf styles in order.
 function fromXlsx (xml, dxfs) {
   const found = []
   for (const m of String(xml).matchAll(/<conditionalFormatting\s[^>]*?sqref="([^"]+)"[^>]*>([\s\S]*?)<\/conditionalFormatting>/g)) {

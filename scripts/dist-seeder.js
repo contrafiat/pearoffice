@@ -1,5 +1,5 @@
 // Build the headless seeder download for Linux:
-//   dist/seeder-pkg/pearsheet-seeder-<version>-linux-<arch>.tar.gz
+//   dist/seeder-pkg/pearoffice-seeder-<version>-linux-<arch>.tar.gz
 // for x64 and arm64, each with the Bare runtime, the seeder bundle and its
 // native addons, a launcher, a systemd unit and a README. Then runs the x64
 // one from a scratch folder to check it starts and prints a pairing link.
@@ -16,12 +16,12 @@ fs.rmSync(outDir, { recursive: true, force: true })
 fs.mkdirSync(outDir, { recursive: true })
 for (const arch of ['x64', 'arm64']) {
   const host = 'linux-' + arch
-  const name = 'pearsheet-seeder-' + version + '-' + host
+  const name = 'pearoffice-seeder-' + version + '-' + host
   const dir = path.join(outDir, name)
   fs.mkdirSync(dir, { recursive: true })
   seederPayload(arch, dir)
-  for (const f of ['pearsheet-seeder', 'pearsheet-seeder.service', 'README.md']) fs.copyFileSync(path.join(root, 'seeder-dist', f), path.join(dir, f))
-  fs.chmodSync(path.join(dir, 'pearsheet-seeder'), 0o755)
+  for (const f of ['pearoffice-seeder', 'pearoffice-seeder.service', 'README.md']) fs.copyFileSync(path.join(root, 'seeder-dist', f), path.join(dir, f))
+  fs.chmodSync(path.join(dir, 'pearoffice-seeder'), 0o755)
   // The launcher's update command compares this with the latest release.
   fs.writeFileSync(path.join(dir, 'VERSION'), version + '\n')
   execFileSync('tar', ['czf', name + '.tar.gz', name], { cwd: outDir })
@@ -36,15 +36,15 @@ for (const arch of ['x64', 'arm64']) {
 if (process.arch === 'x64' && process.platform === 'linux') {
   const { serveRelease } = require('./serve-local-release')
   const crypto = require('crypto')
-  const name = 'pearsheet-seeder-' + version + '-linux-x64'
+  const name = 'pearoffice-seeder-' + version + '-linux-x64'
   const next = version.replace(/\d+$/, (n) => String(Number(n) + 1))
-  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'pearsheet-seeder-pkg-'))
+  const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'pearoffice-seeder-pkg-'))
   const unpack = (into) => { fs.mkdirSync(into, { recursive: true }); execFileSync('tar', ['xzf', path.join(outDir, name + '.tar.gz')], { cwd: into }); return path.join(into, name) }
   const fail = (what) => { console.error('not ok - ' + what); process.exit(1) }
 
   // The fake release: this build, relabelled as the next version.
   const releaseDir = path.join(scratch, 'release')
-  const nextName = 'pearsheet-seeder-' + next + '-linux-x64'
+  const nextName = 'pearoffice-seeder-' + next + '-linux-x64'
   fs.renameSync(unpack(path.join(scratch, 'build')), path.join(scratch, 'build', nextName))
   fs.writeFileSync(path.join(scratch, 'build', nextName, 'VERSION'), next + '\n')
   fs.mkdirSync(releaseDir)
@@ -54,18 +54,18 @@ if (process.arch === 'x64' && process.platform === 'linux') {
 
   ;(async () => {
     const server = await serveRelease({ version: next, dir: releaseDir })
-    const env = { ...process.env, PEARSHEET_UPDATE_LATEST_URL: 'http://127.0.0.1:' + server.address().port + '/latest', PEARSHEET_UPDATE_DELAY: '0' }
-    delete env.PEARSHEET_NO_UPDATE_CHECK
+    const env = { ...process.env, PEAROFFICE_UPDATE_LATEST_URL: 'http://127.0.0.1:' + server.address().port + '/latest', PEAROFFICE_UPDATE_DELAY: '0' }
+    delete env.PEAROFFICE_NO_UPDATE_CHECK
     writeSum(digest)
     try {
       const app = unpack(path.join(scratch, 'run'))
       await new Promise((resolve) => {
-        const proc = spawn(path.join(app, 'pearsheet-seeder'), [], { env: { ...env, PEARSHEET_SEEDER_DATA: path.join(scratch, 'data') }, stdio: ['pipe', 'pipe', 'inherit'] })
+        const proc = spawn(path.join(app, 'pearoffice-seeder'), [], { env: { ...env, PEAROFFICE_SEEDER_DATA: path.join(scratch, 'data') }, stdio: ['pipe', 'pipe', 'inherit'] })
         let out = ''
         const timer = setTimeout(() => { proc.kill(); fail('packaged seeder did not print a pairing link and the update notice:\n' + out) }, 30000)
         proc.stdout.on('data', (d) => {
           out += d
-          if (/pearsheet:\/\/seeder\?rv=/.test(out) && /▀|▄|█/.test(out) && out.includes('PearSheet seeder ' + next + ' is out')) {
+          if (/pearoffice:\/\/seeder\?rv=/.test(out) && /▀|▄|█/.test(out) && out.includes('PearOffice seeder ' + next + ' is out')) {
             clearTimeout(timer)
             proc.kill()
             resolve()
@@ -75,7 +75,7 @@ if (process.arch === 'x64' && process.platform === 'linux') {
       console.log('ok - packaged seeder (linux-x64) starts, prints a pairing link and QR code and says ' + next + ' is out')
 
       const run = (dir) => new Promise((resolve) => {
-        const p = spawn(path.join(dir, 'pearsheet-seeder'), ['update'], { env })
+        const p = spawn(path.join(dir, 'pearoffice-seeder'), ['update'], { env })
         let out = ''
         p.stdout.on('data', (d) => { out += d })
         p.on('exit', (code) => resolve({ code, out }))

@@ -1,0 +1,18 @@
+# systemd user service for the PearOffice seeder.
+#   mkdir -p ~/.config/systemd/user && cp pearoffice-seeder.service ~/.config/systemd/user/
+#   edit ExecStart if you unpacked somewhere other than ~/pearoffice-seeder
+#   systemctl --user daemon-reload && systemctl --user enable --now pearoffice-seeder
+#   loginctl enable-linger "$USER"     (keeps it running when you are logged out)
+# Pairing code: journalctl --user -u pearoffice-seeder, or run it once by hand.
+[Unit]
+Description=PearOffice seeder (stores encrypted sheet data, cannot read it)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=%h/pearoffice-seeder/pearoffice-seeder
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

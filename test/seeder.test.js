@@ -55,7 +55,7 @@ test('blind seeder', async (t) => {
 
   await t.test('pairing with the link lists the seeder in the sheet for every member', async () => {
     const { link } = seeder.openPairing()
-    assert.match(link, /^pearsheet:\/\/seeder\?/)
+    assert.match(link, /^pearoffice:\/\/seeder\?/)
     const r = await call(A, 'seeder:pair', { link })
     assert.equal(r.seederKey, hex(seeder.seederKey))
     assert.ok(seeder.isPaired(A.swarm.keyPair.publicKey))
