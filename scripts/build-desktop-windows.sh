@@ -24,10 +24,12 @@ ssh -o BatchMode=yes -o ConnectTimeout=6 "$WIN" exit || { echo "cannot reach $WI
 TAR=$(mktemp --suffix=.tar.gz)
 trap 'rm -f "$TAR"' EXIT
 echo "==> pack source"
-tar -czf "$TAR" -C "$ROOT/.." \
-  --exclude='node_modules' --exclude='pearoffice/dist' --exclude='pearoffice/desktop/dist' \
-  --exclude='pearoffice/desktop/build/resources' --exclude='pearoffice/spikes' --exclude='.git' \
-  pearoffice peerloom-core
+# Packed as pearoffice/ whatever this checkout's folder is called.
+HERE="$(basename "$ROOT")"
+tar -czf "$TAR" -C "$ROOT/.." --transform "s|^$HERE|pearoffice|" \
+  --exclude='node_modules' --exclude="$HERE/dist" --exclude="$HERE/desktop/dist" \
+  --exclude="$HERE/desktop/build/resources" --exclude="$HERE/spikes" --exclude='.git' \
+  "$HERE" peerloom-core
 scp -q "$TAR" "$WIN:$DIR.tar.gz"
 
 echo "==> install, stage, build, smoke on the VM"

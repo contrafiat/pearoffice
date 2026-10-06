@@ -208,6 +208,25 @@ function createSeeding ({ engine, log = () => {} }) {
     return results
   }
 
+  // A keep request that is retried a few times if the seeder cannot be
+  // reached yet; the drop it cancels is DROP_GRACE_MS away.
+  // Resolves after the first try, whatever its outcome.
+  function keepInBackground (bootstrap, seederKey, tries = [0, 10000, 30000]) {
+    return new Promise((resolve) => {
+      const attempt = (i) => setTimeout(() => {
+        if (closed) return resolve()
+        requestKeep({ bootstrap, seederKeys: [seederKey] }).then((rs) => {
+          resolve()
+          const failed = rs.find((r) => r.error)
+          if (!failed) return
+          if (i + 1 < tries.length) attempt(i + 1)
+          else log('keep request to ' + seederKey.slice(0, 8) + ' failed: ' + failed.error)
+        }, () => resolve())
+      }, tries[i])
+      attempt(0)
+    })
+  }
+
   // One request to a seeder on `pearoffice/seeder/1`, over a direct connection.
   function ask (seederKey, request, timeoutMs = 20000) {
     return new Promise((resolve, reject) => {
@@ -266,9 +285,10 @@ function createSeeding ({ engine, log = () => {} }) {
     if (!base) throw new Error('No such sheet')
     if (!(await pairedSeeders()).includes(seederKey)) throw new Error('This device is not paired with that seeder')
     await engine.append(sheetId, m.seederOp({ sheetId, identity: engine.identity, seederKey }))
-    // Listed again: cancel the drop that taking it off scheduled.
-    await requestKeep({ bootstrap: hex(base.key), seederKeys: [seederKey] })
-    await sweep()
+    // Listed again: cancel the drop that taking it off scheduled, then
+    // register with it. In the background: reaching the seeder can take
+    // longer than the UI waits, and nothing the person sees depends on it.
+    keepInBackground(hex(base.key), seederKey).then(() => sweep()).catch(() => {})
   }
 
   // Stop using a seeder on this device: take it off every sheet where we may,
