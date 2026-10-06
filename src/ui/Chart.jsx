@@ -9,6 +9,7 @@ import { SVGRenderer } from 'echarts/renderers'
 import { chartOption, themeColors } from './chartOption.js'
 import { call } from './bridge.js'
 import { isMobile } from './xlsx.js'
+import { useThemeVersion } from './theme.js'
 
 echarts.use([BarChart, LineChart, PieChart, ScatterChart, RadarChart, CandlestickChart, TitleComponent, TooltipComponent, LegendComponent, GridComponent, RadarComponent, SVGRenderer])
 
@@ -17,6 +18,7 @@ export function ChartView ({ chart, width, height }) {
   const el = useRef(null)
   const inst = useRef(null)
   const ok = chart.resolved && !chart.resolved.error
+  useThemeVersion() // redraw in the new colours
   useEffect(() => {
     if (!ok || !el.current) return
     if (!inst.current) inst.current = echarts.init(el.current, null, { renderer: 'svg', width, height })

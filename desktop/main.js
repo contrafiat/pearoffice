@@ -14,6 +14,10 @@ const { installMenuEntry } = require('./appimage')
 
 const SMOKE = !!process.env.PEARSHEET_SMOKE
 
+// The smoke test keeps the page's storage (zoom, theme) in its throwaway
+// folder too, so one run cannot leave settings for the next.
+if (SMOKE && process.env.PEARSHEET_DATA) app.setPath('userData', path.join(process.env.PEARSHEET_DATA, 'electron'))
+
 // One running copy per data folder: the worklet holds a lock on its store.
 if (!SMOKE && !app.requestSingleInstanceLock()) app.exit(0)
 

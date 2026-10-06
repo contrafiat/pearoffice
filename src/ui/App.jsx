@@ -8,7 +8,10 @@ import { importFile, pickAndImport, isMobile } from './xlsx.js'
 import { Avatar, MemberAvatar } from './Avatar.jsx'
 import { SettingsPanel } from './SettingsPanel.jsx'
 import { UpdateBar } from './UpdateBar.jsx'
+import { applyTheme } from './theme.js'
 import { FileArrowUp, GearSix, LinkSimple, List, Plus } from '@phosphor-icons/react'
+
+applyTheme()
 
 // Import a file (.xlsx, .csv or .json): a file input on desktop, the shell's
 // file picker on phones.

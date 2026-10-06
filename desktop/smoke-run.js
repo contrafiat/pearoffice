@@ -657,6 +657,20 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
     result.importedFormats = true
     step('import')
 
+    // Zoom (bottom right) and Ctrl 0; the theme setting.
+    await js("document.querySelector('.zoom [aria-label=\"Zoom in\"]').click()")
+    await waitFor('zoomed in', "document.querySelector('.zoom-level').textContent === '110%' && document.querySelector('.grid').style.getPropertyValue('--row-h') === '26px'")
+    await sendMod('0', ['control'])
+    await waitFor('zoom reset', "document.querySelector('.zoom-level').textContent === '100%'")
+    await openSettings()
+    await js("[...document.querySelectorAll('.theme-choice button')].find((b) => b.textContent.trim() === 'Dark').click()")
+    await waitFor('dark theme', "document.documentElement.dataset.theme === 'dark' && getComputedStyle(document.documentElement).getPropertyValue('--paper').trim() === '#171a17'")
+    await js("[...document.querySelectorAll('.theme-choice button')].find((b) => b.textContent.trim() === 'System').click()")
+    await waitFor('system theme', '!document.documentElement.dataset.theme')
+    await js("document.querySelector('.panel .close').click()")
+    result.zoomTheme = true
+    step('zoom and theme')
+
     // The Seeder and Devices panels reach the engine (seeder: and link: calls).
     await openSettings()
     await js("document.querySelector('.panel .settings-seeder').click()")

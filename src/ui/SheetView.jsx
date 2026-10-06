@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { call, on } from './bridge.js'
-import { Grid } from './Grid.jsx'
+import { Grid, MIN_ZOOM, MAX_ZOOM } from './Grid.jsx'
 import { colName } from './a1.js'
 import { changeDecimals, jumpTarget, todaySerial } from './cellTools.js'
 import { SIZES, borderCss, fitWidth } from './cellStyle.js'
@@ -22,13 +22,14 @@ import { ChartPanel } from './ChartPanel.jsx'
 import { ChartView, downloadChart, chartSvg } from './Chart.jsx'
 import { guessChart } from '../shared/charts.js'
 import { readPref, writePref } from './prefs.js'
-import { ArrowCounterClockwise, ArrowClockwise, TextB, TextItalic, TextAUnderline, PaintBucket, Copy, Scissors, ClipboardText, Eraser, Numpad, FileXls, DotsThree, Plus, MagnifyingGlass, X, ChartBar, PencilSimple, DownloadSimple, Trash, TextUnderline, TextStrikethrough, TextAlignLeft, TextAlignCenter, TextAlignRight, ArrowUDownLeft, FrameCorners, AlignTop, AlignCenterVertical, AlignBottom, ArrowsOutLineHorizontal, UserPlus } from '@phosphor-icons/react'
+import { Minus, ArrowCounterClockwise, ArrowClockwise, TextB, TextItalic, TextAUnderline, PaintBucket, Copy, Scissors, ClipboardText, Eraser, Numpad, FileXls, DotsThree, Plus, MagnifyingGlass, X, ChartBar, PencilSimple, DownloadSimple, Trash, TextUnderline, TextStrikethrough, TextAlignLeft, TextAlignCenter, TextAlignRight, ArrowUDownLeft, FrameCorners, AlignTop, AlignCenterVertical, AlignBottom, ArrowsOutLineHorizontal, UserPlus } from '@phosphor-icons/react'
 import { DeletePanel } from './DeletePanel.jsx'
 import { TidyPanel } from './TidyPanel.jsx'
 import { FormulaHelp, helpFor, insertFunction } from './FormulaHelp.jsx'
 import { exportSheet, exportCsv, printTab, isMobile } from './xlsx.js'
 
 const COLOURS = ['#1f2420', '#b3261e', '#c2410c', '#a16207', '#15803d', '#0e7490', '#1d4ed8', '#7e22ce']
+const ZOOM_STEPS = [0.5, 0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5]
 const FILLS = ['#fee2e2', '#ffedd5', '#fef3c7', '#dcfce7', '#cffafe', '#dbeafe', '#ede9fe', '#e5e7eb']
 
 // The clipboard as text: rows split by newlines, cells by tabs.
@@ -136,6 +137,25 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
   const [numPad, setNumPadState] = useState(() => readPref('pearsheet:numpad') === '1')
   const setZoom = (z) => { setZoomState(z); writePref('pearsheet:zoom', String(Math.round(z * 100) / 100)) }
   const setNumPad = (on) => { setNumPadState(on); writePref('pearsheet:numpad', on ? '1' : '0') }
+  // The zoom buttons and Ctrl +, - and 0 step through these.
+  const zoomStep = (dir) => {
+    const z = dir > 0 ? ZOOM_STEPS.find((x) => x > zoom + 0.001) : [...ZOOM_STEPS].reverse().find((x) => x < zoom - 0.001)
+    if (z) setZoom(Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z)))
+  }
+  const zoomKeys = useRef(null)
+  zoomKeys.current = (e) => {
+    if (!(e.ctrlKey || e.metaKey) || e.altKey) return
+    if (e.key === '=' || e.key === '+') zoomStep(1)
+    else if (e.key === '-' || e.key === '_') zoomStep(-1)
+    else if (e.key === '0') setZoom(1)
+    else return
+    e.preventDefault()
+  }
+  useEffect(() => {
+    const keys = (e) => zoomKeys.current(e)
+    window.addEventListener('keydown', keys, true)
+    return () => window.removeEventListener('keydown', keys, true)
+  }, [])
   // Changed in Settings while this sheet is open.
   useEffect(() => {
     const onPref = (e) => { if (e.detail && e.detail.key === 'pearsheet:numpad') setNumPadState(e.detail.value === '1') }
@@ -1057,7 +1077,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
         sel={sel}
         editing={editing}
         zoom={zoom}
-        onZoom={isMobile() ? setZoom : null}
+        onZoom={setZoom}
         inputMode={numPad ? 'decimal' : undefined}
         range={range}
         spillBox={spillBox}
@@ -1401,6 +1421,11 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
             <span>Count <b>{totals.count}</b></span>
           </span>
         )}
+        <span className='zoom' role='group' aria-label='Zoom'>
+          <button aria-label='Zoom out' title='Zoom out (Ctrl -)' disabled={zoom <= MIN_ZOOM + 0.001} onClick={() => zoomStep(-1)}><Minus size={14} /></button>
+          <button className='zoom-level' title='Back to 100% (Ctrl 0)' onClick={() => setZoom(1)}>{Math.round(zoom * 100)}%</button>
+          <button aria-label='Zoom in' title='Zoom in (Ctrl +)' disabled={zoom >= MAX_ZOOM - 0.001} onClick={() => zoomStep(1)}><Plus size={14} /></button>
+        </span>
       </footer>
     </div>
   )
