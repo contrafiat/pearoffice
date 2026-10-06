@@ -797,6 +797,9 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 .doc-body h2 { font-size: 16pt; font-weight: 600; margin: 18pt 0 6pt; }
 .doc-body h3 { font-size: 14pt; font-weight: 600; margin: 16pt 0 4pt; color: var(--muted); }
 .doc-body > :first-child { margin-top: 0; }
+/* The others' text cursors and selections, in their colour with the sheet's name tag. */
+.doc-caret { position: relative; margin: 0 -1px; border-left: 2px solid var(--who); pointer-events: none; user-select: none; }
+.doc-caret .presence-tag { font-style: normal; font-weight: normal; font-size: 11px; line-height: 16px; text-decoration: none; z-index: 2; }
 .doc-body p[data-style='title'] { font-size: 26pt; font-weight: 400; margin-bottom: 3pt; line-height: 1.15; }
 .doc-body p[data-style='subtitle'] { font-size: 15pt; color: var(--muted); margin-bottom: 16pt; }
 .doc-body ul, .doc-body ol { padding-left: 1.6em; margin: 0 0 8pt; }

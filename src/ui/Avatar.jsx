@@ -90,13 +90,13 @@ export async function shrinkPicture (file) {
 // of the rest.
 // A green ring marks those with the sheet open now (present: identity ->
 // "here" or "on <tab>"); they come first.
-export function PeopleStack ({ sheetId, members, present = new Map(), max = 3, size = 26, onClick }) {
+export function PeopleStack ({ sheetId, members, present = new Map(), max = 3, size = 26, noun = 'sheet', onClick }) {
   const sorted = [...members].sort((a, b) => (present.has(b.identity) && !b.isMe) - (present.has(a.identity) && !a.isMe))
   const shown = sorted.slice(0, max)
   const rest = members.length - shown.length
   const names = sorted.map((p) => (p.isMe ? 'You' : p.name || 'Unnamed') + (present.has(p.identity) && !p.isMe ? ' (' + present.get(p.identity) + ')' : '')).join(', ')
   return (
-    <button className='people-stack' title={names} aria-label={'People in this sheet: ' + names} onClick={onClick}>
+    <button className='people-stack' title={names} aria-label={'People in this ' + noun + ': ' + names} onClick={onClick}>
       {shown.map((p) => <span key={p.identity} className={'stack-item' + (present.has(p.identity) && !p.isMe ? ' present' : '')}><MemberAvatar sheetId={sheetId} member={p} size={size} /></span>)}
       {rest > 0 && <span className='avatar more-people' style={{ width: size, height: size, fontSize: Math.round(size * 0.4) }}>+{rest}</span>}
     </button>

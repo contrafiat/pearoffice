@@ -1,10 +1,15 @@
-// Who has a sheet open, and which cell they are on: Protomux channel
-// `pearoffice/presence/1` (proposals/2026-10-05-presence.md). Kept in memory
-// only; nothing here is stored.
+// Who has a file open, and where: the cell in a sheet, the text cursor in a
+// document. Protomux channel `pearoffice/presence/1`
+// (proposals/2026-10-05-presence.md, 2026-10-06-documents.md). Kept in
+// memory only; nothing here is stored.
 //
-//   hello  { t, sheetId, identity, device, at, sig }   once, when the channel opens
-//   state  { t, open, tab, row, col, editing }          on change, and every 20 s
-//   bye    { t }                                        when the sheet is closed
+//   hello  { t, sheetId, identity, device, at, sig }    once, when the channel opens
+//   state  { t, open, tab, row, col, editing, cursor }  on change, and every 20 s
+//   bye    { t }                                         when the file is closed
+//
+// `cursor` is { anchor, head }, each a Yjs relative position
+// (Y.encodeRelativePosition) in base64. Older builds drop it (cleanState), so
+// they show a document user as here, without a cursor.
 //
 // A channel exists only while both devices have the sheet open. Neither side
 // sends a state until it has checked the other's hello: signed by a current
@@ -25,6 +30,15 @@ const SILENT_MS = 60000
 const hex = (buf) => b4a.toString(buf, 'hex')
 
 const num = (v) => (Number.isInteger(v) && v > 0 && v < 1e7 ? v : null)
+const CURSOR_MAX = 256
+const pos = (v) => (typeof v === 'string' && v.length > 0 && v.length <= CURSOR_MAX && /^[A-Za-z0-9+/]+={0,2}$/.test(v) ? v : null)
+
+function cleanCursor (c) {
+  if (!c || typeof c !== 'object') return null
+  const anchor = pos(c.anchor)
+  const head = pos(c.head)
+  return anchor && head ? { anchor, head } : null
+}
 
 function cleanState (s) {
   return {
@@ -32,7 +46,8 @@ function cleanState (s) {
     tab: s && typeof s.tab === 'string' ? s.tab.slice(0, 64) : null,
     row: num(s && s.row),
     col: num(s && s.col),
-    editing: !!(s && s.editing)
+    editing: !!(s && s.editing),
+    cursor: cleanCursor(s && s.cursor)
   }
 }
 
@@ -70,7 +85,7 @@ function createPresence ({ engine, emit, log = () => {}, now = () => Date.now() 
     const out = []
     for (const ch of channels.get(sheetId) || []) {
       if (!ch.peer || !ch.state || !ch.state.open) continue
-      out.push({ identity: ch.peer.identity, device: ch.peer.device, tab: ch.state.tab, row: ch.state.row, col: ch.state.col, editing: ch.state.editing })
+      out.push({ identity: ch.peer.identity, device: ch.peer.device, tab: ch.state.tab, row: ch.state.row, col: ch.state.col, editing: ch.state.editing, cursor: ch.state.cursor })
     }
     return out
   }
@@ -215,4 +230,4 @@ function createPresence ({ engine, emit, log = () => {}, now = () => Date.now() 
   return { onConnection, set, list, recheck, close, _checkHello: checkHello }
 }
 
-module.exports = { createPresence, PROTOCOL }
+module.exports = { createPresence, cleanState, PROTOCOL }
