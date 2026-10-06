@@ -57,7 +57,12 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
     await waitFor('sheet list', "!!document.querySelector('.new-sheet') && !document.querySelector('.sheet-list .muted')?.textContent.includes('Starting')", 60000)
     step('ui loaded')
 
+    // New asks the kind; only spreadsheets exist so far.
     await js("document.querySelector('.new-sheet').click()")
+    await waitFor('kind choices', "document.querySelectorAll('.kind-choice').length === 3")
+    if (process.env.PEAROFFICE_SMOKE_NEW_SHOT) fs.writeFileSync(process.env.PEAROFFICE_SMOKE_NEW_SHOT, (await wc.capturePage()).toPNG())
+    result.kinds = await js("[...document.querySelectorAll('.kind-choice')].map((b) => b.querySelector('.kind-label').textContent + (b.disabled ? ' (soon)' : '')).join(', ')")
+    await js("document.querySelector('.kind-choice.kind-sheet').click()")
     await waitFor('grid', "!!document.querySelector('.grid .body') && !!document.querySelector('.selection')")
     // Let the new sheet settle, then make sure the grid has focus.
     await sleep(500)
@@ -782,15 +787,23 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
 
     // Remove the open sheet from this device: it leaves the list.
     await js("document.querySelector('.panel .close').click()")
-    result.sheetsBefore = await js("document.querySelectorAll('.sheet-link').length")
+    result.sheetsBefore = await js("document.querySelectorAll('.sheet-link:not(.all-files)').length")
     await js("document.querySelector('.toolbar .more-button').click()")
     await waitFor('more menu', "[...document.querySelectorAll('.more-menu li')].some((l) => l.textContent.trim() === 'Delete for everyone')")
     await js("[...document.querySelectorAll('.more-menu li')].find((l) => l.textContent.trim() === 'Remove from this device').click()")
     await waitFor('confirm', "[...document.querySelectorAll('.panel button')].some((b) => b.textContent.trim() === 'Remove')")
     await js("[...document.querySelectorAll('.panel button')].find((b) => b.textContent.trim() === 'Remove').click()")
-    await waitFor('sheet removed', "!document.querySelector('.panel') && document.querySelectorAll('.sheet-link').length === " + (result.sheetsBefore - 1), 30000)
-    result.sheetsAfter = await js("document.querySelectorAll('.sheet-link').length")
+    await waitFor('sheet removed', "!document.querySelector('.panel') && document.querySelectorAll('.sheet-link:not(.all-files)').length === " + (result.sheetsBefore - 1), 30000)
+    result.sheetsAfter = await js("document.querySelectorAll('.sheet-link:not(.all-files)').length")
     step('removed from this device')
+
+    // With nothing open, the start screen lists every file with its kind.
+    await waitFor('file list', "!!document.querySelector('.files-home') && document.querySelectorAll('.file-card').length === " + result.sheetsAfter)
+    if (process.env.PEAROFFICE_SMOKE_HOME_SHOT) { await sleep(300); fs.writeFileSync(process.env.PEAROFFICE_SMOKE_HOME_SHOT, (await wc.capturePage()).toPNG()) }
+    result.fileIcons = await js("document.querySelectorAll('.file-card .kind-icon.kind-sheet').length")
+    await js("document.querySelector('.file-card').click()")
+    await waitFor('opened from the list', "!!document.querySelector('.grid .body')")
+    step('file list')
 
     await sleep(300)
     const shot = process.env.PEAROFFICE_SMOKE_SHOT
@@ -799,7 +812,7 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
       fs.writeFileSync(shot, image.toPNG())
       step('screenshot', shot)
     }
-    result.ok = result.moreChartTypes && result.importedFormats && result.keepOnline && result.avatar && result.spill && result.quickWins && result.findSort && result.fill && result.charts && result.formats && result.csvPdf && result.tabs && result.tidied && result.jsonImport && result.csvImport && result.suggested === 'SUBSTITUTE,SUBTOTAL,SUM' && result.argHelp === 'number1' && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.importedFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000 && result.pastedFormula === '=SUM(C1:C2)' && result.inviteLink.startsWith('pearoffice://join?s=') && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
+    result.ok = result.kinds === 'Spreadsheet, Document (soon), Slides (soon)' && result.fileIcons === result.sheetsAfter && result.moreChartTypes && result.importedFormats && result.keepOnline && result.avatar && result.spill && result.quickWins && result.findSort && result.fill && result.charts && result.formats && result.csvPdf && result.tabs && result.tidied && result.jsonImport && result.csvImport && result.suggested === 'SUBSTITUTE,SUBTOTAL,SUM' && result.argHelp === 'number1' && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.importedFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000 && result.pastedFormula === '=SUM(C1:C2)' && result.inviteLink.startsWith('pearoffice://join?s=') && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
   } catch (err) {
     result.error = err.message
     // What the page showed, to tell a UI failure from a load failure.
