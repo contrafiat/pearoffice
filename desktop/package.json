@@ -38,6 +38,7 @@
       "updates.js",
       "vendor/**",
       "smoke-run.js",
+      "smoke/**",
       "package.json",
       "build/icon.png"
     ],
