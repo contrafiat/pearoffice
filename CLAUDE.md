@@ -100,7 +100,7 @@ Code that works for any kind of file sits apart from each editor's own
   WebView provide. Built to `dist/ui` by `scripts/build-ui.mjs`.
 - `desktop/` - the Electron shell: `main.js` starts the worklet bundle with
   the bare-runtime binary and relays IPC, `preload.js` is the bridge,
-  `smoke.js` + `smoke-run.js` are the offscreen smoke test. Has its own
+  `smoke.js`, `smoke-run.js` and `smoke/` are the offscreen smoke test. Has its own
   `package.json` (Electron): `npm install --prefix desktop`.
 - `src/seeder/` - the blind seeder: `seeder.js` (blind-peer plus the rule
   that it stores only sheets a paired device registered), `protocol.js`
@@ -244,10 +244,23 @@ builds are signed and notarized; Linux and Windows builds are unsigned
   The formula corpus must match the golden file bit for bit, and the worklet
   bundle must create, edit and read a sheet over stdin/stdout, and the seeder
   bundle must start and print a pairing link.
-- `npm run smoke:desktop`: launches Electron with an offscreen window and a
-  throwaway data folder, creates a sheet through the UI, types with real key
-  events and checks formula, bold, undo and rename. About 15 s. Skipped (with
-  a message) when there is no display.
+- `npm run smoke:desktop`: drives the real UI in Electron with an offscreen
+  window and real key and mouse events, in four parts. Each part is its own
+  launch with a throwaway data folder and a 60 s limit, and prints one
+  `ok`/`not ok` line, then a summary line. `sheets` is the grid editor
+  (typing, formulas, spilling, fill, charts, copy and paste, undo, zoom; about
+  21 s). `sheet-files` is cell formats, filters, comments, validation, colour
+  rules and names, then .xlsx, .csv, .json and PDF out, tabs, tidy up and
+  .json, .csv and .xlsx in (about 32 s). `docs` is documents (about 9 s).
+  `app` is the shell: the New picker, theme, Seeder and Devices panels, the
+  local seeder, keep online, start at login, profile picture, About, sharing,
+  backups, removing a file and the file list (about 16 s). The parts are in
+  `desktop/smoke/<part>.js`, `desktop/smoke-run.js` picks one from
+  `PEAROFFICE_SMOKE_PART` and `desktop/smoke/launch.js` runs them in turn.
+  Run one with `node desktop/smoke.js --part docs` (a comma list works).
+  `node scripts/smoke-packaged.js <app executable>` runs the same parts
+  against an installed app (120 s limit each). Skipped (with a message) when
+  there is no display.
 
 `test/functions.test.js` checks 408 cases covering 373 of the engine's 389
 functions (`test/fixtures/function-corpus.js`) against LibreOffice's answers in
