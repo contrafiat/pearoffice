@@ -1,7 +1,7 @@
 import { ChartFrame } from './ChartFrame.jsx'
 import React, { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { colName } from './a1.js'
-import { textStyle, borderCss, hasBorder, neededHeight } from './cellStyle.js'
+import { textStyle, borderCss, hasBorder, neededHeight, inkOn } from './cellStyle.js'
 import { Funnel, CaretDown } from '@phosphor-icons/react'
 import { CfIcon } from './cfIcons.jsx'
 
@@ -199,10 +199,30 @@ export const Grid = forwardRef(function Grid (props, ref) {
   function onTouchEnd (e) {
     if (e.touches.length < 2) pinch.current = null
   }
-  useLayoutEffect(() => {
-    const a = anchor.current
+  // Ctrl+scroll (or a trackpad pinch, which arrives as one) zooms around
+  // the pointer.
+  useEffect(() => {
     const el = bodyRef.current
-    if (!a || !el) return
+    if (!el || !onZoom) return
+    const wheel = (e) => {
+      if (!e.ctrlKey && !e.metaKey) return
+      e.preventDefault()
+      const z = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoomRef.current * Math.exp(-e.deltaY / 300)))
+      if (Math.abs(z - zoomRef.current) < 0.01) return
+      const rect = el.getBoundingClientRect()
+      anchor.current = { x: e.clientX - rect.left, y: e.clientY - rect.top, from: zoomRef.current }
+      onZoom(Math.round(z * 100) / 100)
+    }
+    el.addEventListener('wheel', wheel, { passive: false })
+    return () => el.removeEventListener('wheel', wheel)
+  }, [onZoom])
+  const zoomRef = useRef(zoom)
+  useLayoutEffect(() => {
+    const el = bodyRef.current
+    // Zoomed from the buttons or keys: keep the top-left cell in place.
+    const a = anchor.current || { x: 0, y: 0, from: zoomRef.current }
+    zoomRef.current = zoom
+    if (!el || a.from === zoom) return
     anchor.current = null
     const k = zoom / a.from
     el.scrollLeft = (el.scrollLeft + a.x) * k - a.x
@@ -341,7 +361,7 @@ export const Grid = forwardRef(function Grid (props, ref) {
           <div
             key={r + ',' + c}
             className={cls}
-            style={{ top: rowY[r], height: m ? span(m.r1, m.r2) : rowH[r], left: colX[c], width: m ? colX[Math.min(m.c2, view.cols) + 1] - colX[c] : widths[c], color: fmt.color, background: fmt.fill }}
+            style={{ top: rowY[r], height: m ? span(m.r1, m.r2) : rowH[r], left: colX[c], width: m ? colX[Math.min(m.c2, view.cols) + 1] - colX[c] : widths[c], color: fmt.color || inkOn(fmt.fill), background: fmt.fill }}
             data-r={r}
             data-c={c}
             onMouseDown={(e) => { dragging.current = true; onSelect(r, c, e.shiftKey) }}

@@ -86,3 +86,13 @@ export function fitWidth (cells, col) {
   }
   return w ? Math.max(24, Math.min(1000, Math.ceil(w + 14))) : null
 }
+
+// Text on a filled cell with no colour of its own: dark on a light fill and
+// white on a dark one, so a pale fill stays readable in dark mode.
+export function inkOn (fill) {
+  const m = /^#([0-9a-f]{6})$/i.exec(String(fill || ''))
+  if (!m) return undefined
+  const n = parseInt(m[1], 16)
+  const lum = (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255
+  return lum > 0.6 ? '#1f2420' : lum < 0.35 ? '#ffffff' : undefined
+}

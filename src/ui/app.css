@@ -20,8 +20,9 @@
   background: var(--paper);
 }
 
+/* Dark: when the system is, unless this device picked light (theme.js). */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --paper: #171a17;
     --panel: #1e221e;
     --ink: #e6e8e3;
@@ -38,6 +39,24 @@
     --banner: #3a1f1d;
   }
 }
+:root[data-theme="dark"] {
+  --paper: #171a17;
+  --panel: #1e221e;
+  --ink: #e6e8e3;
+  --muted: #9aa198;
+  --line: #2d322c;
+  --line-strong: #3d443c;
+  --head: #232823;
+  --head-on: #2f3d27;
+  --pear: #8bc061;
+  --pear-dark: #a6d47f;
+  --pear-soft: #26331f;
+  --error: #ff8a80;
+  --danger: #ff8a80;
+  --banner: #3a1f1d;
+  color-scheme: dark;
+}
+:root[data-theme="light"] { color-scheme: light; }
 
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; margin: 0; }
@@ -397,6 +416,7 @@ button, input, select { font: inherit; color: inherit; }
 .stop-using { flex-basis: 100%; display: flex; flex-direction: column; gap: 6px; }
 .stop-using p { margin: 0; }
 .tools.phone-row button.on { background: var(--pear-soft); border-color: var(--pear); color: var(--pear-dark); }
+.theme-choice button.on { background: var(--pear-soft); border-color: var(--pear); color: var(--pear-dark); }
 .panel .scan-button { align-self: flex-start; }
 /* A form inside a panel lays out like the panel: one thing per line. */
 .panel form.stack { display: flex; flex-direction: column; gap: 12px; }
@@ -652,3 +672,11 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 .cell .cf-icon { position: absolute; left: 4px; top: 50%; transform: translateY(-50%); display: flex; pointer-events: none; }
 .cell.has-icon { padding-left: 22px; }
 .cf-sample.icons { gap: 1px; }
+
+/* Zoom, bottom right. */
+.tabbar .zoom { flex: none; display: flex; align-items: center; gap: 2px; margin-left: auto; padding-left: 6px; }
+.tabbar .totals + .zoom { margin-left: 0; }
+.tabbar .zoom button { border: 0; background: transparent; color: var(--muted); border-radius: 6px; height: 26px; min-width: 26px; padding: 0 4px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; font-size: 12px; }
+.tabbar .zoom button:hover:not(:disabled) { background: var(--line); color: var(--ink); }
+.tabbar .zoom button:disabled { opacity: 0.4; cursor: default; }
+.tabbar .zoom .zoom-level { min-width: 42px; font-variant-numeric: tabular-nums; }

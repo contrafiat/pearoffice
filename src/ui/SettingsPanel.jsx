@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { ArrowSquareOut, Camera, CaretLeft, Devices, EnvelopeSimple, HardDrives, Trash, X } from '@phosphor-icons/react'
+import { ArrowSquareOut, Camera, CaretLeft, Desktop, Devices, EnvelopeSimple, HardDrives, Moon, Sun, Trash, X } from '@phosphor-icons/react'
 import { call } from './bridge.js'
 import { Avatar, shrinkPicture } from './Avatar.jsx'
 import { readPref, writePref } from './prefs.js'
+import { themePref, setThemePref } from './theme.js'
 
 /* global __APP_VERSION__ */
 const VERSION = typeof __APP_VERSION__ === 'string' ? __APP_VERSION__ : ''
@@ -37,6 +38,7 @@ function openUrl (url) {
 export function SettingsPanel ({ me, onMe, desktop, keepOnline, startAtLogin, onSetting, onDevices, onSeeder, onClose, onError }) {
   const [mode, setMode] = useState('settings')
   const [numPad, setNumPad] = useState(() => readPref('pearsheet:numpad') === '1')
+  const [theme, setTheme] = useState(themePref)
   const picRef = useRef(null)
   const { name, avatar, identity } = me
   const [nameDraft, setNameDraft] = useState(name || '')
@@ -142,6 +144,13 @@ export function SettingsPanel ({ me, onMe, desktop, keepOnline, startAtLogin, on
                 </label>
               </>
             )}
+
+            <h3>Appearance</h3>
+            <div className='row theme-choice' role='group' aria-label='Appearance'>
+              {[['system', 'System', Desktop], ['light', 'Light', Sun], ['dark', 'Dark', Moon]].map(([v, label, Icon]) => (
+                <button key={v} className={theme === v ? 'on' : ''} aria-pressed={theme === v} onClick={() => { setTheme(v); setThemePref(v) }}><Icon size={16} /> {label}</button>
+              ))}
+            </div>
 
             <h3>Devices</h3>
             <p className='small'>Use PearSheet on another device as the same person, and keep your recovery phrase.</p>
