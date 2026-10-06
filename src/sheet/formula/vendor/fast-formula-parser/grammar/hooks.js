@@ -184,7 +184,7 @@ class FormulaParser {
         const nullValue = this.funsNullAs0.includes(name) ? 0 : '';
 
         // PearOffice: a block given where the function takes a single value
-        // runs it once per value (Excel 365). See src/shared/formula/lift.js.
+        // runs it once per value (Excel 365). See src/sheet/formula/lift.js.
         const lift = this.liftArgs && this.liftArgs[name];
         if (lift) {
             const lifted = this._liftCall(name, args, lift, nullValue);

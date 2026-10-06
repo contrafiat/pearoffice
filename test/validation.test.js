@@ -5,9 +5,9 @@ const assert = require('node:assert/strict')
 const Y = require('yjs')
 const XLSX = require('xlsx/dist/xlsx.mini.min.js')
 const fflate = require('fflate')
-const model = require('../src/shared/sheetModel')
-const { normalize, allows, typed, ruleFor, explain } = require('../src/shared/validation')
-const { workbookBytes, workbookToTabs, validationsFromXlsx, READ_OPTIONS } = require('../src/shared/xlsxMap')
+const model = require('../src/sheet/sheetModel')
+const { normalize, allows, typed, ruleFor, explain } = require('../src/sheet/validation')
+const { workbookBytes, workbookToTabs, validationsFromXlsx, READ_OPTIONS } = require('../src/sheet/xlsxMap')
 
 const ok = (rule, raw) => allows(normalize(rule), typed(raw))
 

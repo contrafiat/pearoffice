@@ -1,11 +1,11 @@
-// Charts written into .xlsx files (src/shared/xlsxCharts.js).
+// Charts written into .xlsx files (src/sheet/xlsxCharts.js).
 // scripts/check-chart-export.js opens such a file in LibreOffice.
 
 const test = require('node:test')
 const assert = require('node:assert/strict')
 const XLSX = require('xlsx/dist/xlsx.mini.min.js')
 const fflate = require('fflate')
-const { workbookBytes } = require('../src/shared/xlsxMap')
+const { workbookBytes } = require('../src/sheet/xlsxMap')
 
 const resolved = { categories: ['Jan', 'Feb'], series: [{ name: 'Rent', values: [1200, 1250] }, { name: 'Food', values: [400, null] }] }
 const chart = (extra) => ({ id: 'c', data: 'A1:C3', labels: { row: true, col: true }, seriesIn: 'columns', anchor: { row: 5, col: 2, dx: 3, dy: 4 }, size: { w: 480, h: 300 }, resolved, ...extra })

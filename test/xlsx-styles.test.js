@@ -1,10 +1,10 @@
-// Cell styles written into .xlsx files (src/shared/xlsxStyles.js).
+// Cell styles written into .xlsx files (src/sheet/xlsxStyles.js).
 
 const test = require('node:test')
 const assert = require('node:assert/strict')
 const XLSX = require('xlsx/dist/xlsx.mini.min.js')
 const fflate = require('fflate')
-const { workbookBytes } = require('../src/shared/xlsxMap')
+const { workbookBytes } = require('../src/sheet/xlsxMap')
 
 test('formats become Excel styles, blank formatted cells included', () => {
   const dump = {

@@ -352,7 +352,7 @@ export const Grid = forwardRef(function Grid (props, ref) {
         if (merged.hidden.has(r + ',' + c)) return null
         const m = merged.top.get(r + ',' + c)
         const cell = cells.get(r + ',' + c)
-        // Conditional formatting (src/shared/condFormat.js) go over the cell's own format.
+        // Conditional formatting (src/sheet/condFormat.js) go over the cell's own format.
         const cf = cfStyles && cfStyles.get(r + ',' + c)
         const fmt = cf ? { ...((cell && cell.fmt) || {}), ...cf } : (cell && cell.fmt) || {}
         const head = filterHead && r === filterHead.row && c >= filterHead.c1 && c <= filterHead.c2

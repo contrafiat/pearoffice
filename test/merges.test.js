@@ -4,9 +4,9 @@ const test = require('node:test')
 const assert = require('node:assert/strict')
 const Y = require('yjs')
 const XLSX = require('xlsx/dist/xlsx.mini.min.js')
-const model = require('../src/shared/sheetModel')
-const { evaluateSheet } = require('../src/shared/formula')
-const { workbookToTabs, dumpToWorkbook } = require('../src/shared/xlsxMap')
+const model = require('../src/sheet/sheetModel')
+const { evaluateSheet } = require('../src/sheet/formula')
+const { workbookToTabs, dumpToWorkbook } = require('../src/sheet/xlsxMap')
 
 function sheet () {
   const doc = model.createDoc()

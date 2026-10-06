@@ -70,7 +70,7 @@ function addStyles (files, tabs, { strToU8, strFromU8 }) {
     return id
   }
 
-  // Colour rules' looks (src/shared/condFormat.js) go in <dxfs>.
+  // Colour rules' looks (src/sheet/condFormat.js) go in <dxfs>.
   const { dxfXml } = require('./condFormat')
   const dxfs = []
   const dxfIds = new Map()

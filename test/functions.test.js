@@ -28,7 +28,7 @@ test('every function matches LibreOffice or Excel', () => {
 })
 
 // The distributions and the gamma and beta functions under them
-// (src/shared/formula/precise.js) are held to 13 digits.
+// (src/sheet/formula/precise.js) are held to 13 digits.
 test('statistics functions match to 13 digits', () => {
   const got = runFunctionCorpus()
   const stats = /^=(GAMMA|BETA|CHISQ|F\.|T\.|CONFIDENCE|LOGNORM|NORM|EXPON|POISSON|BINOM|NEGBINOM|HYPGEOM|WEIBULL|GAUSS|PHI|FISHER|ERF)/

@@ -3,7 +3,7 @@
 
 import React, { useEffect, useRef, useState } from 'react'
 import { X } from '@phosphor-icons/react'
-import { call } from './bridge.js'
+import { call } from '../bridge.js'
 import { colName } from './a1.js'
 
 export function FindPanel ({ sheetId, tabId, tabs, canEdit, startWithReplace, onGo, onClose, onError }) {

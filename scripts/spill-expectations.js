@@ -17,7 +17,7 @@ const XLSX = require('xlsx')
 const corpus = process.argv[2] === 'lift' ? 'lift' : 'spill'
 const { inputs, cases } = require('../test/fixtures/' + corpus + '-corpus')
 const { runSpillCorpus } = require('../test/fixtures/spill-run')
-const { toFile } = require('../src/shared/xlsxMap')
+const { toFile } = require('../src/sheet/xlsxMap')
 const { xlfn } = require('./xlfn')
 
 const root = path.join(__dirname, '..')

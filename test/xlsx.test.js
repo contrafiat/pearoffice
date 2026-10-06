@@ -4,9 +4,9 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
 const XLSX = require('xlsx/dist/xlsx.mini.min.js')
-const model = require('../src/shared/sheetModel')
-const { evaluateSheet } = require('../src/shared/formula')
-const { workbookToTabs, dumpToWorkbook, textInput } = require('../src/shared/xlsxMap')
+const model = require('../src/sheet/sheetModel')
+const { evaluateSheet } = require('../src/sheet/formula')
+const { workbookToTabs, dumpToWorkbook, textInput } = require('../src/sheet/xlsxMap')
 
 // What the worklet's sheet:dump returns, built straight from a document.
 function dump (doc) {

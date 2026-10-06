@@ -1,5 +1,5 @@
 // CSV and tab-separated files as sheets. Pure; produces the same import
-// payload as an .xlsx (src/shared/xlsxMap.js), one tab.
+// payload as an .xlsx (src/sheet/xlsxMap.js), one tab.
 //
 // - Read as UTF-8 (a byte-order mark is dropped), so accents and emoji
 //   survive.

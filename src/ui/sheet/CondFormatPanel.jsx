@@ -4,7 +4,7 @@
 
 import React, { useState } from 'react'
 import { X, ArrowUp, ArrowDown, PencilSimple, Trash, Plus } from '@phosphor-icons/react'
-import { describe } from '../shared/condFormat.js'
+import { describe } from '../../sheet/condFormat.js'
 import { CfIcon, ICON_SETS } from './cfIcons.jsx'
 
 // Excel's own presets, so files look the same there.

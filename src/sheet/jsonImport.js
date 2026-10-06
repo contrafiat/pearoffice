@@ -1,5 +1,5 @@
 // JSON files as sheets. Pure; produces the same import payload as an .xlsx
-// (src/shared/xlsxMap.js): { tabs: [{ name, cells: [[row, col, input, numFmt?]],
+// (src/sheet/xlsxMap.js): { tabs: [{ name, cells: [[row, col, input, numFmt?]],
 // styles, widths, freeze }] }.
 //
 // - Every list of objects, at any depth, becomes a tab: one row per object,

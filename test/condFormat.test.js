@@ -7,9 +7,9 @@ const path = require('path')
 const Y = require('yjs')
 const XLSX = require('xlsx/dist/xlsx.mini.min.js')
 const fflate = require('fflate')
-const model = require('../src/shared/sheetModel')
-const { evaluate, normalize, inPeriod } = require('../src/shared/condFormat')
-const { workbookBytes, condFormatsFromXlsx } = require('../src/shared/xlsxMap')
+const model = require('../src/sheet/sheetModel')
+const { evaluate, normalize, inPeriod } = require('../src/sheet/condFormat')
+const { workbookBytes, condFormatsFromXlsx } = require('../src/sheet/xlsxMap')
 
 // Column A: rows 1..n holding the given values ('' leaves a blank).
 function column (values) {

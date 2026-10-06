@@ -1,10 +1,10 @@
-// The fill handle, Fill down/right and Ctrl+D/Ctrl+R (src/shared/fill.js).
+// The fill handle, Fill down/right and Ctrl+D/Ctrl+R (src/sheet/fill.js).
 
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const model = require('../src/shared/sheetModel')
-const { evaluateSheet } = require('../src/shared/formula')
-const { fillLine } = require('../src/shared/fill')
+const model = require('../src/sheet/sheetModel')
+const { evaluateSheet } = require('../src/sheet/formula')
+const { fillLine } = require('../src/sheet/fill')
 
 const plan = (inputs, n, opts) => fillLine(inputs.map((x) => (typeof x === 'string' ? { input: x } : x)), n, opts).map((p) => (p.input !== undefined ? p.input : '#' + p.from))
 

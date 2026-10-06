@@ -4,7 +4,7 @@ const test = require('node:test')
 const assert = require('node:assert/strict')
 const path = require('node:path')
 
-const load = () => import(path.join(__dirname, '..', 'src', 'ui', 'cellTools.js'))
+const load = () => import(path.join(__dirname, '..', 'src', 'ui', 'sheet', 'cellTools.js'))
 
 test('more and fewer decimal places', async () => {
   const { changeDecimals } = await load()

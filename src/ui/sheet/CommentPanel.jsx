@@ -4,7 +4,7 @@
 
 import React, { useEffect, useRef, useState } from 'react'
 import { X, PencilSimple, Trash, CheckCircle, ArrowCounterClockwise } from '@phosphor-icons/react'
-import { MemberAvatar, Avatar } from './Avatar.jsx'
+import { MemberAvatar, Avatar } from '../Avatar.jsx'
 
 const when = (at) => (at ? new Date(at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '')
 

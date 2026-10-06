@@ -13,8 +13,8 @@
 
 const Y = require('yjs')
 const b4a = require('b4a')
-const model = require('../shared/sheetModel')
-const { evaluateSheet } = require('../shared/formula')
+const model = require('../sheet/sheetModel')
+const { evaluateSheet } = require('../sheet/formula')
 
 const Y_PREFIX = 'y/'
 

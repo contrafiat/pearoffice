@@ -55,10 +55,18 @@ See `TODO.md`.
 
 ## Layout
 
-- `src/shared/` - runs anywhere (Bare, Node, browser): `sheetModel.js` (the
-  Yjs document), `refs.js` (A1 <-> id formula references), `formula/`
-  (evaluator, deterministic maths, formulajs fills, vendored
-  fast-formula-parser).
+Code that works for any kind of file sits apart from each editor's own
+(proposals/2026-10-06-rename-to-pearoffice.md, step 3). Documents will get
+`src/doc/` and `src/ui/doc/` the same way.
+
+- `src/shared/` - runs anywhere, for any file: `ids.js`, `phrase.js`
+  (recovery phrase), `qr.js`, Bare shims.
+- `src/sheet/` - the spreadsheet, runs anywhere (Bare, Node, browser):
+  `sheetModel.js` (the Yjs document), `refs.js` (A1 <-> id formula
+  references), `formula/` (evaluator, deterministic maths, formulajs fills,
+  vendored fast-formula-parser), charts, fill, filter, validation, colour
+  rules, .xlsx/.csv/.json import and export, and `sheetMethods.js` (the
+  sheet's IPC methods, run in the worklet).
 - `src/worklet/` - the Bare program: `bare.js` entry, `engine.js` (core
   wiring), `sheetWire.js` (apply rules), `membership.js` (signed membership
   ops, built and checked), `join.js` (the `pearoffice/join/1` handshake),
@@ -66,20 +74,22 @@ See `TODO.md`.
   `linking.js` (linking a person's devices, recovery phrase),
   `presence.js` (who has a sheet open, and their cell),
   `profiles.js` (your name and picture in every sheet),
-  `sheetMethods.js` (IPC), `sheets.js` (live documents).
-- Charts (proposals/2026-10-04-charts.md): `src/shared/charts.js` (data
+  `sheets.js` (live documents).
+- Charts (proposals/2026-10-04-charts.md): `src/sheet/charts.js` (data
   ranges, series, first guess), stored per tab in the root map
   `charts:<tabId>` (`sheetModel.js`), drawn with ECharts as SVG
-  (`src/ui/Chart.jsx`, `chartOption.js`, `ChartFrame.jsx`, `ChartPanel.jsx`).
-  .xlsx exports get DrawingML charts from `src/shared/xlsxCharts.js`;
+  (`src/ui/sheet/Chart.jsx`, `chartOption.js`, `ChartFrame.jsx`, `ChartPanel.jsx`).
+  .xlsx exports get DrawingML charts from `src/sheet/xlsxCharts.js`;
   `node scripts/check-chart-export.js [dir]` has LibreOffice open one with
   every chart type (needs `soffice`). Cell styles go into exports through
-  `src/shared/xlsxStyles.js` (SheetJS CE writes none).
-- `src/shared/jsonImport.js` turns a .json file into the same import payload
+  `src/sheet/xlsxStyles.js` (SheetJS CE writes none).
+- `src/sheet/jsonImport.js` turns a .json file into the same import payload
   as an .xlsx (a tab per list of records, the rest on a Summary tab).
-- `src/ui/` - the React spreadsheet UI. Talks only to `window.pearoffice`
-  (`call`, `on`), which the desktop preload provides and the mobile WebView
-  will provide later. Built to `dist/ui` by `scripts/build-ui.mjs`.
+- `src/ui/` - the React UI: the app shell, file list, sharing, seeder,
+  devices and settings panels. `src/ui/sheet/` is the spreadsheet editor
+  (grid, toolbar, its panels, charts, `xlsx.js` file handling). Talks only to
+  `window.pearoffice` (`call`, `on`), which the desktop preload and the mobile
+  WebView provide. Built to `dist/ui` by `scripts/build-ui.mjs`.
 - `desktop/` - the Electron shell: `main.js` starts the worklet bundle with
   the bare-runtime binary and relays IPC, `preload.js` is the bridge,
   `smoke.js` + `smoke-run.js` are the offscreen smoke test. Has its own
@@ -233,26 +243,26 @@ functions (`test/fixtures/function-corpus.js`) against LibreOffice's answers in
 where the two differ. After adding cases, run `node scripts/function-expectations.js`
 (needs `soffice`): it recalculates them in LibreOffice and lists where PearOffice
 differs. Many upstream fast-formula-parser functions are empty stubs; they are
-filled in `src/shared/formula/fills.js`; newer Excel functions (XLOOKUP,
+filled in `src/sheet/formula/fills.js`; newer Excel functions (XLOOKUP,
 XMATCH, TEXTBEFORE/AFTER, OFFSET, INDIRECT, XNPV, XIRR, DSUM and the other
-database functions) are in `src/shared/formula/newer.js`.
+database functions) are in `src/sheet/formula/newer.js`.
 
 Formulas spill (proposals/2026-10-04-spilling-formulas.md): any array result
 fills the cells below and to the right, computed on each device and never
-stored; `src/shared/formula/index.js` has the four blocking rules
+stored; `src/sheet/formula/index.js` has the four blocking rules
 (`#SPILL!`) and evaluates in reading order. The array functions (FILTER,
 SORT, UNIQUE, SEQUENCE, TEXTSPLIT, TAKE, DROP, VSTACK and the rest) are in
-`src/shared/formula/arrays.js`. `A2#` (the whole spill from A2) is rewritten
+`src/sheet/formula/arrays.js`. `A2#` (the whole spill from A2) is rewritten
 to ANCHORARRAY(A2) before parsing (proposals/2026-10-04-spill-reference.md).
 A single-value function given a range runs once per value
-(`src/shared/formula/lift.js`, proposals/2026-10-04-functions-over-ranges.md);
+(`src/sheet/formula/lift.js`, proposals/2026-10-04-functions-over-ranges.md);
 `test/lift-corpus.test.js` checks each one against LibreOffice: run
 `node scripts/spill-expectations.js lift` after changing the table. `test/spill.test.js` covers the rules;
 `test/spill-corpus.test.js` checks whole blocks
 (`test/fixtures/spill-corpus.js`) against LibreOffice: after adding cases,
 run `node scripts/spill-expectations.js`.
 
-Formula suggestions come from `src/shared/formula/catalog.js` (name, arguments
+Formula suggestions come from `src/sheet/formula/catalog.js` (name, arguments
 and one line for each of the 399 working functions); `test/catalog.test.js`
 fails if a function is added to the engine without an entry.
 
@@ -260,14 +270,14 @@ After a deliberate formula change, regenerate the golden file with
 `UPDATE_GOLDEN=1 node --test test/formula.test.js test/functions.test.js test/spill-corpus.test.js test/lift-corpus.test.js` and say why in the commit.
 
 jstat's gamma, log-gamma and incomplete beta functions are replaced at
-start-up by @stdlib's (`src/shared/formula/precise.js`), so the distributions
+start-up by @stdlib's (`src/sheet/formula/precise.js`), so the distributions
 match Excel to about 15 digits; `test/functions.test.js` holds them to 13.
 Under Bare, `debug` (pulled in by @stdlib) is swapped for a no-op
 (`scripts/bare-imports.js`).
 
 Formula code must never use `**`, and `Math.pow`, `Math.sin` and `Math.cos`
-are replaced at start-up (`src/shared/formula/detmath.js`). A test fails if a
-`**` appears under `src/shared/formula/`.
+are replaced at start-up (`src/sheet/formula/detmath.js`). A test fails if a
+`**` appears under `src/sheet/formula/`.
 
 ## The things to get right
 

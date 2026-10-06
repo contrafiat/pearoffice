@@ -241,7 +241,7 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
     for (const t0 = Date.now(); !fs.existsSync(pngFile) && Date.now() - t0 < 10000;) await sleep(200)
     await sleep(300)
     const png = fs.existsSync(pngFile) ? fs.readFileSync(pngFile) : Buffer.alloc(0)
-    // The .xlsx export carries the chart (src/shared/xlsxCharts.js).
+    // The .xlsx export carries the chart (src/sheet/xlsxCharts.js).
     await js("document.querySelector('.toolbar .export').click()")
     const chartXlsx = require('node:path').join(dataDir, 'downloads', 'Untitled sheet.xlsx')
     for (const t0 = Date.now(); !fs.existsSync(chartXlsx) && Date.now() - t0 < 10000;) await sleep(200)
@@ -613,7 +613,7 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
     step('tidy up')
 
     // A .json file: lists of records become tabs, dates become dates
-    // (src/shared/jsonImport.js).
+    // (src/sheet/jsonImport.js).
     const json = JSON.stringify({ balance: 42, bills: [{ name: 'Rent', amount: 1200, due: '2026-11-01' }, { name: 'Water', amount: 30.5, due: '2026-11-15' }] })
     await js(`(() => {
       const dt = new DataTransfer()
@@ -629,7 +629,7 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
     step('json import')
 
     // A .csv file: UTF-8 text, leading zeros kept, dates shown as dates
-    // (src/shared/csvImport.js).
+    // (src/sheet/csvImport.js).
     await js(`(() => {
       const dt = new DataTransfer()
       dt.items.add(new File([${JSON.stringify('Name,Code,Due\nCafé,007,11/15/2026\n')}], 'Codes.csv'))

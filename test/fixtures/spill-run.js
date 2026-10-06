@@ -1,8 +1,8 @@
 // Evaluates the spill corpus: { cell: block } where block is rows of
 // values ({ error } for errors), or { error } when the anchor itself is one.
-const { colToNum } = require('../../src/shared/a1')
-const model = require('../../src/shared/sheetModel')
-const { evaluateSheet } = require('../../src/shared/formula')
+const { colToNum } = require('../../src/sheet/a1')
+const model = require('../../src/sheet/sheetModel')
+const { evaluateSheet } = require('../../src/sheet/formula')
 
 function pos (a1) {
   const m = /^([A-Z]+)(\d+)$/.exec(a1)
