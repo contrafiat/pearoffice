@@ -781,6 +781,30 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 
 .doc-scroll { flex: 1; min-height: 0; overflow: auto; background: var(--head); padding: 24px 16px 48px; cursor: text; }
 .doc-page { max-width: 816px; margin: 0 auto; min-height: calc(100% - 8px); background: var(--panel); border: 1px solid var(--line); box-shadow: 0 1px 6px rgb(0 0 0 / 0.08); padding: 72px 80px; box-sizing: border-box; cursor: auto; }
+/* The outline (src/ui/doc/Outline.jsx): beside the page on desktop, a sheet on phones. */
+.doc-main { position: relative; }
+.doc-row { display: flex; flex: 1; min-height: 0; }
+.doc-row > .doc-scroll { min-width: 0; }
+.doc-outline { flex: none; width: 240px; display: flex; flex-direction: column; min-height: 0; background: var(--panel); border-right: 1px solid var(--line); }
+.doc-outline header { display: grid; grid-template-columns: 32px 1fr 32px; align-items: center; padding: 8px 8px 4px; }
+.doc-outline h2 { grid-column: 2; margin: 0; font-size: 14px; font-weight: 600; text-align: center; }
+.doc-outline .close { grid-column: 3; display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: 0; border-radius: 6px; background: none; color: var(--muted); cursor: pointer; }
+.doc-outline .close:hover { background: var(--head); color: var(--ink); }
+.outline-list { list-style: none; margin: 0; padding: 4px 8px 16px; overflow-y: auto; flex: 1; min-height: 0; }
+.outline-item { display: block; width: 100%; text-align: left; border: 0; background: none; color: var(--ink); font: inherit; font-size: 13px; padding: 6px 8px; border-radius: 6px; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.outline-item:hover { background: var(--head); }
+.outline-item.level-0 { font-weight: 600; }
+.outline-item.level-1 { font-weight: 500; }
+.outline-item.level-2 { padding-left: 22px; }
+.outline-item.level-3 { padding-left: 36px; color: var(--muted); }
+.outline-item.on { background: var(--pear-soft); color: var(--pear-dark); }
+.outline-empty { margin: 0; padding: 8px 16px; font-size: 13px; text-align: center; }
+.panel .outline-list { padding: 0; max-height: 60vh; flex: none; }
+.panel .outline-item { display: block; text-align: left; font-size: 15px; padding: 10px 12px; border: 0; background: none; border-radius: 8px; width: 100%; }
+.panel .outline-item.on { background: var(--pear-soft); }
+.panel .outline-item.level-2 { padding-left: 28px; }
+.panel .outline-item.level-3 { padding-left: 44px; }
+.doc-toast { position: absolute; left: 50%; bottom: 40px; transform: translateX(-50%); z-index: 15; max-width: calc(100% - 32px); background: var(--ink); color: var(--panel); padding: 8px 14px; border-radius: 8px; font-size: 13px; text-align: center; box-shadow: 0 6px 20px rgb(0 0 0 / 0.2); }
 .doc-footer { display: flex; justify-content: center; gap: 18px; padding: 4px 14px; font-size: 12px; color: var(--muted); background: var(--panel); border-top: 1px solid var(--line); font-variant-numeric: tabular-nums; }
 @media (max-width: 720px) {
   .doc-scroll { padding: 0; }

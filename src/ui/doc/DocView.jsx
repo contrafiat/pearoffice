@@ -10,15 +10,16 @@ import { yCursorPlugin, ySyncPluginKey, absolutePositionToRelativePosition } fro
 import { call, on } from '../bridge.js'
 import { FileBar, useMembers } from '../FileBar.jsx'
 import { colourFor } from '../Avatar.jsx'
-import { readPref } from '../prefs.js'
+import { readPref, writePref } from '../prefs.js'
 import { isMobile } from '../sheet/xlsx.js'
-import { exportDocument } from './docFiles.js'
+import { exportDocument, tidyPaste } from './docFiles.js'
+import { Outline } from './Outline.jsx'
 import { documentExtensions, FindReplace, findKey, changeCaseCommand, LINE_HEIGHTS, SIZES } from './extensions.js'
 import {
   ArrowCounterClockwise, ArrowClockwise, TextB, TextItalic, TextUnderline, TextStrikethrough, TextAUnderline, Highlighter,
   TextSuperscript, TextSubscript, TextAlignLeft, TextAlignCenter, TextAlignRight, TextAlignJustify, ArrowsDownUp,
   ListBullets, ListNumbers, ListChecks, TextOutdent, TextIndent, LinkSimple, Quotes, CodeBlock, Minus, Table,
-  TextAa, Eraser, MagnifyingGlass, CaretUp, CaretDown, X, Check
+  TextAa, Eraser, MagnifyingGlass, CaretUp, CaretDown, X, Check, TreeView
 } from '@phosphor-icons/react'
 
 // The document editor (proposals/2026-10-06-documents.md). It keeps its own
@@ -35,6 +36,8 @@ const STYLES = [['normal', 'Normal text'], ['title', 'Title'], ['subtitle', 'Sub
 const ALIGNS = [['left', 'Align left', TextAlignLeft], ['center', 'Centre', TextAlignCenter], ['right', 'Align right', TextAlignRight], ['justify', 'Justify', TextAlignJustify]]
 const SEND_MS = 300
 const CURSOR_MS = 150
+const TOAST_MS = 5000
+const OUTLINE_PREF = 'pearoffice:docOutline'
 
 function toB64 (bytes) {
   let s = ''
@@ -58,6 +61,14 @@ export function DocView ({ sheetId, onTitleChange, onError, onGone }) {
   const [finding, setFinding] = useState(false)
   const members = useMembers(sheetId)
   const phone = isMobile()
+  // The outline is remembered on desktop; on a phone it is a sheet opened
+  // when wanted.
+  const [outline, setOutline] = useState(() => !phone && readPref(OUTLINE_PREF) === '1')
+  const toggleOutline = () => {
+    if (!phone) writePref(OUTLINE_PREF, outline ? '0' : '1')
+    setOutline(!outline)
+  }
+  const editorRef = useRef(null)
   const errorRef = useRef(onError)
   errorRef.current = onError
   const goneRef = useRef(onGone)
@@ -236,6 +247,8 @@ export function DocView ({ sheetId, onTitleChange, onError, onGone }) {
           return (
             <>
               <li role='menuitem' onClick={() => setFinding(true)}>Find and replace</li>
+              <li role='menuitem' onClick={toggleOutline}>{outline ? 'Hide the outline' : 'Show the outline'}</li>
+              {canEdit && <li role='menuitem' onClick={() => editorRef.current && pastePlain(editorRef.current).catch((err) => onError(err.message))}>Paste as plain text</li>}
               <li role='menuitem' onClick={() => save('docx')}>Save as a Word file</li>
               <li role='menuitem' onClick={() => save('md')}>Save as Markdown</li>
               <li role='menuitem' onClick={() => save('txt')}>Save as plain text</li>
@@ -246,14 +259,24 @@ export function DocView ({ sheetId, onTitleChange, onError, onGone }) {
         }}
       />
       {note && <div className='banner info'>{note}</div>}
-      <DocEditor ydoc={ydoc} canEdit={canEdit} phone={phone} finding={finding} setFinding={setFinding} onBlur={() => flushRef.current()} cursors={cursors} onCursor={onCursor} />
+      <DocEditor ydoc={ydoc} canEdit={canEdit} phone={phone} finding={finding} setFinding={setFinding} outline={outline} toggleOutline={toggleOutline} editorRef={editorRef} onBlur={() => flushRef.current()} cursors={cursors} onCursor={onCursor} />
     </div>
   )
 }
 
-function DocEditor ({ ydoc, canEdit, phone, finding, setFinding, onBlur, cursors, onCursor }) {
+function DocEditor ({ ydoc, canEdit, phone, finding, setFinding, outline, toggleOutline, editorRef, onBlur, cursors, onCursor }) {
   const canEditRef = useRef(canEdit)
   canEditRef.current = canEdit
+  // A short note when a paste left something out.
+  const [toast, setToast] = useState(null)
+  const toastTimer = useRef(null)
+  useEffect(() => () => clearTimeout(toastTimer.current), [])
+  const showToast = useRef(null)
+  showToast.current = (text) => {
+    clearTimeout(toastTimer.current)
+    setToast(text)
+    toastTimer.current = setTimeout(() => setToast(null), TOAST_MS)
+  }
   const others = useMemo(() => remoteCursors(), [ydoc])
   const editor = useEditor({
     editable: canEdit,
@@ -266,10 +289,21 @@ function DocEditor ({ ydoc, canEdit, phone, finding, setFinding, onBlur, cursors
       FindReplace,
       RemoteCursors.configure({ others })
     ],
-    editorProps: { attributes: { class: 'doc-body', 'aria-label': 'Document', spellcheck: 'true' } },
+    editorProps: {
+      attributes: { class: 'doc-body', 'aria-label': 'Document', spellcheck: 'true' },
+      // Word, Google Docs, LibreOffice and web pages, tidied as an import is.
+      // A copy from a document here is already in the editor's terms.
+      transformPastedHTML: (html) => {
+        if (/data-pm-slice/.test(html)) return html
+        const t = tidyPaste(html)
+        if (t.dropped) showToast.current('Some parts of what you pasted, such as pictures, were left out.')
+        return t.html
+      }
+    },
     onBlur
   }, [ydoc])
   useEffect(() => { if (editor) editor.setEditable(canEdit) }, [editor, canEdit])
+  useEffect(() => { editorRef.current = editor }, [editor, editorRef])
 
   // The others' cursors in, this person's cursor out.
   const cursorsKey = JSON.stringify(cursors)
@@ -348,6 +382,8 @@ function DocEditor ({ ydoc, canEdit, phone, finding, setFinding, onBlur, cursors
   const onKeyDown = (e) => {
     if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'f') { e.preventDefault(); setFinding(true) }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k' && canEdit) { e.preventDefault(); setLinking(s ? s.href : '') }
+    // Ctrl+Shift+V (Cmd+Shift+V): paste as plain text.
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'v' && canEdit) { e.preventDefault(); pastePlain(editor).catch(() => {}) }
   }
 
   if (!editor || !s) return <div className='loading'>Opening document...</div>
@@ -403,6 +439,7 @@ function DocEditor ({ ydoc, canEdit, phone, finding, setFinding, onBlur, cursors
         {btn('Change case', TextAa, undefined, (e) => openMenu('case', e.currentTarget), { 'aria-haspopup': 'menu', disabled: s.empty })}
         {btn('Clear formatting', Eraser, undefined, () => editor.chain().focus().unsetAllMarks().unsetTextAlign().run())}
         {btn('Find and replace (Ctrl+F)', MagnifyingGlass, finding, () => setFinding(!finding))}
+        {btn('Outline', TreeView, outline, toggleOutline, { className: 'outline-button' + (outline ? ' on' : '') })}
       </div>
       {menu && <div className='doc-scrim' onMouseDown={() => setMenu(null)} />}
       {menu && (menu.kind === 'color' || menu.kind === 'highlight') && (
@@ -449,11 +486,15 @@ function DocEditor ({ ydoc, canEdit, phone, finding, setFinding, onBlur, cursors
       )}
       {linking !== null && canEdit && <LinkBar editor={editor} initial={linking} onClose={() => setLinking(null)} />}
       {finding && <FindBar editor={editor} canEdit={canEdit} onClose={() => { editor.commands.setFind({ query: '' }); setFinding(false) }} />}
-      <div className='doc-scroll' onMouseDown={(e) => { if (e.target === e.currentTarget) editor.commands.focus('end') }}>
-        <div className='doc-page'>
-          <EditorContent editor={editor} />
+      <div className='doc-row'>
+        {outline && <Outline editor={editor} phone={phone} onClose={toggleOutline} />}
+        <div className='doc-scroll' onMouseDown={(e) => { if (e.target === e.currentTarget) editor.commands.focus('end') }}>
+          <div className='doc-page'>
+            <EditorContent editor={editor} />
+          </div>
         </div>
       </div>
+      {toast && <div className='doc-toast' role='status'>{toast}</div>}
       <footer className='doc-footer' aria-live='polite'>
         <span className='word-count'>{s.words === 1 ? '1 word' : s.words + ' words'}</span>
         <span>{s.chars + (s.chars === 1 ? ' character' : ' characters')}</span>
@@ -524,6 +565,15 @@ const RemoteCursors = Extension.create({
     })]
   }
 })
+
+// The clipboard's text, pasted without its formatting. Read through the app
+// (desktop/main.js, mobile/App.js), which needs no permission prompt.
+async function pastePlain (editor) {
+  const { text } = await call('app:getClipboard')
+  if (!text) return
+  editor.view.focus()
+  editor.view.pasteText(text)
+}
 
 // Tab and Shift+Tab, as buttons: deeper in a list, or the paragraph's indent.
 function indent (editor) {

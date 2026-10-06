@@ -894,6 +894,31 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
     await waitFor('remote caret gone', "!document.querySelector('.doc-caret')")
     step('document')
 
+    // Paste from Google Docs (its bold wrapper and inline styles) keeps the
+    // heading, list and bold word without making it all bold; the outline
+    // lists the headings and a click moves to one.
+    const gdocs = '<meta charset="utf-8"><b style="font-weight:normal;" id="docs-internal-guid-0a1b2c3d"><h2 dir="ltr" style="line-height:1.38;margin-top:18pt;margin-bottom:6pt;"><span style="font-size:16pt;font-family:Arial,sans-serif;color:#000000;font-weight:400;">Pasted section</span></h2><p dir="ltr" style="line-height:1.38;margin-top:0pt;margin-bottom:0pt;"><span style="font-size:11pt;font-family:Arial,sans-serif;color:#000000;font-weight:400;">Plain then </span><span style="font-size:11pt;font-family:Arial,sans-serif;color:#000000;font-weight:700;">strong</span></p><ul style="margin-top:0;margin-bottom:0;"><li dir="ltr" style="list-style-type:disc;" aria-level="1"><p dir="ltr" role="presentation"><span style="font-size:11pt;font-weight:400;">Pasted item</span></p></li></ul></b>'
+    await js(`(() => {
+      const ed = document.querySelector('.doc-body').editor
+      ed.chain().insertContentAt(ed.state.doc.content.size, { type: 'paragraph' }).focus('end').run()
+      const dt = new DataTransfer()
+      dt.setData('text/html', ${JSON.stringify(gdocs)})
+      dt.setData('text/plain', 'Pasted section')
+      document.querySelector('.doc-body').dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }))
+    })()`)
+    await waitFor('pasted', "(document.querySelector('.doc-body h2') || {}).textContent === 'Pasted section' && [...document.querySelectorAll('.doc-body li')].some((l) => l.textContent === 'Pasted item')")
+    result.docPaste = await js("(() => { const b = [...document.querySelectorAll('.doc-body strong')].map((x) => x.textContent); return b.includes('strong') && !b.some((t) => /Plain|Pasted/.test(t)) })()")
+    await js("document.querySelector('.doc-tools .outline-button').click()")
+    await waitFor('outline', "[...document.querySelectorAll('.doc-outline .outline-item')].map((b) => b.textContent).join('|') === 'Weekly plan|Pasted section'")
+    await waitFor('outline follows the cursor', "(document.querySelector('.doc-outline .outline-item.on') || {}).textContent === 'Pasted section'")
+    await js("[...document.querySelectorAll('.doc-outline .outline-item')].find((b) => b.textContent === 'Weekly plan').click()")
+    await waitFor('outline click', "(document.querySelector('.doc-outline .outline-item.on') || {}).textContent === 'Weekly plan' && document.querySelector('.doc-body').editor.state.selection.$from.parent.textContent === 'Weekly plan'")
+    if (process.env.PEAROFFICE_SMOKE_OUTLINE_SHOT) { await sleep(300); fs.writeFileSync(process.env.PEAROFFICE_SMOKE_OUTLINE_SHOT, (await wc.capturePage()).toPNG()) }
+    result.docOutline = await js("document.querySelector('.doc-outline .outline-item.level-2').textContent === 'Pasted section'")
+    await js("document.querySelector('.doc-tools .outline-button').click()")
+    await waitFor('outline closed', "!document.querySelector('.doc-outline')")
+    step('document paste and outline')
+
     // A Markdown file imported as a document (src/ui/doc/docFiles.js), then
     // saved as Word, Markdown and PDF. The picture in it is left out, and
     // a notice says so.
@@ -928,7 +953,7 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
       docPdf.length > 1000 && docPdf.slice(0, 4).toString() === '%PDF'
     if (!result.docExport) throw new Error('document export: ' + JSON.stringify({ docx: docxOut.length, md: mdOut.slice(0, 200), pdf: docPdf.length }))
     step('document export')
-    result.ok = result.docImport && result.docImportNotice && result.docExport && result.about && result.donation && result.docCursors && result.kinds === 'Spreadsheet, Document, Slides (soon)' && result.docCard && result.docReopened && result.docWords === '10 words' && result.fileIcons === result.sheetsAfter && result.moreChartTypes && result.importedFormats && result.keepOnline && result.avatar && result.spill && result.quickWins && result.findSort && result.fill && result.charts && result.formats && result.csvPdf && result.tabs && result.tidied && result.jsonImport && result.csvImport && result.suggested === 'SUBSTITUTE,SUBTOTAL,SUM' && result.argHelp === 'number1' && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.importedFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000 && result.pastedFormula === '=SUM(C1:C2)' && result.inviteLink.startsWith('pearoffice://join?s=') && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
+    result.ok = result.docPaste && result.docOutline && result.docImport && result.docImportNotice && result.docExport && result.about && result.donation && result.docCursors && result.kinds === 'Spreadsheet, Document, Slides (soon)' && result.docCard && result.docReopened && result.docWords === '10 words' && result.fileIcons === result.sheetsAfter && result.moreChartTypes && result.importedFormats && result.keepOnline && result.avatar && result.spill && result.quickWins && result.findSort && result.fill && result.charts && result.formats && result.csvPdf && result.tabs && result.tidied && result.jsonImport && result.csvImport && result.suggested === 'SUBSTITUTE,SUBTOTAL,SUM' && result.argHelp === 'number1' && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.importedFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000 && result.pastedFormula === '=SUM(C1:C2)' && result.inviteLink.startsWith('pearoffice://join?s=') && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
   } catch (err) {
     result.error = err.message
     // What the page showed, to tell a UI failure from a load failure.
