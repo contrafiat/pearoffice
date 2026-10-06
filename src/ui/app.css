@@ -398,6 +398,9 @@ button, input, select { font: inherit; color: inherit; }
 .stop-using p { margin: 0; }
 .tools.phone-row button.on { background: var(--pear-soft); border-color: var(--pear); color: var(--pear-dark); }
 .panel .scan-button { align-self: flex-start; }
+/* A form inside a panel lays out like the panel: one thing per line. */
+.panel form.stack { display: flex; flex-direction: column; gap: 12px; }
+.panel form.stack p { margin: 0; }
 .invite-link .pairing { margin-top: 10px; }
 .formula-help { position: fixed; z-index: 40; max-width: min(440px, calc(100vw - 8px)); max-height: 320px; overflow-y: auto; background: var(--panel); border: 1px solid var(--line-strong); border-radius: 8px; box-shadow: 0 8px 28px rgb(0 0 0 / 0.18); padding: 4px; font-size: 13px; }
 .formula-help .fh-item { padding: 6px 8px; border-radius: 6px; cursor: pointer; }

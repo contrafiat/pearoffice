@@ -73,7 +73,7 @@ export function DevicesPanel ({ initialLink = '', startWith = null, onBack = nul
         )}
 
         {mode === 'use' && (
-          <form onSubmit={(e) => { e.preventDefault(); restartAfter('link:join', { link: input.trim() }) }}>
+          <form className='stack' onSubmit={(e) => { e.preventDefault(); restartAfter('link:join', { link: input.trim() }) }}>
             <p>Paste the link from your other device. This device must not have any sheets yet; it takes on your identity.</p>
             <input aria-label='Device link' placeholder='pearsheet://link?...' value={input} onChange={(e) => setInput(e.target.value)} autoFocus />
             <ScanButton prefix='pearsheet://link?' what='a PearSheet device link' onError={onError} onLink={(l) => { setInput(l); restartAfter('link:join', { link: l }) }} />
@@ -93,7 +93,7 @@ export function DevicesPanel ({ initialLink = '', startWith = null, onBack = nul
         )}
 
         {mode === 'restore' && (
-          <form onSubmit={(e) => { e.preventDefault(); restartAfter('app:restorePhrase', { phrase: input }) }}>
+          <form className='stack' onSubmit={(e) => { e.preventDefault(); restartAfter('app:restorePhrase', { phrase: input }) }}>
             <p>Type your 24 words. This works on a device with no sheets yet. Your sheets come back when you link from another device or are invited again.</p>
             <textarea aria-label='Recovery phrase' rows='4' value={input} onChange={(e) => setInput(e.target.value)} autoFocus />
             <div className='row end'>
