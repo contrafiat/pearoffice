@@ -2,6 +2,21 @@
 
 Append-only, newest on top. Per Constitution §4.
 
+## 2026-10-06 - Pictures in documents live beside the document
+Tier: T3
+Context: pictures were deferred from Documents v1
+(proposals/2026-10-06-document-images.md).
+Choice: a picture core per writer per file, encrypted with the file's key
+and backed up by the seeder; the document holds references and hashes.
+Pictures are shrunk in the app to at most 1 MB; every member device fetches
+all of them; Markdown export embeds them.
+Alternatives: bytes inside the Yjs document (about 3.5x the storage, kept
+until a tidy-up, held twice in phone memory); 500 KB limit; phones fetching
+pictures only when viewed.
+Consequences: a new core to replicate, register with the seeder and carry on
+moves; a spike checks encryption with the file key and seeder behaviour
+first.
+
 ## 2026-10-06 - File types keep plain names
 Tier: T0
 Context: whether sheets, documents and slides get names of our own to stand
