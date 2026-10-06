@@ -2,6 +2,14 @@
 
 Append-only, newest on top. Per Constitution §4.
 
+## 2026-10-06 - File types keep plain names
+Tier: T0
+Context: whether sheets, documents and slides get names of our own to stand
+apart from Microsoft and Google.
+Choice: Spreadsheet, Document and Slides.
+Alternatives: pear-themed names.
+Consequences: none on the wire; the PearOffice name and icon carry the brand.
+
 ## 2026-10-06 - Documents: TipTap on the same file machinery
 Tier: T2
 Context: PearOffice's second file kind (proposals/2026-10-06-documents.md).
