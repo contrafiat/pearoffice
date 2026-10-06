@@ -2,6 +2,20 @@
 
 Append-only, newest on top. Per Constitution §4.
 
+## 2026-10-05 - Presence: a members-only channel, nothing stored
+Tier: T2
+Context: show who has a sheet open and which cell they are on
+(proposals/2026-10-05-presence.md).
+Choice: a Protomux channel `pearsheet/presence/1` per sheet, open only
+while both devices have the sheet on screen. Each side signs a hello with
+its identity key for its own swarm key; the other checks the connection
+key, the signature, the age and current membership before sending or
+accepting anything. State lives in memory and drops after 60 s of silence.
+Alternatives: Yjs awareness inside the sync (would reach the seeder's
+relay path and the Autobase), presence ops in the log (stored forever).
+Consequences: the seeder never sees presence; older builds see none. The
+hide setting is mutual: with it off you see nobody either.
+
 ## 2026-10-05 - Histogram and waterfall .xlsx: as Excel writes them
 Tier: T1
 Context: PR #73's export, first opened in real Excel (Excel for the web).

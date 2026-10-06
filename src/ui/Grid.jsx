@@ -17,7 +17,7 @@ export const MAX_ZOOM = 2.5
 // sheets stay fast. Headers are drawn outside the scroll area and moved with
 // the scroll position.
 export const Grid = forwardRef(function Grid (props, ref) {
-  const { view, cells, sel, ext = sel, range, spillBox, editing, onSelect, onEdit, onEditChange, onEditKey, onEditBlur, onEditCaret = () => {}, onKeyDown, onHeaderMenu, onCellMenu = () => {}, onFill = null, charts = [], selectedChart = null, chartActions = null, onResize, onRowResize = () => {}, onCopy, onPaste, zoom = 1, onZoom, inputMode, hiddenRows = null, hiddenCols = null, unhideMarks = null, onUnhide = () => {}, onAutoFit = () => {}, filterHead = null, onFilterMenu = () => {}, commentMarks = null, onComment = () => {}, invalidCells = null, cfStyles = null, dropdownAt = null, onDropdown = () => {} } = props
+  const { view, cells, sel, ext = sel, range, spillBox, editing, onSelect, onEdit, onEditChange, onEditKey, onEditBlur, onEditCaret = () => {}, onKeyDown, onHeaderMenu, onCellMenu = () => {}, onFill = null, charts = [], selectedChart = null, chartActions = null, onResize, onRowResize = () => {}, onCopy, onPaste, zoom = 1, onZoom, inputMode, hiddenRows = null, hiddenCols = null, unhideMarks = null, onUnhide = () => {}, onAutoFit = () => {}, filterHead = null, onFilterMenu = () => {}, commentMarks = null, onComment = () => {}, invalidCells = null, cfStyles = null, dropdownAt = null, onDropdown = () => {}, others = [] } = props
   // Row height and column widths scale with the zoom (pinch on a phone);
   // stored widths stay unzoomed.
   const ROW_H = Math.round(BASE_ROW_H * zoom)
@@ -503,6 +503,12 @@ export const Grid = forwardRef(function Grid (props, ref) {
               style={{ top: rowY[spillBox.r1], left: colX[spillBox.c1], width: colX[Math.min(spillBox.c2, view.cols) + 1] - colX[spillBox.c1], height: span(spillBox.r1, spillBox.r2) }}
             />
           )}
+          {/* Where the others with this sheet open are (proposals/2026-10-05-presence.md). */}
+          {others.filter((o) => rowH[o.row] > 0 && widths[o.col] > 0).map((o) => (
+            <div key={o.key} className={'presence' + (o.editing ? ' typing' : '') + (o.row === 1 ? ' first-row' : '')} style={{ top: rowY[o.row], left: colX[o.col], width: widths[o.col], height: rowH[o.row], '--who': o.colour }}>
+              <span className='presence-tag'>{o.label}{o.editing ? ' (typing)' : ''}</span>
+            </div>
+          ))}
           <div
             className='selection'
             style={(() => {

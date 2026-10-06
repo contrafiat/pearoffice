@@ -6,7 +6,7 @@ import { changeDecimals, jumpTarget, todaySerial } from './cellTools.js'
 import { SIZES, borderCss, fitWidth } from './cellStyle.js'
 import { shiftA1 } from '../shared/refs.js'
 import { SharePanel } from './SharePanel.jsx'
-import { PeopleStack } from './Avatar.jsx'
+import { PeopleStack, colourFor } from './Avatar.jsx'
 import { FindPanel } from './FindPanel.jsx'
 import { SortPanel } from './SortPanel.jsx'
 import { FilterPanel } from './FilterPanel.jsx'
@@ -207,6 +207,26 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
   useEffect(() => { loadMembers() }, [loadMembers])
   useEffect(() => on('sheet:members', (d) => { if (d.sheetId === sheetId) loadMembers() }), [sheetId, loadMembers])
 
+  // Who else has this sheet open, and where (proposals/2026-10-05-presence.md).
+  // This device says where it is while the sheet is on screen, unless
+  // Settings turned that off; then it sees nobody either.
+  const [present, setPresent] = useState([])
+  const [sharePresence, setSharePresence] = useState(() => readPref('pearsheet:presence') !== '0')
+  const [onScreen, setOnScreen] = useState(() => document.visibilityState !== 'hidden')
+  useEffect(() => {
+    const vis = () => setOnScreen(document.visibilityState !== 'hidden')
+    const pref = (e) => { if (e.detail && e.detail.key === 'pearsheet:presence') setSharePresence(e.detail.value !== '0') }
+    document.addEventListener('visibilitychange', vis)
+    window.addEventListener('pearsheet:pref', pref)
+    return () => { document.removeEventListener('visibilitychange', vis); window.removeEventListener('pearsheet:pref', pref) }
+  }, [])
+  useEffect(() => {
+    setPresent([])
+    call('sheet:present', { sheetId }).then((d) => setPresent(d.people)).catch(() => {})
+    const off = on('sheet:presence', (d) => { if (d.sheetId === sheetId) setPresent(d.people) })
+    return () => { off(); call('sheet:presence', { sheetId, open: false }).catch(() => {}) }
+  }, [sheetId])
+
   const goneRef = useRef(onGone)
   goneRef.current = onGone
   const load = useCallback(async () => {
@@ -244,6 +264,24 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
   // Filters (proposals/2026-10-04-freeze-filter.md) are this device's own,
   // kept in its storage per sheet and tab, never in the sheet.
   const viewTab = view && view.tabId
+  const isEditing = !!editing
+  useEffect(() => {
+    const open = sharePresence && onScreen && !!viewTab
+    call('sheet:presence', { sheetId, open, tab: viewTab, row: sel.row, col: sel.col, editing: isEditing }).catch(() => {})
+  }, [sheetId, sharePresence, onScreen, viewTab, sel.row, sel.col, isEditing])
+  const nameOf = (identity) => {
+    const m = members.find((x) => x.identity === identity)
+    return !m ? 'Someone' : m.isMe ? 'You (other device)' : m.name || 'Unnamed'
+  }
+  const others = present
+    .filter((p) => p.tab === viewTab && p.row && p.col)
+    .map((p) => ({ key: p.device, row: p.row, col: p.col, editing: p.editing, colour: colourFor(p.identity), label: nameOf(p.identity) }))
+  // identity -> where they are, for the pictures by Share.
+  const presentWhere = new Map()
+  for (const p of present) {
+    const tab = view && p.tab !== viewTab && view.tabs.find((t) => t.id === p.tab)
+    presentWhere.set(p.identity, tab ? 'on ' + tab.name : 'here')
+  }
   const filterKey = 'pearsheet:filter:' + sheetId + ':' + viewTab
   const [filter, setFilterState] = useState(null)
   useEffect(() => {
@@ -1003,7 +1041,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
         {/* Phones keep the title readable: Find and Export move into More,
             and the people (or a share icon when alone) open Share. */}
         {!phone && <button className='find-button icon-button' title='Find and replace (Ctrl+F)' aria-label='Find' onClick={() => setFinding({ replace: false })}><MagnifyingGlass size={ICON} /></button>}
-        {members.length > 1 && <PeopleStack sheetId={sheetId} members={members} max={phone ? 2 : 3} size={phone ? 26 : 26} onClick={() => setSharing(true)} />}
+        {members.length > 1 && <PeopleStack sheetId={sheetId} members={members} present={presentWhere} max={phone ? 2 : 3} size={phone ? 26 : 26} onClick={() => setSharing(true)} />}
         {!phone && <button className='share' onClick={() => setSharing(true)}>Share</button>}
         {phone && members.length <= 1 && <button className='share-icon icon-button' aria-label='Share' title='Share' onClick={() => setSharing(true)}><UserPlus size={ICON} /></button>}
         <span className='more'>
@@ -1074,6 +1112,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
       <Grid
         ref={gridRef}
         view={view}
+        others={others}
         cells={cells}
         sel={sel}
         editing={editing}
