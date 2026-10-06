@@ -18,6 +18,14 @@ import b4a from 'b4a'
 import { requestLocalNetworkPermission } from '../modules/local-network'
 
 const ALLOWED = /^(sheet|app|seeder|link):[A-Za-z]+$/
+// iOS file types for the share sheet, by MIME type.
+const UTIS = {
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'org.openxmlformats.spreadsheetml.sheet',
+  'text/csv': 'public.comma-separated-values-text',
+  'application/json': 'public.json',
+  'image/png': 'public.png',
+  'image/svg+xml': 'public.svg-image'
+}
 
 // Phone features the web UI cannot reach on its own, answered by the shell.
 async function shellMethod (method, args) {
@@ -27,7 +35,7 @@ async function shellMethod (method, args) {
     const safe = String(args.name || 'PearSheet.xlsx').replace(/[\\/:*?"<>|]/g, ' ')
     const uri = FileSystem.cacheDirectory + safe
     await FileSystem.writeAsStringAsync(uri, args.base64, { encoding: FileSystem.EncodingType.Base64 })
-    await Sharing.shareAsync(uri, { mimeType: args.mime, dialogTitle: safe, UTI: 'org.openxmlformats.spreadsheetml.sheet' })
+    await Sharing.shareAsync(uri, { mimeType: args.mime, dialogTitle: safe, UTI: UTIS[args.mime] || 'public.data' })
     return { ok: true }
   }
   if (method === 'app:pickFile') {

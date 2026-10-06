@@ -572,6 +572,15 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
     for (const t0 = Date.now(); !fs.existsSync(csvFile) && Date.now() - t0 < 10000;) await sleep(200)
     await sleep(300)
     const csv = fs.existsSync(csvFile) ? fs.readFileSync(csvFile, 'utf8') : ''
+    await more('Save as JSON')
+    const jsonFile = require('node:path').join(downloads, 'Household budget.json')
+    for (const t0 = Date.now(); !fs.existsSync(jsonFile) && Date.now() - t0 < 10000;) await sleep(200)
+    await sleep(300)
+    let saved = null
+    try { saved = JSON.parse(fs.readFileSync(jsonFile, 'utf8')) } catch {}
+    // The first row names the fields: Rent | 1200, then Food, Total.
+    result.json = !!saved && Array.isArray(saved.Sheet1) && saved.Sheet1.some((r) => r.Rent === 'Total' && r['1200'] === 1650.5)
+    if (!result.json) throw new Error('json export: ' + JSON.stringify(saved).slice(0, 300))
     await more('Save this tab as PDF')
     const pdfFile = require('node:path').join(dataDir, 'Household budget.pdf')
     for (const t0 = Date.now(); !fs.existsSync(pdfFile) && Date.now() - t0 < 15000;) await sleep(200)
@@ -589,7 +598,7 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
     await js("[...document.querySelectorAll('.panel button')].find((b) => b.textContent.trim() === 'Delete tab').click()")
     await waitFor('tab deleted', "document.querySelectorAll('.tab:not(.add)').length === 1 && document.querySelector('.tab.active').textContent === 'Sheet1'")
     result.tabs = true
-    step('csv, pdf, duplicate and delete a tab')
+    step('csv, json, pdf, duplicate and delete a tab')
 
     // Tidy up (proposals/2026-10-05-shared-compaction.md): the sheet moves to
     // a fresh copy with the same content, and the app switches to it.
