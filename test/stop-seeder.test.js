@@ -70,7 +70,10 @@ test('stop backing up to a seeder', async (t) => {
     const { due } = (await seeder.drops()).find((d) => d.sheet === bootstrap)
     assert.ok(due > Date.now() + 6 * DAY && due < Date.now() + 8 * DAY)
 
-    // New edits no longer reach the seeder.
+    // New edits no longer reach the seeder, once both devices have noticed
+    // (each checks every 5 s; run the check now).
+    await owner.seeding.sweep()
+    await editor.seeding.sweep()
     await sleep(1000)
     const before = core.length
     for (let i = 2; i < 6; i++) await call(owner, 'sheet:setCell', { sheetId, row: i, col: 1, input: 'x' + i })
@@ -91,6 +94,21 @@ test('stop backing up to a seeder', async (t) => {
     await waitFor('drop cancelled', async () => !(await seeder.drops()).some((d) => d.sheet === bootstrap))
     assert.equal(await seeder.runDrops(Date.now() + 8 * DAY), 0)
     assert.ok(seeder.allowedSheets().includes(bootstrap))
+  })
+
+  await t.test('a request goes over the open backup connection, quickly, and leaves it up', async () => {
+    const fromOwner = () => [...seeder.peer.swarm.connections].find((x) => b4a.equals(x.remotePublicKey, owner.swarm.keyPair.publicKey))
+    await waitFor('backup connection up', async () => !!fromOwner())
+    const conn = fromOwner()
+    const t0 = Date.now()
+    const keep = await owner.seeding.requestKeep({ bootstrap, seederKeys: [seederKey] })
+    assert.equal(keep[0].error, undefined)
+    assert.ok(Date.now() - t0 < 3000, 'answered in ' + (Date.now() - t0) + ' ms')
+    await sleep(500)
+    // Compare as a boolean: a failing assert.equal on two connections makes
+    // the test reporter print both, swarm and stores included, which ran the
+    // machine out of memory.
+    assert.ok(fromOwner() === conn, 'the backup connection was not replaced')
   })
 
   await t.test('stop using a seeder takes it off your own listings and leaves the others', async () => {

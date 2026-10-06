@@ -227,19 +227,72 @@ function createSeeding ({ engine, log = () => {} }) {
     })
   }
 
-  // One request to a seeder on `pearoffice/seeder/1`, over a direct connection.
+  // One request to a seeder on `pearoffice/seeder/1`. Goes over the backup
+  // connection to that seeder when one is open: dialling a second one is
+  // slow, and the seeder then drops the backup connection in its favour.
+  // Requests to one seeder run one at a time, as the seeder answers on a
+  // single channel per connection.
+  const queues = new Map() // seederKey -> the last request's promise
   function ask (seederKey, request, timeoutMs = 20000) {
-    return new Promise((resolve, reject) => {
-      const socket = engine.swarm.dht.connect(b4a.from(seederKey, 'hex'), { keyPair: engine.swarm.keyPair })
-      const done = (err, value) => { clearTimeout(timer); try { socket.destroy() } catch {} if (err) reject(err); else resolve(value) }
-      const timer = setTimeout(() => done(new Error('seeder did not answer')), timeoutMs)
-      socket.on('error', () => {})
-      socket.on('open', () => {
-        const ch = Protomux.from(socket).createChannel({ protocol: SEEDER_PROTOCOL, onopen: () => msg.send(request) })
-        if (!ch) return done(new Error('could not open a channel'))
-        const msg = ch.addMessage({ encoding: c.json, onmessage: (m) => (m && m.t === 'ok' ? done(null, m) : done(new Error((m && m.reason) || 'refused'))) })
-        ch.open()
+    const prev = queues.get(seederKey) || Promise.resolve()
+    const run = prev.catch(() => {}).then(() => {
+      const open = openBackupSocket(seederKey)
+      if (!open) return askOver(null, seederKey, request, timeoutMs)
+      return askOver(open, seederKey, request, timeoutMs).catch((e) => {
+        if (e.answered) throw e
+        return askOver(null, seederKey, request, timeoutMs)
       })
+    })
+    queues.set(seederKey, run)
+    run.catch(() => {}).then(() => { if (queues.get(seederKey) === run) queues.delete(seederKey) })
+    return run
+  }
+
+  function openBackupSocket (seederKey) {
+    const bp = peering && peering.blindPeers.get(seederKey)
+    const socket = bp && bp.connected && bp.socket
+    return socket && !socket.destroying && !socket.destroyed ? socket : null
+  }
+
+  // Over `socket` if given (left open afterwards), else over a new direct
+  // connection that is closed once answered.
+  function askOver (socket, seederKey, request, timeoutMs) {
+    const own = !socket
+    return new Promise((resolve, reject) => {
+      if (own) socket = engine.swarm.dht.connect(b4a.from(seederKey, 'hex'), { keyPair: engine.swarm.keyPair })
+      let ch = null
+      let finished = false
+      const done = (err, value) => {
+        if (finished) return
+        finished = true
+        clearTimeout(timer)
+        if (ch) try { ch.close() } catch {}
+        if (own) try { socket.destroy() } catch {}
+        if (err) reject(err); else resolve(value)
+      }
+      const timer = setTimeout(() => done(new Error('seeder did not answer')), timeoutMs)
+      const answer = (m) => {
+        if (m && m.t === 'ok') return done(null, m)
+        const err = new Error((m && m.reason) || 'refused')
+        err.answered = true
+        done(err)
+      }
+      const start = () => {
+        ch = Protomux.from(socket).createChannel({
+          protocol: SEEDER_PROTOCOL,
+          onopen: () => msg.send(request),
+          onclose: () => done(new Error('connection to the seeder closed'))
+        })
+        if (!ch) return done(new Error('could not open a channel'))
+        const msg = ch.addMessage({ encoding: c.json, onmessage: answer })
+        ch.open()
+      }
+      if (own) {
+        socket.on('error', () => {})
+        socket.on('open', start)
+      } else {
+        start()
+      }
     })
   }
 
