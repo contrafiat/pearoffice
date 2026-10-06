@@ -1,5 +1,5 @@
 // Turning text from an imported file into cell input, shared by the JSON and
-// CSV imports (src/shared/jsonImport.js, csvImport.js).
+// CSV imports (src/sheet/jsonImport.js, csvImport.js).
 
 const NUMBERISH = /^[+-]?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?$/i
 const DATE_ONLY = /^(\d{4})-(\d{2})-(\d{2})$/

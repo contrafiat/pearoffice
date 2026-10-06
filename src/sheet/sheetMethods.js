@@ -5,14 +5,14 @@
 // appended to the sheet's Autobase as a `y` op.
 
 const b4a = require('b4a')
-const model = require('../shared/sheetModel')
-const { displayNumber } = require('../shared/formula')
-const SSF = require('../shared/formula/vendor/fast-formula-parser/ssf/ssf')
-const m = require('./membership')
-const validation = require('../shared/validation')
-const condFormat = require('../shared/condFormat')
-const refs = require('../shared/refs')
-const charts = require('../shared/charts')
+const model = require('./sheetModel')
+const { displayNumber } = require('./formula')
+const SSF = require('./formula/vendor/fast-formula-parser/ssf/ssf')
+const m = require('../worklet/membership')
+const validation = require('./validation')
+const condFormat = require('./condFormat')
+const refs = require('./refs')
+const charts = require('./charts')
 
 const hex = (buf) => b4a.toString(buf, 'hex')
 const INVITE_HOURS = 24

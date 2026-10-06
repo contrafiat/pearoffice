@@ -1,5 +1,5 @@
 import React, { useLayoutEffect, useState } from 'react'
-import { helpFor, insertFunction } from '../shared/formula/help.js'
+import { helpFor, insertFunction } from '../../sheet/formula/help.js'
 
 export { helpFor, insertFunction }
 

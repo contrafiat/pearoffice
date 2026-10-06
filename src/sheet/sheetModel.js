@@ -16,7 +16,7 @@
 // that update to the Autobase.
 
 const Y = require('yjs')
-const { newId } = require('./ids')
+const { newId } = require('../shared/ids')
 const refs = require('./refs')
 const { numToCol } = require('./a1')
 const { fillLine } = require('./fill')
@@ -326,7 +326,7 @@ function sortRows (doc, tabId, r1, c1, r2, c2, order) {
 }
 
 // Fill n cells past a source range in one direction ('down', 'up', 'right',
-// 'left'), as one change: series or copies (src/shared/fill.js). Copied
+// 'left'), as one change: series or copies (src/sheet/fill.js). Copied
 // formulas shift their references to the new cell; formats come along.
 // skipRows: rows a filter hides on this device, left untouched by a fill
 // up or down (as in Excel).
@@ -887,7 +887,7 @@ function getValidations (doc, tabId) {
 // Conditional formatting (proposals/2026-10-04-sheet-tools.md), in the root
 // map cf:<tabId>: rule id -> { range (stored like a formula reference),
 // order, ...rule }. Lower order comes first; a new rule goes on top. The
-// colours are worked out on each device (src/shared/condFormat.js).
+// colours are worked out on each device (src/sheet/condFormat.js).
 const condFormat = require('./condFormat')
 
 function cfRange (doc, tabId, rangeText) {
@@ -1096,7 +1096,7 @@ function importTabs (doc, payload) {
           t.get('fmt').set(cellKey(rowId, colId) + ':num', num)
         }
       }
-      // Formats read from the file's styles (src/shared/xlsxStyles.js); a
+      // Formats read from the file's styles (src/sheet/xlsxStyles.js); a
       // value PearOffice does not allow is left out.
       for (const [row, col, f] of tab.styles || []) {
         const { rowId, colId } = idsAt(doc, id, row, col)
@@ -1111,7 +1111,7 @@ function importTabs (doc, payload) {
         const rowId = t.get('rows').get(Number(row) - 1)
         if (rowId && px > 0) doc.getMap('heights:' + id).set(rowId, Math.max(12, Math.min(600, Math.round(px))))
       }
-      // Charts read from the file (src/shared/xlsxChartsRead.js).
+      // Charts read from the file (src/sheet/xlsxChartsRead.js).
       for (const c of tab.charts || []) {
         const key = newId()
         const chart = new Y.Map()

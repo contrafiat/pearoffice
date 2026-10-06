@@ -1,9 +1,9 @@
-// Sheets as JSON (src/shared/jsonExport.js): the reverse of the import.
+// Sheets as JSON (src/sheet/jsonExport.js): the reverse of the import.
 
 const test = require('node:test')
 const assert = require('node:assert')
-const { jsonToTabs } = require('../src/shared/jsonImport')
-const { sheetToJson, isoDate } = require('../src/shared/jsonExport')
+const { jsonToTabs } = require('../src/sheet/jsonImport')
+const { sheetToJson, isoDate } = require('../src/sheet/jsonExport')
 
 // The import payload as a dump, with each input read as the engine would
 // (numbers, TRUE/FALSE, text with its apostrophe dropped).

@@ -6,9 +6,9 @@ const fs = require('fs')
 const path = require('path')
 const XLSX = require('xlsx/dist/xlsx.mini.min.js')
 const fflate = require('fflate')
-const model = require('../src/shared/sheetModel')
-const { workbookBytes, workbookToTabs, READ_OPTIONS } = require('../src/shared/xlsxMap')
-const { stylesFromXlsx } = require('../src/shared/xlsxStyles')
+const model = require('../src/sheet/sheetModel')
+const { workbookBytes, workbookToTabs, READ_OPTIONS } = require('../src/sheet/xlsxMap')
+const { stylesFromXlsx } = require('../src/sheet/xlsxStyles')
 
 const FMT = { b: true, i: true, u: true, s: true, size: 16, font: 'serif', color: '#cc0000', fill: '#ffeeaa', align: 'center', valign: 'middle', wrap: true, bt: 'thin', bb: 'double:#0000ff', bl: 'medium', br: 'dashed' }
 

@@ -3,7 +3,7 @@
 // or dark.
 
 import { SSF } from 'xlsx/dist/xlsx.mini.min.js'
-import { histogram, waterfall } from '../shared/charts.js'
+import { histogram, waterfall } from '../../sheet/charts.js'
 
 export const UP = '#3c9a5f'
 export const DOWN = '#c0392b'

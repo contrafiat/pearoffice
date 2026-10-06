@@ -1,4 +1,4 @@
-// JSON files as sheets (src/shared/jsonImport.js).
+// JSON files as sheets (src/sheet/jsonImport.js).
 
 const test = require('node:test')
 const assert = require('node:assert/strict')
@@ -6,7 +6,7 @@ const Hyperswarm = require('hyperswarm')
 const Corestore = require('corestore')
 const createTestnet = require('@hyperswarm/testnet')
 const { createSheetEngine } = require('../src/worklet/engine')
-const { jsonToTabs, jsonFileToTabs, cellFor } = require('../src/shared/jsonImport')
+const { jsonToTabs, jsonFileToTabs, cellFor } = require('../src/sheet/jsonImport')
 const { tmpDir, cleanup, call, grid } = require('./helpers')
 
 // Shaped like a budget app's export.

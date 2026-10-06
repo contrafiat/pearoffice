@@ -1,4 +1,4 @@
-// CSV and tab-separated files as sheets (src/shared/csvImport.js).
+// CSV and tab-separated files as sheets (src/sheet/csvImport.js).
 
 const test = require('node:test')
 const assert = require('node:assert/strict')
@@ -6,7 +6,7 @@ const Hyperswarm = require('hyperswarm')
 const Corestore = require('corestore')
 const createTestnet = require('@hyperswarm/testnet')
 const { createSheetEngine } = require('../src/worklet/engine')
-const { csvToTabs, csvBytesToTabs, separatorOf, parseCsv } = require('../src/shared/csvImport')
+const { csvToTabs, csvBytesToTabs, separatorOf, parseCsv } = require('../src/sheet/csvImport')
 const { tmpDir, cleanup, call, grid } = require('./helpers')
 
 const cells = (text) => csvToTabs(text).tabs[0].cells

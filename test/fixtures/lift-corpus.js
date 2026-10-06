@@ -5,7 +5,7 @@
 // (scripts/spill-expectations.js lift writes test/fixtures/lift-expected.json).
 
 const { inputs, cases: functionCases, EXCEL_OVERRIDES: FUNCTION_OVERRIDES } = require('./function-corpus')
-const { LIFT } = require('../../src/shared/formula/lift')
+const { LIFT } = require('../../src/sheet/formula/lift')
 
 // Top-level arguments of the outermost call, as text.
 function splitCall (f) {

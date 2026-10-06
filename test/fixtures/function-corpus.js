@@ -131,7 +131,7 @@ const formulas = [
   '=T.TEST(A1:A10, B1:B10, 1, 3)', '=INDEX(LINEST(B1:B10, A1:A10), 1, 2)', '=INDEX(LOGEST(B1:B10, A1:A10), 1, 2)',
   '=IMDIV("1+2i", "3-4i")', '=COMPLEX(0, -1)',
 
-  // Newer functions (src/shared/formula/newer.js)
+  // Newer functions (src/sheet/formula/newer.js)
   '=XLOOKUP("cherry", C1:C6, D1:D6)', '=XLOOKUP("fig", C1:C6, D1:D6, "none")', '=XLOOKUP(11, A1:A10, B1:B10, , -1)',
   '=XLOOKUP(11, A1:A10, B1:B10, , 1)', '=XLOOKUP("apple", C1:C6, D1:D6, , 0, -1)', '=XLOOKUP("b*", C1:C6, D1:D6, , 2)',
   '=XLOOKUP(7, K1:L1, K2:L2)', '=XMATCH("date", C1:C6)', '=XMATCH(11, A1:A10, 1)', '=XMATCH("apple", C1:C6, 0, -1)',

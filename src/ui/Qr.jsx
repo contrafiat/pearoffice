@@ -2,7 +2,7 @@ import React from 'react'
 import { QrCode as QrIcon } from '@phosphor-icons/react'
 import { call } from './bridge.js'
 import { toSvg } from '../shared/qr.js'
-import { isMobile } from './xlsx.js'
+import { isMobile } from './sheet/xlsx.js'
 
 // A link as a QR code, for another device's camera.
 export function QrCode ({ value, size = 220, label = 'QR code' }) {

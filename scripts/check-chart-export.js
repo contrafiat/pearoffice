@@ -14,7 +14,7 @@ const createTestnet = require('@hyperswarm/testnet')
 const Hyperswarm = require('hyperswarm')
 const { createSheetEngine } = require('../src/worklet/engine')
 const { call } = require('../test/helpers')
-const { workbookBytes } = require('../src/shared/xlsxMap')
+const { workbookBytes } = require('../src/sheet/xlsxMap')
 
 const KINDS = [
   { type: 'column', title: 'Column', dataLabels: true },

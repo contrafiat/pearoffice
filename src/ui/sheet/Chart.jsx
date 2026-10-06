@@ -7,9 +7,9 @@ import { BarChart, LineChart, PieChart, ScatterChart, RadarChart, CandlestickCha
 import { TitleComponent, TooltipComponent, LegendComponent, GridComponent, RadarComponent } from 'echarts/components'
 import { SVGRenderer } from 'echarts/renderers'
 import { chartOption, themeColors } from './chartOption.js'
-import { call } from './bridge.js'
+import { call } from '../bridge.js'
 import { isMobile } from './xlsx.js'
-import { useThemeVersion } from './theme.js'
+import { useThemeVersion } from '../theme.js'
 
 echarts.use([BarChart, LineChart, PieChart, ScatterChart, RadarChart, CandlestickChart, TitleComponent, TooltipComponent, LegendComponent, GridComponent, RadarComponent, SVGRenderer])
 

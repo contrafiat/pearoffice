@@ -35,7 +35,7 @@ test('formula results do not depend on the timezone', () => {
 })
 
 test('no ** operator in the vendored formula code', () => {
-  const root = path.join(__dirname, '..', 'src', 'shared', 'formula')
+  const root = path.join(__dirname, '..', 'src', 'sheet', 'formula')
   const hits = []
   const walk = (dir) => {
     for (const e of fs.readdirSync(dir, { withFileTypes: true })) {

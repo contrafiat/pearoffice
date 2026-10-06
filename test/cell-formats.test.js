@@ -3,7 +3,7 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
 const Y = require('yjs')
-const model = require('../src/shared/sheetModel')
+const model = require('../src/sheet/sheetModel')
 
 function sheet () {
   const doc = model.createDoc()

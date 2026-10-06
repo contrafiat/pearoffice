@@ -7,9 +7,9 @@ const fs = require('fs')
 const path = require('path')
 const XLSX = require('xlsx/dist/xlsx.mini.min.js')
 const fflate = require('fflate')
-const { histogram, waterfall, chartData, rangeBlock, parseRange } = require('../src/shared/charts')
-const { workbookBytes } = require('../src/shared/xlsxMap')
-const { chartsFromXlsx } = require('../src/shared/xlsxChartsRead')
+const { histogram, waterfall, chartData, rangeBlock, parseRange } = require('../src/sheet/charts')
+const { workbookBytes } = require('../src/sheet/xlsxMap')
+const { chartsFromXlsx } = require('../src/sheet/xlsxChartsRead')
 
 test('histogram bins: Scott\'s rule, a set width, edges as Excel', () => {
   const values = [1, 2, 2, 3, 3, 3, 4, 4, 5, 7, 8, 8, 9, 12]

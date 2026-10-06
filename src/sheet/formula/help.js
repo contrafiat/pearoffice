@@ -1,5 +1,5 @@
 // Formula help while typing: which function name is being typed, or which
-// function's brackets the caret is in. Used by src/ui/FormulaHelp.jsx.
+// function's brackets the caret is in. Used by src/ui/sheet/FormulaHelp.jsx.
 
 const { suggest, lookup } = require('./catalog')
 

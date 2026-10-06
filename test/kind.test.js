@@ -5,7 +5,7 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
 const b4a = require('b4a')
-const model = require('../src/shared/sheetModel')
+const model = require('../src/sheet/sheetModel')
 const m = require('../src/worklet/membership')
 
 test('new files are sheets, and files without a kind count as sheets', () => {

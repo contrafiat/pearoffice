@@ -1,7 +1,7 @@
 // Evaluates the function corpus: { cell: value | { error } }.
-const { colToNum } = require('../../src/shared/a1')
-const model = require('../../src/shared/sheetModel')
-const { evaluateSheet } = require('../../src/shared/formula')
+const { colToNum } = require('../../src/sheet/a1')
+const model = require('../../src/sheet/sheetModel')
+const { evaluateSheet } = require('../../src/sheet/formula')
 const { inputs, cases } = require('./function-corpus')
 
 function pos (a1) {

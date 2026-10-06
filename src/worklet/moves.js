@@ -18,7 +18,7 @@
 
 const b4a = require('b4a')
 const { defaultEncodeInvite } = require('@peerloom/core/engine')
-const model = require('../shared/sheetModel')
+const model = require('../sheet/sheetModel')
 const m = require('./membership')
 
 const hex = (buf) => b4a.toString(buf, 'hex')

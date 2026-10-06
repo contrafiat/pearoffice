@@ -3,7 +3,7 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
 const Y = require('yjs')
-const model = require('../src/shared/sheetModel')
+const model = require('../src/sheet/sheetModel')
 
 function sheet () {
   const doc = model.createDoc()
@@ -83,7 +83,7 @@ test('two people replying and resolving at once keep everything', () => {
 test('comments go out to .xlsx as notes and come back', () => {
   const XLSX = require('xlsx/dist/xlsx.mini.min.js')
   const fflate = require('fflate')
-  const { workbookBytes, workbookToTabs, READ_OPTIONS } = require('../src/shared/xlsxMap')
+  const { workbookBytes, workbookToTabs, READ_OPTIONS } = require('../src/sheet/xlsxMap')
   const dump = { title: 'T', tabs: [{ name: 'A', cells: [{ row: 1, col: 1, input: 'x', value: 'x', fmt: {} }], widths: {}, comments: [{ row: 1, col: 1, author: 'Ann', text: 'Ann: Check\nBob: Done' }, { row: 4, col: 2, author: 'Bob', text: 'Bob: on a blank cell' }] }] }
   const bytes = workbookBytes(XLSX, fflate, dump)
   const { tabs } = workbookToTabs(XLSX, XLSX.read(bytes, { type: 'array', ...READ_OPTIONS }))

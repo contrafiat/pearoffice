@@ -1,4 +1,4 @@
-// Charts read from imported .xlsx files (src/shared/xlsxChartsRead.js).
+// Charts read from imported .xlsx files (src/sheet/xlsxChartsRead.js).
 
 const test = require('node:test')
 const assert = require('node:assert/strict')
@@ -6,9 +6,9 @@ const fs = require('fs')
 const path = require('path')
 const XLSX = require('xlsx/dist/xlsx.mini.min.js')
 const fflate = require('fflate')
-const model = require('../src/shared/sheetModel')
-const { workbookBytes, workbookToTabs, READ_OPTIONS } = require('../src/shared/xlsxMap')
-const { chartsFromXlsx } = require('../src/shared/xlsxChartsRead')
+const model = require('../src/sheet/sheetModel')
+const { workbookBytes, workbookToTabs, READ_OPTIONS } = require('../src/sheet/xlsxMap')
+const { chartsFromXlsx } = require('../src/sheet/xlsxChartsRead')
 
 const cells = []
 const put = (r, c, v) => cells.push({ row: r, col: c, input: String(v), value: v, fmt: {} })

@@ -1,16 +1,16 @@
 // .xlsx import and export in the UI, with SheetJS (Community Edition, mini
-// build, vendored in vendor/). The conversion itself is in src/shared/xlsxMap.js.
+// build, vendored in vendor/). The conversion itself is in src/sheet/xlsxMap.js.
 // On phones the shell does the file handling (share sheet, file picker).
 import * as XLSX from 'xlsx/dist/xlsx.mini.min.js'
 import * as fflate from 'fflate'
-import { workbookToTabs, workbookBytes, freezeFromXlsx, validationsFromXlsx, condFormatsFromXlsx, READ_OPTIONS, MAX_IMPORT_CELLS } from '../shared/xlsxMap.js'
-import { stylesFromXlsx } from '../shared/xlsxStyles.js'
-import { chartsFromXlsx } from '../shared/xlsxChartsRead.js'
-import { jsonFileToTabs } from '../shared/jsonImport.js'
-import { csvBytesToTabs } from '../shared/csvImport.js'
-import { sheetToJson } from '../shared/jsonExport.js'
-import { call } from './bridge.js'
-import { writePref } from './prefs.js'
+import { workbookToTabs, workbookBytes, freezeFromXlsx, validationsFromXlsx, condFormatsFromXlsx, READ_OPTIONS, MAX_IMPORT_CELLS } from '../../sheet/xlsxMap.js'
+import { stylesFromXlsx } from '../../sheet/xlsxStyles.js'
+import { chartsFromXlsx } from '../../sheet/xlsxChartsRead.js'
+import { jsonFileToTabs } from '../../sheet/jsonImport.js'
+import { csvBytesToTabs } from '../../sheet/csvImport.js'
+import { sheetToJson } from '../../sheet/jsonExport.js'
+import { call } from '../bridge.js'
+import { writePref } from '../prefs.js'
 import { borderCss, fontPx, FONTS } from './cellStyle.js'
 
 const MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -43,8 +43,8 @@ function importWorkbook (wb, name, bytes) {
 }
 
 // A .json file becomes one tab per list of records plus a Summary tab
-// (src/shared/jsonImport.js).
-// CSV and tab-separated files have their own reader (src/shared/csvImport.js):
+// (src/sheet/jsonImport.js).
+// CSV and tab-separated files have their own reader (src/sheet/csvImport.js):
 // UTF-8, leading zeros kept, dates shown as dates.
 const isJson = (name) => /\.json$/i.test(String(name || ''))
 const isCsv = (name) => /\.(csv|tsv|txt)$/i.test(String(name || ''))
@@ -120,7 +120,7 @@ export async function exportCsv (view) {
   return saveText(fileName(view.title + (view.tabs.length > 1 ? ' - ' + tab : '')) + '.csv', 'text/csv', tabCsv(view))
 }
 
-// The whole sheet as JSON, values only (src/shared/jsonExport.js).
+// The whole sheet as JSON, values only (src/sheet/jsonExport.js).
 export async function exportJson (sheetId) {
   const dump = await call('sheet:dump', { sheetId })
   return saveText(fileName(dump.title) + '.json', 'application/json', JSON.stringify(sheetToJson(dump), null, 2) + '\n')

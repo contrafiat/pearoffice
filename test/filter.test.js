@@ -2,7 +2,7 @@
 
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const { filterRows, columnValues, tableEnd, isActive } = require('../src/shared/filter')
+const { filterRows, columnValues, tableEnd, isActive } = require('../src/sheet/filter')
 
 // Rows of [name, amount] under a header in A1:B1; '' is a blank cell.
 function table (rows) {
@@ -55,7 +55,7 @@ test('filters on several columns combine', () => {
 })
 
 test('a fill down skips the rows a filter hides', () => {
-  const model = require('../src/shared/sheetModel')
+  const model = require('../src/sheet/sheetModel')
   const doc = model.createDoc()
   model.initSheet(doc)
   const tab = model.tabIds(doc)[0]

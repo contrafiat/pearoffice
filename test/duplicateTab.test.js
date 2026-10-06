@@ -4,7 +4,7 @@
 
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const model = require('../src/shared/sheetModel')
+const model = require('../src/sheet/sheetModel')
 
 test('a duplicated tab keeps its charts, layout, rules and comments', () => {
   const doc = model.createDoc()

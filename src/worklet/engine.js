@@ -5,7 +5,7 @@ const b4a = require('b4a')
 const { createGroupEngine } = require('@peerloom/core/engine')
 const { createSheets } = require('./sheets')
 const { createApplyOps } = require('./sheetWire')
-const { createSheetMethods } = require('./sheetMethods')
+const { createSheetMethods } = require('../sheet/sheetMethods')
 const { createJoinService } = require('./join')
 const { createSeeding } = require('./seeding')
 const { createMoves } = require('./moves')
@@ -13,7 +13,7 @@ const { createLinking } = require('./linking')
 const { createDeleting } = require('./deleting')
 const { createProfiles } = require('./profiles')
 const { createPresence } = require('./presence')
-const model = require('../shared/sheetModel')
+const model = require('../sheet/sheetModel')
 
 function createSheetEngine (opts = {}) {
   const { createSwarm: makeSwarm, log = () => {}, ...rest } = opts

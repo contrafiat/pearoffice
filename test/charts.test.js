@@ -4,8 +4,8 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
 const Y = require('yjs')
-const model = require('../src/shared/sheetModel')
-const { parseRange, chartData, guessChart, rangeBlock } = require('../src/shared/charts')
+const model = require('../src/sheet/sheetModel')
+const { parseRange, chartData, guessChart, rangeBlock } = require('../src/sheet/charts')
 
 const cell = (v) => (typeof v === 'number' ? { num: v, text: String(v) } : { num: null, text: v })
 const block = (rows) => rows.map((r) => r.map(cell))

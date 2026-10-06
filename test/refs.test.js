@@ -1,7 +1,7 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
-const model = require('../src/shared/sheetModel')
-const { evaluateSheet } = require('../src/shared/formula')
+const model = require('../src/sheet/sheetModel')
+const { evaluateSheet } = require('../src/sheet/formula')
 
 function setup () {
   const doc = model.createDoc()
@@ -92,7 +92,7 @@ test('cross-tab references follow renames', () => {
 })
 
 test('pasting shifts relative references and keeps $-fixed ones', () => {
-  const { shiftA1 } = require('../src/shared/refs')
+  const { shiftA1 } = require('../src/sheet/refs')
   assert.equal(shiftA1('A1+B2', 1, 1), 'B2+C3')
   assert.equal(shiftA1('$A$1+A$1+$A1', 2, 3), '$A$1+D$1+$A3')
   assert.equal(shiftA1("'My Tab'!A1:B2", 1, 0), "'My Tab'!A2:B3")

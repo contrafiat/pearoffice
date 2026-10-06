@@ -1,21 +1,21 @@
-// The formula suggestions list (src/shared/formula/catalog.js) and the help
-// that reads what is being typed (src/shared/formula/help.js).
+// The formula suggestions list (src/sheet/formula/catalog.js) and the help
+// that reads what is being typed (src/sheet/formula/help.js).
 
 const test = require('node:test')
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const path = require('node:path')
-const { FUNCTIONS, suggest } = require('../src/shared/formula/catalog')
-const { analyze, helpFor, insertFunction } = require('../src/shared/formula/help')
-const { fillFunctions } = require('../src/shared/formula/fills')
+const { FUNCTIONS, suggest } = require('../src/sheet/formula/catalog')
+const { analyze, helpFor, insertFunction } = require('../src/sheet/formula/help')
+const { fillFunctions } = require('../src/sheet/formula/fills')
 
 const NOT_LISTED = new Set(['CELL', 'INFO', 'PHONETIC', 'FILTERXML', 'WEBSERVICE', 'FORECAST.ETS', 'FORECAST.ETS.CONFINT', 'FORECAST.ETS.SEASONALITY', 'FORECAST.ETS.STAT'])
 
 test('the suggestions list every working function and nothing else', () => {
-  const dir = path.join(__dirname, '..', 'src', 'shared', 'formula', 'vendor', 'fast-formula-parser', 'formulas', 'functions')
+  const dir = path.join(__dirname, '..', 'src', 'sheet', 'formula', 'vendor', 'fast-formula-parser', 'formulas', 'functions')
   const engine = new Set(Object.keys(fillFunctions()))
   for (const f of fs.readdirSync(dir)) for (const [k, v] of Object.entries(require(path.join(dir, f)))) if (typeof v === 'function') engine.add(k)
-  engine.add('ANCHORARRAY') // the evaluator adds it (src/shared/formula/index.js)
+  engine.add('ANCHORARRAY') // the evaluator adds it (src/sheet/formula/index.js)
   const listed = new Set(FUNCTIONS.map((f) => f.name))
   assert.deepEqual([...engine].filter((n) => !listed.has(n) && !NOT_LISTED.has(n)), [], 'in the engine but not suggested')
   assert.deepEqual([...listed].filter((n) => !engine.has(n)), [], 'suggested but not in the engine')

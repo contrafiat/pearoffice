@@ -5,8 +5,8 @@ const assert = require('node:assert/strict')
 const Y = require('yjs')
 const XLSX = require('xlsx/dist/xlsx.mini.min.js')
 const fflate = require('fflate')
-const model = require('../src/shared/sheetModel')
-const { workbookBytes, workbookToTabs, freezeFromXlsx } = require('../src/shared/xlsxMap')
+const model = require('../src/sheet/sheetModel')
+const { workbookBytes, workbookToTabs, freezeFromXlsx } = require('../src/sheet/xlsxMap')
 
 function sheet () {
   const doc = model.createDoc()

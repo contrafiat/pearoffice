@@ -147,7 +147,7 @@ function dumpToWorkbook (XLSX, dump) {
     let maxC = 0
     for (const cell of tab.cells) {
       // A formatted cell with nothing in it: its style is added as a blank
-      // cell (src/shared/xlsxStyles.js), not as empty text.
+      // cell (src/sheet/xlsxStyles.js), not as empty text.
       if (!cell.input && !cell.error && (cell.value === null || cell.value === undefined)) continue
       const ref = XLSX.utils.encode_cell({ r: cell.row - 1, c: cell.col - 1 })
       const out = {}
@@ -204,7 +204,7 @@ function dumpToWorkbook (XLSX, dump) {
   return wb
 }
 
-// The workbook with the dump's charts added (src/shared/xlsxCharts.js), as
+// The workbook with the dump's charts added (src/sheet/xlsxCharts.js), as
 // .xlsx bytes. Charts name tabs as the workbook does (Excel shortens some).
 // Worksheet parts that must come after data validation (and conditional
 // formatting) in the file, in the order Excel requires.
@@ -225,7 +225,7 @@ function workbookBytes (XLSX, fflate, dump) {
   const names = new Map(dump.tabs.map((t, i) => [String(t.name).toUpperCase(), wb.SheetNames[i]]))
   const rename = (data) => String(data || '').replace(/^'((?:[^']|'')+)'!|^([A-Za-z_][\w.]*)!/, (m, q, b) => { const n = names.get((q !== undefined ? q.replace(/''/g, "'") : b).toUpperCase()); return n ? "'" + n.replace(/'/g, "''") + "'!" : m })
   const tabs = dump.tabs.map((t, i) => ({ name: wb.SheetNames[i], charts: (t.charts || []).map((c) => ({ ...c, data: rename(c.data) })) }))
-  // Styles first (src/shared/xlsxStyles.js), then frozen panes, then charts.
+  // Styles first (src/sheet/xlsxStyles.js), then frozen panes, then charts.
   const files = fflate.unzipSync(bytes)
   const { dxfId } = require('./xlsxStyles').addStyles(files, dump.tabs, fflate)
   dump.tabs.forEach((t, i) => {

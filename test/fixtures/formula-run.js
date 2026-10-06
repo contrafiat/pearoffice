@@ -1,8 +1,8 @@
 // Evaluates the corpus and returns { cell: value | { error } }. Shared by the
 // Node test and the Bare run, which must produce identical output.
-const { colToNum } = require('../../src/shared/a1')
-const model = require('../../src/shared/sheetModel')
-const { evaluateSheet } = require('../../src/shared/formula')
+const { colToNum } = require('../../src/sheet/a1')
+const model = require('../../src/sheet/sheetModel')
+const { evaluateSheet } = require('../../src/sheet/formula')
 const { inputs, cases } = require('./formula-corpus')
 
 function pos (a1) {

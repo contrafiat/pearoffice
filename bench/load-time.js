@@ -7,7 +7,7 @@ const os = require('os')
 const path = require('path')
 const Corestore = require('corestore')
 const { createSheetEngine } = require('../src/worklet/engine')
-const model = require('../src/shared/sheetModel')
+const model = require('../src/sheet/sheetModel')
 const { call } = require('../test/helpers')
 
 const Hyperswarm = require('hyperswarm')
