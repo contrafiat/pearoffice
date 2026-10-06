@@ -73,7 +73,7 @@ Code that works for any kind of file sits apart from each editor's own
   `moves.js` (removal by moving to fresh keys), `seeding.js` (seeder client),
   `linking.js` (linking a person's devices, recovery phrase),
   `presence.js` (who has a sheet open, and their cell),
-  `profiles.js` (your name and picture in every sheet),
+  `profiles.js` (your name and picture in every sheet), `fileMethods.js` (`file:*` IPC for any kind of file; `sheet:*` names kept as aliases),
   `sheets.js` (live documents).
 - Charts (proposals/2026-10-04-charts.md): `src/sheet/charts.js` (data
   ranges, series, first guess), stored per tab in the root map

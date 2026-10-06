@@ -5,8 +5,8 @@ import { colName } from './a1.js'
 import { changeDecimals, jumpTarget, todaySerial } from './cellTools.js'
 import { SIZES, borderCss, fitWidth } from './cellStyle.js'
 import { shiftA1 } from '../../sheet/refs.js'
-import { SharePanel } from '../SharePanel.jsx'
-import { PeopleStack, colourFor } from '../Avatar.jsx'
+import { colourFor } from '../Avatar.jsx'
+import { FileBar, useMembers } from '../FileBar.jsx'
 import { FindPanel } from './FindPanel.jsx'
 import { SortPanel } from './SortPanel.jsx'
 import { FilterPanel } from './FilterPanel.jsx'
@@ -22,9 +22,7 @@ import { ChartPanel } from './ChartPanel.jsx'
 import { ChartView, downloadChart, chartSvg } from './Chart.jsx'
 import { guessChart } from '../../sheet/charts.js'
 import { readPref, writePref } from '../prefs.js'
-import { Minus, ArrowCounterClockwise, ArrowClockwise, TextB, TextItalic, TextAUnderline, PaintBucket, Copy, Scissors, ClipboardText, Eraser, Numpad, FileXls, DotsThree, Plus, MagnifyingGlass, X, ChartBar, PencilSimple, DownloadSimple, Trash, TextUnderline, TextStrikethrough, TextAlignLeft, TextAlignCenter, TextAlignRight, ArrowUDownLeft, FrameCorners, AlignTop, AlignCenterVertical, AlignBottom, ArrowsOutLineHorizontal, UserPlus } from '@phosphor-icons/react'
-import { DeletePanel } from '../DeletePanel.jsx'
-import { TidyPanel } from '../TidyPanel.jsx'
+import { Minus, ArrowCounterClockwise, ArrowClockwise, TextB, TextItalic, TextAUnderline, PaintBucket, Copy, Scissors, ClipboardText, Eraser, Numpad, FileXls, Plus, MagnifyingGlass, X, ChartBar, PencilSimple, DownloadSimple, Trash, TextUnderline, TextStrikethrough, TextAlignLeft, TextAlignCenter, TextAlignRight, ArrowUDownLeft, FrameCorners, AlignTop, AlignCenterVertical, AlignBottom, ArrowsOutLineHorizontal } from '@phosphor-icons/react'
 import { FormulaHelp, helpFor, insertFunction } from './FormulaHelp.jsx'
 import { exportSheet, exportCsv, exportJson, printTab, isMobile } from './xlsx.js'
 
@@ -115,8 +113,6 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
   }, [])
   const [menu, setMenu] = useState(null) // { kind, index, x, y } | null
   const [renaming, setRenaming] = useState(null) // { id, value } | null
-  const [sharing, setSharing] = useState(false)
-  const [more, setMore] = useState(false) // the ⋯ menu
   // Formula help: where the caret is in the text being edited, the
   // highlighted suggestion, and whether Escape hid the list.
   const [caret, setCaret] = useState(null)
@@ -162,8 +158,6 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
     window.addEventListener('pearoffice:pref', onPref)
     return () => window.removeEventListener('pearoffice:pref', onPref)
   }, [])
-  const [deleting, setDeleting] = useState(null) // 'local' | 'everyone' | null
-  const [tidying, setTidying] = useState(false)
   const [finding, setFinding] = useState(null) // { replace } while Find is open
   const [sorting, setSorting] = useState(null) // what the Sort panel sorts
   const [droppingTab, setDroppingTab] = useState(null) // a tab waiting for "Delete"
@@ -200,12 +194,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
   const gridRef = useRef(null)
 
   // Everyone in the sheet, for the pictures next to Share.
-  const [members, setMembers] = useState([])
-  const loadMembers = useCallback(() => {
-    call('sheet:members', { sheetId }).then((d) => setMembers(d.members)).catch(() => {})
-  }, [sheetId])
-  useEffect(() => { loadMembers() }, [loadMembers])
-  useEffect(() => on('sheet:members', (d) => { if (d.sheetId === sheetId) loadMembers() }), [sheetId, loadMembers])
+  const members = useMembers(sheetId)
 
   // Who else has this sheet open, and where (proposals/2026-10-05-presence.md).
   // This device says where it is while the sheet is on screen, unless
@@ -903,17 +892,40 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
 
   return (
     <div className='sheet' onClick={() => { if (menu) setMenu(null); if (picking && !phone) setPicking(null) }}>
-      <header className='toolbar'>
-        <input
-          className='title'
-          aria-label='Sheet title'
-          defaultValue={view.title}
-          key={view.title}
-          readOnly={!canEdit}
-          onBlur={async (e) => { if (e.target.value !== view.title) { await run('sheet:setTitle', { title: e.target.value }); onTitleChange() } }}
-          onKeyDown={(e) => { if (e.key === 'Enter') e.target.blur() }}
-        />
-        {!canEdit && <span className='badge view-only'>{hasEditRole ? 'Getting edit access...' : 'View only'}</span>}
+      <FileBar
+        sheetId={sheetId}
+        noun='sheet'
+        title={view.title}
+        myRole={view.myRole}
+        frozen={view.frozen}
+        canEdit={canEdit}
+        badge={!canEdit && <span className='badge view-only'>{hasEditRole ? 'Getting edit access...' : 'View only'}</span>}
+        phone={phone}
+        members={members}
+        present={presentWhere}
+        onTitleChange={onTitleChange}
+        onError={onError}
+        onGone={onGone}
+        menuItems={(close) => (
+          <>
+            <li role='menuitem' onClick={() => setFinding({ replace: canEdit })}>Find and replace</li>
+            {phone && window.pearoffice && <li role='menuitem' onClick={() => exportSheet(sheetId).catch((err) => onError(err.message))}>Save as an Excel file</li>}
+            <li role='menuitem' onClick={() => exportCsv(view).catch((err) => onError(err.message))}>Download this tab as CSV</li>
+            <li role='menuitem' onClick={() => exportJson(sheetId).catch((err) => onError(err.message))}>Save as JSON</li>
+            {!phone && <li role='menuitem' onClick={() => printTab(view, 'pdf', printCharts()).catch((err) => onError(err.message))}>Save this tab as PDF</li>}
+            {!phone && <li role='menuitem' onClick={() => printTab(view, 'print', printCharts()).catch((err) => onError(err.message))}>Print this tab...</li>}
+            {canEdit && <li role='menuitem' onClick={openSort}>Sort...</li>}
+            {freezeItems(close)}
+            {filterItems(close)}
+            {canEdit && <li role='menuitem' onClick={() => setValidating({ ...range })}>Validation...</li>}
+            {(canEdit || (view.condFormats || []).length > 0) && <li role='menuitem' onClick={() => setColouring(true)}>Conditional formatting...</li>}
+            {(canEdit || (view.names || []).length > 0) && <li role='menuitem' onClick={() => setNaming({ adding: false })}>Named ranges...</li>}
+            {threads.length > 0 && <li role='menuitem' onClick={() => setListingComments(true)}>Comments{openThreads ? ' (' + openThreads + ' open)' : ''}</li>}
+            {canEdit && phone && <li role='menuitem' onClick={() => fillSelection('down')}>Fill down</li>}
+            {canEdit && phone && <li role='menuitem' onClick={() => fillSelection('right')}>Fill right</li>}
+          </>
+        )}
+      >
         <div className={'tools' + (phone ? ' phone-row' : '')} role='toolbar' aria-label='Formatting' hidden={!canEdit}>
           <button title='Undo (Ctrl+Z)' aria-label='Undo' disabled={!view.canUndo} onClick={() => run('sheet:undo')}><ArrowCounterClockwise size={ICON} /></button>
           <button title='Redo (Ctrl+Y)' aria-label='Redo' disabled={!view.canRedo} onClick={() => run('sheet:redo')}><ArrowClockwise size={ICON} /></button>
@@ -1047,35 +1059,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
         {/* Phones keep the title readable: Find and Export move into More,
             and the people (or a share icon when alone) open Share. */}
         {!phone && <button className='find-button icon-button' title='Find and replace (Ctrl+F)' aria-label='Find' onClick={() => setFinding({ replace: false })}><MagnifyingGlass size={ICON} /></button>}
-        {members.length > 1 && <PeopleStack sheetId={sheetId} members={members} present={presentWhere} max={phone ? 2 : 3} size={phone ? 26 : 26} onClick={() => setSharing(true)} />}
-        {!phone && <button className='share' onClick={() => setSharing(true)}>Share</button>}
-        {phone && members.length <= 1 && <button className='share-icon icon-button' aria-label='Share' title='Share' onClick={() => setSharing(true)}><UserPlus size={ICON} /></button>}
-        <span className='more'>
-          <button className='more-button icon-button' aria-label='More' title='More' onClick={() => setMore(!more)}><DotsThree size={ICON} weight='bold' /></button>
-          {more && (
-            <ul className='menu more-menu' role='menu' onClick={() => setMore(false)}>
-              <li role='menuitem' onClick={() => setFinding({ replace: canEdit })}>Find and replace</li>
-              {phone && window.pearoffice && <li role='menuitem' onClick={() => exportSheet(sheetId).catch((err) => onError(err.message))}>Save as an Excel file</li>}
-              <li role='menuitem' onClick={() => exportCsv(view).catch((err) => onError(err.message))}>Download this tab as CSV</li>
-              <li role='menuitem' onClick={() => exportJson(sheetId).catch((err) => onError(err.message))}>Save as JSON</li>
-              {!phone && <li role='menuitem' onClick={() => printTab(view, 'pdf', printCharts()).catch((err) => onError(err.message))}>Save this tab as PDF</li>}
-              {!phone && <li role='menuitem' onClick={() => printTab(view, 'print', printCharts()).catch((err) => onError(err.message))}>Print this tab...</li>}
-              {canEdit && <li role='menuitem' onClick={openSort}>Sort...</li>}
-              {freezeItems(() => setMore(false))}
-              {filterItems(() => setMore(false))}
-              {canEdit && <li role='menuitem' onClick={() => setValidating({ ...range })}>Validation...</li>}
-              {(canEdit || (view.condFormats || []).length > 0) && <li role='menuitem' onClick={() => setColouring(true)}>Conditional formatting...</li>}
-              {(canEdit || (view.names || []).length > 0) && <li role='menuitem' onClick={() => setNaming({ adding: false })}>Named ranges...</li>}
-              {threads.length > 0 && <li role='menuitem' onClick={() => setListingComments(true)}>Comments{openThreads ? ' (' + openThreads + ' open)' : ''}</li>}
-              {canEdit && phone && <li role='menuitem' onClick={() => fillSelection('down')}>Fill down</li>}
-              {canEdit && phone && <li role='menuitem' onClick={() => fillSelection('right')}>Fill right</li>}
-              <li role='menuitem' onClick={() => setDeleting('local')}>Remove from this device</li>
-              {view.myRole === 'owner' && !view.frozen && <li role='menuitem' onClick={() => setTidying(true)}>Tidy up this sheet...</li>}
-              {view.myRole === 'owner' && <li role='menuitem' className='danger' onClick={() => setDeleting('everyone')}>Delete for everyone</li>}
-            </ul>
-          )}
-        </span>
-      </header>
+      </FileBar>
 
       {frozenNote && <div className='banner info'>{frozenNote}</div>}
       <div className='formula-bar'>
@@ -1366,10 +1350,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
           onClose={() => { setFiltering(null); afterPanel() }}
         />
       )}
-      {sharing && <SharePanel sheetId={sheetId} onClose={() => setSharing(false)} onError={onError} />}
       {shownHelp && <FormulaHelp help={shownHelp} selected={helpSel} onPick={pickFunction} anchor={document.activeElement && document.activeElement.tagName === 'INPUT' ? document.activeElement : null} />}
-      {tidying && <TidyPanel sheetId={sheetId} title={view.title} onClose={() => setTidying(false)} onError={onError} onDone={() => setTidying(false)} />}
-      {deleting && <DeletePanel sheetId={sheetId} title={view.title} kind={deleting} onClose={() => setDeleting(null)} onError={onError} onDone={() => { setDeleting(null); onGone() }} />}
 
       {menu && (
         <ul className='menu' ref={menuRef} style={menu.kind === 'tab' ? { left: menu.x, bottom: window.innerHeight - menu.y } : { left: menu.x, top: menu.y }} role='menu'>

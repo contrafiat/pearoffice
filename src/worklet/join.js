@@ -33,7 +33,7 @@ const CLAIM_RESEND_MS = 3000
 // so look again on a short timer while the join is pending.
 const LOOKUP_EVERY_MS = [3000, 5000, 10000, 15000]
 // A join that has found nobody to let it in for this long stops by itself:
-// invites last at most 7 days (sheetMethods.js).
+// invites last at most 7 days (fileMethods.js).
 const GIVE_UP_MS = 7 * 24 * 3600 * 1000
 const hex = (buf) => b4a.toString(buf, 'hex')
 
