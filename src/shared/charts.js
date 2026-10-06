@@ -26,7 +26,8 @@ function parseRange (text) {
 }
 
 // The block a chart reads: rows of { num, text } (num null when the cell is
-// not a number). cellAt(row, col) gives { value, error, display, spill }.
+// not a number), plus fmt, the number's format code when it has one.
+// cellAt(row, col) gives { value, error, display, numFmt, spill }.
 function rangeBlock (range, cellAt) {
   let { r1, c1, r2, c2 } = range
   if (range.spill) {
@@ -41,7 +42,9 @@ function rangeBlock (range, cellAt) {
     for (let c = c1; c <= c2; c++) {
       const x = cellAt(r, c)
       const num = x && x.error === undefined && typeof x.value === 'number' ? x.value : null
-      line.push({ num, text: x ? (x.display !== undefined ? x.display : x.value === null || x.value === undefined ? '' : String(x.value)) : '' })
+      const cell = { num, text: x ? (x.display !== undefined ? x.display : x.value === null || x.value === undefined ? '' : String(x.value)) : '' }
+      if (num !== null && x.numFmt) cell.fmt = x.numFmt
+      line.push(cell)
     }
     out.push(line)
   }
@@ -62,14 +65,23 @@ function chartData (block, { seriesIn = 'columns', labels = {}, type } = {}) {
   const firstSeries = catCol || X_FIRST.includes(type) ? 1 : 0
   const cols = grid[0].length
   const categories = body.map((line, i) => (X_FIRST.includes(type) ? line[0].num : catCol ? line[0].text : String(i + 1)))
+  // A series takes the format of its first number, as in Excel, so a chart
+  // of amounts shown as currency shows currency too.
+  const formatOf = (c) => { const x = body.find((line) => line[c].num !== null); return x && x[c].fmt }
   const series = []
   for (let c = firstSeries; c < cols; c++) {
-    series.push({
+    const s = {
       name: nameRow ? grid[0][c].text : 'Series ' + (c - firstSeries + 1),
       values: body.map((line) => line[c].num)
-    })
+    }
+    const format = formatOf(c)
+    if (format) s.format = format
+    series.push(s)
   }
-  return { categories, series }
+  const out = { categories, series }
+  const xFormat = X_FIRST.includes(type) && formatOf(0)
+  if (xFormat) out.xFormat = xFormat
+  return out
 }
 
 // A first chart for a block of cells: names in the first row and column when

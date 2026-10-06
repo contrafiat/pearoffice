@@ -48,7 +48,7 @@ function resolveChart (doc, tabId, chart, allValues) {
     const v = values.get(r + ',' + c)
     if (!v) return null
     const fmt = v.from ? model.getFormat(doc, tab, v.from[0], v.from[1]) : model.getFormat(doc, tab, r, c)
-    return { ...v, display: present(v, fmt).display }
+    return { ...v, display: present(v, fmt).display, numFmt: fmt.num }
   }
   const block = charts.rangeBlock(range, cellAt)
   if (!block) return { error: 'The formula in ' + chart.data.replace(/#$/, '') + ' does not spill' }
