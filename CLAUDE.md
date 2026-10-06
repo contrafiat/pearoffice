@@ -61,7 +61,7 @@ Code that works for any kind of file sits apart from each editor's own
 
 - `src/shared/` - runs anywhere, for any file: `ids.js`, `phrase.js`
   (recovery phrase), `qr.js`, Bare shims.
-- `src/doc/` and `src/ui/doc/` - documents (proposals/2026-10-06-documents.md): `docModel.js` (the Yjs doc: `meta`, `body`), `docMethods.js` (`doc:create`, `doc:state`, `doc:update`), `DocView.jsx` (TipTap 3 editor), `docFiles.js` (import .docx/.md/.txt/.html, export .docx/.md/.txt/PDF; `node scripts/check-doc-export.js [dir]` has LibreOffice read an exported .docx), `DocView.jsx` sync notes ( the UI keeps a Yjs replica and sends batched updates, `doc:updated` brings others' edits).
+- `src/doc/` and `src/ui/doc/` - documents (proposals/2026-10-06-documents.md): `docModel.js` (the Yjs doc: `meta`, `body`), `docMethods.js` (`doc:create`, `doc:state`, `doc:update`), `DocView.jsx` (TipTap 3 editor), `docFiles.js` (import .docx/.md/.txt/.html, export .docx/.md/.txt/PDF; `node scripts/check-doc-export.js [dir]` has LibreOffice read an exported .docx). The editor keeps a Yjs replica and sends batched updates; `doc:updated` brings others' edits.
 - `src/sheet/` - the spreadsheet, runs anywhere (Bare, Node, browser):
   `sheetModel.js` (the Yjs document), `refs.js` (A1 <-> id formula
   references), `formula/` (evaluator, deterministic maths, formulajs fills,
