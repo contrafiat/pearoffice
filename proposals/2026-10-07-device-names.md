@@ -1,6 +1,6 @@
 # Linked devices and their names
 
-**Status:** draft, 2026-10-07. Asked for by Tim (as in PearCal and Keet);
+**Status:** approved by Tim 2026-10-07. Asked for by Tim (as in PearCal and Keet);
 he chose to keep the names in each file, like your name and picture.
 
 **Goal:** a "Linked devices" list in the Devices panel: every device that
@@ -86,8 +86,10 @@ released.
 
 Hide the section. Names stay in the files and are ignored.
 
+## Decided 2026-10-07
+
+1. Removing a lost device is left for a later proposal.
+
 ## Open questions
 
-1. Removing a lost device from the list (cutting it off) needs a new
-   identity today (the Devices panel says so). Leave that for a later
-   proposal? Recommended: yes.
+None.
