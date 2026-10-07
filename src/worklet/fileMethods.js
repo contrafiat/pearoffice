@@ -244,6 +244,24 @@ function createFileMethods (sheets, { getJoin, getMoves, getProfiles }) {
     },
     'app:phraseNudged': async (args, ctx) => { await ctx.localDb.put('phraseNudged', { at: Date.now() }); return { ok: true } },
 
+    // The first-run welcome and tour, once per device. A device that already
+    // has a file or a name was in use before the tour existed, so it counts
+    // as done.
+    // Whether this device has been through onboarding. A device that had a
+    // file or a name before onboarding existed counts as done. Once
+    // onboarding has been shown, only finishing or skipping it counts, so
+    // setting a name and quitting halfway brings the tour back.
+    'app:onboarding': async (args, ctx) => {
+      if (await ctx.localDb.get('onboarded')) return { done: true }
+      if (await ctx.localDb.get('onboardingStarted')) return { done: false }
+      for await (const row of ctx.localDb.createReadStream({ gt: 'groups:joined:', lt: 'groups:joined:~', limit: 1 })) if (row) return { done: true }
+      const p = await getProfiles().local()
+      if (p && p.name) return { done: true }
+      await ctx.localDb.put('onboardingStarted', { at: Date.now() })
+      return { done: false }
+    },
+    'app:onboarded': async (args, ctx) => { await ctx.localDb.put('onboarded', { at: Date.now() }); return { ok: true } },
+
     // A nudge to donate, once, two weeks after first use (as in the other
     // PeerLoom apps). The UI never shows it on iOS before the first release.
     'donation:status': async (args, ctx) => {

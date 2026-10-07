@@ -300,6 +300,8 @@ ipcMain.handle('worklet:call', async (_e, method, args) => {
     if (!updates) throw new Error('Updates are off in this copy')
     return updates.apply()
   }
+  // The smoke parts other than onboarding start with the tour already done.
+  if (method === 'app:onboarding' && SMOKE && process.env.PEAROFFICE_NO_ONBOARDING === '1') return { done: true }
   if (method === 'app:settings') return { ...settings, startAtLogin: settings.startAtLogin && loginItem.isEnabled() }
   if (method === 'app:setSetting') {
     const patch = {}

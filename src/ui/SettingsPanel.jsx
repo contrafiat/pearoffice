@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Camera, CaretLeft, Desktop, Devices, HardDrives, Moon, Sun, Trash, X } from '@phosphor-icons/react'
+import { Camera, CaretLeft, Compass, Desktop, Devices, HardDrives, Moon, Sun, Trash, X } from '@phosphor-icons/react'
 import { call } from './bridge.js'
 import { Avatar, shrinkPicture } from './Avatar.jsx'
 import { readPref, writePref } from './prefs.js'
@@ -10,7 +10,7 @@ import { AboutContent, BitcoinContent, VERSION } from './About.jsx'
 const TITLES = { settings: 'Settings', about: 'About PearOffice', bitcoin: 'Bitcoin Lightning' }
 
 // One place for your profile and this device's settings, plus About.
-export function SettingsPanel ({ me, onMe, desktop, keepOnline, startAtLogin, onSetting, onDevices, onSeeder, onClose, onError, startIn = null }) {
+export function SettingsPanel ({ me, onMe, desktop, keepOnline, startAtLogin, onSetting, onDevices, onSeeder, onTour, onClose, onError, startIn = null }) {
   const [mode, setMode] = useState(startIn ? startIn.mode : 'settings') // settings | about | bitcoin
   const [wallet, setWallet] = useState(false) // a Lightning wallet is installed
   const [numPad, setNumPad] = useState(() => readPref('pearoffice:numpad') === '1')
@@ -144,13 +144,17 @@ export function SettingsPanel ({ me, onMe, desktop, keepOnline, startAtLogin, on
             <p className='small'>An always-on computer that keeps an encrypted copy of your sheets online. It cannot read them.</p>
             <div className='row'><button className='settings-seeder' onClick={onSeeder}><HardDrives size={16} /> Seeder</button></div>
 
+            <h3>Help</h3>
+            <p className='small'>A short tour of how PearOffice works and what is different from cloud apps.</p>
+            <div className='row'><button className='settings-tour' onClick={onTour}><Compass size={16} /> Take the tour</button></div>
+
             <div className='row about-row'>
               <button className='link-button about-link' onClick={() => setMode('about')}>About PearOffice{VERSION ? ' ' + VERSION : ''}</button>
             </div>
           </>
         )}
 
-        {mode === 'about' && <AboutContent startSection={startIn && startIn.section} onBitcoin={(detected) => { setWallet(detected); setMode('bitcoin') }} />}
+        {mode === 'about' && <AboutContent startSection={startIn && startIn.section} onTour={onTour} onBitcoin={(detected) => { setWallet(detected); setMode('bitcoin') }} />}
         {mode === 'bitcoin' && <BitcoinContent detected={wallet} />}
       </section>
     </div>

@@ -13,6 +13,7 @@ import { UpdateBar } from './UpdateBar.jsx'
 import { applyTheme } from './theme.js'
 import { FileHome, NewPanel } from './Files.jsx'
 import { DonationReminder, donationsShown } from './About.jsx'
+import { Onboarding } from './Onboarding.jsx'
 import { FileArrowUp, GearSix, House, LinkSimple, List, Plus } from '@phosphor-icons/react'
 
 applyTheme()
@@ -104,6 +105,8 @@ export function App () {
   const desktop = !!(window.pearoffice && window.pearoffice.platform === 'desktop')
   const [keepOnline, setKeepOnline] = useState(null)
   const [startAtLogin, setStartAtLogin] = useState(false)
+  // The first-run welcome and tour: null, or { tourOnly } while it is open.
+  const [onboarding, setOnboarding] = useState(null)
 
   const refresh = useCallback(async () => {
     try {
@@ -142,6 +145,7 @@ export function App () {
   useEffect(() => {
     refresh()
     loadMe()
+    call('app:onboarding').then((r) => { if (r && !r.done) setOnboarding({ tourOnly: false }) }).catch(() => {})
     if (desktop) call('app:settings').then((s) => { setKeepOnline(!!s.keepOnline); setStartAtLogin(!!s.startAtLogin) }).catch(() => {})
     const offs = [
       on('worklet:exit', () => setError('The sync engine stopped. Restart PearOffice.')),
@@ -281,6 +285,7 @@ export function App () {
           }}
           onDevices={() => { setSettings(false); setDevices({ fromSettings: true }) }}
           onSeeder={() => { setSettings(false); setSeeder('fromSettings') }}
+          onTour={() => { setSettings(false); setOnboarding({ tourOnly: true }) }}
           onClose={() => setSettings(false)}
           onError={setError}
           startIn={typeof settings === 'object' ? settings : null}
@@ -299,10 +304,24 @@ export function App () {
       {toast && <div className='toast' role='status'>{toast}</div>}
       {devices && <DevicesPanel initialLink={devices.link || ''} startWith={devices.startWith || null} onBack={devices.fromSettings ? () => { setDevices(null); setSettings(true) } : null} onClose={() => setDevices(null)} onError={setError} />}
       {seeder && <SeederPanel initialLink={typeof seeder === 'string' && seeder !== 'fromSettings' ? seeder : ''} onBack={seeder === 'fromSettings' ? () => { setSeeder(false); setSettings(true) } : null} onClose={() => setSeeder(false)} onError={setError} />}
+      {onboarding && (
+        <Onboarding
+          tourOnly={onboarding.tourOnly}
+          hidden={!!devices}
+          me={{ name, avatar, identity: myId }}
+          onMe={loadMe}
+          onPhrase={() => setDevices({ startWith: 'phrase' })}
+          onNew={() => setNewFile(true)}
+          onJoin={() => setJoining('')}
+          importButton={(finish) => <ImportButton className='ob-import' onImported={async (id, r) => { finish(); await opened(id, r) }} onError={setError} />}
+          onDone={() => setOnboarding(null)}
+          onError={setError}
+        />
+      )}
       <main className='main'>
         {desktop && <UpdateBar />}
         {notice && <div className='banner info'>{notice} <button className='link-button' onClick={() => setNotice(null)}>OK</button></div>}
-        {nudge && (
+        {nudge && !onboarding && (
           <div className='banner info'>
             Write down your recovery phrase so you can get your identity back if you lose this device.{' '}
             <button className='link-button' onClick={() => { setNudge(false); setDevices({ startWith: 'menu' }) }}>Show it</button>
@@ -336,7 +355,7 @@ export function App () {
                 : (
                   <div className='empty'>
                     <h1>Shared files, device to device.</h1>
-                    <p>No accounts and no servers. Create a file, join one with a link or import a spreadsheet.</p>
+                    <p>No accounts and no servers. Create a file, join one with a link or import one.</p>
                     <StartActions onNew={() => setNewFile(true)} onJoin={() => setJoining('')} onImported={opened} onError={setError} />
                   </div>
                   )}

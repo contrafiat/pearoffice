@@ -15,6 +15,11 @@ export function DevicesPanel ({ initialLink = '', startWith = null, onBack = nul
   const [copied, setCopied] = useState(false)
 
   useEffect(() => on('link:done', () => setLinked(true)), [])
+  // Opened straight at the phrase (the first-run tour's Show my phrase).
+  useEffect(() => {
+    if (startWith !== 'phrase') return
+    call('link:phrase').then((r) => { setPhrase(r.phrase); call('app:phraseNudged').catch(() => {}) }).catch((err) => { onError(err.message); onClose() })
+  }, [])
 
   async function restartAfter (method, args) {
     setBusy(true)
@@ -88,9 +93,9 @@ export function DevicesPanel ({ initialLink = '', startWith = null, onBack = nul
 
         {mode === 'phrase' && phrase && (
           <>
-            <p className='warn'>Write these down and keep them somewhere safe. Anyone who has them can act as you in every sheet.</p>
+            <p className='warn'>Write these down and keep them somewhere safe. Anyone who has them can act as you in every file.</p>
             <ol className='phrase'>{phrase.split(' ').map((w, i) => <li key={i}>{w}</li>)}</ol>
-            <div className='row end'><button onClick={() => { setPhrase(null); setMode('menu') }}>Done</button></div>
+            <div className='row end'><button onClick={() => { setPhrase(null); if (startWith === 'phrase') onClose(); else setMode('menu') }}>Done</button></div>
           </>
         )}
 

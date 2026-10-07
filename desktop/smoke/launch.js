@@ -26,7 +26,7 @@ function runPart ({ command, args, part, shot, timeout, echo }) {
     const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pearoffice-smoke-' + part + '-'))
     const started = Date.now()
     const child = spawn(command, args, {
-      env: { ...process.env, PEAROFFICE_SMOKE: '1', PEAROFFICE_SMOKE_PART: part, PEAROFFICE_DATA: dataDir, PEAROFFICE_SMOKE_SHOT: shot },
+      env: { ...process.env, PEAROFFICE_SMOKE: '1', PEAROFFICE_SMOKE_PART: part, PEAROFFICE_DATA: dataDir, PEAROFFICE_SMOKE_SHOT: shot, PEAROFFICE_NO_ONBOARDING: part === 'onboarding' ? '' : '1' },
       stdio: ['ignore', 'pipe', echo ? 'inherit' : 'pipe']
     })
     let out = ''
