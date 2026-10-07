@@ -170,6 +170,10 @@ rule 15): the dedicated AVD `PearOffice_Pixel_9` has a 12 GB data partition
 (`all` lists every node with a text, to pick one by position).
 On this emulator `adb shell input text` knocks adb offline; send
 `input keyevent` codes instead.
+If a boot dies with a Vulkan error (`VK_ERROR_INITIALIZATION_FAILED`),
+`emu.sh` boots again with Vulkan off; `EMU_NO_VULKAN=1` starts that way.
+The UI text dump can lag behind the WebView here: when a tap seems to do
+nothing, screenshot before tapping again.
 
 Two traps, both hit on 2026-10-03:
 
