@@ -92,7 +92,7 @@ test('removal moves the sheet to fresh keys', async (t) => {
   await t.test('a member who was offline during the move follows when back', async () => {
     late = await device('Late', lateDir)
     await waitFor('late follows', async () => late.bases.get(newId) && (await call(late, 'sheet:view', { sheetId: newId })).myRole === 'editor' && late.bases.get(newId).writable, { timeout: 40000 })
-    assert.equal((await grid(late, newId))['3,1'], 'after the move')
+    await waitFor('late has the edit', async () => (await grid(late, newId))['3,1'] === 'after the move')
     await waitFor('the owner gets what Late typed offline', async () => (await grid(owner, newId))['5,1'] === 'typed offline', { timeout: 30000 })
   })
 

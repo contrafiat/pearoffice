@@ -54,7 +54,8 @@ test('invites, roles and membership', async (t) => {
     editorLink = (await call(owner, 'sheet:invite', { sheetId, role: 'editor' })).link
     await call(editor, 'sheet:join', { link: editorLink })
     await waitFor('editor is a member', async () => editor.bases.get(sheetId) && (await call(editor, 'sheet:view', { sheetId })).myRole === 'editor')
-    assert.equal((await grid(editor, sheetId))['1,1'], 'secret-rent')
+    // Values are refreshed a moment after the content arrives (sheets.js).
+    await waitFor('editor has the content', async () => (await grid(editor, sheetId))['1,1'] === 'secret-rent')
     await waitFor('editor writable', async () => editor.bases.get(sheetId).writable)
     await call(editor, 'sheet:setCell', { sheetId, row: 2, col: 1, input: 'from-editor' })
     await waitFor('owner sees the edit', async () => (await grid(owner, sheetId))['2,1'] === 'from-editor')
