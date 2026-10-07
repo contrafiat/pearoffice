@@ -295,7 +295,7 @@ button, input, select { font: inherit; color: inherit; }
 /* The person at the bottom of the sidebar: opens Settings. */
 .me-bar { margin-top: auto; display: flex; align-items: center; gap: 2px; border-top: 1px solid var(--line); padding-top: 6px; }
 .me-row { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; background: none; border: 0; padding: 4px 6px; cursor: pointer; color: var(--ink); text-align: left; font: inherit; }
-.me-bar .about-button { flex: none; color: var(--muted); background: none; border: 0; padding: 6px; }
+.me-bar .about-button { flex: none; display: flex; align-items: center; justify-content: center; align-self: stretch; line-height: 0; color: var(--muted); background: none; border: 0; padding: 0 6px; }
 .me-bar .about-button:hover { color: var(--pear-dark); }
 .me-row:hover .me-name, .me-row:hover .gear { color: var(--pear-dark); }
 .me-row .me-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
