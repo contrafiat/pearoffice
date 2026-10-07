@@ -18,6 +18,7 @@ const { createDeleting } = require('./deleting')
 const { createProfiles } = require('./profiles')
 const { createPresence } = require('./presence')
 const { createRediscover } = require('./rediscover')
+const { createWake } = require('./wake')
 const { createPictures } = require('./pictures')
 const model = require('../sheet/sheetModel')
 
@@ -198,6 +199,13 @@ function createSheetEngine (opts = {}) {
     if (pictures) await pictures.close()
     return coreClose()
   }
+  // Phones: rebuild the swarm when the worklet resumes after a pause.
+  const wake = createWake({ getSwarm: () => engine.swarm, log })
+  if (typeof Bare !== 'undefined' && Bare.on) {
+    Bare.on('suspend', () => wake.suspended())
+    Bare.on('resume', () => { wake.resumed().catch(() => {}) })
+  }
+  engine.wake = wake
   engine.sheets = sheets
   engine.autoCompact = autoCompact // for tests
   engine.checkTidied = (sheetId) => deleting.checkTidied(sheetId) // for tests

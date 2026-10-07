@@ -45,6 +45,7 @@ export function DevicesPanel ({ initialLink = '', startWith = null, onBack = nul
             </div>
             <h3>Recovery phrase</h3>
             <p>24 words that bring back your identity if you lose every device. Anyone with them can act as you.</p>
+            <p className='muted'>They do not hold your files. After a restore, the owner of each file invites you back. Files only you own need another linked device to survive.</p>
             <div className='row'>
               <button onClick={async () => { try { setPhrase((await call('link:phrase')).phrase); setMode('phrase'); call('app:phraseNudged').catch(() => {}) } catch (err) { onError(err.message) } }}><Key size={16} /> Show phrase</button>
               <button onClick={() => setMode('restore')}><ArrowCounterClockwise size={16} /> Restore</button>
@@ -56,6 +57,7 @@ export function DevicesPanel ({ initialLink = '', startWith = null, onBack = nul
         {mode === 'show' && (
           <>
             <p>Open this link on your new device within 5 minutes. It gives that device your identity, so only use it on your own device.</p>
+            <p className='muted'>Keep PearOffice open on this screen until the new device has joined. If you leave to send the link, come back here.</p>
             {link && (
               <div className='row'>
                 <input readOnly value={link.link} aria-label='Device link' onFocus={(e) => e.target.select()} />

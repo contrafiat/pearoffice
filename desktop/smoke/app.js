@@ -9,6 +9,10 @@ const path = require('node:path')
 module.exports = async function app (t) {
   const { js, step, waitFor, openSettings, win, getTray, dataDir, result, sleep } = t
 
+  // The empty screen's start buttons (PEAROFFICE_SMOKE_EMPTY_SHOT=<file>).
+  await t.shot('PEAROFFICE_SMOKE_EMPTY_SHOT')
+  result.startButtonSizes = await js("[...document.querySelectorAll('.empty-actions > *')].map((b) => { const r = b.getBoundingClientRect(); return b.tagName + ' ' + Math.round(r.width) + 'x' + Math.round(r.height) }).join(', ')")
+  result.startButtonsEqual = await js("(() => { const w = [...document.querySelectorAll('.empty-actions > *')].map((b) => Math.round(b.getBoundingClientRect().width)); const h = [...document.querySelectorAll('.empty-actions > *')].map((b) => Math.round(b.getBoundingClientRect().height)); return w.length === 3 && Math.max(...w) - Math.min(...w) <= 1 && Math.max(...h) - Math.min(...h) <= 1 })()")
   // New asks the kind: spreadsheet, document or slides.
   await js("document.querySelector('.sidebar .new-sheet').click()")
   await waitFor('kind choices', "document.querySelectorAll('.kind-choice').length === 3")
@@ -172,5 +176,5 @@ module.exports = async function app (t) {
   await waitFor('opened from the list', "!!document.querySelector('.grid .body')")
   step('file list')
 
-  return result.about && result.donation && result.kinds === 'Spreadsheet, Document, Slides' && result.fileIcons === result.sheetsAfter && result.keepOnline && result.avatar && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.inviteLink.startsWith('pearoffice://join?s=')
+  return result.startButtonsEqual && result.about && result.donation && result.kinds === 'Spreadsheet, Document, Slides' && result.fileIcons === result.sheetsAfter && result.keepOnline && result.avatar && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.inviteLink.startsWith('pearoffice://join?s=')
 }
