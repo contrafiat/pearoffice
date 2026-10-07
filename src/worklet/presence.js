@@ -1,15 +1,19 @@
 // Who has a file open, and where: the cell in a sheet, the text cursor in a
-// document. Protomux channel `pearoffice/presence/1`
-// (proposals/2026-10-05-presence.md, 2026-10-06-documents.md). Kept in
-// memory only; nothing here is stored.
+// document, the slide and boxes in a deck. Protomux channel
+// `pearoffice/presence/1` (proposals/2026-10-05-presence.md,
+// 2026-10-06-documents.md, 2026-10-06-slides.md). Kept in memory only;
+// nothing here is stored.
 //
 //   hello  { t, sheetId, identity, device, at, sig }    once, when the channel opens
-//   state  { t, open, tab, row, col, editing, cursor }  on change, and every 20 s
+//   state  { t, open, tab, row, col, editing, cursor,
+//            slide, sel, box }                          on change, and every 20 s
 //   bye    { t }                                         when the file is closed
 //
 // `cursor` is { anchor, head }, each a Yjs relative position
-// (Y.encodeRelativePosition) in base64. Older builds drop it (cleanState), so
-// they show a document user as here, without a cursor.
+// (Y.encodeRelativePosition) in base64. In a deck, `slide` is the slide on
+// screen, `sel` the selected element ids (up to 20) and `box` the text box
+// `cursor` is in. Older builds drop the fields they do not know (cleanState),
+// so they show a document or deck user as here, with nothing else.
 //
 // A channel exists only while both devices have the sheet open. Neither side
 // sends a state until it has checked the other's hello: signed by a current
@@ -40,6 +44,15 @@ function cleanCursor (c) {
   return anchor && head ? { anchor, head } : null
 }
 
+const ID_MAX = 64
+const SEL_MAX = 20
+const id = (v) => (typeof v === 'string' && v.length > 0 && v.length <= ID_MAX ? v : null)
+
+function cleanSel (v) {
+  if (!Array.isArray(v)) return []
+  return [...new Set(v.map(id).filter(Boolean))].slice(0, SEL_MAX)
+}
+
 function cleanState (s) {
   return {
     open: !!(s && s.open),
@@ -47,7 +60,10 @@ function cleanState (s) {
     row: num(s && s.row),
     col: num(s && s.col),
     editing: !!(s && s.editing),
-    cursor: cleanCursor(s && s.cursor)
+    cursor: cleanCursor(s && s.cursor),
+    slide: id(s && s.slide),
+    sel: cleanSel(s && s.sel),
+    box: id(s && s.box)
   }
 }
 
@@ -85,7 +101,7 @@ function createPresence ({ engine, emit, log = () => {}, now = () => Date.now() 
     const out = []
     for (const ch of channels.get(sheetId) || []) {
       if (!ch.peer || !ch.state || !ch.state.open) continue
-      out.push({ identity: ch.peer.identity, device: ch.peer.device, tab: ch.state.tab, row: ch.state.row, col: ch.state.col, editing: ch.state.editing, cursor: ch.state.cursor })
+      out.push({ identity: ch.peer.identity, device: ch.peer.device, tab: ch.state.tab, row: ch.state.row, col: ch.state.col, editing: ch.state.editing, cursor: ch.state.cursor, slide: ch.state.slide, sel: ch.state.sel, box: ch.state.box })
     }
     return out
   }

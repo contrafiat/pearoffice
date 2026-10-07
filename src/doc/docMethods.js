@@ -15,7 +15,7 @@ const { MIMES, TOO_BIG, MAX_BYTES } = require('../worklet/pictures')
 const hex = (buf) => b4a.toString(buf, 'hex')
 
 function createDocMethods (sheets, { getJoin, getPictures }) {
-  const { profileName, myRole, frozenInfo, isFrozen, requireEdit, commit, docFor } = createFileHelpers(sheets)
+  const { profileName, requireEdit, commit, docFor, replicaState, replicaUpdate } = createFileHelpers(sheets)
 
   const methods = {
     'doc:create': async ({ title = 'Untitled document' } = {}, ctx) => {
@@ -33,41 +33,12 @@ function createDocMethods (sheets, { getJoin, getPictures }) {
       return { sheetId: groupId }
     },
 
-    // The whole document, for the editor's copy. From here on the editor
-    // gets doc:updated events for it. withState false: only the role and
-    // the rest, when the editor already has the content.
-    'doc:state': async ({ sheetId, withState = true }, ctx) => {
-      const { e, doc } = await docFor(sheetId)
-      e.docOpen = true
-      const role = (await isFrozen(ctx, sheetId)) ? 'viewer' : await myRole(ctx, sheetId)
-      const base = ctx.bases.get(sheetId)
-      return {
-        sheetId,
-        state: withState ? b4a.toString(model.encodeState(doc), 'base64') : undefined,
-        title: model.title(doc),
-        // Just joined: the content has not arrived yet.
-        loading: !doc.getMap('meta').has('kind'),
-        // Made by a newer build: open it read-only rather than drop content
-        // this editor does not know.
-        newer: docModel.version(doc) > docModel.VERSION,
-        myRole: role,
-        frozen: await frozenInfo(ctx, sheetId),
-        writable: !!(base && base.writable)
-      }
-    },
+    // The whole document, for the editor's copy (replicaState).
+    'doc:state': ({ sheetId, withState = true }, ctx) =>
+      replicaState(ctx, sheetId, { withState, newer: (doc) => docModel.version(doc) > docModel.VERSION }),
 
-    // An edit from the editor, as a Yjs update. It goes into the worklet's
-    // copy the guarded way (so a bad one changes nothing) and then out to
-    // everyone like any other edit.
-    'doc:update': async ({ sheetId, update }, ctx) => {
-      await requireEdit(ctx, sheetId)
-      const { e, doc } = await docFor(sheetId)
-      if (model.kind(doc) !== 'doc') throw new Error('Not a document')
-      if (typeof update !== 'string' || !update) throw new Error('Nothing to save')
-      const bytes = b4a.from(update, 'base64')
-      if (!e.guarded.apply(bytes, 'ui')) throw new Error('That edit could not be saved')
-      return commit(ctx, sheetId, bytes)
-    },
+    // An edit from the editor, as a Yjs update (replicaUpdate).
+    'doc:update': ({ sheetId, update }, ctx) => replicaUpdate(ctx, sheetId, update, 'doc', 'a document'),
 
     // A picture for the document (proposals/2026-10-06-document-images.md):
     // stored in this device's picture core for the file, and the document

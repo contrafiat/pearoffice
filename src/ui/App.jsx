@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { call, on } from './bridge.js'
 import { SheetView } from './sheet/SheetView.jsx'
 import { DocView } from './doc/DocView.jsx'
+import { SlidesView } from './slides/SlidesView.jsx'
 import { JoinPanel, JoinProgress, JoinPill } from './JoinPanel.jsx'
 import { SeederPanel } from './SeederPanel.jsx'
 import { DevicesPanel } from './DevicesPanel.jsx'
@@ -60,7 +61,7 @@ function ImportButton ({ className, onImported, onError }) {
 
 // Whether this build has an editor for the file's kind. Older builds learn
 // about newer kinds through device linking (proposals/2026-10-06-documents.md).
-const EDITORS = ['sheet', 'doc']
+const EDITORS = ['sheet', 'doc', 'slides']
 function kindOf (files, sheetId) {
   const f = files && files.find((x) => x.sheetId === sheetId)
   return (f && f.kind) || 'sheet'
@@ -190,11 +191,13 @@ export function App () {
 
   async function create (kind) {
     setNewFile(false)
-    if (!EDITORS.includes(kind)) return // slides are not built yet
+    if (!EDITORS.includes(kind)) return
     try {
       const { sheetId } = kind === 'doc'
         ? await call('doc:create', { title: 'Untitled document' })
-        : await call('sheet:create', { title: 'Untitled sheet' })
+        : kind === 'slides'
+          ? await call('slides:create', { title: 'Untitled slides' })
+          : await call('sheet:create', { title: 'Untitled sheet' })
       await refresh()
       setCurrent(sheetId)
     } catch (err) {
@@ -314,7 +317,9 @@ export function App () {
             )
           : current && kindOf(sheets, current) === 'doc'
             ? <DocView key={current} sheetId={current} onTitleChange={refresh} onError={setError} onGone={async () => { forget(current); await refresh() }} />
-            : current
+            : current && kindOf(sheets, current) === 'slides'
+              ? <SlidesView key={current} sheetId={current} onTitleChange={refresh} onError={setError} onGone={async () => { forget(current); await refresh() }} />
+              : current
               ? <SheetView key={current} sheetId={current} onTitleChange={refresh} onError={setError} onGone={async () => { forget(current); await refresh() }} />
               : sheets && sheets.length
                 ? (

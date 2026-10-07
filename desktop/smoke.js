@@ -1,7 +1,7 @@
 // Desktop smoke test: builds the UI and the worklet, then runs each part of
-// smoke-run.js (sheets, sheet-files, docs, app) in its own Electron launch
+// smoke-run.js (sheets, sheet-files, docs, slides, app) in its own Electron launch
 // with an offscreen window and a throwaway data folder.
-// Usage: node desktop/smoke.js [--part sheets|sheet-files|docs|app] [screenshot.png]
+// Usage: node desktop/smoke.js [--part sheets|sheet-files|docs|slides|app] [screenshot.png]
 
 const path = require('node:path')
 const { execFileSync } = require('node:child_process')

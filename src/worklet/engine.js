@@ -9,6 +9,7 @@ const { createApplyOps } = require('./sheetWire')
 const { createSheetMethods } = require('../sheet/sheetMethods')
 const { createFileMethods } = require('./fileMethods')
 const { createDocMethods } = require('../doc/docMethods')
+const { createSlidesMethods } = require('../slides/slidesMethods')
 const { createJoinService } = require('./join')
 const { createSeeding } = require('./seeding')
 const { createMoves } = require('./moves')
@@ -69,6 +70,7 @@ function createSheetEngine (opts = {}) {
     ...createFileMethods(sheets, deps),
     ...createSheetMethods(sheets, deps),
     ...createDocMethods(sheets, deps),
+    ...createSlidesMethods(sheets, deps),
     // Who has a sheet open (proposals/2026-10-05-presence.md).
     'sheet:presence': async ({ sheetId, ...state }) => { if (presence) presence.set(sheetId, state); return {} },
     'sheet:present': async ({ sheetId }) => ({ people: presence ? presence.list(sheetId) : [] }),

@@ -30,12 +30,12 @@ import {
 // applied from doc:updated. Undo is the editor's own and only undoes this
 // person's edits.
 
-const COLOURS = ['#1f2420', '#b3261e', '#c2410c', '#a16207', '#15803d', '#0e7490', '#1d4ed8', '#7e22ce']
-const HIGHLIGHTS = ['#fef08a', '#fed7aa', '#fecaca', '#bbf7d0', '#a5f3fc', '#bfdbfe', '#ddd6fe', '#e5e7eb']
+export const COLOURS = ['#1f2420', '#b3261e', '#c2410c', '#a16207', '#15803d', '#0e7490', '#1d4ed8', '#7e22ce']
+export const HIGHLIGHTS = ['#fef08a', '#fed7aa', '#fecaca', '#bbf7d0', '#a5f3fc', '#bfdbfe', '#ddd6fe', '#e5e7eb']
 const DEFAULT_SIZE = '11'
 const FONTS = [['', 'Sans'], ['serif', 'Serif'], ['monospace', 'Mono']]
 const STYLES = [['normal', 'Normal text'], ['title', 'Title'], ['subtitle', 'Subtitle'], ['h1', 'Heading 1'], ['h2', 'Heading 2'], ['h3', 'Heading 3']]
-const ALIGNS = [['left', 'Align left', TextAlignLeft], ['center', 'Centre', TextAlignCenter], ['right', 'Align right', TextAlignRight], ['justify', 'Justify', TextAlignJustify]]
+export const ALIGNS = [['left', 'Align left', TextAlignLeft], ['center', 'Centre', TextAlignCenter], ['right', 'Align right', TextAlignRight], ['justify', 'Justify', TextAlignJustify]]
 const SEND_MS = 300
 const CURSOR_MS = 150
 const TOAST_MS = 5000
@@ -597,7 +597,7 @@ function DocEditor ({ sheetId, pictures, ydoc, canEdit, phone, finding, setFindi
 
 // This person's selection as Yjs relative positions (base64), which stay put
 // while others edit. Null until the editor is bound to the document.
-function cursorOf (state) {
+export function cursorOf (state) {
   const y = ySyncPluginKey.getState(state)
   if (!y || !y.binding || !y.binding.mapping.size) return null
   const { anchor, head } = state.selection
@@ -609,7 +609,7 @@ function cursorOf (state) {
 // Awareness: a numeric id per device, { user, cursor } with JSON relative
 // positions, and a 'change' event. Presence carries the states instead of an
 // awareness channel, so this holds no local state of its own.
-function remoteCursors () {
+export function remoteCursors () {
   const states = new Map()
   const ids = new Map() // device -> id
   const listeners = new Set()
@@ -646,7 +646,7 @@ function caret (user) {
   return el
 }
 
-const RemoteCursors = Extension.create({
+export const RemoteCursors = Extension.create({
   name: 'remoteCursors',
   addOptions: () => ({ others: null }),
   addProseMirrorPlugins () {
@@ -712,7 +712,7 @@ function outdent (editor) {
 }
 
 // A link for the selection (or the link under the caret), typed inline.
-function LinkBar ({ editor, initial, onClose }) {
+export function LinkBar ({ editor, initial, onClose }) {
   const [href, setHref] = useState(initial || '')
   function apply () {
     const url = href.trim()

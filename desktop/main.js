@@ -231,7 +231,7 @@ ipcMain.handle('worklet:call', async (_e, method, args) => {
     if (win && !win.isDestroyed()) win.webContents.reload()
     return { ok: true }
   }
-  if (typeof method !== 'string' || !/^(sheet|file|doc|app|seeder|link|donation):[A-Za-z]+$/.test(method)) throw new Error('bad method')
+  if (typeof method !== 'string' || !/^(sheet|file|doc|slides|app|seeder|link|donation):[A-Za-z]+$/.test(method)) throw new Error('bad method')
   await worklet.ready()
   return worklet.call(method, args || {})
 })

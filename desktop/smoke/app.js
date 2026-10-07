@@ -9,7 +9,7 @@ const path = require('node:path')
 module.exports = async function app (t) {
   const { js, step, waitFor, openSettings, win, getTray, dataDir, result, sleep } = t
 
-  // New asks the kind: spreadsheet, document or slides (not yet).
+  // New asks the kind: spreadsheet, document or slides.
   await js("document.querySelector('.sidebar .new-sheet').click()")
   await waitFor('kind choices', "document.querySelectorAll('.kind-choice').length === 3")
   await t.shot('PEAROFFICE_SMOKE_NEW_SHOT')
@@ -163,5 +163,5 @@ module.exports = async function app (t) {
   await waitFor('opened from the list', "!!document.querySelector('.grid .body')")
   step('file list')
 
-  return result.about && result.donation && result.kinds === 'Spreadsheet, Document, Slides (soon)' && result.fileIcons === result.sheetsAfter && result.keepOnline && result.avatar && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.inviteLink.startsWith('pearoffice://join?s=')
+  return result.about && result.donation && result.kinds === 'Spreadsheet, Document, Slides' && result.fileIcons === result.sheetsAfter && result.keepOnline && result.avatar && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.inviteLink.startsWith('pearoffice://join?s=')
 }

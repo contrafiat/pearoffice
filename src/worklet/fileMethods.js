@@ -88,7 +88,43 @@ function createFileHelpers (sheets) {
     return { e, doc: e.guarded.doc }
   }
 
-  return { profileName, viewGet, peopleOf, myRole, frozenInfo, isFrozen, requireOwner, requireEdit, commit, docFor }
+  // The whole file, for an editor that keeps its own copy (documents and
+  // slides). From here on the editor gets doc:updated events for it.
+  // withState false: only the role and the rest, when it has the content.
+  // `newer`: made by a newer build, so open it read-only rather than drop
+  // content this editor does not know.
+  async function replicaState (ctx, sheetId, { withState = true, newer = () => false } = {}) {
+    const { e, doc } = await docFor(sheetId)
+    e.docOpen = true
+    const role = (await isFrozen(ctx, sheetId)) ? 'viewer' : await myRole(ctx, sheetId)
+    const base = ctx.bases.get(sheetId)
+    return {
+      sheetId,
+      state: withState ? b4a.toString(model.encodeState(doc), 'base64') : undefined,
+      title: model.title(doc),
+      // Just joined: the content has not arrived yet.
+      loading: !doc.getMap('meta').has('kind'),
+      newer: newer(doc),
+      myRole: role,
+      frozen: await frozenInfo(ctx, sheetId),
+      writable: !!(base && base.writable)
+    }
+  }
+
+  // An edit from such an editor, as a Yjs update. It goes into the worklet's
+  // copy the guarded way (so a bad one changes nothing) and then out to
+  // everyone like any other edit.
+  async function replicaUpdate (ctx, sheetId, update, kind, label) {
+    await requireEdit(ctx, sheetId)
+    const { e, doc } = await docFor(sheetId)
+    if (model.kind(doc) !== kind) throw new Error('Not ' + label)
+    if (typeof update !== 'string' || !update) throw new Error('Nothing to save')
+    const bytes = b4a.from(update, 'base64')
+    if (!e.guarded.apply(bytes, 'ui')) throw new Error('That edit could not be saved')
+    return commit(ctx, sheetId, bytes)
+  }
+
+  return { profileName, viewGet, peopleOf, myRole, frozenInfo, isFrozen, requireOwner, requireEdit, commit, docFor, replicaState, replicaUpdate }
 }
 
 function createFileMethods (sheets, { getJoin, getMoves, getProfiles }) {

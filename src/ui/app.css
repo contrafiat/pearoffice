@@ -865,3 +865,117 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 .doc-body p.is-editor-empty:first-child::before { content: attr(data-placeholder); float: left; height: 0; color: var(--muted); pointer-events: none; }
 .doc-body .find-match { background: rgb(250 204 21 / 0.4); border-radius: 2px; }
 .doc-body .find-match.current { background: rgb(249 115 22 / 0.55); }
+
+/* Slides (src/ui/slides/, proposals/2026-10-06-slides.md). The slide itself
+   is drawn in the deck's theme colours whatever the app's theme; the space
+   around it follows the app. */
+.slides { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.slides-tools { position: relative; }
+.slides-tools .layout-select { width: 150px; }
+.slides-tools .font-select { width: 76px; }
+.slides-tools .size-select { width: 56px; }
+.slides-tools select:disabled { opacity: 0.4; cursor: default; }
+.slides-link { position: absolute; top: 100%; left: 0; right: 0; z-index: 11; box-shadow: 0 6px 16px rgb(0 0 0 / 0.1); }
+.slides-row { display: flex; flex: 1; min-height: 0; }
+.slides-main { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; background: var(--head); }
+
+/* The slide list. */
+.slide-list { flex: none; width: 228px; display: flex; flex-direction: column; min-height: 0; background: var(--panel); border-right: 1px solid var(--line); }
+.slide-add { display: flex; gap: 0; padding: 10px 12px 6px; }
+.slide-add button { border: 1px solid var(--line-strong); background: var(--panel); color: var(--ink); height: 32px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; font: inherit; font-size: 13px; }
+.slide-add .add-slide { flex: 1; border-radius: 8px 0 0 8px; }
+.slide-add .add-layout { width: 32px; border-left: 0; border-radius: 0 8px 8px 0; }
+.slide-add button:hover { background: var(--head); }
+.slide-thumbs { list-style: none; margin: 0; padding: 6px 8px 24px; overflow-y: auto; flex: 1; min-height: 0; outline: none; }
+.slide-thumb { position: relative; display: flex; align-items: flex-start; gap: 6px; padding: 6px 4px; border-radius: 8px; cursor: pointer; user-select: none; }
+.slide-thumb:hover { background: var(--head); }
+.slide-number { width: 18px; flex: none; text-align: right; font-size: 12px; color: var(--muted); padding-top: 2px; font-variant-numeric: tabular-nums; }
+.thumb-frame { position: relative; flex: none; border: 2px solid var(--line); border-radius: 6px; overflow: hidden; background: #fff; box-sizing: content-box; }
+.slide-thumb.current .thumb-frame { border-color: var(--pear); }
+.slide-thumbs:focus-visible .slide-thumb.current .thumb-frame { box-shadow: 0 0 0 3px var(--pear-soft); }
+.slide-thumb.dragging { opacity: 0.45; }
+.slide-thumb.drop-before::before, .slide-thumb.drop-after::after { content: ''; position: absolute; left: 28px; right: 4px; height: 3px; border-radius: 2px; background: var(--pear); }
+.slide-thumb.drop-before::before { top: -2px; }
+.slide-thumb.drop-after::after { bottom: -2px; }
+.thumb { position: absolute; inset: 0; pointer-events: none; }
+.thumb .slide { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+.thumb-people { position: absolute; right: 4px; bottom: 4px; display: flex; gap: 2px; }
+.thumb-person { display: inline-flex; border-radius: 50%; box-shadow: 0 0 0 2px var(--who); }
+.thumb-more { position: absolute; right: 8px; top: 8px; width: 26px; height: 26px; display: none; align-items: center; justify-content: center; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--ink); cursor: pointer; }
+.slide-thumb:hover .thumb-more, .slide-thumb.current .thumb-more { display: inline-flex; }
+.slide-list.phone { width: auto; flex-direction: row; border-right: 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.slide-list.phone .slide-thumbs { display: flex; gap: 4px; overflow-x: auto; overflow-y: hidden; padding: 6px 8px; scrollbar-width: none; }
+.slide-list.phone .slide-thumbs::-webkit-scrollbar { display: none; }
+.slide-list.phone .slide-thumb { flex-direction: column; align-items: center; gap: 2px; padding: 4px; }
+.slide-list.phone .slide-number { width: auto; text-align: center; padding: 0; }
+.slide-list.phone .thumb-more { top: 22px; right: 8px; }
+.slide-list.phone .slide-thumb.add { justify-content: flex-end; }
+.slide-list.phone .slide-thumb.add .add-slide { display: inline-flex; align-items: center; justify-content: center; border: 2px dashed var(--line-strong); border-radius: 6px; background: none; color: var(--muted); margin-top: 18px; }
+.slide-list.phone .slide-thumb.drop-before::before { left: -3px; right: auto; top: 18px; bottom: 4px; width: 3px; height: auto; }
+
+/* The stage: the slide scaled to fit, with selection drawn over it. */
+.slide-stage { position: relative; flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; outline: none; }
+.slide-holder { position: relative; flex: none; box-shadow: 0 2px 14px rgb(0 0 0 / 0.14); }
+.slide { position: absolute; left: 0; top: 0; transform-origin: 0 0; overflow: hidden; background: var(--slide-bg); color: var(--slide-ink); font-family: var(--slide-body); }
+.slide-el { position: absolute; transform-origin: 50% 50%; }
+.slide-stage.layout .slide-el { cursor: move; }
+.slide-stage.phone .slide-el, .slide-stage .slide-el.editing { cursor: text; }
+.slide-stage:not(.layout):not(.phone) .slide-el { cursor: default; }
+.slide-stage .slide-el:has(.slide-empty-mark) { outline: 2px dashed rgb(0 0 0 / 0.18); outline-offset: -2px; }
+.slide-empty-mark { display: none; }
+.slide-text { position: absolute; left: 0; top: 0; transform-origin: 0 0; font-size: var(--slide-body-size); line-height: 1.2; overflow-wrap: break-word; }
+.slide-text.role-title { font-family: var(--slide-heading); font-size: var(--slide-title-size); font-weight: var(--slide-title-weight); line-height: 1.1; }
+.slide-live, .slide-text .slide-body { height: 100%; }
+.slide-body { outline: none; white-space: pre-wrap; padding: 6px 10px; box-sizing: border-box; }
+.slide-text.role-title .slide-body { display: flex; flex-direction: column; justify-content: center; }
+.slide-body p { margin: 0; min-height: 1.2em; }
+.slide-body ul, .slide-body ol { margin: 0; padding-left: 1.3em; }
+.slide-body li > p { margin: 0 0 0.25em; }
+.slide-body ul[data-type='taskList'] { list-style: none; padding-left: 0.2em; }
+.slide-body ul[data-type='taskList'] li { display: flex; align-items: flex-start; gap: 0.4em; }
+.slide-body blockquote { margin: 0; padding-left: 0.6em; border-left: 0.15em solid currentColor; opacity: 0.8; }
+.slide-body hr { border: 0; border-top: 0.06em solid currentColor; margin: 0.4em 0; }
+.slide-body a { color: var(--accent1); text-decoration: underline; }
+.slide-body mark { color: inherit; border-radius: 0.1em; }
+.slide-body code { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-size: 0.9em; }
+.slide-placeholder { position: absolute; inset: 0; margin: 0; padding: 6px 10px; color: var(--slide-muted); pointer-events: none; display: flex; }
+.slide-text.role-title .slide-placeholder { align-items: center; }
+/* A title slide's title and subtitle are centred. */
+.slide[data-layout='title'] .slide-el[data-role] .slide-text { text-align: center; }
+.slide[data-layout='title'] .slide-el[data-role] .slide-placeholder { justify-content: center; }
+.slide-body p.is-editor-empty:first-child::before { content: attr(data-placeholder); float: left; height: 0; color: var(--slide-muted); pointer-events: none; }
+.slide-overlay { position: absolute; inset: 0; pointer-events: none; }
+.sel-frame { position: absolute; border: 1.5px solid var(--pear); transform-origin: 50% 50%; margin: -1px 0 0 -1px; }
+.sel-frame.editing { border-style: dashed; }
+.handle { position: absolute; width: 10px; height: 10px; margin: -5px 0 0 -5px; background: #fff; border: 1.5px solid var(--pear); border-radius: 2px; pointer-events: auto; touch-action: none; }
+.h-nw { left: 0; top: 0; }
+.h-n { left: 50%; top: 0; }
+.h-ne { left: 100%; top: 0; }
+.h-e { left: 100%; top: 50%; }
+.h-se { left: 100%; top: 100%; }
+.h-s { left: 50%; top: 100%; }
+.h-sw { left: 0; top: 100%; }
+.h-w { left: 0; top: 50%; }
+.rotate-handle { position: absolute; left: 50%; top: -30px; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; background: #fff; border: 1.5px solid var(--pear); pointer-events: auto; cursor: grab; touch-action: none; }
+.rotate-handle::after { content: ''; position: absolute; left: 5px; top: 13px; width: 1.5px; height: 16px; background: var(--pear); }
+.guide { position: absolute; background: #e5487a; pointer-events: none; }
+.guide.v { top: 0; bottom: 0; width: 1px; }
+.guide.h { left: 0; right: 0; height: 1px; }
+.remote-sel { position: absolute; border: 2px solid var(--who); transform-origin: 50% 50%; margin: -2px 0 0 -2px; }
+.remote-sel.typing { border-style: dashed; }
+.remote-sel .presence-tag { left: -2px; bottom: 100%; }
+.slide-deleted { flex-direction: column; gap: 12px; color: var(--muted); }
+.slide-deleted p { margin: 0; font-size: 15px; }
+.slide-deleted button { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--pear); background: var(--pear); color: #fff; border-radius: 8px; padding: 8px 16px; cursor: pointer; font: inherit; font-weight: 500; }
+
+/* Speaker notes under the slide. */
+.slide-notes { flex: none; height: 132px; overflow-y: auto; background: var(--panel); border-top: 1px solid var(--line); padding: 10px 18px; cursor: text; }
+.notes-body { outline: none; min-height: 100%; font-size: 14px; line-height: 1.45; color: var(--ink); }
+.notes-body p { margin: 0 0 4px; }
+.notes-body ul, .notes-body ol { margin: 0 0 4px; padding-left: 1.4em; }
+.notes-body p.is-editor-empty:first-child::before { content: attr(data-placeholder); float: left; height: 0; color: var(--muted); pointer-events: none; }
+.slides.phone .slide-stage { flex: none; height: 46vw; min-height: 180px; }
+.slides.phone .slide-notes { flex: 1; height: auto; min-height: 80px; }
+@media (max-width: 720px) {
+  .slide-list:not(.phone) { width: 150px; }
+}

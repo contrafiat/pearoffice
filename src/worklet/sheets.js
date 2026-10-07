@@ -267,8 +267,9 @@ function createSheets ({ emit, getBase, getLocalDb = () => null, getStore = () =
 
   function trackUndo (e) {
     const doc = e.guarded.doc
-    // A document's editor keeps its own undo (src/ui/doc/DocView.jsx).
-    const scope = model.kind(doc) === 'doc'
+    // A document's or deck's editor keeps its own undo (src/ui/doc/DocView.jsx,
+    // src/ui/slides/SlidesView.jsx).
+    const scope = model.kind(doc) !== 'sheet'
       ? [doc.getMap('meta')]
       : [doc.getMap('meta'), doc.getArray('tabs'), ...model.tabIds(doc).map((id) => doc.getMap('tab:' + id))]
     // captureTimeout 0: every edit is its own undo step. The default (500 ms)
@@ -299,7 +300,7 @@ function createSheets ({ emit, getBase, getLocalDb = () => null, getStore = () =
   }
 
   function values (e) {
-    if (model.kind(e.guarded.doc) === 'doc') return new Map() // no formulas in a document
+    if (model.kind(e.guarded.doc) !== 'sheet') return new Map() // formulas are only in sheets
     if (!e.values) e.values = evaluateSheet(e.guarded.doc)
     return e.values
   }
