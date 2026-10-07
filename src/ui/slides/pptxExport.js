@@ -124,7 +124,16 @@ export function pptxChart (value, theme) {
   }
   if (type === 'area' && chart.stacked) options.barGrouping = 'stacked'
   if (type === 'doughnut') options.holeSize = 60
-  if (pie && chart.dataLabels) options.showPercent = false
+  // Pie labels as PearOffice draws them (SlideChart.jsx compactPie): with a
+  // legend, the percentage inside each slice; without one, name, value and
+  // percentage.
+  if (pie && chart.dataLabels) {
+    const withLegend = legend !== 'none'
+    options.showValue = !withLegend
+    options.showPercent = true
+    options.showLabel = !withLegend
+    if (withLegend) options.dataLabelPosition = 'ctr'
+  }
   if (type === 'line' && chart.smooth) options.lineSmooth = true
   if (type === 'scatter') options.lineSize = 0
   if (type === 'radar') options.radarStyle = 'marker'
