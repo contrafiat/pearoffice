@@ -64,9 +64,9 @@ export function JoinProgress ({ entry, onBackground, onClose, onError }) {
   ]
   return (
     <div className='panel-backdrop' onMouseDown={(e) => { if (e.target === e.currentTarget) onBackground() }}>
-      <section className='panel join-progress' role='dialog' aria-label='Joining a sheet'>
+      <section className='panel join-progress' role='dialog' aria-label='Joining a file'>
         <header>
-          <h2>Joining {entry.title ? '"' + entry.title + '"' : 'a sheet'}</h2>
+          <h2>Joining {entry.title ? '"' + entry.title + '"' : 'a file'}</h2>
           <button className='close' aria-label='Keep going in the background' onClick={onBackground}><X size={18} /></button>
         </header>
         <CircleNotch className='join-spinner' size={40} aria-hidden='true' />
@@ -109,7 +109,7 @@ export function JoinPill ({ entries, onOpen }) {
   return (
     <button className='join-pill' onClick={() => onOpen(first.sheetId)}>
       <CircleNotch size={16} className='spin' aria-hidden='true' />
-      {entries.length > 1 ? 'Joining ' + entries.length + ' sheets...' : first.title ? 'Joining "' + first.title + '"...' : 'Joining a sheet...'}
+      {entries.length > 1 ? 'Joining ' + entries.length + ' files...' : first.title ? 'Joining "' + first.title + '"...' : 'Joining a file...'}
     </button>
   )
 }

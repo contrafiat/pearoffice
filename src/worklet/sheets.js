@@ -110,12 +110,12 @@ function createSheets ({ emit, getBase, getLocalDb = () => null, getStore = () =
   function load (sheetId) {
     // Asked about a sheet this device does not hold (yet): fail without
     // leaving an entry behind, so a later call after joining loads it.
-    if (!open.has(sheetId) && !getBase(sheetId)) return Promise.reject(new Error('unknown sheet: ' + sheetId))
+    if (!open.has(sheetId) && !getBase(sheetId)) return Promise.reject(new Error('unknown file: ' + sheetId))
     const e = entryFor(sheetId)
     if (!e.loading) {
       e.loading = (async () => {
         const base = getBase(sheetId)
-        if (!base) throw new Error('unknown sheet: ' + sheetId)
+        if (!base) throw new Error('unknown file: ' + sheetId)
         await base.ready()
         const fork = base.view.core.fork
         const snap = await readSnapshot(sheetId)

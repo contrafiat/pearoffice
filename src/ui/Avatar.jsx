@@ -90,7 +90,7 @@ export async function shrinkPicture (file) {
 // of the rest.
 // A green ring marks those with the sheet open now (present: identity ->
 // "here" or "on <tab>"); they come first.
-export function PeopleStack ({ sheetId, members, present = new Map(), max = 3, size = 26, noun = 'sheet', onClick }) {
+export function PeopleStack ({ sheetId, members, present = new Map(), max = 3, size = 26, noun = 'file', onClick }) {
   const sorted = [...members].sort((a, b) => (present.has(b.identity) && !b.isMe) - (present.has(a.identity) && !a.isMe))
   const shown = sorted.slice(0, max)
   const rest = members.length - shown.length

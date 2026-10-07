@@ -63,7 +63,7 @@ function createMoves ({ engine, sheets, getJoin, getDeleting = () => null, getPi
     const me = hex(engine.identity.publicKey)
     if (identity === me) throw new Error('The owner cannot remove themselves')
     const members = await ownerCheck(oldId, 'Only the owner can remove people')
-    if (!members.some((x) => x.identity === identity)) throw new Error('Not a member of this sheet')
+    if (!members.some((x) => x.identity === identity)) throw new Error('Not a member of this file')
     return moveSheet(oldId, members.filter((x) => x.identity !== identity), 'remove')
   }
 
@@ -71,15 +71,15 @@ function createMoves ({ engine, sheets, getJoin, getDeleting = () => null, getPi
   // is out, since a move does not carry invites and the link would stop
   // working.
   async function compact (oldId) {
-    const members = await ownerCheck(oldId, 'Only the owner can tidy up a sheet')
-    if (await openInvites(oldId)) throw new Error('An invite link for this sheet has not been used yet')
+    const members = await ownerCheck(oldId, 'Only the owner can tidy up a file')
+    if (await openInvites(oldId)) throw new Error('An invite link for this file has not been used yet')
     return moveSheet(oldId, members, 'compact')
   }
 
   async function ownerCheck (oldId, message) {
     const sheet = await viewGet(oldId, 'sheet')
     if (!sheet || sheet.owner !== hex(engine.identity.publicKey)) throw new Error(message)
-    if (await viewGet(oldId, 'moved')) throw new Error('This sheet has already moved')
+    if (await viewGet(oldId, 'moved')) throw new Error('This file has already moved')
     return membersOf(oldId)
   }
 

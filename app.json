@@ -40,7 +40,7 @@
       "buildNumber": "1",
       "supportsTablet": true,
       "infoPlist": {
-        "NSLocalNetworkUsageDescription": "PearOffice connects directly to the people you share sheets with, and to your own devices, on your Wi-Fi.",
+        "NSLocalNetworkUsageDescription": "PearOffice connects directly to the people you share files with, and to your own devices, on your Wi-Fi.",
         "NSBonjourServices": [
           "_hyperswarm._udp",
           "_pearofficelan._tcp"

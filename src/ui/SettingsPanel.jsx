@@ -95,14 +95,14 @@ export function SettingsPanel ({ me, onMe, desktop, keepOnline, startAtLogin, on
                 </span>
               </form>
             </div>
-            <p className='small'>The people you share sheets with see your name and picture.</p>
+            <p className='small'>The people you share files with see your name and picture.</p>
 
             {desktop && keepOnline !== null && (
               <>
                 <h3>This computer</h3>
                 <label className='check keep-online'>
                   <input type='checkbox' checked={keepOnline} onChange={(e) => onSetting({ keepOnline: e.target.checked })} />
-                  <span>Keep sheets online when closed<br /><span className='small muted'>Closing the window hides PearOffice in the tray, so people can sync with you while this computer is on.</span></span>
+                  <span>Keep files online when closed<br /><span className='small muted'>Closing the window hides PearOffice in the tray, so people can sync with you while this computer is on.</span></span>
                 </label>
                 {keepOnline && (
                   <label className='check start-at-login'>
@@ -126,7 +126,7 @@ export function SettingsPanel ({ me, onMe, desktop, keepOnline, startAtLogin, on
             <h3>Sharing</h3>
             <label className='check show-me'>
               <input type='checkbox' checked={showMe} onChange={(e) => { setShowMe(e.target.checked); writePref('pearoffice:presence', e.target.checked ? '1' : '0') }} />
-              <span>Show others when I have a sheet open<br /><span className='small muted'>They see which cell you are on. When this is off, you do not see them either.</span></span>
+              <span>Show others when I have a file open<br /><span className='small muted'>They see which cell, line or slide you are on. When this is off, you do not see them either.</span></span>
             </label>
 
             <h3>Appearance</h3>
@@ -141,7 +141,7 @@ export function SettingsPanel ({ me, onMe, desktop, keepOnline, startAtLogin, on
             <div className='row'><button className='settings-devices' onClick={onDevices}><Devices size={16} /> Devices and recovery phrase</button></div>
 
             <h3>Seeder</h3>
-            <p className='small'>An always-on computer that keeps an encrypted copy of your sheets online. It cannot read them.</p>
+            <p className='small'>An always-on computer that keeps an encrypted copy of your files online. It cannot read them.</p>
             <div className='row'><button className='settings-seeder' onClick={onSeeder}><HardDrives size={16} /> Seeder</button></div>
 
             <h3>Help</h3>

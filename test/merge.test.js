@@ -87,7 +87,7 @@ test('asking for a sheet before it exists does not break loading it later', asyn
   const { createSheets } = require('../src/worklet/sheets')
   let base = null
   const sheets = createSheets({ emit: () => {}, getBase: () => base })
-  await assert.rejects(sheets.load('s1'), /unknown sheet/)
+  await assert.rejects(sheets.load('s1'), /unknown file/)
   const Hyperbee = require('hyperbee')
   const Corestore = require('corestore')
   const store = new Corestore(require('./helpers').tmpDir())

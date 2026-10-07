@@ -40,7 +40,7 @@ async function main () {
   const seeder = await createSeeder({ dataDir, log: say })
   if (forgetOnStart) {
     const r = await seeder.forgetDevice(forgetOnStart)
-    say(r.forgotten ? 'forgot that device; ' + r.dropping + ' sheet(s) will be deleted in 7 days' : 'that device was not paired')
+    say(r.forgotten ? 'forgot that device; ' + r.dropping + ' file(s) will be deleted in 7 days' : 'that device was not paired')
   }
   // Forget a device by its full key or a unique start of it.
   async function forget (prefix) {
@@ -95,11 +95,11 @@ async function main () {
         else if (cmd === 'devices') {
           const list = await seeder.devices()
           if (!list.length) say('no paired devices')
-          for (const d of list) say(d.deviceKey + '  paired ' + new Date(d.pairedAt || 0).toISOString().slice(0, 10) + '  ' + d.sheets + ' sheet(s)')
+          for (const d of list) say(d.deviceKey + '  paired ' + new Date(d.pairedAt || 0).toISOString().slice(0, 10) + '  ' + d.sheets + ' file(s)')
         } else if (cmd.startsWith('forget ')) {
           try {
             const r = await forget(cmd.slice(7))
-            say('forgot that device; ' + r.dropping + ' sheet(s) will be deleted in 7 days')
+            say('forgot that device; ' + r.dropping + ' file(s) will be deleted in 7 days')
           } catch (err) { say(err.message) }
         } else if (cmd) say('commands: pair, status, devices, forget <device key>')
       }

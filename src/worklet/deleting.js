@@ -69,9 +69,9 @@ function createDeleting ({ engine, sheets, getSeeding, getPictures = () => null,
 
   async function deleteForEveryone (sheetId) {
     const base = engine.bases.get(sheetId)
-    if (!base) throw new Error('unknown sheet: ' + sheetId)
+    if (!base) throw new Error('unknown file: ' + sheetId)
     const sheet = await viewGet(base, 'sheet')
-    if (!sheet || sheet.owner !== hex(engine.identity.publicKey)) throw new Error('Only the owner can delete a sheet for everyone')
+    if (!sheet || sheet.owner !== hex(engine.identity.publicKey)) throw new Error('Only the owner can delete a file for everyone')
     await engine.append(sheetId, m.deleteOp({ sheetId, owner: engine.identity }))
     // onDeleted runs when apply records it (the engine's onMembership hook).
     return { ok: true }

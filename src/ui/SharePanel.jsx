@@ -11,7 +11,7 @@ function hoursLeft (expiresAt) {
   return h <= 0 ? 'less than an hour left' : h === 1 ? '1 hour left' : h + ' hours left'
 }
 
-export function SharePanel ({ sheetId, onClose, onError }) {
+export function SharePanel ({ sheetId, noun = 'file', onClose, onError }) {
   const [data, setData] = useState(null)
   const [link, setLink] = useState(null) // { link, role }
   const [copied, setCopied] = useState(false)
@@ -60,7 +60,7 @@ export function SharePanel ({ sheetId, onClose, onError }) {
 
   return (
     <div className='panel-backdrop' onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
-      <section className='panel' role='dialog' aria-label='Share this sheet'>
+      <section className='panel' role='dialog' aria-label={'Share this ' + noun}>
         <header>
           <h2>Share</h2>
           <button className='close' aria-label='Close' onClick={onClose}><X size={18} /></button>
@@ -93,7 +93,7 @@ export function SharePanel ({ sheetId, onClose, onError }) {
               </div>
             )}
             {!isOwner && <p className='muted'>Only the owner can invite people or change roles.</p>}
-            {isOwner && confirming && <p className='warn'>Removing someone moves the sheet to new keys. They keep what they already had and see nothing new. Anyone editing the old copy at that moment may lose that last change.</p>}
+            {isOwner && confirming && <p className='warn'>Removing someone moves the {noun} to new keys. They keep what they already had and see nothing new. Anyone editing the old copy at that moment may lose that last change.</p>}
 
             <h3>People</h3>
             <ul className='people'>
@@ -146,7 +146,7 @@ export function SharePanel ({ sheetId, onClose, onError }) {
               </>
             )}
 
-            <Backups sheetId={sheetId} members={data.members} onError={onError} />
+            <Backups sheetId={sheetId} noun={noun} members={data.members} onError={onError} />
           </>
         )}
       </section>
@@ -155,7 +155,7 @@ export function SharePanel ({ sheetId, onClose, onError }) {
 }
 
 // The seeders this sheet backs up to (proposals/2026-10-04-stop-backing-up.md).
-function Backups ({ sheetId, members, onError }) {
+function Backups ({ sheetId, noun, members, onError }) {
   const [info, setInfo] = useState(null)
   const [busy, setBusy] = useState(null) // seeder key being changed
 
@@ -195,7 +195,7 @@ function Backups ({ sheetId, members, onError }) {
           </li>
         ))}
       </ul>
-      {info.listed.some((s) => s.canStop) && <p className='muted small'>Stopping a seeder deletes its copy of this sheet after 7 days.</p>}
+      {info.listed.some((s) => s.canStop) && <p className='muted small'>Stopping a seeder deletes its copy of this {noun} after 7 days.</p>}
     </>
   )
 }

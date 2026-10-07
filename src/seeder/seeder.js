@@ -97,7 +97,7 @@ async function createSeeder ({ dataDir, bootstrap = null, log = () => {} }) {
       if (ref && allowed.has(ref)) { vouched.set(stream, ref); return ref }
       if (!ref && vouched.has(stream)) return vouched.get(stream)
       log('refused cores from ' + remote.slice(0, 8))
-      throw new Error('This seeder only stores sheets registered by a paired device')
+      throw new Error('This seeder only stores files registered by a paired device')
     },
 
     // Remember which cores belong to which sheet, so a drop can find them.
@@ -260,7 +260,7 @@ async function createSeeder ({ dataDir, bootstrap = null, log = () => {} }) {
         if (!m || (m.t !== 'drop' && m.t !== 'keep')) return
         const remote = hex(conn.remotePublicKey)
         if (!paired.has(remote)) return msg.send({ t: 'no', reason: 'Only paired devices can ask for that' })
-        if (typeof m.bootstrap !== 'string' || !allowed.has(m.bootstrap)) return msg.send({ t: 'no', reason: 'This seeder does not hold that sheet' })
+        if (typeof m.bootstrap !== 'string' || !allowed.has(m.bootstrap)) return msg.send({ t: 'no', reason: 'This seeder does not hold that file' })
         if (m.t === 'keep') return msg.send({ t: 'ok', cancelled: await keep(m.bootstrap, remote) })
         msg.send({ t: 'ok', due: await scheduleDrop(m.bootstrap, m.afterMs) })
       }

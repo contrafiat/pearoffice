@@ -63,9 +63,9 @@ export function FileBar ({ sheetId, noun, title, myRole, frozen, canEdit, badge,
           )}
         </span>
       </header>
-      {sharing && <SharePanel sheetId={sheetId} onClose={() => setSharing(false)} onError={onError} />}
-      {tidying && <TidyPanel sheetId={sheetId} title={title} onClose={() => setTidying(false)} onError={onError} onDone={() => setTidying(false)} />}
-      {deleting && <DeletePanel sheetId={sheetId} title={title} kind={deleting} onClose={() => setDeleting(null)} onError={onError} onDone={() => { setDeleting(null); onGone() }} />}
+      {sharing && <SharePanel sheetId={sheetId} noun={noun} onClose={() => setSharing(false)} onError={onError} />}
+      {tidying && <TidyPanel sheetId={sheetId} title={title} noun={noun} onClose={() => setTidying(false)} onError={onError} onDone={() => setTidying(false)} />}
+      {deleting && <DeletePanel sheetId={sheetId} title={title} noun={noun} kind={deleting} onClose={() => setDeleting(null)} onError={onError} onDone={() => { setDeleting(null); onGone() }} />}
     </>
   )
 }

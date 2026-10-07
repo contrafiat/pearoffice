@@ -17,7 +17,7 @@ const LIGHTNING_WALLETS = [
   { name: 'Wallet of Satoshi', url: 'https://walletofsatoshi.com', desc: 'Beginner-friendly Lightning wallet' },
   { name: 'Phoenix', url: 'https://phoenix.acinq.co', desc: 'Self-custodial Lightning wallet' }
 ]
-const SHARE_TEXT = 'Check out PearOffice - private, peer-to-peer spreadsheets with no servers or accounts.\n\nhttps://peerloomllc.com/'
+const SHARE_TEXT = 'Check out PearOffice - private, peer-to-peer spreadsheets, documents and slides with no servers or accounts.\n\nhttps://peerloomllc.com/'
 
 // The main open-source parts of PearOffice and their licences.
 const CREDITS = [
@@ -116,7 +116,7 @@ export function AboutContent ({ startSection = null, onBitcoin, onTour }) {
         </Section>
       )}
       <Section id='share' title='Share the app' open={open === 'share'} onToggle={toggle}>
-        <p>Know someone who would want private, serverless spreadsheets they can share? Tell them about PearOffice.</p>
+        <p>Know someone who would want private spreadsheets, documents and slides they can share without a server? Tell them about PearOffice.</p>
         <div className='row center'>
           {mobile()
             ? <button onClick={() => call('app:share', { text: SHARE_TEXT }).catch(() => {})}><ShareNetwork size={16} /> Share PearOffice</button>

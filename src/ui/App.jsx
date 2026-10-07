@@ -11,7 +11,7 @@ import { Avatar, MemberAvatar } from './Avatar.jsx'
 import { SettingsPanel } from './SettingsPanel.jsx'
 import { UpdateBar } from './UpdateBar.jsx'
 import { applyTheme } from './theme.js'
-import { FileHome, NewPanel } from './Files.jsx'
+import { FileHome, NewPanel, untitled } from './Files.jsx'
 import { DonationReminder, donationsShown } from './About.jsx'
 import { Onboarding } from './Onboarding.jsx'
 import { FileArrowUp, GearSix, House, Info, LinkSimple, List, Plus } from '@phosphor-icons/react'
@@ -164,12 +164,12 @@ export function App () {
         setCurrent(sheetId)
         setWaitingJoin((w) => (w === sheetId ? null : w))
         const s = list && list.find((x) => x.sheetId === sheetId)
-        setToast('Joined ' + (s && s.title ? '"' + s.title + '"' : 'the sheet'))
+        setToast('Joined ' + (s && s.title ? '"' + s.title + '"' : 'the file'))
       }),
       // A sheet moved to fresh keys: follow it if it is the one on screen.
       on('sheet:moved', async ({ from, to }) => { await refresh(); setCurrent((c) => (c === from ? to : c)) }),
       on('sheet:removed', refresh),
-      on('sheet:tidied', () => setNotice('PearOffice tidied up a long sheet: devices now keep it as it is, not every change ever made.')),
+      on('sheet:tidied', () => setNotice('PearOffice tidied up a long file: devices now keep it as it is, not every change ever made.')),
       // Any edit or membership change anywhere: titles, roles and people in
       // the sidebar stay live. Batched, since edits arrive in bursts.
       on('sheet:changed', refreshSoon),
@@ -179,8 +179,8 @@ export function App () {
       // A sheet left this device (removed here, deleted by its owner, or an
       // old copy after a move).
       on('sheet:gone', async ({ sheetId }) => { forget(sheetId); await refresh() }),
-      on('join:gaveUp', async () => { setNotice('PearOffice stopped waiting to join a sheet after 7 days. Ask for a new invite.'); await refresh() }),
-      on('sheet:deleted', ({ title }) => setNotice('"' + (title || 'A sheet') + '" was deleted by its owner.')),
+      on('join:gaveUp', async () => { setNotice('PearOffice stopped waiting to join a file after 7 days. Ask for a new invite.'); await refresh() }),
+      on('sheet:deleted', ({ title }) => setNotice('"' + (title || 'A file') + '" was deleted by its owner.')),
       on('app:deeplink', ({ url }) => { call('app:takeLink').catch(() => {}); openLink(url) })
     ]
     // A link that opened the app before this page was listening.
@@ -245,7 +245,7 @@ export function App () {
             <button
               key={s.sheetId}
               className={'sheet-link' + (s.sheetId === current ? ' active' : '') + (s.joining ? ' joining' : '') + (s.waiting ? ' waiting' : '') + (s.removed ? ' removed' : '')}
-              title={s.waiting ? 'Waiting for someone in this sheet to come online' : s.removed ? 'You were removed from this sheet' : undefined}
+              title={s.waiting ? 'Waiting for someone in this file to come online' : s.removed ? 'You were removed from this file' : undefined}
               onClick={() => (s.waiting ? setWaitingJoin(s.sheetId) : setCurrent(s.sheetId))}
             >
               {s.owner
@@ -255,7 +255,7 @@ export function App () {
                   </span>
                   )
                 : <span className='sheet-owner placeholder' aria-hidden='true' />}
-              <span className='sheet-title'>{s.waiting ? 'Joining...' : (s.title || 'Untitled sheet')}</span>
+              <span className='sheet-title'>{s.waiting ? 'Joining...' : (s.title || untitled(s.kind))}</span>
               {s.joining && !s.waiting && <span className='badge'>joining</span>}
               {!s.joining && s.people > 1 && (
                 <span className='people-count' title={s.people + ' people'} aria-label={s.people + ' people'}>
