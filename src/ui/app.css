@@ -1104,3 +1104,79 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 .presenter-foot button:disabled { opacity: 0.35; cursor: default; }
 .presenter-foot button.on { border-color: #8bc061; color: #8bc061; }
 
+
+/* The first-run welcome and tour (Onboarding.jsx): a centred dialog on
+   desktop, the whole screen on phones. */
+.ob-backdrop { position: fixed; inset: 0; z-index: 40; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgb(0 0 0 / 0.38); backdrop-filter: blur(3px); animation: pearoffice-fade-in 0.2s ease; }
+.ob-backdrop.hidden { display: none; }
+.ob-card { width: min(460px, 100%); min-height: min(540px, calc(100vh - 32px)); max-height: calc(100vh - 32px); overflow-y: auto; display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--line-strong); border-radius: 18px; box-shadow: 0 24px 70px rgb(0 0 0 / 0.28); padding: 20px 28px 24px; color: var(--ink); }
+.ob-name-form { display: flex; flex-direction: column; flex: 1; }
+.ob-top { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; min-height: 28px; }
+.ob-dots { grid-column: 2; display: flex; gap: 6px; list-style: none; margin: 0; padding: 0; }
+.ob-dots li { width: 8px; height: 8px; border-radius: 4px; background: var(--line-strong); transition: width 0.2s ease; }
+.ob-dots li.done { background: var(--pear); opacity: 0.45; }
+.ob-dots li.on { width: 22px; background: var(--pear); }
+.ob-card .ob-skip { grid-column: 3; justify-self: end; text-decoration: none; font-size: 14px; color: var(--muted); padding: 4px 2px; }
+.ob-card .ob-skip:hover { color: var(--ink); }
+.ob-body { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; text-align: center; padding: 18px 0 8px; animation: ob-in 0.22s ease; }
+@keyframes ob-in { from { opacity: 0; transform: translateY(6px); } }
+@media (prefers-reduced-motion: reduce) { .ob-body, .ob-backdrop { animation: none; } }
+.ob-body p { margin: 0; max-width: 36ch; color: var(--muted); font-size: 15px; line-height: 1.55; }
+.ob-title { margin: 4px 0 0; font-size: 23px; font-weight: 500; line-height: 1.25; color: var(--ink); }
+.ob-icon { width: 84px; height: 84px; border-radius: 50%; display: grid; place-items: center; background: var(--pear-soft); color: var(--pear-dark); margin-bottom: 4px; }
+.ob-pear { position: relative; width: 46px; height: 58px; margin: 4px 0 6px; background: var(--pear); border-radius: 50% 50% 46% 46% / 40% 40% 60% 60%; box-shadow: inset -6px -8px 0 rgb(0 0 0 / 0.08); }
+.ob-pear::before { content: ''; position: absolute; top: -9px; left: 21px; width: 4px; height: 12px; border-radius: 2px; background: var(--pear-dark); transform: rotate(12deg); }
+.ob-pear::after { content: ''; position: absolute; top: -10px; left: 25px; width: 15px; height: 9px; border-radius: 0 100% 0 100%; background: var(--pear); transform: rotate(-12deg); }
+.ob-kinds { display: flex; justify-content: center; gap: 12px; list-style: none; margin: 10px 0 0; padding: 0; width: 100%; }
+.ob-kinds li { flex: 1 1 0; max-width: 112px; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 6px 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); font-size: 13px; color: var(--ink); }
+.ob-roles { list-style: none; margin: 4px 0 0; padding: 0; width: 100%; max-width: 320px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); text-align: left; }
+.ob-roles li { display: flex; align-items: baseline; gap: 12px; padding: 9px 14px; font-size: 14px; }
+.ob-roles li + li { border-top: 1px solid var(--line); }
+.ob-roles b { flex: none; width: 52px; font-weight: 500; color: var(--ink); }
+.ob-roles span { color: var(--muted); }
+.ob-body .ob-hint { display: flex; align-items: flex-start; gap: 10px; max-width: 340px; padding: 10px 14px; border-radius: 12px; background: var(--head); color: var(--ink); font-size: 13.5px; line-height: 1.45; text-align: left; }
+.ob-hint svg { flex: none; margin-top: 1px; color: var(--pear-dark); }
+.ob-card button:where(:not(.link-button)), .ob-card label.ob-import { flex: 1 1 0; min-width: 0; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 11px 16px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--panel); color: var(--ink); font: inherit; font-size: 15px; line-height: 1.2; cursor: pointer; white-space: nowrap; }
+.ob-card button:where(:not(.link-button)):hover:not(:disabled), .ob-card label.ob-import:hover { background: var(--head); }
+.ob-card button.primary { background: var(--pear); border-color: var(--pear); color: var(--panel); font-weight: 500; }
+.ob-card button.primary:hover:not(:disabled) { background: var(--pear-dark); border-color: var(--pear-dark); }
+.ob-card button:disabled { opacity: 0.45; cursor: default; }
+.ob-card button:focus-visible, .ob-card label.ob-import:focus-within { outline: 2px solid var(--pear); outline-offset: 2px; }
+.ob-foot { display: flex; gap: 10px; margin-top: 18px; }
+.ob-foot.one { justify-content: center; }
+.ob-foot.one button { flex: 0 1 280px; }
+.ob-card button.ob-show-phrase { flex: none; width: min(280px, 100%); margin-top: 4px; }
+.ob-actions { display: flex; flex-direction: column; gap: 10px; width: min(300px, 100%); margin-top: 6px; }
+.ob-actions > * { flex: none !important; }
+.ob-card input.ob-name { width: min(300px, 100%); padding: 11px 14px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--paper); color: var(--ink); font: inherit; font-size: 16px; text-align: center; }
+.ob-card input.ob-name:focus { outline: none; border-color: var(--pear); box-shadow: 0 0 0 3px var(--pear-soft); }
+.ob-card button.ob-picture { position: relative; flex: none; padding: 0; border: 0; border-radius: 50%; background: none; }
+.ob-card button.ob-picture:hover { background: none; }
+.ob-welcome-foot { flex-direction: column; align-items: center; }
+.ob-foot.ob-welcome-foot button { flex: none; }
+.ob-foot.ob-welcome-foot button.primary { width: min(280px, 100%); }
+.ob-card .ob-have { font: inherit; font-size: 14.5px; color: var(--pear-dark); padding: 6px 8px; }
+.ob-choices { display: flex; flex-direction: column; gap: 10px; width: min(360px, 100%); margin-top: 6px; }
+.ob-card button.ob-choice { flex: none; justify-content: flex-start; gap: 14px; padding: 14px 14px 14px 12px; border-radius: 12px; text-align: left; white-space: normal; }
+.ob-choice-icon { flex: none; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: var(--pear-soft); color: var(--pear-dark); }
+.ob-choice-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.ob-choice-text b { font-weight: 500; font-size: 15px; }
+.ob-choice-text span { color: var(--muted); font-size: 13.5px; line-height: 1.4; }
+.ob-choice-go { flex: none; color: var(--muted); }
+.ob-card input.ob-link { font-size: 14px; }
+.ob-card textarea.ob-phrase { width: min(340px, 100%); box-sizing: border-box; padding: 11px 14px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--paper); color: var(--ink); font: inherit; font-size: 15px; line-height: 1.5; resize: none; }
+.ob-card textarea.ob-phrase:focus { outline: none; border-color: var(--pear); box-shadow: 0 0 0 3px var(--pear-soft); }
+.ob-body p.ob-count { font-size: 13px; margin-top: -6px; }
+.ob-body p.ob-error { color: var(--error); font-size: 14px; }
+.ob-card button.scan-button { flex: none; width: min(300px, 100%); }
+.ob-waiting .join-spinner { margin-bottom: 4px; }
+.ob-camera { position: absolute; right: -2px; bottom: -2px; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--pear); color: var(--panel); border: 3px solid var(--panel); }
+@media (max-width: 720px) {
+  .ob-backdrop { padding: 0; background: var(--panel); backdrop-filter: none; }
+  .ob-card {
+    width: 100%; height: 100%; min-height: 0; max-height: none; border: 0; border-radius: 0; box-shadow: none;
+    padding: calc(14px + env(safe-area-inset-top)) calc(20px + env(safe-area-inset-right)) calc(20px + env(safe-area-inset-bottom)) calc(20px + env(safe-area-inset-left));
+  }
+  .ob-title { font-size: 22px; }
+  .ob-foot { margin-top: 14px; }
+}

@@ -57,6 +57,10 @@ theme and presence. Part 2 presents: full screen with keys and clickers, a
 presenter view on a second display (an audience window opened by
 `desktop/main.js`) and phones (landscape fills the screen, portrait shows
 notes). Part 3 adds shapes, pictures and four themes; part 4 PDF and .pptx export and .pptx import.
+A first launch shows a welcome, asks your name and gives a short tour
+(`src/ui/Onboarding.jsx`; once per device, `app:onboarding` and
+`app:onboarded`; a device with a file or a name counts as done). Settings
+and About replay the tour.
 See `TODO.md`.
 
 ## Layout
@@ -102,7 +106,7 @@ Code that works for any kind of file sits apart from each editor's own
 - `src/sheet/jsonImport.js` turns a .json file into the same import payload
   as an .xlsx (a tab per list of records, the rest on a Summary tab).
 - `src/ui/` - the React UI: the app shell, file list, sharing, seeder,
-  devices and settings panels, About and donations (`About.jsx`). `src/ui/sheet/` is the spreadsheet editor
+  devices and settings panels, About and donations (`About.jsx`), the first-run welcome and tour (`Onboarding.jsx`). `src/ui/sheet/` is the spreadsheet editor
   (grid, toolbar, its panels, charts, `xlsx.js` file handling). Talks only to
   `window.pearoffice` (`call`, `on`), which the desktop preload and the mobile
   WebView provide. Built to `dist/ui` by `scripts/build-ui.mjs`.
@@ -257,7 +261,7 @@ builds are signed and notarized; Linux and Windows builds are unsigned
   bundle must create, edit and read a sheet over stdin/stdout, and the seeder
   bundle must start and print a pairing link.
 - `npm run smoke:desktop`: drives the real UI in Electron with an offscreen
-  window and real key and mouse events, in eleven parts. Each part is its own
+  window and real key and mouse events, in thirteen parts. Each part is its own
   launch with a throwaway data folder and a 60 s limit, and prints one
   `ok`/`not ok` line, then a summary line. `sheets` is the grid editor
   (typing, formulas, spilling, fill, charts, copy and paste, undo, zoom; about
@@ -304,7 +308,14 @@ builds are signed and notarized; Linux and Windows builds are unsigned
   saves each type in Plain and Midnight, the tools and the data panel.
   `app` is the shell: the New picker, theme, Seeder and Devices panels, the
   local seeder, keep online, start at login, profile picture, About, sharing,
-  backups, removing a file and the file list (about 16 s). The parts are in
+  backups, removing a file and the file list (about 16 s). `onboarding` is
+  the first-run welcome, name and tour, Show my phrase, finishing with New
+  file, a started tour coming back, "I already use PearOffice" (link and
+  restore steps, errors, waiting and Cancel) and the tour from Settings and
+  About (about 6 s; `PEAROFFICE_SMOKE_ONBOARDING_SHOTS=<folder>` saves
+  every step, light, dark and phone). `onboarding-restore` restores from a
+  phrase through the real restart and the welcome back note (about 2 s). The other parts start with it done
+  (`PEAROFFICE_NO_ONBOARDING=1`, honoured only in a smoke run). The parts are in
   `desktop/smoke/<part>.js`, `desktop/smoke-run.js` picks one from
   `PEAROFFICE_SMOKE_PART` and `desktop/smoke/launch.js` runs them in turn.
   Run one with `node desktop/smoke.js --part docs` (a comma list works).

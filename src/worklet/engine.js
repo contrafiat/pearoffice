@@ -97,6 +97,7 @@ function createSheetEngine (opts = {}) {
     'sheet:deleteForEveryone': async ({ sheetId }) => deleting.deleteForEveryone(sheetId),
     'link:start': async () => linking.start(),
     'link:join': async ({ link }) => linking.join(link),
+    'link:cancel': async () => linking.cancel(),
     'link:phrase': async () => ({ phrase: linking.phrase() }),
     'app:restorePhrase': async ({ phrase }) => linking.restore(phrase),
     // Close stores cleanly, then exit. The desktop shell calls this on quit.
