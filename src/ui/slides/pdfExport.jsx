@@ -114,6 +114,9 @@ export async function deckHtml (ydoc, title, pictures) {
       'html,body{margin:0;padding:0}' +
       '.page{position:relative;width:' + pw + 'px;height:' + ph + 'px;overflow:hidden;break-after:page;page-break-after:always}' +
       '.page:last-child{break-after:auto;page-break-after:auto}' +
+      // Zoom, not a transform: Android's PDF engine lays out the slide's
+      // unscaled 1920 px box, which shrank and clipped every page there.
+      '.page>.slide{transform:none!important;zoom:' + scale + '}' +
       FONT_CSS + SLIDE_CSS
     return '<!doctype html><html><head><meta charset="utf-8"><title>' + esc(title) + '</title><style>' + css + '</style></head><body>' + body + '</body></html>'
   } finally {
