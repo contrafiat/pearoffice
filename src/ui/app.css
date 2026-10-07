@@ -945,6 +945,9 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 .slide-empty-mark { display: none; }
 .slide-text { position: absolute; left: 0; top: 0; transform-origin: 0 0; font-size: var(--slide-body-size); line-height: 1.2; overflow-wrap: break-word; }
 .slide-text.role-title { font-family: var(--slide-heading); font-size: var(--slide-title-size); font-weight: var(--slide-title-weight); line-height: 1.1; }
+/* Bold on slides is always the heaviest bundled weight: "bolder" from a light
+   title (Midnight's 300) only reached 400 and looked regular. */
+.slide-text strong, .slide-text b { font-weight: 600; }
 .slide-live, .slide-text .slide-body { height: 100%; }
 .slide-body { outline: none; white-space: pre-wrap; padding: 6px 10px; box-sizing: border-box; }
 .slide-text.role-title .slide-body { display: flex; flex-direction: column; justify-content: center; }
