@@ -133,7 +133,7 @@ module.exports = async function app (t) {
   await waitFor('own picture shown', "!!document.querySelector('.panel .me-picture img.avatar') && !!document.querySelector('.me-row img.avatar')")
   result.avatar = await js("document.querySelector('.me-row img.avatar').src.startsWith('data:image/jpeg;base64,')")
   // About: version and the open-source list.
-  await js("document.querySelector('.panel .about-link').click()")
+  await js("document.querySelector('.sidebar .about-button').click()")
   await waitFor('about', "document.querySelector('.panel').textContent.includes('Open-source software') && /Version \\d/.test(document.querySelector('.panel').textContent)")
   // Support development opens the Bitcoin sheet; back returns to About.
   await js("[...document.querySelectorAll('.about-toggle')].find((b) => b.textContent.trim() === 'Support development').click()")

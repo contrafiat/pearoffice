@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { PearMark } from './PearMark.jsx'
 import { ArrowCounterClockwise, ArrowLeft, ArrowRight, ArrowsClockwise, Camera, CaretRight, CircleNotch, Devices, GearSix, HardDrives, Key, LinkSimple, Plus, RocketLaunch, ShieldCheck } from '@phosphor-icons/react'
 import { call } from './bridge.js'
 import { Avatar, shrinkPicture } from './Avatar.jsx'
@@ -177,7 +178,7 @@ export function Onboarding ({ tourOnly = false, hidden = false, me, onMe, onPhra
 
         {step === 'welcome' && (
           <div className='ob-body'>
-            <span className='ob-pear' aria-hidden='true' />
+            <PearMark size={58} className='ob-pear-mark' />
             <h2 className='ob-title'>Welcome to PearOffice</h2>
             <p>Spreadsheets, documents and slides that you share straight from your devices. No account and no servers.</p>
             <ul className='ob-kinds' aria-label='What you can make'>

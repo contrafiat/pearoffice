@@ -14,7 +14,8 @@ import { applyTheme } from './theme.js'
 import { FileHome, NewPanel } from './Files.jsx'
 import { DonationReminder, donationsShown } from './About.jsx'
 import { Onboarding } from './Onboarding.jsx'
-import { FileArrowUp, GearSix, House, LinkSimple, List, Plus } from '@phosphor-icons/react'
+import { FileArrowUp, GearSix, House, Info, LinkSimple, List, Plus } from '@phosphor-icons/react'
+import { PearMark } from './PearMark.jsx'
 
 applyTheme()
 
@@ -85,7 +86,11 @@ function StartActions ({ onNew, onJoin, onImported, onError }) {
 export function App () {
   const [sheets, setSheets] = useState(null)
   const [current, setCurrent] = useState(null)
-  const [error, setError] = useState(null)
+  const [error, setErrorNow] = useState(null)
+  // While the worklet restarts with another identity (a link or a restore),
+  // calls in flight fail; those errors would flash in a banner just before
+  // the page reloads (src/ui/takeIdentity.js sets the flag).
+  const setError = useCallback((m) => { if (m && window.__pearRestarting) return; setErrorNow(m) }, [])
   const [joining, setJoining] = useState(null) // initial link text, or '' for an empty panel
   const [name, setName] = useState(null)
   const [avatar, setAvatar] = useState(null) // { data, mime, hash } or null
@@ -222,7 +227,7 @@ export function App () {
       {navOpen && <div className='nav-scrim' onClick={() => setNavOpen(false)} />}
       <aside className='sidebar' onClick={(e) => { if (e.target.closest('button')) setNavOpen(false) }}>
         <div className='brand'>
-          <span className='brand-mark' aria-hidden='true' />
+          <PearMark size={20} />
           PearOffice
         </div>
         <button className='new-sheet' onClick={() => setNewFile(true)}><Plus size={16} /> New</button>
@@ -261,11 +266,14 @@ export function App () {
             </button>
           ))}
         </nav>
-        <button className='me-row' onClick={() => setSettings(true)} aria-label='Settings'>
-          <Avatar name={name} src={avatar ? 'data:' + avatar.mime + ';base64,' + avatar.data : null} seed={myId} size={32} />
-          <span className='me-name'>{name || 'Set your name'}</span>
-          <GearSix className='gear' size={20} aria-hidden='true' />
-        </button>
+        <div className='me-bar'>
+          <button className='me-row' onClick={() => setSettings(true)} aria-label='Settings'>
+            <Avatar name={name} src={avatar ? 'data:' + avatar.mime + ';base64,' + avatar.data : null} seed={myId} size={32} />
+            <span className='me-name'>{name || 'Set your name'}</span>
+            <GearSix className='gear' size={20} aria-hidden='true' />
+          </button>
+          <button className='icon-button about-button' aria-label='About PearOffice' title='About PearOffice' onClick={() => setSettings({ mode: 'about' })}><Info size={20} /></button>
+        </div>
       </aside>
       {newFile && <NewPanel onPick={create} onClose={() => setNewFile(false)} />}
       {joining !== null && (
@@ -278,6 +286,7 @@ export function App () {
       )}
       {settings && (
         <SettingsPanel
+          key={typeof settings === 'object' ? 'start-' + settings.mode + '-' + (settings.section || '') : 'settings'}
           me={{ name, avatar, identity: myId }}
           onMe={loadMe}
           desktop={desktop}
