@@ -131,3 +131,53 @@ export function rotated (f, p, { step = false } = {}) {
   }
   return { ...f, rot: Math.round(deg) % 360 }
 }
+
+// Cropping a picture from a handle (dir as for resized): the picture keeps
+// its size on the slide and the frame shows more or less of it. `c` is the
+// crop ({ l, t, r, b }, fractions cut from each side). An edge cannot go
+// past the picture's own edge, and at least a tenth of it stays in each
+// direction. Returns { frame, crop }.
+export function cropped (f, c, dir, p) {
+  const kw = 1 - c.l - c.r
+  const kh = 1 - c.t - c.b
+  const fw = f.w / kw
+  const fh = f.h / kh
+  // The whole picture and the frame, in the frame's own axes about its centre.
+  const fl = -f.w / 2 - c.l * fw
+  const ft = -f.h / 2 - c.t * fh
+  const fr = fl + fw
+  const fb = ft + fh
+  let l = -f.w / 2
+  let r = f.w / 2
+  let t = -f.h / 2
+  let b = f.h / 2
+  const minW = fw * 0.1
+  const minH = fh * 0.1
+  const c0 = centreOf(f)
+  const local = turn(p.x - c0.x, p.y - c0.y, -f.rot)
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
+  if (dir.x < 0) l = clamp(local.x, fl, r - minW)
+  if (dir.x > 0) r = clamp(local.x, l + minW, fr)
+  if (dir.y < 0) t = clamp(local.y, ft, b - minH)
+  if (dir.y > 0) b = clamp(local.y, t + minH, fb)
+  const crop = { l: (l - fl) / fw, t: (t - ft) / fh, r: (fr - r) / fw, b: (fb - b) / fh }
+  for (const k of ['l', 't', 'r', 'b']) crop[k] = Math.round(Math.min(0.9, Math.max(0, crop[k])) * 10000) / 10000
+  const off = turn((l + r) / 2, (t + b) / 2, f.rot)
+  const w = r - l
+  const h = b - t
+  return {
+    frame: { x: Math.round(c0.x + off.x - w / 2), y: Math.round(c0.y + off.y - h / 2), w: Math.max(1, Math.round(w)), h: Math.max(1, Math.round(h)), rot: f.rot },
+    crop
+  }
+}
+
+// The whole picture behind a cropped frame, as a frame of its own.
+export function uncropped (f, c) {
+  const fw = f.w / (1 - c.l - c.r)
+  const fh = f.h / (1 - c.t - c.b)
+  const lx = -f.w / 2 - c.l * fw + fw / 2
+  const ly = -f.h / 2 - c.t * fh + fh / 2
+  const off = turn(lx, ly, f.rot)
+  const c0 = centreOf(f)
+  return { x: c0.x + off.x - fw / 2, y: c0.y + off.y - fh / 2, w: fw, h: fh, rot: f.rot }
+}

@@ -9,7 +9,9 @@
 //
 // pptxgenjs writes a paragraph property block for every run of a paragraph,
 // which PowerPoint calls damaged, and has no option for an arrow's head or
-// shaft, so the slides it writes are tidied up after (tidySlide).
+// shaft or a picture's crop, so the slides it writes are tidied up after
+// (tidySlide). Opacity, where text sits, wrapping, line ends and custom
+// shapes (custGeom from the path, svgPath.js) it writes itself.
 
 import PptxGenJS from 'pptxgenjs'
 import JSZip from 'jszip'
@@ -18,6 +20,7 @@ import slidesModel from '../../slides/slidesModel.js'
 import { ROLES } from '../../slides/layouts.js'
 import { themeFor, defaultSize } from './themes.js'
 import { slideSchema } from './text.js'
+import { parsePath, BOX } from './svgPath.js'
 
 export const PPTX = 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
 
@@ -26,7 +29,28 @@ const inch = (v) => v / PER_IN
 // .slide-body's padding (6px 10px) at TEXT_SCALE, in points.
 const PAD_X = 7.5
 const PAD_Y = 4.5
-const PRESET = { rect: 'rect', roundRect: 'roundRect', ellipse: 'ellipse', triangle: 'triangle', arrow: 'rightArrow', line: 'line' }
+const PRESET = { rect: 'rect', roundRect: 'roundRect', ellipse: 'ellipse', triangle: 'triangle', arrow: 'rightArrow', line: 'line', custom: 'custGeom' }
+const VALIGN = { top: 'top', middle: 'middle', bottom: 'bottom' }
+// Percent see-through, as pptxgenjs takes it; undefined when opaque.
+const transparency = (opacity) => (opacity < 1 ? Math.round((1 - opacity) * 100) : undefined)
+
+// A custom shape's path as pptxgenjs custGeom points, in inches from the
+// corner of a w x h (slide units) box. Null when the path cannot be read.
+export function customPoints (d, w, h) {
+  const segs = parsePath(d)
+  if (!segs) return null
+  const X = (v) => Math.round(inch(v / BOX * w) * 10000) / 10000
+  const Y = (v) => Math.round(inch(v / BOX * h) * 10000) / 10000
+  const out = []
+  for (const sg of segs) {
+    if (sg.c === 'Z') out.push({ close: true })
+    else if (sg.c === 'M') out.push({ x: X(sg.x), y: Y(sg.y), moveTo: true })
+    else if (sg.c === 'L') out.push({ x: X(sg.x), y: Y(sg.y) })
+    else if (sg.c === 'C') out.push({ x: X(sg.x), y: Y(sg.y), curve: { type: 'cubic', x1: X(sg.x1), y1: Y(sg.y1), x2: X(sg.x2), y2: Y(sg.y2) } })
+    else if (sg.c === 'Q') out.push({ x: X(sg.x), y: Y(sg.y), curve: { type: 'quadratic', x1: X(sg.x1), y1: Y(sg.y1) } })
+  }
+  return out
+}
 
 // --- colours and fonts ----------------------------------------------------------
 
@@ -53,8 +77,8 @@ export function slotHex (c, theme) {
 }
 
 // The text colour on a shape's fill, as objects.jsx draws it (inkOn).
-function inkOn (fill, theme) {
-  if (fill === 'none' || fill === 'background') return hexOf(theme.text)
+function inkOn (fill, theme, opacity = 1) {
+  if (fill === 'none' || fill === 'background' || opacity < 0.5) return hexOf(theme.text)
   const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(fill)
   if (!m) return hexOf(theme.background)
   const [r, g, b] = m.slice(1).map((x) => parseInt(x, 16))
@@ -251,6 +275,7 @@ export async function deckToPptx (doc, { title = '', pictures = new Map() } = {}
   pptx.company = 'PearOffice'
   pptx.theme = { headFontFace: fontName(theme.headingFont), bodyFontFace: fontName(theme.bodyFont) }
   const arrows = new Map() // object name -> its avLst
+  const crops = new Map() // object name -> its srcRect
 
   for (const s of slidesModel.slides(doc)) {
     const slide = pptx.addSlide()
@@ -264,15 +289,18 @@ export async function deckToPptx (doc, { title = '', pictures = new Map() } = {}
         const p = pictures.get(String(e.map.get('ref') || ''))
         if (!p || !PICTURE_TYPES.includes(p.mime)) continue
         slide.addImage({ ...box, data: p.mime + ';base64,' + b64(p.bytes), altText: String(e.map.get('alt') || '').slice(0, 500) })
+        const c = slidesModel.crop(e.map)
+        if (c.l || c.t || c.r || c.b) crops.set(box.objectName, '<a:srcRect' + ['l', 't', 'r', 'b'].map((k) => c[k] ? ' ' + k + '="' + Math.round(c[k] * 100000) + '"' : '').join('') + '/>')
         continue
       }
       const role = type === 'text' && ROLES.includes(e.map.get('role')) ? e.map.get('role') : null
       const json = fragmentJson(e.map.get('text'))
       const st = type === 'shape' ? slidesModel.style(e.map) : null
+      const tl = slidesModel.textLayout(e.map)
       const base = {
         fontFace: fontName(role === 'title' ? theme.headingFont : theme.bodyFont),
         fontSize: defaultSize(theme, role),
-        color: st ? inkOn(st.fill, theme) : hexOf(theme.text),
+        color: st ? inkOn(st.fill, theme, st.fillOpacity) : hexOf(theme.text),
         align: st || (titleSlide && role) ? 'center' : 'left',
         lineHeight: role === 'title' ? 1.1 : 1.2
       }
@@ -281,9 +309,9 @@ export async function deckToPptx (doc, { title = '', pictures = new Map() } = {}
         fontSize: base.fontSize,
         color: base.color,
         align: base.align,
-        valign: st || role === 'title' ? 'middle' : 'top',
+        valign: VALIGN[tl.anchor],
         margin: [PAD_X, PAD_X, PAD_Y, PAD_Y], // left, right, bottom, top
-        wrap: true
+        wrap: tl.wrap
       }
       if (type === 'text') {
         if (isEmpty(json)) continue // an empty box draws nothing
@@ -295,18 +323,24 @@ export async function deckToPptx (doc, { title = '', pictures = new Map() } = {}
       const lineHex = st.lineW > 0 ? slotHex(st.line, theme) : null
       const lw = lineHex ? st.lineW : 0
       const shape = { ...box, shape: PRESET[st.shape] }
+      const END = { arrow: 'arrow', triangle: 'triangle', oval: 'oval' }
       if (st.shape === 'line') {
-        Object.assign(shape, { y: inch(f.y + f.h / 2), h: 0, line: { color: lineHex || hexOf(theme.text), width: Math.max(0.25, lw / 2) } })
+        Object.assign(shape, { y: inch(f.y + f.h / 2), h: 0, line: { color: lineHex || hexOf(theme.text), width: Math.max(0.25, lw / 2), transparency: transparency(st.lineOpacity), beginArrowType: END[st.head], endArrowType: END[st.tail] } })
         if (!lineHex) delete shape.line
         if (lineHex) slide.addShape(shape.shape, shape)
         continue
       }
       Object.assign(shape, { x: inch(f.x + lw / 2), y: inch(f.y + lw / 2), w: inch(Math.max(1, f.w - lw)), h: inch(Math.max(1, f.h - lw)) })
       const fill = slotHex(st.fill, theme)
-      if (fill) shape.fill = { color: fill }
-      if (lineHex) shape.line = { color: lineHex, width: lw / 2 }
+      if (fill) shape.fill = { color: fill, transparency: transparency(st.fillOpacity) }
+      if (lineHex) shape.line = { color: lineHex, width: lw / 2, transparency: transparency(st.lineOpacity) }
       const iw = Math.max(1, f.w - lw)
       const ih = Math.max(1, f.h - lw)
+      if (st.shape === 'custom') {
+        const points = customPoints(st.path, iw, ih)
+        if (points) shape.points = points
+        else shape.shape = 'rect'
+      }
       if (st.shape === 'roundRect') shape.rectRadius = inch(Math.min(iw, ih) * 0.16)
       if (st.shape === 'arrow') {
         // objects.jsx: the shaft is the middle 40 percent, the head
@@ -325,18 +359,18 @@ export async function deckToPptx (doc, { title = '', pictures = new Map() } = {}
   const zip = await JSZip.loadAsync(raw)
   for (const name of Object.keys(zip.files)) {
     if (!/^ppt\/slides\/slide\d+\.xml$/.test(name)) continue
-    zip.file(name, tidySlide(await zip.file(name).async('string'), arrows))
+    zip.file(name, tidySlide(await zip.file(name).async('string'), arrows, crops))
   }
   return zip.generateAsync({ type: 'uint8array', compression: 'DEFLATE', mimeType: PPTX })
 }
 
 const PPR = /<a:pPr\b[^>]*?(?:\/>|>[\s\S]*?<\/a:pPr>)/g
 
-// One paragraph property block per paragraph, first in it, and each arrow's
-// head and shaft. Each numbered item carries its own number (textRuns), as
-// LibreOffice starts counting again at every startAt; startAt="1" is the
-// default and goes.
-export function tidySlide (xml, arrows = new Map()) {
+// One paragraph property block per paragraph, first in it, each arrow's
+// head and shaft and each picture's crop. Each numbered item carries its
+// own number (textRuns), as LibreOffice starts counting again at every
+// startAt; startAt="1" is the default and goes.
+export function tidySlide (xml, arrows = new Map(), crops = new Map()) {
   xml = xml.replace(/(<a:buAutoNum type="[A-Za-z]+") startAt="1"/g, '$1')
   xml = xml.replace(/<a:p>([\s\S]*?)<\/a:p>/g, (all, inner) => {
     const blocks = inner.match(PPR)
@@ -350,6 +384,14 @@ export function tidySlide (xml, arrows = new Map()) {
     const g = xml.indexOf(geom, at)
     if (g < 0) continue
     xml = xml.slice(0, g + geom.length) + gd + xml.slice(g + geom.length)
+  }
+  for (const [name, rect] of crops) {
+    const at = xml.indexOf('name="' + name + '"')
+    if (at < 0) continue
+    const stretch = '<a:stretch><a:fillRect/></a:stretch>'
+    const g = xml.indexOf(stretch, at)
+    if (g < 0) continue
+    xml = xml.slice(0, g) + rect + xml.slice(g)
   }
   return xml
 }

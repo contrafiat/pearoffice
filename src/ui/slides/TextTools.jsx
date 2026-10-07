@@ -13,7 +13,8 @@ import { COLOURS, HIGHLIGHTS, ALIGNS, LinkBar } from '../doc/DocView.jsx'
 const FONTS = [['', 'Theme'], ['sans-serif', 'Sans'], ['serif', 'Serif'], ['monospace', 'Mono']]
 export const SLIDE_SIZES = [10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 40, 44, 48, 54, 60, 72, 88, 96] // points
 
-export function TextTools ({ editor: given, defaultSize, phone, btn }) {
+// afterAlign: more buttons after Alignment (where text sits in its box).
+export function TextTools ({ editor: given, defaultSize, phone, btn, afterAlign }) {
   const editor = given && !given.isDestroyed ? given : null
   const s = useEditorState({
     editor,
@@ -75,6 +76,7 @@ export function TextTools ({ editor: given, defaultSize, phone, btn }) {
       {swatch('highlight', 'Highlight', Highlighter, s && s.highlight)}
       <span className='sep' />
       {btn('Alignment', AlignIcon, undefined, (e) => openMenu('align', e.currentTarget), { disabled: !rich, 'aria-haspopup': 'menu', className: 'align-button' })}
+      {afterAlign}
       {btn('Bulleted list', ListBullets, s && s.bullet, () => run((c) => c.toggleBulletList()), { disabled: off })}
       {btn('Numbered list', ListNumbers, s && s.ordered, () => run((c) => c.toggleOrderedList()), { disabled: off })}
       {btn('Link (Ctrl+K)', LinkSimple, s && s.link, () => setLinking(linking === null ? s.href : null), { disabled: !rich })}

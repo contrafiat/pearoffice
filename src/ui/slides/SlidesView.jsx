@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as Y from 'yjs'
-import { ArrowCounterClockwise, ArrowClockwise, Textbox, SelectionForeground, SelectionBackground, Trash, ArrowUUpLeft, Play, Shapes, Image as ImageIcon } from '@phosphor-icons/react'
+import { ArrowCounterClockwise, ArrowClockwise, Textbox, SelectionForeground, SelectionBackground, Trash, ArrowUUpLeft, Play, Shapes, Crop, Image as ImageIcon } from '@phosphor-icons/react'
 import { call, on } from '../bridge.js'
 import { FileBar, useMembers } from '../FileBar.jsx'
 import { colourFor } from '../Avatar.jsx'
@@ -17,8 +17,8 @@ import { SlideList } from './SlideList.jsx'
 import { TextTools } from './TextTools.jsx'
 import { Notes } from './Notes.jsx'
 import { Show, Presenter } from './Present.jsx'
-import { PicturesContext, usePictureCache } from './objects.jsx'
-import { InsertShape, ShapeTools } from './ShapeTools.jsx'
+import { PicturesContext, usePictureCache, hasText } from './objects.jsx'
+import { InsertShape, ShapeTools, AnchorButtons } from './ShapeTools.jsx'
 import { exportDeck } from './pdfExport.jsx'
 
 // The slide deck editor (proposals/2026-10-06-slides.md). As with documents
@@ -293,6 +293,13 @@ export function SlidesView ({ sheetId, onTitleChange, onError, onGone }) {
   const setShapeStyle = (fn) => change((doc) => {
     for (const el of els) if (shownSel.includes(el.id) && el.type === 'shape') slidesModel.setStyle(doc, current, el.id, fn(el))
   })
+  const setShapeOpacity = (o) => change((doc) => {
+    for (const el of els) if (shownSel.includes(el.id) && el.type === 'shape') slidesModel.setOpacity(doc, current, el.id, o)
+  })
+  const setShapeArrows = (ends) => change((doc) => {
+    for (const el of els) if (shownSel.includes(el.id) && el.type === 'shape') slidesModel.setArrows(doc, current, el.id, ends)
+  })
+  const [cropping, setCropping] = useState(null) // the picture being cropped
 
   // Pictures from the file picker or the clipboard: shrunk and stored as in
   // documents (src/ui/doc/pictures.js), then put on this slide, selected.
@@ -396,6 +403,14 @@ export function SlidesView ({ sheetId, onTitleChange, onError, onGone }) {
   const slideMap = (slide || deleted) && slidesModel.slide(ydoc, current)
   const notes = slideMap && slideMap.get('notes')
   const selShapes = layoutEdit && !editing ? els.filter((el) => el.type === 'shape' && shownSel.includes(el.id)) : []
+  const selPicture = layoutEdit && !editing && shownSel.length === 1 ? els.find((el) => el.id === shownSel[0] && el.type === 'picture') : null
+  // Top, middle and bottom act on the box being edited or the selected
+  // boxes that hold text.
+  const anchorEls = !layoutEdit ? [] : editingBox ? [editingBox] : els.filter((el) => shownSel.includes(el.id) && hasText(el))
+  const anchorValue = anchorEls.length && anchorEls.every((el) => el.layout.anchor === anchorEls[0].layout.anchor) ? anchorEls[0].layout.anchor : null
+  const anchorTools = layoutEdit && (
+    <AnchorButtons btn={btn} value={anchorValue} disabled={!anchorEls.length} onPick={(a) => change((doc) => { for (const el of anchorEls) slidesModel.setAnchor(doc, current, el.id, a) })} />
+  )
 
   return (
     <PicturesContext.Provider value={pictures}>
@@ -449,8 +464,10 @@ export function SlidesView ({ sheetId, onTitleChange, onError, onGone }) {
             </>
           )}
           {selShapes.length
-            ? <ShapeTools shapes={selShapes} theme={deck.theme} phone={phone} setStyle={setShapeStyle} />
-            : canEdit && <TextTools editor={toolEditor} defaultSize={defaultSize(deck.theme, editingBox ? editingBox.role : 'body')} phone={phone} btn={btn} />}
+            ? <><ShapeTools shapes={selShapes} theme={deck.theme} phone={phone} setStyle={setShapeStyle} setOpacity={setShapeOpacity} setArrows={setShapeArrows} />{selShapes.some((el) => el.style.shape !== 'line') && <span className='sep' />}{selShapes.some((el) => el.style.shape !== 'line') && anchorTools}</>
+            : selPicture
+              ? btn(cropping ? 'Finish cropping (Enter)' : 'Crop', Crop, !!cropping, () => (cropping ? setCropping(null) : setCropping(selPicture.id)), { className: 'crop-button' + (cropping ? ' on' : '') })
+              : canEdit && <TextTools editor={toolEditor} defaultSize={defaultSize(deck.theme, editingBox ? editingBox.role : 'body')} phone={phone} btn={btn} afterAlign={anchorTools} />}
           <button className='present-button' title={phone ? 'Present' : 'Present (F5, or Shift+F5 from this slide)'} onMouseDown={(e) => e.preventDefault()} onClick={() => startShow(true)} disabled={!deck.slides.length}><Play size={ICON} weight='fill' /> Present</button>
         </div>
         <div className='slides-row'>
@@ -464,7 +481,7 @@ export function SlidesView ({ sheetId, onTitleChange, onError, onGone }) {
                 </div>
                 )
               : slide
-                ? <Stage size={deck.size} theme={deck.theme} slideId={current} layout={slide.layout} els={els} sel={shownSel} setSel={setSel} editing={editing} startEditing={startEditing} stopEditing={stopEditing} editStart={editStart} canEdit={canEdit} layoutEdit={layoutEdit} phone={phone} undo={undo} change={change} others={others} onCursor={onCursor} onEditor={setBoxEditor} onPastePictures={addPictures} />
+                ? <Stage size={deck.size} theme={deck.theme} slideId={current} layout={slide.layout} els={els} sel={shownSel} setSel={setSel} editing={editing} startEditing={startEditing} stopEditing={stopEditing} editStart={editStart} canEdit={canEdit} layoutEdit={layoutEdit} phone={phone} undo={undo} change={change} others={others} onCursor={onCursor} onEditor={setBoxEditor} onPastePictures={addPictures} cropping={cropping} setCropping={setCropping} />
                 : <div className='slide-stage' />}
             {phone && <SlideList slides={deck.slides} current={current} onPick={setCurrent} size={deck.size} theme={deck.theme} canEdit={canEdit} phone={phone} people={bySlide} sheetId={sheetId} onAdd={addSlide} onDuplicate={duplicate} onDelete={remove} onMove={move} />}
             {notes instanceof Y.XmlFragment && <Notes key={current} fragment={notes} undo={undo} canEdit={canEdit} phone={phone} onFocus={setNotesEditor} />}

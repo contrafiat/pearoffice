@@ -880,6 +880,10 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 .shape-palette .palette-row { display: flex; gap: 6px; }
 .doc-tools .shape-palette .swatch { width: 24px; height: 24px; min-width: 0; padding: 0; border-radius: 6px; border: 1px solid var(--line-strong); }
 .doc-tools .shape-palette .swatch.none { background: var(--panel); color: var(--muted); }
+.shape-palette .opacity-row { border-top: 1px solid var(--line); padding-top: 6px; }
+.doc-tools .shape-palette .opacity-button { flex: 1; min-width: 0; height: 26px; padding: 0 4px; font-size: 12px; }
+.doc-tools .shape-palette .opacity-button.on { background: var(--pear-soft); border-color: var(--pear); color: var(--pear-dark); }
+.slides-tools .line-head, .slides-tools .line-tail { width: 116px; }
 .icon-swatch .swatch-bar.none { background: repeating-linear-gradient(135deg, transparent 0 3px, var(--line-strong) 3px 4px) !important; }
 .alt-edit { position: fixed; display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: var(--panel); border: 1px solid var(--line-strong); border-radius: 8px; box-shadow: 0 6px 24px rgb(0 0 0 / 0.16); }
 .alt-edit label { font-size: 13px; color: var(--muted); }
@@ -938,9 +942,11 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 /* Shapes and pictures (src/ui/slides/objects.jsx) fill their frame; text in
    a shape sits in the middle. */
 .slide-shape { position: absolute; inset: 0; display: block; overflow: visible; }
-.slide-el[data-type='shape'] .slide-body { display: flex; flex-direction: column; justify-content: center; text-align: center; }
+.slide-el[data-type='shape'] .slide-body { text-align: center; }
 .shape-ink { display: contents; }
 .slide-picture { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; display: block; user-select: none; pointer-events: none; }
+/* A cropped picture: the whole picture, larger, moved inside a clipping box. */
+.slide-picture-crop { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
 .slide-picture-wait { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 16px; box-sizing: border-box; overflow: hidden; background: #c8cbd0; color: #464b52; font-size: 28px; text-align: center; }
 .slide-empty-mark { display: none; }
 .slide-text { position: absolute; left: 0; top: 0; transform-origin: 0 0; font-size: var(--slide-body-size); line-height: 1.2; overflow-wrap: break-word; }
@@ -950,7 +956,11 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 .slide-text strong, .slide-text b { font-weight: 600; }
 .slide-live, .slide-text .slide-body { height: 100%; }
 .slide-body { outline: none; white-space: pre-wrap; padding: 6px 10px; box-sizing: border-box; }
-.slide-text.role-title .slide-body { display: flex; flex-direction: column; justify-content: center; }
+/* Where text sits in its box (data-anchor) and text that does not wrap. */
+.slide-text[data-anchor='middle'] .slide-body, .slide-text[data-anchor='bottom'] .slide-body { display: flex; flex-direction: column; justify-content: center; }
+.slide-text[data-anchor='bottom'] .slide-body { justify-content: flex-end; }
+.slide-text[data-wrap='false'] { overflow-wrap: normal; }
+.slide-text[data-wrap='false'] .slide-body { white-space: pre; }
 .slide-body p { margin: 0; min-height: 1.2em; }
 .slide-body ul, .slide-body ol { margin: 0; padding-left: 1.3em; }
 .slide-body li > p { margin: 0 0 0.25em; }
@@ -962,7 +972,8 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 .slide-body mark { color: inherit; border-radius: 0.1em; }
 .slide-body code { font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace; font-size: 0.9em; }
 .slide-placeholder { position: absolute; inset: 0; margin: 0; padding: 6px 10px; color: var(--slide-muted); pointer-events: none; display: flex; }
-.slide-text.role-title .slide-placeholder { align-items: center; }
+.slide-text[data-anchor='middle'] .slide-placeholder { align-items: center; }
+.slide-text[data-anchor='bottom'] .slide-placeholder { align-items: flex-end; }
 /* A title slide's title and subtitle are centred. */
 .slide[data-layout='title'] .slide-el[data-role] .slide-text { text-align: center; }
 .slide[data-layout='title'] .slide-el[data-role] .slide-placeholder { justify-content: center; }
@@ -979,6 +990,10 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 .h-s { left: 50%; top: 100%; }
 .h-sw { left: 0; top: 100%; }
 .h-w { left: 0; top: 50%; }
+.crop-handle { background: #1f2328; border-color: #fff; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 1px; }
+.sel-frame.cropping { border-style: dashed; }
+.crop-ghost { position: absolute; transform-origin: 50% 50%; opacity: 0.35; pointer-events: none; }
+.box-menu .wrap-text .check { display: inline-block; width: 1.1em; }
 .rotate-handle { position: absolute; left: 50%; top: -30px; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; background: #fff; border: 1.5px solid var(--pear); pointer-events: auto; cursor: grab; touch-action: none; }
 .rotate-handle::after { content: ''; position: absolute; left: 5px; top: 13px; width: 1.5px; height: 16px; background: var(--pear); }
 .guide { position: absolute; background: #e5487a; pointer-events: none; }

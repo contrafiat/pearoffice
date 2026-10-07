@@ -1,14 +1,17 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { call } from '../bridge.js'
 import { pictureCache, fromB64 } from '../doc/pictures.js'
+import { fitPath } from './svgPath.js'
 
 // Shapes and pictures on a slide (proposals/2026-10-06-slides.md, part 3),
 // drawn the same way in the editor's stage, the slide list and the show.
 //
 // A shape is an inline SVG that fills its frame. A line runs across the
-// middle of its frame from left to right; rotate it for any other angle. A
-// picture is an <img> of bytes fetched with slides:picture, stretched to
-// its frame, with a grey box and its alt text until they arrive.
+// middle of its frame from left to right; rotate it for any other angle.
+// Its head is the left end and its tail the right. A custom shape's path is
+// stretched from its 1000 x 1000 box to the frame. A picture is an <img> of
+// bytes fetched with slides:picture, its uncropped part stretched to its
+// frame, with a grey box and its alt text until they arrive.
 
 const RETRY_MS = 15000
 
@@ -18,8 +21,13 @@ export const SHAPE_LABELS = {
   ellipse: 'Ellipse',
   triangle: 'Triangle',
   arrow: 'Arrow',
-  line: 'Line'
+  line: 'Line',
+  custom: 'Custom shape'
 }
+
+// The shapes the Insert shape menu offers: custom shapes come from import,
+// duplicate or paste.
+export const INSERT_SHAPES = Object.keys(SHAPE_LABELS).filter((s) => s !== 'custom')
 
 // The pictures fetched for one open deck. The editor and the audience
 // window each make one (usePictureCache) and hand it down.
@@ -42,8 +50,8 @@ export function colourCss (c) {
 }
 
 // The SVG outline of a shape in a w by h box, kept inside the box by half
-// the outline width.
-function shapePath (shape, w, h, s) {
+// the outline width. `path` is a custom shape's.
+function shapePath (shape, w, h, s, path) {
   const x0 = s
   const y0 = s
   const x1 = Math.max(x0, w - s)
@@ -69,9 +77,40 @@ function shapePath (shape, w, h, s) {
     }
     case 'line':
       return <line x1={0} y1={h / 2} x2={w} y2={h / 2} />
+    case 'custom': {
+      const d = fitPath(path, x0, y0, iw, ih)
+      if (d) return <path d={d} />
+      return <rect x={x0} y={y0} width={iw} height={ih} />
+    }
     default:
       return <rect x={x0} y={y0} width={iw} height={ih} />
   }
+}
+
+// An arrowhead at the end of a line at (x, y) pointing in direction dir
+// (1 right, -1 left), sized from the line width sw: three widths wide and
+// long, as PowerPoint's middle size. Returns { el, back }: back is how far
+// the line stops short so that it does not show past a filled head.
+function lineEnd (kind, x, y, dir, sw, colour, opacity) {
+  const len = Math.max(9, sw * 3)
+  const half = len / 2
+  const bx = x - dir * len
+  if (kind === 'arrow') {
+    return {
+      el: <polyline points={[bx, y - half, x, y, bx, y + half].join(' ')} fill='none' stroke={colour} strokeOpacity={opacity} strokeWidth={sw} strokeLinejoin='miter' strokeLinecap='round' />,
+      back: 0
+    }
+  }
+  if (kind === 'triangle') {
+    return {
+      el: <polygon points={[x + dir * sw * 0.5, y, bx, y - half, bx, y + half].join(' ')} fill={colour} fillOpacity={opacity} stroke='none' />,
+      back: len * 0.8
+    }
+  }
+  if (kind === 'oval') {
+    return { el: <ellipse cx={x - dir * half * 0.5} cy={y} rx={half} ry={half} fill={colour} fillOpacity={opacity} stroke='none' />, back: half * 0.5 }
+  }
+  return { el: null, back: 0 }
 }
 
 // A shape drawn to fill its frame. `style` is slidesModel.style's answer.
@@ -79,10 +118,25 @@ export function ShapeSvg ({ style, w, h, className }) {
   const line = style.lineW > 0 ? colourCss(style.line) : 'none'
   const sw = line === 'none' ? 0 : style.lineW
   const fill = style.shape === 'line' ? 'none' : colourCss(style.fill)
+  const lineOpacity = style.lineOpacity < 1 ? style.lineOpacity : undefined
+  const fillOpacity = style.fillOpacity < 1 ? style.fillOpacity : undefined
+  if (style.shape === 'line') {
+    const head = sw ? lineEnd(style.head, 0, h / 2, -1, sw, line, lineOpacity) : { el: null, back: 0 }
+    const tail = sw ? lineEnd(style.tail, w, h / 2, 1, sw, line, lineOpacity) : { el: null, back: 0 }
+    return (
+      <svg className={'slide-shape' + (className ? ' ' + className : '')} data-shape='line' data-head={style.head} data-tail={style.tail} width='100%' height='100%' viewBox={'0 0 ' + w + ' ' + h} preserveAspectRatio='none' aria-hidden='true'>
+        <g fill='none' stroke={line} strokeOpacity={lineOpacity} strokeWidth={sw} strokeLinecap={head.back || tail.back ? 'butt' : 'round'}>
+          <line x1={head.back} y1={h / 2} x2={Math.max(head.back, w - tail.back)} y2={h / 2} />
+          {head.el}
+          {tail.el}
+        </g>
+      </svg>
+    )
+  }
   return (
     <svg className={'slide-shape' + (className ? ' ' + className : '')} data-shape={style.shape} width='100%' height='100%' viewBox={'0 0 ' + w + ' ' + h} preserveAspectRatio='none' aria-hidden='true'>
-      <g fill={fill} stroke={line} strokeWidth={sw} strokeLinejoin='round' strokeLinecap={style.shape === 'line' ? 'round' : 'butt'}>
-        {shapePath(style.shape, w, h, style.shape === 'line' ? 0 : sw / 2)}
+      <g fill={fill} fillOpacity={fillOpacity} stroke={line} strokeOpacity={lineOpacity} strokeWidth={sw} strokeLinejoin='round' strokeLinecap='butt'>
+        {shapePath(style.shape, w, h, sw / 2, style.path)}
       </g>
     </svg>
   )
@@ -101,9 +155,12 @@ export function ShapeIcon ({ shape, size = 20 }) {
   )
 }
 
+const NO_CROP = { l: 0, t: 0, r: 0, b: 0 }
+const pct = (v) => Math.round(v * 1e6) / 1e4 + '%'
+
 // A picture from the deck's picture cache. While its bytes are missing, a
 // grey box with its alt text; a failed fetch is tried again later.
-export function SlidePicture ({ pic }) {
+export function SlidePicture ({ pic, crop }) {
   const cache = useContext(PicturesContext)
   const [url, setUrl] = useState(null)
   const [failed, setFailed] = useState(false)
@@ -122,6 +179,19 @@ export function SlidePicture ({ pic }) {
     load()
     return () => { live = false; clearTimeout(retry) }
   }, [cache, pic.ref, pic.hash])
+  const c = crop || NO_CROP
+  if (url && (c.l || c.t || c.r || c.b)) {
+    // The uncropped part fills the frame: the whole picture is drawn larger
+    // and moved so that only that part shows.
+    const kw = 1 - c.l - c.r
+    const kh = 1 - c.t - c.b
+    const style = { left: pct(-c.l / kw), top: pct(-c.t / kh), width: pct(1 / kw), height: pct(1 / kh) }
+    return (
+      <div className='slide-picture-crop'>
+        <img className='slide-picture cropped' src={url} alt={pic.alt} data-ref={pic.ref} draggable={false} style={style} />
+      </div>
+    )
+  }
   if (url) return <img className='slide-picture' src={url} alt={pic.alt} data-ref={pic.ref} draggable={false} />
   return (
     <div className='slide-picture-wait' role='img' aria-label={pic.alt || 'Picture'}>
@@ -131,9 +201,10 @@ export function SlidePicture ({ pic }) {
 }
 
 // The text colour that reads on a shape's fill: the slide's background
-// colour on theme colours and dark fills, the text colour otherwise.
-function inkOn (fill) {
-  if (fill === 'none' || fill === 'background') return 'var(--slide-ink)'
+// colour on theme colours and dark fills, the text colour otherwise and on
+// fills that are mostly see-through.
+function inkOn (fill, opacity = 1) {
+  if (fill === 'none' || fill === 'background' || opacity < 0.5) return 'var(--slide-ink)'
   const m = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(fill)
   if (!m) return 'var(--slide-bg)'
   const [r, g, b] = m.slice(1).map((x) => parseInt(x, 16))
@@ -143,12 +214,12 @@ function inkOn (fill) {
 // What a slide element draws inside its frame div: `text` is the element's
 // text, drawn by the caller (static or live).
 export function ElementBody ({ el, frame, text }) {
-  if (el.type === 'picture') return <SlidePicture pic={el.pic} />
+  if (el.type === 'picture') return <SlidePicture pic={el.pic} crop={el.crop} />
   if (el.type === 'shape') {
     return (
       <>
         <ShapeSvg style={el.style} w={frame.w} h={frame.h} />
-        {el.style.shape !== 'line' && <div className='shape-ink' style={{ color: inkOn(el.style.fill) }}>{text}</div>}
+        {el.style.shape !== 'line' && <div className='shape-ink' style={{ color: inkOn(el.style.fill, el.style.fillOpacity) }}>{text}</div>}
       </>
     )
   }

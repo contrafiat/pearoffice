@@ -19,9 +19,12 @@ export function placeholderFor (role, phone) {
   return ''
 }
 
-export function TextFrame ({ frame, role, children }) {
+// `layout` is slidesModel.textLayout's answer: where the text sits (top,
+// middle or bottom) and whether it wraps.
+export function TextFrame ({ frame, role, layout, children }) {
   const style = { width: frame.w / TEXT_SCALE, height: frame.h / TEXT_SCALE, transform: 'scale(' + TEXT_SCALE + ')' }
-  return <div className={'slide-text' + (role === 'title' ? ' role-title' : '')} style={style}>{children}</div>
+  const anchor = layout ? layout.anchor : role === 'title' ? 'middle' : 'top'
+  return <div className={'slide-text' + (role === 'title' ? ' role-title' : '')} data-anchor={anchor} data-wrap={layout && !layout.wrap ? 'false' : undefined} style={style}>{children}</div>
 }
 
 // The fragment drawn as DOM, redrawn when it changes. `placeholder` shows

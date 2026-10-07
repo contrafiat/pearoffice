@@ -4,10 +4,13 @@
 // size and rotation; text with its formatting, bullets and levels;
 // placeholders, which take their position and style from the slide's layout
 // and master; shapes drawn on the layout and master; backgrounds and
-// speaker notes. What has no place in a PearOffice deck is counted for the
-// notice: animations, transitions, charts, media, custom shapes (drawn as
-// their box), gradients (their first colour) and the rest. Tables and
-// SmartArt keep their text.
+// speaker notes; see-through fills and outlines, where text sits and
+// whether it wraps, picture crops, arrowheads, custom shapes (their paths
+// scaled into a 1000 x 1000 box, customGeom.js) and SmartArt (from the
+// drawing PowerPoint saves with it). What has no place in a PearOffice deck
+// is counted for the notice: animations, transitions, charts, media,
+// gradients (their first colour) and the rest. Tables keep their text, as
+// does SmartArt saved with no drawing.
 //
 // readPresentation turns the file into plain data, buildDeck turns that into
 // one Yjs update for slides:import (made with slidesModel on an empty doc)
@@ -26,6 +29,7 @@ import {
   fillOf, colourIn, readTheme, readClrMap, hexRgb, MAX_MEDIA, NOT_PPTX
 } from './importOoxml.js'
 import { readParagraphs, isBlank, parasToJson, notesJson, writeFragment } from './importText.js'
+import { customPath } from './customGeom.js'
 
 export const isPptxFile = (name) => /\.pptx$/i.test(String(name || ''))
 
@@ -51,6 +55,9 @@ const PRESETS = {
   upArrow: { shape: 'arrow', turn: 270, swap: true }
 }
 const isLinePreset = (p) => p === 'line' || /Connector[0-9]*$/.test(p)
+// Line ends PowerPoint has, as the ones PearOffice draws.
+const ENDS = { arrow: 'arrow', stealth: 'arrow', triangle: 'triangle', diamond: 'triangle', oval: 'oval' }
+const ANCHORS = { t: 'top', ctr: 'middle', b: 'bottom' }
 
 const TITLE_TYPES = ['title', 'ctrTitle']
 const BODY_TYPES = ['body', 'subTitle', 'obj']
@@ -344,8 +351,9 @@ function lineFrame (st, r, lineW) {
 }
 
 // A box whose text does not wrap in PowerPoint (wrap="none") is widened
-// to about its longest line, from the side its text is aligned to, since
-// our boxes always wrap.
+// to about its longest line, from the side its text is aligned to: text
+// that does not wrap runs out of the right of its box here whatever its
+// alignment.
 function unwrapped (st, frame, paras) {
   let widest = 0
   for (const p of paras) {
@@ -394,7 +402,7 @@ async function walk (sc, part, tree, xf, depth, source) {
         await walk(sc, part, el, g ? groupXf(g, xf) : xf, depth + 1, source)
         break
       }
-      case 'graphicFrame': await frameEl(sc, part, el, xf, key); break
+      case 'graphicFrame': await frameEl(sc, part, el, xf, key, depth, source); break
       case 'contentPart': lose(sc.st, 'other', key); break
     }
   }
@@ -443,30 +451,56 @@ function shapeEl (sc, part, el, xf, source, key) {
   const fillRef = kid(style, 'fillRef')
   if (!fill && num(fillRef, 'idx', 0) > 0) fill = { colour: colourIn(fillRef, ctx) || 'none' }
   let fillC = fill && !fill.group ? fill.colour : 'none'
-  // Our fills are solid: a mostly see-through one is left out (often a
-  // tint over a picture), a mostly solid one drawn solid.
-  const seeThrough = fillC !== 'none' && fill.alpha < 1
-  if (seeThrough && fill.alpha < 0.5) fillC = 'none'
-
+  // A see-through fill keeps its opacity; one that cannot be seen is none.
+  let fillOpacity = fillC !== 'none' && fill.alpha != null ? fill.alpha : 1
+  if (fillOpacity < 0.005) { fillC = 'none'; fillOpacity = 1 }
   const ln = kid(spPr, 'ln')
   const lnRef = kid(style, 'lnRef')
   const lnFill = ln ? fillOf(ln, ctx) : null
   let line = 'none'
   let lineEmu = 0
+  let lineOpacity = 1
   if (lnFill) {
     line = lnFill.colour
     lineEmu = num(ln, 'w', 9525)
+    if (lnFill.alpha != null) lineOpacity = lnFill.alpha
   } else if (num(lnRef, 'idx', 0) > 0) {
     line = colourIn(lnRef, ctx) || 'none'
     lineEmu = num(ln, 'w', sc.theme.lineWidths[num(lnRef, 'idx', 1) - 1] || 9525)
   }
+  if (lineOpacity < 0.005) { line = 'none'; lineOpacity = 1 }
   let lineW = line === 'none' ? 0 : Math.min(100, Math.max(1, Math.round(lineEmu * st.kx)))
   if (line !== 'none' && !lineW) lineW = 1
+  const look = { fill: fillC, line, lineW, fillOpacity, lineOpacity: line === 'none' ? 1 : lineOpacity }
 
   if (isLinePreset(prst)) {
     if (line === 'none') return
-    sc.els.push({ kind: 'shape', shape: 'line', frame: lineFrame(st, r, lineW), fill: 'none', line, lineW, paras: [] })
+    const end = (name) => ENDS[attr(kid(ln, name), 'type')] || 'none'
+    sc.els.push({ kind: 'shape', shape: 'line', frame: lineFrame(st, r, lineW), ...look, fill: 'none', fillOpacity: 1, head: end('headEnd'), tail: end('tailEnd'), paras: [] })
     return
+  }
+
+  // A custom shape that is only a rectangle (at any angle) or our triangle,
+  // as LibreOffice often writes them, becomes that shape; any other is
+  // drawn from its paths.
+  let preset = PRESETS[prst]
+  let shapeFrame = null
+  let path = null
+  if (prst === 'custom') {
+    const geom = kid(spPr, 'custGeom')
+    const simple = simpleOutline(geom, r)
+    if (simple) {
+      preset = PRESETS[simple.shape]
+      shapeFrame = toFrame(st, simple.r)
+    } else {
+      const custom = customPath(geom, raw)
+      if (custom) {
+        preset = { shape: 'custom' }
+        path = custom.path
+        if (custom.noFill) { look.fill = 'none'; look.fillOpacity = 1 }
+        if (custom.approximated) lose(st, 'approximated', key)
+      }
+    }
   }
 
   const fontRef = kid(style, 'fontRef')
@@ -482,26 +516,20 @@ function shapeEl (sc, part, el, xf, source, key) {
   const blank = isBlank(paras)
   const frame = toFrame(st, r)
   const cls = ph ? phClass(ph.type) : null
-  const visible = fillC !== 'none' || lineW > 0
+  const visible = look.fill !== 'none' || look.lineW > 0
+  // Where the text sits and whether it wraps: the shape's own, else its
+  // layout's or master's placeholder.
+  const bodies = [el, lph && lph.el, mph && mph.el].map((x) => x && dig(x, 'txBody', 'bodyPr'))
+  const fromBody = (name) => { for (const b of bodies) { const v = attr(b, name); if (v) return v } return null }
+  const text = { anchor: ANCHORS[fromBody('anchor')] || null, wrap: fromBody('wrap') !== 'none' }
 
   if (!visible) {
-    if (seeThrough) lose(st, 'seeThrough', key)
     // A box with no fill or outline is a text box. Empty title and body
     // placeholders stay, as empty layout boxes do.
     if (!blank || cls === 'title' || cls === 'body') {
-      const noWrap = attr(dig(el, 'txBody', 'bodyPr'), 'wrap') === 'none'
-      sc.els.push({ kind: 'text', frame: noWrap ? unwrapped(st, frame, paras) : frame, ph: cls, phType: ph ? ph.type : null, paras })
+      sc.els.push({ kind: 'text', frame: text.wrap ? frame : unwrapped(st, frame, paras), ph: cls, phType: ph ? ph.type : null, paras, ...text })
     }
     return
-  }
-  let preset = PRESETS[prst]
-  let shapeFrame = frame
-  // A custom shape that is only a rectangle (at any angle) or our triangle,
-  // as LibreOffice often writes them, becomes that shape.
-  const simple = prst === 'custom' ? simpleOutline(kid(spPr, 'custGeom'), r) : null
-  if (simple) {
-    preset = PRESETS[simple.shape]
-    shapeFrame = toFrame(st, simple.r)
   }
   if (!preset) {
     // Shapes on a layout or master are decoration: one we cannot draw is
@@ -511,8 +539,7 @@ function shapeEl (sc, part, el, xf, source, key) {
     preset = PRESETS.rect
   }
   if (fill && fill.lost) lose(st, fill.lost, key)
-  if (seeThrough) lose(st, 'seeThrough', key)
-  sc.els.push({ kind: 'shape', shape: preset.shape, frame: turnedFrame(shapeFrame, preset), fill: fillC, line, lineW, paras })
+  sc.els.push({ kind: 'shape', shape: preset.shape, path, frame: turnedFrame(shapeFrame || frame, preset), ...look, paras, ...text })
 }
 
 // A custom outline's corners in the shape's box (EMU, flips applied), when
@@ -600,12 +627,29 @@ function picEl (sc, part, el, xf, key) {
   const blip = dig(el, 'blipFill', 'blip')
   const media = mediaOf(sc, part, attr(blip, 'r:embed'), key)
   if (!media) return
-  sc.els.push({ kind: 'picture', frame: toFrame(sc.st, xf(raw)), media, alt: String(attr(cNvPr(el), 'descr') || '').slice(0, 500) })
+  // A crop: srcRect gives what is cut from each side in 1000ths of a
+  // percent (negative values add space, which is left out).
+  const src = dig(el, 'blipFill', 'srcRect')
+  const side = (k) => Math.max(0, Math.min(0.9, num(src, k, 0) / 100000))
+  const crop = src ? { l: side('l'), t: side('t'), r: side('r'), b: side('b') } : null
+  sc.els.push({ kind: 'picture', frame: toFrame(sc.st, xf(raw)), media, alt: String(attr(cNvPr(el), 'descr') || '').slice(0, 500), crop })
 }
 
-// Tables and SmartArt keep their text as a text box; charts, embedded
-// objects and the rest are counted.
-async function frameEl (sc, part, el, xf, key) {
+// The drawing PowerPoint saves with a SmartArt graphic (ppt/diagrams/
+// drawingN.xml): named from the diagram's data part (dataModelExt relId),
+// a relationship of the slide's.
+async function diagramDrawing (sc, part, data) {
+  const ext = data ? [...data.getElementsByTagName('*')].find((e) => e.localName === 'dataModelExt') : null
+  const rel = ext && part.rels.get(attr(ext, 'relId'))
+  if (!rel || rel.external || rel.type !== 'diagramDrawing') return null
+  const drawing = await loadPart(sc.st, rel.target)
+  return drawing && kid(drawing.root, 'spTree') ? drawing : null
+}
+
+// Tables keep their text as a text box, as does SmartArt saved with no
+// drawing; SmartArt with its drawing becomes its shapes and text; charts,
+// embedded objects and the rest are counted.
+async function frameEl (sc, part, el, xf, key, depth, source) {
   const raw = rawXfrm(el)
   const gd = dig(el, 'graphic', 'graphicData')
   const uri = attr(gd, 'uri') || ''
@@ -630,10 +674,17 @@ async function frameEl (sc, part, el, xf, key) {
   } else if (/\/chart$/.test(uri) || /chartex$/.test(uri)) {
     lose(sc.st, 'charts', key)
   } else if (/\/diagram$/.test(uri)) {
-    lose(sc.st, 'smartArt', key)
     const dm = attr(kid(gd, 'relIds'), 'r:dm')
     const rel = dm && part.rels.get(dm)
     const data = rel && !rel.external ? await readXml(sc.st.zip, rel.target) : null
+    const drawing = await diagramDrawing(sc, part, data)
+    if (drawing) {
+      // Its shapes are placed from the graphic frame's corner.
+      const at = (r) => xf({ ...r, x: r.x + raw.x, y: r.y + raw.y })
+      await walk(sc, drawing, kid(drawing.root, 'spTree'), at, depth + 1, source)
+      return
+    }
+    lose(sc.st, 'smartArt', key)
     const paras = []
     for (const t of data ? [...data.getElementsByTagName('*')].filter((e) => e.localName === 't' && e.parentNode && e.parentNode.localName === 'pt') : []) {
       for (const p of readParagraphs(t, [sc.st.defaultText], ctx)) if (!isBlank([p])) paras.push({ ...p, bullet: null, level: 0 })
@@ -675,8 +726,8 @@ export function pickTheme (slides) {
 }
 
 // The colour text on a filled shape is drawn in (objects.jsx, inkOn).
-function inkOn (fill, theme) {
-  if (!fill || fill === 'none') return theme.text
+function inkOn (fill, theme, opacity = 1) {
+  if (!fill || fill === 'none' || opacity < 0.5) return theme.text
   const rgb = hexRgb(fill)
   if (!rgb) return theme.background
   return 0.299 * rgb[0] + 0.587 * rgb[1] + 0.114 * rgb[2] > 160 ? '#000000' : '#ffffff'
@@ -755,20 +806,27 @@ export function buildDeck (parsed, { Y: Yx = Y, title = 'Imported slides', pictu
             if (isBlank(el.paras)) continue
             made = slidesModel.addText(doc, id, el.frame)
           } else if (el.kind === 'shape') {
-            made = slidesModel.addShape(doc, id, el.shape, el.frame)
-            if (made) slidesModel.setStyle(doc, id, made, { fill: el.fill, line: el.line, lineW: el.lineW })
+            made = slidesModel.addShape(doc, id, el.shape, el.frame, { path: el.path })
+            if (made) {
+              slidesModel.setStyle(doc, id, made, { fill: el.fill, line: el.line, lineW: el.lineW })
+              if (el.fillOpacity < 1 || el.lineOpacity < 1) slidesModel.setOpacity(doc, id, made, { fill: el.fillOpacity, line: el.lineOpacity })
+              if (el.shape === 'line' && (el.head !== 'none' || el.tail !== 'none')) slidesModel.setArrows(doc, id, made, { head: el.head, tail: el.tail })
+            }
           } else if (el.kind === 'picture') {
             const p = pictures.get(el.media)
             if (!p) continue // could not be read; counted already
             made = slidesModel.addPicture(doc, id, { ref: refFor(el.media), hash: '', mime: p.mime, w: p.w, h: p.h, alt: el.alt }, el.frame)
+            if (made && el.crop) slidesModel.setCrop(doc, id, made, el.crop)
           }
           add(made)
           if (!made || el.kind === 'picture') continue
+          if (el.anchor) slidesModel.setAnchor(doc, id, made, el.anchor)
+          if (el.wrap === false) slidesModel.setWrap(doc, id, made, false)
           const map = slidesModel.element(doc, id, made)
           const role = el.role || null
           fill(map, el.paras, {
             defaultSize: role === 'title' ? defaultSize(theme, 'title') : defaultSize(theme, 'body'),
-            ink: el.kind === 'shape' ? inkOn(el.fill, theme) : theme.text
+            ink: el.kind === 'shape' ? inkOn(el.fill, theme, el.fillOpacity) : theme.text
           })
         }
         // Layout boxes were made first: put everything back in file order.
@@ -798,9 +856,9 @@ const LEFT_OUT = {
   other: ['other object', 'other objects']
 }
 const AS_TEXT = { tables: ['table', 'tables'], smartArt: ['SmartArt graphic', 'SmartArt graphics'] }
-const AS_BOX = { customShapes: ['custom shape', 'custom shapes'], otherShapes: ['shape PearOffice does not have', 'shapes PearOffice does not have'] }
+const AS_BOX = { customShapes: ['custom shape PearOffice cannot read', 'custom shapes PearOffice cannot read'], otherShapes: ['shape PearOffice does not have', 'shapes PearOffice does not have'] }
 const FIRST_COLOUR = { gradients: ['gradient', 'gradients'], patterns: ['pattern', 'patterns'] }
-const SOLID = { seeThrough: ['see-through fill', 'see-through fills'] }
+const CLOSE = { approximated: ['custom shape', 'custom shapes'] }
 
 function listOf (lost, labels) {
   const parts = Object.keys(labels).filter((k) => lost[k] > 0).map((k) => lost[k] + ' ' + labels[k][lost[k] === 1 ? 0 : 1])
@@ -814,12 +872,12 @@ export function noticeFor (lost) {
   const text = listOf(lost, AS_TEXT)
   const box = listOf(lost, AS_BOX)
   const first = listOf(lost, FIRST_COLOUR)
-  const solid = listOf(lost, SOLID)
+  const close = listOf(lost, CLOSE)
   if (left) out.push('Left out: ' + left + '.')
   if (text) out.push('Kept as text only: ' + text + '.')
   if (box) out.push('Drawn as boxes: ' + box + '.')
   if (first) out.push('Filled with their first colour: ' + first + '.')
-  if (solid) out.push('Made solid or left out: ' + solid + '.')
+  if (close) out.push('Drawn close to the original: ' + close + '.')
   out.push('Fonts and the theme are the closest PearOffice has.')
   return out.join(' ')
 }

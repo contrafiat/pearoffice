@@ -30,7 +30,12 @@ const VERSION = 1
 const SIZE = [1920, 1080]
 const THEME = 'plain'
 const TYPES = ['text', 'shape', 'picture']
-const SHAPES = ['rect', 'roundRect', 'ellipse', 'triangle', 'arrow', 'line']
+const SHAPES = ['rect', 'roundRect', 'ellipse', 'triangle', 'arrow', 'line', 'custom']
+const ENDS = ['none', 'arrow', 'triangle', 'oval']
+const ANCHORS = ['top', 'middle', 'bottom']
+const PATH_MAX = 20000
+// SVG path data in a 1000 x 1000 box: only these commands and numbers.
+const PATH = /^\s*[Mm][\sMmLlHhVvCcQqAaZz0-9.,+eE-]*$/
 const COLOR = /^(#[0-9a-fA-F]{6}|none|text|background|accent[1-6])$/
 const MAX_ELEMENTS = 1000
 const FRAME_MIN = -10000
@@ -329,12 +334,15 @@ function addText (doc, slideId, frameValue = { x: 560, y: 440, w: 800, h: 200, r
 }
 
 // A new shape on top. Returns its id.
-function addShape (doc, slideId, shape, frameValue = { x: 760, y: 340, w: 400, h: 400, rot: 0 }) {
+// `path`: for shape 'custom', SVG path data in a 1000 x 1000 box.
+function addShape (doc, slideId, shape, frameValue = { x: 760, y: 340, w: 400, h: 400, rot: 0 }, { path } = {}) {
   const els = elsOf(slide(doc, slideId))
   if (!els || !SHAPES.includes(shape) || elements(doc, slideId).length >= MAX_ELEMENTS) return null
+  if (shape === 'custom' && !cleanPath(path)) return null
   const id = newId()
   const map = newElement('shape', frameValue, topZ(doc, slideId))
   map.set('shape', shape)
+  if (shape === 'custom') map.set('path', cleanPath(path))
   map.set('fill', shape === 'line' ? 'none' : 'accent1')
   map.set('line', shape === 'line' ? 'text' : 'none')
   map.set('lineW', shape === 'line' ? 6 : 0)
@@ -372,15 +380,54 @@ function addPicture (doc, slideId, pic, frameValue = null) {
   return id
 }
 
-// A shape's fill, outline colour and outline width, as stored, made safe.
+function cleanPath (v) {
+  return typeof v === 'string' && v.length <= PATH_MAX && PATH.test(v) ? v.trim() : null
+}
+
+const opacity = (v) => clampNum(v, 0, 1, 1)
+
+// A shape's look, as stored, made safe (proposals/2026-10-06-slides.md and
+// 2026-10-06-slides-followups.md). A custom shape whose path is bad draws as
+// its box.
 function style (map) {
   const col = (v, dflt) => (typeof v === 'string' && COLOR.test(v) ? v : dflt)
+  let shape = SHAPES.includes(map.get('shape')) ? map.get('shape') : 'rect'
+  const path = shape === 'custom' ? cleanPath(map.get('path')) : null
+  if (shape === 'custom' && !path) shape = 'rect'
   return {
-    shape: SHAPES.includes(map.get('shape')) ? map.get('shape') : 'rect',
+    shape,
+    path,
     fill: col(map.get('fill'), 'accent1'),
     line: col(map.get('line'), 'none'),
-    lineW: clampNum(map.get('lineW'), 0, 100, 0)
+    lineW: clampNum(map.get('lineW'), 0, 100, 0),
+    fillOpacity: opacity(map.get('fillOpacity')),
+    lineOpacity: opacity(map.get('lineOpacity')),
+    head: ENDS.includes(map.get('head')) ? map.get('head') : 'none',
+    tail: ENDS.includes(map.get('tail')) ? map.get('tail') : 'none'
   }
+}
+
+// Where text sits in a text box or shape and whether it wraps. Titles and
+// shapes default to the middle, other text boxes to the top.
+function textLayout (map) {
+  const anchor = map.get('anchor')
+  const middle = map.get('type') === 'shape' || map.get('role') === 'title'
+  return {
+    anchor: ANCHORS.includes(anchor) ? anchor : middle ? 'middle' : 'top',
+    wrap: map.get('wrap') !== false
+  }
+}
+
+// A picture's crop: fractions cut from each side, each 0 to 0.9, and the
+// two from one axis together under 0.95.
+function crop (map) {
+  const c = map.get('crop')
+  const f = (v) => clampNum(v, 0, 0.9, 0)
+  if (!c || typeof c !== 'object') return { l: 0, t: 0, r: 0, b: 0 }
+  let [l, t, r, b] = [f(c.l), f(c.t), f(c.r), f(c.b)]
+  if (l + r > 0.95) { l = 0; r = 0 }
+  if (t + b > 0.95) { t = 0; b = 0 }
+  return { l, t, r, b }
 }
 
 // Change a shape's fill, line or lineW (others are left alone).
@@ -389,6 +436,55 @@ function setStyle (doc, slideId, elId, changes = {}) {
   if (!map || map.get('type') !== 'shape') return false
   for (const k of ['fill', 'line']) if (typeof changes[k] === 'string' && COLOR.test(changes[k])) map.set(k, changes[k])
   if (Number.isFinite(changes.lineW)) map.set('lineW', clampNum(changes.lineW, 0, 100, 0))
+  return true
+}
+
+// Fill and outline opacity of a shape, each 0 to 1 (others left alone).
+function setOpacity (doc, slideId, elId, { fill, line } = {}) {
+  const map = element(doc, slideId, elId)
+  if (!map || map.get('type') !== 'shape') return false
+  if (Number.isFinite(fill)) map.set('fillOpacity', opacity(fill))
+  if (Number.isFinite(line)) map.set('lineOpacity', opacity(line))
+  return true
+}
+
+function textHolder (doc, slideId, elId) {
+  const map = element(doc, slideId, elId)
+  return map && (map.get('type') === 'text' || map.get('type') === 'shape') ? map : null
+}
+
+function setAnchor (doc, slideId, elId, anchor) {
+  const map = textHolder(doc, slideId, elId)
+  if (!map || !ANCHORS.includes(anchor)) return false
+  map.set('anchor', anchor)
+  return true
+}
+
+function setWrap (doc, slideId, elId, wrap) {
+  const map = textHolder(doc, slideId, elId)
+  if (!map) return false
+  if (wrap) map.delete('wrap')
+  else map.set('wrap', false)
+  return true
+}
+
+// A picture's crop ({ l, t, r, b }); none or all zero removes it.
+function setCrop (doc, slideId, elId, value) {
+  const map = element(doc, slideId, elId)
+  if (!map || map.get('type') !== 'picture') return false
+  map.set('crop', value || {})
+  const c = crop(map)
+  if (!c.l && !c.t && !c.r && !c.b) map.delete('crop')
+  else map.set('crop', c)
+  return true
+}
+
+// Arrowheads on a line: head is the start, tail the end.
+function setArrows (doc, slideId, elId, { head, tail } = {}) {
+  const map = element(doc, slideId, elId)
+  if (!map || map.get('type') !== 'shape' || map.get('shape') !== 'line') return false
+  if (ENDS.includes(head)) map.set('head', head)
+  if (ENDS.includes(tail)) map.set('tail', tail)
   return true
 }
 
@@ -481,6 +577,8 @@ module.exports = {
   THEME,
   TYPES,
   SHAPES,
+  ENDS,
+  ANCHORS,
   MAX_ELEMENTS,
   newId,
   keyBetween,
@@ -506,7 +604,14 @@ module.exports = {
   addShape,
   addPicture,
   style,
+  textLayout,
+  crop,
   setStyle,
+  setOpacity,
+  setAnchor,
+  setWrap,
+  setCrop,
+  setArrows,
   setAlt,
   pictureRefs,
   setFrame,

@@ -2,8 +2,11 @@
 // (src/ui/slides/pptxExport.js), then has LibreOffice turn it into a PDF and
 // checks each text is on the right page in about the right place (within 5
 // percent of the slide), and reads the .pptx's XML for the six shapes, the
-// picture, rotation, notes and the slide size. Needs `soffice` and
-// `pdftotext` (poppler).
+// picture, rotation, notes and the slide size. Slide 3 has the follow-ups
+// (proposals/2026-10-06-slides-followups.md): see-through fill and outline,
+// bottom-anchored and unwrapped text, a cropped picture, arrowheads and
+// custom shapes; LibreOffice saves the deck again as .pptx and its XML must
+// still have each of them. Needs `soffice` and `pdftotext` (poppler).
 // Usage: node scripts/check-slides-export.js [out-dir]
 // With an out-dir it also keeps the .pptx, LibreOffice's PDF and a PNG of
 // each page for a look.
@@ -104,7 +107,8 @@ const FORMATTED = {
   const schema = m.slideSchema()
   const fill = (map, json) => m.prosemirrorJSONToYXmlFragment(schema, json, map.get('text'))
   const els = (slideId) => S.elements(doc, slideId)
-  let s1, s2, s3
+  let s1, s2, s3, s4
+  const ids = {}
   const picRef = 'core0:blob0'
   const PIC = png(320, 160)
 
@@ -139,7 +143,29 @@ const FORMATTED = {
     }
     S.addPicture(doc, s2, { ref: picRef, hash: 'h', mime: 'image/png', w: 320, h: 160, alt: 'Green box' }, { x: 100, y: 640, w: 400, h: 200, rot: 0 })
 
-    s3 = S.addSlide(doc, { after: s2, layout: 'blank' })
+    s4 = S.addSlide(doc, { after: s2, layout: 'blank' })
+    ids.seeThrough = S.addShape(doc, s4, 'rect', { x: 80, y: 80, w: 300, h: 200, rot: 0 })
+    S.setStyle(doc, s4, ids.seeThrough, { fill: '#d32f2f', line: '#1976d2', lineW: 8 })
+    S.setOpacity(doc, s4, ids.seeThrough, { fill: 0.5, line: 0.75 })
+    ids.bottom = S.addText(doc, s4, { x: 450, y: 80, w: 600, h: 500, rot: 0 })
+    fill(S.element(doc, s4, ids.bottom), { type: 'doc', content: [p([t('Bottom words')])] })
+    S.setAnchor(doc, s4, ids.bottom, 'bottom')
+    ids.unwrapped = S.addText(doc, s4, { x: 80, y: 640, w: 160, h: 80, rot: 0 })
+    fill(S.element(doc, s4, ids.unwrapped), { type: 'doc', content: [p([t('One long line that never wraps')])] })
+    S.setWrap(doc, s4, ids.unwrapped, false)
+    ids.cropped = S.addPicture(doc, s4, { ref: picRef, hash: 'h', mime: 'image/png', w: 320, h: 160, alt: 'Cropped box' }, { x: 1150, y: 80, w: 200, h: 200, rot: 0 })
+    S.setCrop(doc, s4, ids.cropped, { l: 0.25, t: 0, r: 0.25, b: 0 })
+    ids.arrow = S.addShape(doc, s4, 'line', { x: 1150, y: 360, w: 500, h: 40, rot: 0 })
+    S.setStyle(doc, s4, ids.arrow, { lineW: 6 })
+    S.setArrows(doc, s4, ids.arrow, { head: 'arrow', tail: 'triangle' })
+    ids.oval = S.addShape(doc, s4, 'line', { x: 1150, y: 440, w: 500, h: 40, rot: 0 })
+    S.setStyle(doc, s4, ids.oval, { lineW: 6 })
+    S.setArrows(doc, s4, ids.oval, { tail: 'oval' })
+    ids.custom = S.addShape(doc, s4, 'custom', { x: 1150, y: 560, w: 300, h: 300, rot: 0 }, { path: 'M500 0L1000 1000L0 1000Z' })
+    ids.curve = S.addShape(doc, s4, 'custom', { x: 1500, y: 560, w: 300, h: 300, rot: 0 }, { path: 'M0 1000C0 0 1000 0 1000 1000Z' })
+    fill(S.element(doc, s4, ids.curve), { type: 'doc', content: [p([t('Curved')])] })
+
+    s3 = S.addSlide(doc, { after: s4, layout: 'blank' })
     const gone = S.addText(doc, s3)
     fill(S.element(doc, s3, gone), { type: 'doc', content: [p([t('Deleted slide')])] })
     S.deleteSlide(doc, s3)
@@ -193,11 +219,29 @@ const FORMATTED = {
   const slide1 = await xml('ppt/slides/slide1.xml')
   const slide2 = await xml('ppt/slides/slide2.xml')
   const notes = (await Promise.all(Object.keys(zip.files).filter((n) => /^ppt\/notesSlides\/notesSlide\d+\.xml$/.test(n)).map(xml))).join('')
-  const allSlides = slide1 + slide2
+  const slide3 = await xml('ppt/slides/slide3.xml')
+  const allSlides = slide1 + slide2 + slide3
+
+  // LibreOffice reads the .pptx and saves it again: the new fields must
+  // come back in its XML.
+  const again = path.join(out, 'again')
+  fs.mkdirSync(again, { recursive: true })
+  execFileSync('soffice', ['--headless', '-env:UserInstallation=file://' + path.join(out, 'lo-profile'), '--convert-to', 'pptx', '--outdir', again, file], { stdio: 'pipe', timeout: 120000 })
+  const loZip = await (await import('jszip')).default.loadAsync(fs.readFileSync(path.join(again, 'Export check.pptx')))
+  const lo3 = loZip.file('ppt/slides/slide3.xml') ? await loZip.file('ppt/slides/slide3.xml').async('string') : ''
+  const spOf = (x, name) => { const i = x.indexOf(name); if (i < 0) return ''; const a = x.lastIndexOf('<p:sp>', i); const b = x.indexOf('</p:sp>', i); return a < 0 || b < 0 ? '' : x.slice(a, b) }
+  // LibreOffice names shapes its own way: find them by their text or kind.
+  const loHas = (re) => re.test(lo3)
+  // The bottom-anchored text's top, and the unwrapped line's words.
+  const bottomAt = find(2, 'Bottom words')
+  const oneLine = (() => {
+    const words = 'One long line that never wraps'.split(' ').map((w) => (pages[2] || { words: [] }).words.find((x) => x.text === w))
+    return words.every(Boolean) && words.every((w) => Math.abs(w.y0 - words[0].y0) < 1)
+  })()
   const twoPPr = [...allSlides.matchAll(/<a:p>([\s\S]*?)<\/a:p>/g)].some((x) => (x[1].match(/<a:pPr\b/g) || []).length > 1)
 
   const checks = {
-    'two pages (deleted slide left out)': pages.length === 2 && !bbox.includes('Deleted'),
+    'three pages (deleted slide left out)': pages.length === 3 && !bbox.includes('Deleted'),
     'pages are 13.333 x 7.5 in': pages.every((pg) => Math.round(pg.w) === 960 && Math.round(pg.h) === 540),
     'title centred on page 1': at(0, 'Quarterly review', { cx: 960, cy: 440 }),
     'subtitle centred under it': at(0, 'Prepared by Ana', { cx: 960, top: 629 }),
@@ -219,7 +263,17 @@ const FORMATTED = {
     link: Object.keys(zip.files).some((n) => /slide2\.xml\.rels$/.test(n)) && (await xml('ppt/slides/_rels/slide2.xml.rels')).includes('https://example.com/deck'),
     'bullets and numbering': slide2.includes('<a:buChar char="&#x2022;"/>') && slide2.includes('<a:buAutoNum type="arabicPeriod"') && slide2.includes('lvl="1"'),
     'one paragraph property block per paragraph': !twoPPr,
-    'speaker notes': notes.includes('Speak slowly') && notes.includes('Mention the budget')
+    'speaker notes': notes.includes('Speak slowly') && notes.includes('Mention the budget'),
+    'see-through fill and outline written': /name="shape [^"]*"[\s\S]*?<a:solidFill><a:srgbClr val="D32F2F"><a:alpha val="50000"\/><\/a:srgbClr><\/a:solidFill><a:ln w="50800"><a:solidFill><a:srgbClr val="1976D2"><a:alpha val="75000"\/>/.test(slide3),
+    'see-through fill and outline read back': loHas(/<a:srgbClr val="d32f2f"><a:alpha val="50000"\/><\/a:srgbClr>/i) && loHas(/<a:srgbClr val="1976d2"><a:alpha val="75000"\/><\/a:srgbClr>/i),
+    'bottom anchor written and read back': /anchor="b"/.test(spOf(slide3, 'Bottom words')) && /anchor="b"/.test(spOf(lo3, 'Bottom words')),
+    'bottom-anchored text at the bottom of its box': !!bottomAt && near(bottomAt.y1, (80 + 500 - 9) / 1080) && bottomAt.y0 > 0.3,
+    'no wrap written and read back': /wrap="none"/.test(spOf(slide3, 'never wraps')) && /wrap="none"/.test(spOf(lo3, 'never wraps')),
+    'unwrapped text on one line': oneLine,
+    'crop written and read back': /<a:srcRect l="25000" r="25000"\/>/.test(slide3) && (() => { const m = /<a:srcRect l="(\d+)"[^>]*r="(\d+)"/.exec(lo3); return !!m && Math.abs(m[1] - 25000) < 100 && Math.abs(m[2] - 25000) < 100 })(),
+    'line ends written and read back': /<a:headEnd type="arrow"\/><a:tailEnd type="triangle"\/>/.test(slide3) && /<a:tailEnd type="oval"\/>/.test(slide3) && loHas(/<a:headEnd[^>]* type="arrow"/) && loHas(/<a:tailEnd[^>]* type="triangle"/) && loHas(/<a:tailEnd[^>]* type="oval"/),
+    'custom shapes written and read back': (slide3.match(/<a:custGeom>/g) || []).length === 2 && /<a:cubicBezTo>/.test(slide3) && (lo3.match(/<a:custGeom>/g) || []).length >= 2 && /<a:cubicBezTo>/.test(lo3),
+    'text in a custom shape': !!find(2, 'Curved')
   }
   for (const [name, ok] of Object.entries(checks)) console.log((ok ? 'ok   ' : 'FAIL ') + name)
   const failed = Object.values(checks).filter((x) => !x).length

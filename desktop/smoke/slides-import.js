@@ -1,8 +1,9 @@
 // Smoke test part "slides-import": a .pptx made here (by hand, with Node's
 // zlib, so the packaged app can run it too) imported through Import a file
 // (src/ui/slides/pptxImport.js). The deck must open with its two slides in
-// order, the title in the title box, the bullets, a shape, the picture
-// drawn from its stored bytes and the notice of what was left out.
+// order, the title in the title box, the bullets, a shape, a see-through
+// custom shape, the picture drawn from its stored bytes and the notice of
+// what was left out.
 //
 // PEAROFFICE_SMOKE_IMPORT_FILE=<a .pptx> imports that file instead (only
 // checks that it opens) and PEAROFFICE_SMOKE_IMPORT_SHOTS=<folder> saves a
@@ -106,6 +107,8 @@ function smokeDeck () {
   const slide2 = `<p:sld ${NS}><p:cSld><p:spTree>${HEAD}` +
     `<p:pic><p:nvPicPr><p:cNvPr id="4" name="Pic" descr="A red box"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr><p:blipFill><a:blip r:embed="rIdP"/></p:blipFill><p:spPr>${xfrm(1000000, 1000000, 4000000, 2000000)}</p:spPr></p:pic>` +
     `<p:sp><p:nvSpPr><p:cNvPr id="5" name="E"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr>${xfrm(7000000, 1000000, 2000000, 2000000)}<a:prstGeom prst="ellipse"/><a:solidFill><a:srgbClr val="2266CC"/></a:solidFill></p:spPr></p:sp>` +
+    // A custom shape with a curve (proposals/2026-10-06-slides-followups.md).
+    `<p:sp><p:nvSpPr><p:cNvPr id="7" name="C"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr>${xfrm(9500000, 1000000, 2000000, 2000000)}<a:custGeom><a:pathLst><a:path w="100" h="100"><a:moveTo><a:pt x="0" y="100"/></a:moveTo><a:cubicBezTo><a:pt x="0" y="0"/><a:pt x="100" y="0"/><a:pt x="100" y="100"/></a:cubicBezTo><a:close/></a:path></a:pathLst></a:custGeom><a:solidFill><a:srgbClr val="CC8822"><a:alpha val="50000"/></a:srgbClr></a:solidFill></p:spPr></p:sp>` +
     `<p:sp><p:nvSpPr><p:cNvPr id="6" name="X"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr><p:spPr>${xfrm(1000000, 4000000, 6000000, 800000)}<a:prstGeom prst="rect"/><a:noFill/></p:spPr><p:txBody><a:bodyPr/><a:p><a:r><a:rPr lang="en-US" sz="2400" b="1"/><a:t>Picture slide</a:t></a:r></a:p></p:txBody></p:sp>` +
     '</p:spTree></p:cSld><p:transition><p:fade/></p:transition></p:sld>'
   const theme = `<a:theme ${NS} name="T"><a:themeElements><a:clrScheme name="C"><a:dk1><a:srgbClr val="000000"/></a:dk1><a:lt1><a:srgbClr val="FFFFFF"/></a:lt1></a:clrScheme><a:fontScheme name="F"><a:majorFont><a:latin typeface="Arial"/></a:majorFont><a:minorFont><a:latin typeface="Arial"/></a:minorFont></a:fontScheme></a:themeElements></a:theme>`
@@ -189,7 +192,10 @@ async function run (t) {
   // The picture comes from its stored bytes: drawn and 64 by 32.
   await waitFor('picture drawn', "(() => { const i = document.querySelector('.slide-stage img.slide-picture'); return !!i && i.complete && i.naturalWidth === 64 && i.naturalHeight === 32 && i.alt === 'A red box' })()", 20000)
   result.importPicture = true
-  step('slide 2: picture, shape and text')
+  // The custom shape: its curve drawn at half opacity.
+  result.importCustom = await js("(() => { const p = document.querySelector('.slide-stage .slide-el[data-type=shape] svg[data-shape=custom] path'); return !!p && /C/.test(p.getAttribute('d')) && p.parentNode.getAttribute('fill') === '#cc8822' && p.parentNode.getAttribute('fill-opacity') === '0.5' })()")
+  if (!result.importCustom) throw new Error('custom shape not drawn')
+  step('slide 2: picture, shapes and text')
 
   const notice = await js("(document.querySelector('.banner.info') || {}).textContent || ''")
   if (!notice.includes('Left out: 1 slide transition.')) throw new Error('notice: ' + JSON.stringify(notice))
