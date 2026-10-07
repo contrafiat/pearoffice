@@ -51,9 +51,14 @@ export function colourCss (c) {
   return /^#[0-9a-fA-F]{6}$/.test(c) ? c : 'none'
 }
 
+// PowerPoint's corner for a rounded rectangle with none of its own: a
+// sixth of the shorter side.
+export const POWERPOINT_RADIUS = 0.16667
+
 // The SVG outline of a shape in a w by h box, kept inside the box by half
-// the outline width. `path` is a custom shape's.
-function shapePath (shape, w, h, s, path) {
+// the outline width. `path` is a custom shape's; `radius` is a rounded
+// rectangle's corner as a fraction of the shorter side (0 to 0.5).
+function shapePath (shape, w, h, s, path, radius = POWERPOINT_RADIUS) {
   const x0 = s
   const y0 = s
   const x1 = Math.max(x0, w - s)
@@ -62,7 +67,7 @@ function shapePath (shape, w, h, s, path) {
   const ih = y1 - y0
   switch (shape) {
     case 'roundRect': {
-      const r = Math.min(iw, ih) * 0.16
+      const r = Math.min(iw, ih) * Math.min(0.5, Math.max(0, radius))
       return <rect x={x0} y={y0} width={iw} height={ih} rx={r} ry={r} />
     }
     case 'ellipse':
@@ -138,7 +143,7 @@ export function ShapeSvg ({ style, w, h, className }) {
   return (
     <svg className={'slide-shape' + (className ? ' ' + className : '')} data-shape={style.shape} width='100%' height='100%' viewBox={'0 0 ' + w + ' ' + h} preserveAspectRatio='none' aria-hidden='true'>
       <g fill={fill} fillOpacity={fillOpacity} stroke={line} strokeOpacity={lineOpacity} strokeWidth={sw} strokeLinejoin='round' strokeLinecap='butt'>
-        {shapePath(style.shape, w, h, sw / 2, style.path)}
+        {shapePath(style.shape, w, h, sw / 2, style.path, style.radius)}
       </g>
     </svg>
   )

@@ -99,6 +99,20 @@ drawing ignores them.
 2. Custom shapes and SmartArt drawings on import.
 3. Charts (if approved as above).
 
+## Added 2026-10-07
+
+Three more optional fields, found while polishing (approved by Tim with the
+PR that builds them):
+
+| Field | On | Values | Today |
+| --- | --- | --- | --- |
+| `radius` | shape `roundRect` | 0 to 0.5, a fraction of the shorter side | 0.16667 (PowerPoint's default) |
+| `chart.textColor` | chart | a theme slot or `#rrggbb` | the theme's text colour |
+| `chart.smooth` | chart (line, area) | `true` | straight lines |
+
+Import reads them from `prstGeom avLst adj`, the chart's `txPr` colour and
+`c:smooth`; export writes them back. Older builds ignore them.
+
 ## Decided 2026-10-06
 
 1. Charts: a `chart` element drawn with the sheet's chart code, keeping the

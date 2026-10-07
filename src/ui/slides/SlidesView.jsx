@@ -486,7 +486,7 @@ export function SlidesView ({ sheetId, onTitleChange, onError, onGone }) {
             : selPicture
               ? btn(cropping ? 'Finish cropping (Enter)' : 'Crop', Crop, !!cropping, () => (cropping ? setCropping(null) : setCropping(selPicture.id)), { className: 'crop-button' + (cropping ? ' on' : '') })
               : selChart
-                ? <ChartTools value={selChart.chart} btn={btn} phone={phone} setChart={(patch) => change((doc) => slidesModel.setChart(doc, chartSlide, selChart.id, { chart: patch }))} onEditData={() => setDataPanel(selChart.id)} />
+                ? <ChartTools value={selChart.chart} theme={deck.theme} btn={btn} phone={phone} setChart={(patch) => change((doc) => slidesModel.setChart(doc, chartSlide, selChart.id, { chart: patch }))} onEditData={() => setDataPanel(selChart.id)} />
                 : canEdit && <TextTools editor={toolEditor} defaultSize={defaultSize(deck.theme, editingBox ? editingBox.role : 'body')} phone={phone} btn={btn} afterAlign={anchorTools} />}
           <button className='present-button' title={phone ? 'Present' : 'Present (F5, or Shift+F5 from this slide)'} onMouseDown={(e) => e.preventDefault()} onClick={() => startShow(true)} disabled={!deck.slides.length}><Play size={ICON} weight='fill' /> Present</button>
         </div>

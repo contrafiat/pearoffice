@@ -3,7 +3,7 @@ import { PaintBucket, PencilSimpleLine, AlignTopSimple, AlignCenterVerticalSimpl
 import { ShapeIcon, SHAPE_LABELS, INSERT_SHAPES } from './objects.jsx'
 
 // The Insert shape menu, plus fill, outline colour, outline width, their
-// opacity and a line's arrowheads for the selected shapes, plus where text
+// opacity, a rounded rectangle's corners and a line's arrowheads for the selected shapes, plus where text
 // sits in a box. Desktop only: phones draw shapes but do not style them
 // (proposals/2026-10-06-slides.md, decision 5, and
 // 2026-10-06-slides-followups.md).
@@ -13,6 +13,8 @@ const FIXED = ['#000000', '#7f7f7f', '#ffffff', '#d32f2f', '#f57c00', '#fbc02d',
 const WIDTHS = [0, 1, 2, 3, 4, 6, 8, 12, 16, 24]
 const OPACITIES = [1, 0.75, 0.5, 0.25]
 const ENDS = [['none', 'None'], ['arrow', 'Arrow'], ['triangle', 'Triangle'], ['oval', 'Circle']]
+// Rounded rectangle corners, as a fraction of the shorter side.
+const CORNERS = [[0, 'Square corners'], [0.05, 'Small corners'], [0.16667, 'Medium corners'], [0.25, 'Large corners'], [0.5, 'Round ends']]
 const ANCHORS = [['top', 'Top', AlignTopSimple], ['middle', 'Middle', AlignCenterVerticalSimple], ['bottom', 'Bottom', AlignBottomSimple]]
 
 // A stored colour as the theme shows it, for swatches outside the slide.
@@ -28,6 +30,43 @@ const pop = (button) => {
   const r = button.getBoundingClientRect()
   return { top: r.bottom + 4, left: Math.max(4, Math.min(r.left, window.innerWidth - 260)) }
 }
+
+// The colour menu: the theme's colours, fixed colours and none. `kind`
+// names it (fill-palette, line-palette, chart-text-palette); `children`
+// go below, as the opacity row does. `noneLabel` is the last swatch's
+// name.
+export function ColourPalette ({ theme, kind, at, onPick, onClose, noneLabel = 'None', children }) {
+  return (
+    <>
+      <div className='doc-scrim' onMouseDown={onClose} />
+      <span className={'palette shape-palette doc-pop ' + kind + '-palette'} role='menu' style={{ position: 'fixed', top: at.top, left: at.left }}>
+        <span className='palette-row'>
+          {SLOTS.map(([c, label]) => (
+            <button key={c} className={'swatch slot-' + c} style={{ background: colourOf(theme, c) }} title={label} aria-label={label} onMouseDown={(e) => e.preventDefault()} onClick={() => onPick(c)} />
+          ))}
+        </span>
+        <span className='palette-row'>
+          {FIXED.map((c) => (
+            <button key={c} className='swatch' style={{ background: c }} title={c} aria-label={c} onMouseDown={(e) => e.preventDefault()} onClick={() => onPick(c)} />
+          ))}
+          <button className='swatch none' title={noneLabel} aria-label={noneLabel} onMouseDown={(e) => e.preventDefault()} onClick={() => onPick('none')}>×</button>
+        </span>
+        {children}
+      </span>
+    </>
+  )
+}
+
+// A colour button with the colour shown in a bar under its icon.
+export function SwatchButton ({ kind, label, Icon, colour, size, onOpen }) {
+  return (
+    <button title={label} aria-label={label} className={'swatch-button ' + kind} onMouseDown={(e) => e.preventDefault()} onClick={(e) => onOpen(e.currentTarget)}>
+      <span className='icon-swatch'><Icon size={size} /><span className={'swatch-bar' + (colour ? '' : ' none')} style={{ background: colour || 'transparent' }} /></span>
+    </button>
+  )
+}
+
+export const popBelow = pop
 
 // Top, middle and bottom: where the text sits in the selected boxes.
 // `value` is the anchor they share, or null.
@@ -58,7 +97,7 @@ export function InsertShape ({ btn, Icon, disabled, onPick }) {
 }
 
 // shapes: the selected shape elements ({ id, style }). setStyle(fn) sets
-// each one's fill, line and lineW to fn(el); setOpacity and setArrows take
+// each one's fill, line, lineW and radius to fn(el); setOpacity and setArrows take
 // { fill, line } and { head, tail } for all of them.
 export function ShapeTools ({ shapes, theme, phone, setStyle, setOpacity, setArrows }) {
   const [menu, setMenu] = useState(null) // { kind: 'fill' | 'line', top, left }
@@ -82,14 +121,11 @@ export function ShapeTools ({ shapes, theme, phone, setStyle, setOpacity, setArr
   }
   const width = (w) => setStyle((el) => (w > 0 && el.style.line === 'none' ? { lineW: w, line: 'text' } : { lineW: w }))
 
-  const swatch = (kind, label, Icon, c) => {
-    const shown = colourOf(theme, c)
-    return (
-      <button title={label} aria-label={label} className={'swatch-button shape-' + kind} onMouseDown={(e) => e.preventDefault()} onClick={(e) => open(kind, e.currentTarget)}>
-        <span className='icon-swatch'><Icon size={ICON} /><span className={'swatch-bar' + (shown ? '' : ' none')} style={{ background: shown || 'transparent' }} /></span>
-      </button>
-    )
-  }
+  const swatch = (kind, label, Icon, c) => <SwatchButton kind={'shape-' + kind} label={label} Icon={Icon} colour={colourOf(theme, c)} size={ICON} onOpen={(b) => open(kind, b)} />
+  // Corners for the rounded rectangles among the selected shapes.
+  const rounded = shapes.filter((el) => el.style.shape === 'roundRect')
+  const radius = rounded.length && rounded.every((el) => el.style.radius === rounded[0].style.radius) ? rounded[0].style.radius : null
+  const corners = radius === null || CORNERS.some((c) => c[0] === radius) ? CORNERS : [...CORNERS, [radius, 'Corners ' + Math.round(radius * 100) + '%']].sort((a, b) => a[0] - b[0])
 
   return (
     <>
@@ -99,20 +135,14 @@ export function ShapeTools ({ shapes, theme, phone, setStyle, setOpacity, setArr
         {lineW === null && <option value=''>Mixed</option>}
         {(WIDTHS.includes(lineW) || lineW === null ? WIDTHS : [...WIDTHS, lineW].sort((a, b) => a - b)).map((w) => <option key={w} value={String(w)}>{w ? w + ' pt' : 'None'}</option>)}
       </select>
-      {menu && <div className='doc-scrim' onMouseDown={() => setMenu(null)} />}
+      {rounded.length > 0 && (
+        <select aria-label='Corners' title='Corners' className='corner-radius' value={radius === null ? '' : String(radius)} onChange={(e) => setStyle(() => ({ radius: Number(e.target.value) }))}>
+          {radius === null && <option value=''>Mixed</option>}
+          {corners.map(([v, label]) => <option key={v} value={String(v)}>{label}</option>)}
+        </select>
+      )}
       {menu && (
-        <span className={'palette shape-palette doc-pop ' + menu.kind + '-palette'} role='menu' style={{ position: 'fixed', top: menu.top, left: menu.left }}>
-          <span className='palette-row'>
-            {SLOTS.map(([c, label]) => (
-              <button key={c} className={'swatch slot-' + c} style={{ background: colourOf(theme, c) }} title={label} aria-label={label} onMouseDown={(e) => e.preventDefault()} onClick={() => pick(c)} />
-            ))}
-          </span>
-          <span className='palette-row'>
-            {FIXED.map((c) => (
-              <button key={c} className='swatch' style={{ background: c }} title={c} aria-label={c} onMouseDown={(e) => e.preventDefault()} onClick={() => pick(c)} />
-            ))}
-            <button className='swatch none' title='None' aria-label='None' onMouseDown={(e) => e.preventDefault()} onClick={() => pick('none')}>×</button>
-          </span>
+        <ColourPalette theme={theme} kind={menu.kind} at={menu} onPick={pick} onClose={() => setMenu(null)}>
           <span className='palette-row opacity-row' role='group' aria-label='Opacity'>
             {OPACITIES.map((v) => {
               const key = menu.kind === 'fill' ? 'fillOpacity' : 'lineOpacity'
@@ -124,7 +154,7 @@ export function ShapeTools ({ shapes, theme, phone, setStyle, setOpacity, setArr
               )
             })}
           </span>
-        </span>
+        </ColourPalette>
       )}
       {onlyLines && (
         <>

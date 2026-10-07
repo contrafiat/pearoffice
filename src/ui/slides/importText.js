@@ -153,7 +153,10 @@ function paragraphJson (p, opts) {
     else content.push(...textNodes(r, opts))
   }
   const attrs = {}
-  if (p.align) attrs.textAlign = p.align
+  // opts.align: the alignment of a paragraph that names none, where the box
+  // draws another by default (shapes centre theirs, PowerPoint does not).
+  const align = p.align || opts.align
+  if (align) attrs.textAlign = align
   const lh = lineHeight(p.lnSpc)
   if (lh) attrs.lineHeight = lh
   if (!p.bullet && p.level > 0) attrs.indent = p.level

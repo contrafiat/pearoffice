@@ -359,7 +359,14 @@ function followUpsDeck () {
         '<a:arcTo wR="wd4" hR="hd2" stAng="0" swAng="5400000"/><a:close/></a:path><a:path fill="none"><a:moveTo><a:pt x="0" y="0"/></a:moveTo><a:lnTo><a:pt x="r" y="t"/></a:lnTo></a:path>',
       '<a:gd name="x1" fmla="*/ w 3 4"/>') + '<a:solidFill><a:srgbClr val="FFAA00"/></a:solidFill></p:spPr><p:txBody><a:bodyPr anchor="b"/>' + para('Wave text') + '</p:txBody></p:sp>' +
     // SmartArt with its drawing, and one without.
-    smartArt(10, 'Diagram', 500000, 'rIdD1') + smartArt(11, 'Plain', 5000000, 'rIdD2')
+    smartArt(10, 'Diagram', 500000, 'rIdD1') + smartArt(11, 'Plain', 5000000, 'rIdD2') +
+    // Rounded rectangles: a quarter corner, PowerPoint's default and square.
+    '<p:sp>' + nv(12, 'Quarter') + '<p:spPr>' + xfrm(7000000, 2500000, 1000000, 600000) + '<a:prstGeom prst="roundRect"><a:avLst><a:gd name="adj" fmla="val 25000"/></a:avLst></a:prstGeom><a:solidFill><a:srgbClr val="112233"/></a:solidFill></p:spPr></p:sp>' +
+    '<p:sp>' + nv(13, 'Default') + '<p:spPr>' + xfrm(8200000, 2500000, 1000000, 600000) + '<a:prstGeom prst="roundRect"><a:avLst/></a:prstGeom><a:solidFill><a:srgbClr val="112244"/></a:solidFill></p:spPr></p:sp>' +
+    '<p:sp>' + nv(14, 'Square') + '<p:spPr>' + xfrm(9400000, 2500000, 1000000, 600000) + '<a:prstGeom prst="roundRect"><a:avLst><a:gd name="adj" fmla="val 0"/></a:avLst></a:prstGeom><a:solidFill><a:srgbClr val="112255"/></a:solidFill></p:spPr></p:sp>' +
+    // Narrow boxes whose long text does not wrap, centred and right-aligned.
+    '<p:sp>' + nv(15, 'Centred') + '<p:spPr>' + xfrm(7000000, 4000000, 500000, 400000) + '<a:prstGeom prst="rect"/><a:noFill/></p:spPr><p:txBody><a:bodyPr wrap="none"/>' + para('Centred words that run on and on', ' algn="ctr"') + '</p:txBody></p:sp>' +
+    '<p:sp>' + nv(16, 'Righted') + '<p:spPr>' + xfrm(7000000, 5000000, 500000, 400000) + '<a:prstGeom prst="rect"/><a:noFill/></p:spPr><p:txBody><a:bodyPr wrap="none"/>' + para('Right words that run on and on', ' algn="r"') + '</p:txBody></p:sp>'
   )
   return craft({
     size: [12192000, 6858000],
@@ -433,6 +440,16 @@ test('follow-ups: opacity, text position, no wrap, crop, line ends, custom shape
   // Without one: its text only.
   assert.equal(named('Only text').type, 'text')
   assert.equal(built.lost.smartArt, 1)
+  // Rounded corners from adj, else PowerPoint's sixth.
+  const corner = (fill) => st(shapes.find((e) => st(e).fill === fill)).radius
+  assert.equal([corner('#112233'), corner('#112244'), corner('#112255')].join(), '0.25,0.16667,0')
+  // Text that does not wrap keeps its box where PowerPoint has it: the
+  // text grows from the box's middle or right edge as drawn.
+  for (const [text, y] of [['Centred words that run on and on', 4000000], ['Right words that run on and on', 5000000]]) {
+    const box = named(text)
+    assert.equal(box.type + ' ' + sm.textLayout(box.map).wrap, 'text false')
+    assert.equal([box.frame.x, box.frame.y, box.frame.w, box.frame.h].join(), [7000000, y, 500000, 400000].map((v) => Math.round(v * k)).join(), text)
+  }
   // The master's empty custom shape (craft's MASTER) is the design shape.
   assert.equal(JSON.stringify(Object.keys(built.lost).sort()), JSON.stringify(['approximated', 'designShapes', 'smartArt']))
   assert.equal(f.noticeFor(built.lost), 'Left out: 1 drawn shape from the slide design. Kept as text only: 1 SmartArt graphic. Drawn close to the original: 1 custom shape. Fonts and the theme are the closest PearOffice has.')
@@ -592,7 +609,7 @@ test('charts: a pptxgenjs deck with a stacked bar, a line, a pie, a doughnut, a 
   assert.equal(built.lost.chartTypes || 0, 0)
 })
 
-test('charts: a hand-made chart part with a combined chart, scheme colours, holes and an unreadable chart', async () => {
+test('charts: a hand-made chart part with a combined chart, scheme colours, holes, smooth lines, text colour and an unreadable chart', async () => {
   const chartXml = (plot) => '<?xml version="1.0" encoding="UTF-8"?><c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><c:chart>' +
     '<c:title><c:tx><c:rich><a:bodyPr/><a:p><a:r><a:t>Made</a:t></a:r><a:r><a:t> by hand</a:t></a:r></a:p></c:rich></c:tx></c:title><c:autoTitleDeleted val="0"/><c:plotArea>' + plot + '</c:plotArea><c:legend><c:legendPos val="t"/></c:legend></c:chart></c:chartSpace>'
   const ser = (i, name, colour, cats, vals) => '<c:ser><c:idx val="' + i + '"/><c:tx><c:v>' + name + '</c:v></c:tx>' + (colour ? '<c:spPr><a:solidFill>' + colour + '</a:solidFill></c:spPr>' : '') +
@@ -600,21 +617,28 @@ test('charts: a hand-made chart part with a combined chart, scheme colours, hole
     '<c:val><c:numRef><c:numCache><c:ptCount val="' + vals.length + '"/>' + vals.map((v, k) => (v === null ? '' : '<c:pt idx="' + k + '"><c:v>' + v + '</c:v></c:pt>')).join('') + '</c:numCache></c:numRef></c:val></c:ser>'
   const combo = '<c:areaChart><c:grouping val="percentStacked"/>' + ser(0, 'Low', '<a:schemeClr val="accent2"/>', [2020, 2021, 2022], [1, null, 3]) + ser(1, 'High', '<a:srgbClr val="00AA00"/>', [2020, 2021, 2022], [4, 5, 6]) + '<c:dLbls><c:showVal val="1"/></c:dLbls></c:areaChart>' +
     '<c:lineChart>' + ser(2, 'Extra', null, [2020, 2021, 2022], [1, 1, 1]) + '</c:lineChart>'
+  const WHITE = '<c:txPr><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill></a:defRPr></a:pPr></a:p></c:txPr>'
+  const smoothLine = '<c:lineChart>' + ser(0, 'Curve', null, [1, 2, 3], [3, 1, 2]).replace('</c:ser>', '<c:smooth val="1"/></c:ser>') + ser(1, 'Flat', null, [1, 2, 3], [1, 1, 1]).replace('</c:ser>', '<c:smooth val="0"/></c:ser>') +
+    '<c:dLbls>' + WHITE + '<c:showVal val="0"/></c:dLbls></c:lineChart><c:catAx>' + WHITE + '</c:catAx><c:valAx>' + WHITE + '</c:valAx>'
   const frame = (id, rid, y) => '<p:graphicFrame><p:nvGraphicFramePr><p:cNvPr id="' + id + '" name="Chart ' + id + '"/><p:cNvGraphicFramePr/><p:nvPr/></p:nvGraphicFramePr><p:xfrm><a:off x="914400" y="' + y + '"/><a:ext cx="3657600" cy="1828800"/></p:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" r:id="' + rid + '"/></a:graphicData></a:graphic></p:graphicFrame>'
   const bytes = await craft({
     slides: [{
-      xml: slideXml(frame(2, 'rIdC1', 914400) + frame(3, 'rIdC2', 3657600)),
-      rels: [['rIdC1', 'chart', '../charts/chart1.xml'], ['rIdC2', 'chart', '../charts/chart2.xml']]
+      xml: slideXml(frame(2, 'rIdC1', 914400) + frame(3, 'rIdC2', 3657600) + frame(4, 'rIdC3', 5000000)),
+      rels: [['rIdC1', 'chart', '../charts/chart1.xml'], ['rIdC2', 'chart', '../charts/chart2.xml'], ['rIdC3', 'chart', '../charts/chart3.xml']]
     }],
     extraFiles: {
       'ppt/charts/chart1.xml': chartXml(combo),
-      'ppt/charts/chart2.xml': chartXml('<c:bubbleChart>' + ser(0, 'B', null, [1], [1]) + '</c:bubbleChart>')
+      'ppt/charts/chart2.xml': chartXml('<c:bubbleChart>' + ser(0, 'B', null, [1], [1]) + '</c:bubbleChart>'),
+      // A smooth line with its text white, except the title's own run.
+      'ppt/charts/chart3.xml': chartXml(smoothLine).replace('<a:r><a:t>Made</a:t>', '<a:r><a:rPr><a:solidFill><a:srgbClr val="FF0000"/></a:solidFill></a:rPr><a:t>Made</a:t>').replace('</c:chart>', '</c:chart>' + WHITE)
     }
   })
   const { doc, built } = await imported(bytes)
   const charts = els(doc, sm.slideIds(doc)[0]).filter((e) => e.type === 'chart')
-  assert.equal(charts.length, 1)
+  assert.equal(charts.length, 2)
   assert.equal(chartLine(charts[0].map), 'dataLabels=true legend=bottom stacked=true title=Made by hand type=area | 2020,2021,2022 | Low:1,,3:#c0504d ; High:4,5,6:#00aa00')
+  // Smooth when any line series is; white, as most of its text is.
+  assert.equal(chartLine(charts[1].map).split(' | ')[0], 'legend=bottom smooth=true textColor=#ffffff title=Made by hand type=line')
   assert.equal(built.lost.chartTypes, 1)
   assert.equal(built.lost.charts, 1)
 })
@@ -729,13 +753,13 @@ test('LibreOffice templates', { skip: !soffice() || !templateDir ? 'needs LibreO
       assert.equal(built.lost.customShapes || 0, 0, n)
       assert.ok((built.lost.designShapes || 0) <= 2, n + ' ' + JSON.stringify(built.lost))
       assert.equal(built.lost.charts || 0, 0, n)
-      // Freshes has a column chart (slide 6) and a line chart (slide 7),
-      // with LibreOffice's values and colours.
+      // Freshes has a column chart (slide 6, white text) and a smooth line
+      // chart (slide 7, grey text), with LibreOffice's values and colours.
       if (n === 'Freshes') {
         const charts = ids.flatMap((id, i) => els(doc, id).filter((e) => e.type === 'chart').map((e) => (i + 1) + ': ' + chartLine(e.map)))
         assert.equal(charts.join('\n'), [
-          '6: legend=none type=column | 2016,2017,2018,2019 | Series 1:25,15,40,20:#ffffff',
-          '7: legend=bottom type=line | 2016,2017,2018,2019 | Series 1:27,13,10,50:#ff420e ; Series 2:25,15,40,20:#2499be'
+          '6: legend=none textColor=#ffffff type=column | 2016,2017,2018,2019 | Series 1:25,15,40,20:#ffffff',
+          '7: legend=bottom smooth=true textColor=#666666 type=line | 2016,2017,2018,2019 | Series 1:27,13,10,50:#ff420e ; Series 2:25,15,40,20:#2499be'
         ].join('\n'))
       }
     }

@@ -1,9 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { X, Plus, Minus, ChartBar, ChartBarHorizontal, ChartLine, ChartLineUp, ChartPie, ChartDonut, ChartScatter, Pentagon, Table, Stack, Tag } from '@phosphor-icons/react'
+import { X, Plus, Minus, ChartBar, ChartBarHorizontal, ChartLine, ChartLineUp, ChartPie, ChartDonut, ChartScatter, Pentagon, Table, Stack, Tag, TextAa, WaveSine } from '@phosphor-icons/react'
+import { ColourPalette, SwatchButton, colourOf, popBelow } from './ShapeTools.jsx'
 
 // The tools for a selected chart on a slide (proposals/2026-10-06-slides-
-// followups.md, "Charts"): its type, title, legend, values on the chart and
-// stacking, plus Edit data: a small panel with the chart's numbers in a grid.
+// followups.md, "Charts"): its type, title, legend, values on the chart,
+// stacking, smooth lines and text colour, plus Edit data: a small panel with the chart's numbers in a grid.
 // Desktop only: phones and viewers only draw charts.
 
 export const CHART_TYPES = [
@@ -17,6 +18,7 @@ export const CHART_TYPES = [
   ['radar', 'Radar', Pentagon]
 ]
 const STACKS = ['column', 'bar', 'line', 'area']
+const SMOOTH = ['line', 'area']
 const SEND_MS = 400
 const MAX_SERIES = 10
 const MAX_ROWS = 1000
@@ -57,10 +59,12 @@ function TitleField ({ value, onSave }) {
   )
 }
 
-// value: the chart's { chart, data }. setChart(patch) merges settings;
-// onEditData opens the data panel.
-export function ChartTools ({ value, btn, phone, setChart, onEditData }) {
+// value: the chart's { chart, data }; theme: the slide theme, for the
+// text colour. setChart(patch) merges settings; onEditData opens the data
+// panel.
+export function ChartTools ({ value, theme, btn, phone, setChart, onEditData }) {
   const [menu, setMenu] = useState(null)
+  const [colours, setColours] = useState(null)
   const c = value.chart
   const type = CHART_TYPES.find((t) => t[0] === c.type) || CHART_TYPES[0]
   const ICON = phone ? 20 : 18
@@ -85,6 +89,9 @@ export function ChartTools ({ value, btn, phone, setChart, onEditData }) {
         <option value='none'>No legend</option>
       </select>
       {btn('Show values', Tag, !!c.dataLabels, () => setChart({ dataLabels: !c.dataLabels || undefined }), { className: 'chart-labels' + (c.dataLabels ? ' on' : '') })}
+      {SMOOTH.includes(c.type) && btn('Smooth lines', WaveSine, !!c.smooth, () => setChart({ smooth: !c.smooth || undefined }), { className: 'chart-smooth' + (c.smooth ? ' on' : '') })}
+      <SwatchButton kind='chart-text' label='Text colour' Icon={TextAa} colour={colourOf(theme, c.textColor || 'text')} size={ICON} onOpen={(b) => setColours(colours ? null : popBelow(b))} />
+      {colours && <ColourPalette theme={theme} kind='chart-text' at={colours} noneLabel='Automatic' onClose={() => setColours(null)} onPick={(col) => { setColours(null); setChart({ textColor: col === 'none' ? undefined : col }) }} />}
       {STACKS.includes(c.type) && btn('Stacked', Stack, !!c.stacked, () => setChart({ stacked: !c.stacked || undefined }), { className: 'chart-stacked' + (c.stacked ? ' on' : '') })}
       <button className='chart-edit-data' title='Edit data' onMouseDown={(e) => e.preventDefault()} onClick={onEditData}><Table size={ICON} /> Edit data</button>
     </>

@@ -71,8 +71,10 @@ export function chartData ({ chart, data }) {
 
 // A chart element ({ chart, data }, slidesModel.chartOf) as pptxgenjs
 // addChart's arguments: { type, data, options }. Colours and text follow
-// the slide theme as the chart is drawn (SlideChart.jsx); sizes are its
-// ECharts sizes in points.
+// the slide theme as the chart is drawn (SlideChart.jsx), text in the
+// chart's own text colour when it has one; sizes are its ECharts sizes in
+// points. Horizontal bars keep PowerPoint's order (first category at the
+// bottom), which is how slides draw them.
 export function pptxChart (value, theme) {
   const chart = value.chart
   const data = chartData(value)
@@ -80,7 +82,7 @@ export function pptxChart (value, theme) {
   const pie = type === 'pie' || type === 'doughnut'
   const accents = theme.accents.map(hexOf)
   const font = fontName(theme.bodyFont)
-  const ink = hexOf(theme.text)
+  const ink = slotHex(chart.textColor, theme) || hexOf(theme.text)
   const labels = data.categories.map((c) => (c === null || c === undefined ? '' : String(c)))
   let rows
   if (type === 'scatter') {
@@ -123,6 +125,7 @@ export function pptxChart (value, theme) {
   if (type === 'area' && chart.stacked) options.barGrouping = 'stacked'
   if (type === 'doughnut') options.holeSize = 60
   if (pie && chart.dataLabels) options.showPercent = false
+  if (type === 'line' && chart.smooth) options.lineSmooth = true
   if (type === 'scatter') options.lineSize = 0
   if (type === 'radar') options.radarStyle = 'marker'
   return { type, data: rows, options }
@@ -434,7 +437,9 @@ export async function deckToPptx (doc, { title = '', pictures = new Map() } = {}
         if (points) shape.points = points
         else shape.shape = 'rect'
       }
-      if (st.shape === 'roundRect') shape.rectRadius = inch(Math.min(iw, ih) * 0.16)
+      // pptxgenjs writes the corner as adj, a fraction of the shorter side;
+      // a square corner still needs a value or PowerPoint uses its own.
+      if (st.shape === 'roundRect') shape.rectRadius = inch(Math.min(iw, ih) * st.radius) || 1e-7
       if (st.shape === 'arrow') {
         // objects.jsx: the shaft is the middle 40 percent, the head
         // min(half the width, 0.8 of the height) long.

@@ -3,6 +3,12 @@
 // or dark. A theme may also carry `palette` (series colours) and `font`, as
 // slides pass theirs (src/ui/slides/SlideChart.jsx); a series with its own
 // `color` (#rrggbb) is drawn in it.
+//
+// `opts` are for slides only: barsBottomUp draws a bar chart's first
+// category (and first series in each group) at the bottom, as PowerPoint
+// and Excel do; compactPie puts a
+// small pie's values inside its slices (or leaves them out) so that no label
+// lands on the legend. Line and area charts with chart.smooth draw curves.
 
 import { SSF } from 'xlsx/dist/xlsx.mini.min.js'
 import { histogram, waterfall } from '../../sheet/charts.js'
@@ -40,7 +46,7 @@ function trend (points) {
   return { at: (x) => a + b * x, r2: syy ? (sxy * sxy) / (sxx * syy) : 1 }
 }
 
-export function chartOption (chart, data, theme = themeColors()) {
+export function chartOption (chart, data, theme = themeColors(), opts = {}) {
   const type = chart.type || 'column'
   // The format picked for the chart, else the cells' own (the first series'
   // for the main axis). A histogram's values are counts, so it keeps none.
@@ -67,13 +73,20 @@ export function chartOption (chart, data, theme = themeColors()) {
 
   if (type === 'pie' || type === 'doughnut') {
     const s = data.series[0] || { name: '', values: [] }
+    const small = !!opts.compactPie
+    // A small pie: a smaller circle above a legend that wraps onto more
+    // lines in place of paging, values inside the slices.
+    if (small && legend !== 'none') option.legend = legend === 'right' ? { ...option.legend, type: 'plain' } : { type: 'plain', bottom: 4, left: 'center', itemGap: 8, itemWidth: 18, itemHeight: 10, textStyle: text }
     option.series = [{
       type: 'pie',
       name: s.name,
-      radius: type === 'doughnut' ? ['45%', '70%'] : '70%',
-      center: ['50%', chart.title ? '55%' : '50%'],
+      radius: type === 'doughnut' ? (small ? ['32%', '55%'] : ['45%', '70%']) : small ? '55%' : '70%',
+      center: [small && legend === 'right' ? '40%' : '50%', small && legend === 'bottom' ? (chart.title ? '50%' : '44%') : chart.title ? '55%' : '50%'],
+      labelLayout: small ? { hideOverlap: true } : undefined,
       data: data.categories.map((name, i) => ({ name: String(name), value: s.values[i] })).filter((d) => d.value !== null && d.value > 0),
-      label: chart.dataLabels ? { show: true, formatter: (p) => p.name + ': ' + fmt(p.value) + ' (' + p.percent + '%)', color: theme.ink } : { color: theme.ink },
+      label: opts.compactPie
+        ? (chart.dataLabels ? { show: true, position: 'inside', formatter: (p) => Math.round(p.percent) + '%' } : { show: false })
+        : chart.dataLabels ? { show: true, formatter: (p) => p.name + ': ' + fmt(p.value) + ' (' + p.percent + '%)', color: theme.ink } : { color: theme.ink },
       itemStyle: { borderColor: theme.panel, borderWidth: 1 }
     }]
     return option
@@ -188,7 +201,7 @@ export function chartOption (chart, data, theme = themeColors()) {
     const secondAxis = valueAxis({ name: undefined, splitLine: { show: false } })
     if (!chart.percent) secondAxis.axisLabel = { ...secondAxis.axisLabel, formatter: secondFmt }
     option.xAxis = horizontal ? valueAxis() : catAxis
-    option.yAxis = horizontal ? { ...catAxis, inverse: true } : (type === 'combo' && second.size ? [valueAxis(), secondAxis] : valueAxis())
+    option.yAxis = horizontal ? { ...catAxis, inverse: !opts.barsBottomUp } : (type === 'combo' && second.size ? [valueAxis(), secondAxis] : valueAxis())
     option.series = data.series.map((s, i) => {
       const asLine = type === 'line' || type === 'area' || (type === 'combo' && lines.has(i))
       // Each series shows its own cells' format in the tooltip and labels.
@@ -206,10 +219,18 @@ export function chartOption (chart, data, theme = themeColors()) {
         areaStyle: type === 'area' ? { opacity: chart.stacked || chart.percent ? 0.85 : 0.35 } : undefined,
         yAxisIndex: type === 'combo' && second.has(i) ? 1 : 0,
         connectNulls: asLine,
+        smooth: asLine && chart.smooth && (type === 'line' || type === 'area') ? true : undefined,
         symbolSize: 5,
         label: label && { ...label, formatter: (p) => sFmt(p.value), position: horizontal ? 'right' : chart.stacked || chart.percent ? 'inside' : 'top' }
       }
     })
+    if (horizontal && opts.barsBottomUp && option.series.length > 1 && !chart.stacked && !chart.percent) {
+      // ECharts puts the first series at the top of each group; PowerPoint
+      // at the bottom. Drawn in reverse, with colours and the legend kept.
+      option.series.forEach((x, i) => { x.color = x.color || palette[i % palette.length] })
+      option.series.reverse()
+      if (option.legend.show !== false) option.legend.data = data.series.map((x) => x.name)
+    }
   }
 
   // Straight-line trends, dashed, with R² in the legend.
