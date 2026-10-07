@@ -181,11 +181,41 @@ export const Picture = Node.create({
 // (Collaboration, cursors, find, placeholder) on top; import and export use
 // these alone, so both read and write the same nodes and marks.
 export function documentExtensions () {
+  return textExtensions({ tables: true, pictures: true })
+}
+
+// A slide's text box (proposals/2026-10-06-slides.md, Text boxes): the
+// document's schema without headings, tables, code blocks and pictures.
+export function slideExtensions () {
+  return textExtensions({ starter: { heading: false, codeBlock: false } })
+}
+
+// Speaker notes: paragraphs, bold, italic and lists.
+export function notesExtensions () {
+  return [
+    StarterKit.configure({
+      undoRedo: false,
+      trailingNode: false,
+      heading: false,
+      blockquote: false,
+      codeBlock: false,
+      code: false,
+      horizontalRule: false,
+      strike: false,
+      underline: false,
+      link: false
+    })
+  ]
+}
+
+// Documents and slides share these, in this order.
+function textExtensions ({ starter = {}, tables = false, pictures = false }) {
   return [
     StarterKit.configure({
       undoRedo: false, // Collaboration's undo only undoes this person's edits
       trailingNode: false, // it would add a paragraph on every device at once
-      link: { openOnClick: false, autolink: true, defaultProtocol: 'https' }
+      link: { openOnClick: false, autolink: true, defaultProtocol: 'https' },
+      ...starter
     }),
     TextStyle,
     Color,
@@ -194,13 +224,13 @@ export function documentExtensions () {
     Highlight.configure({ multicolor: true }),
     TaskList,
     TaskItem.configure({ nested: true }),
-    TableKit.configure({ table: { resizable: false } }),
+    tables && TableKit.configure({ table: { resizable: false } }),
     TextAlign.configure({ types: ['heading', 'paragraph'] }),
     Subscript,
     Superscript,
     ParagraphFormat,
-    Picture
-  ]
+    pictures && Picture
+  ].filter(Boolean)
 }
 
 // --- find and replace -------------------------------------------------------

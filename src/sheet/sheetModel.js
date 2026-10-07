@@ -126,8 +126,8 @@ function newTab (doc, name, rows = DEFAULT_ROWS, cols = DEFAULT_COLS) {
 
 // What kind of file a document is (proposals/2026-10-06-rename-to-pearoffice.md,
 // step 2). Files made before kinds count as sheets. Documents are in
-// src/doc/docModel.js.
-const KINDS = ['sheet', 'doc']
+// src/doc/docModel.js, slide decks in src/slides/slidesModel.js.
+const KINDS = ['sheet', 'doc', 'slides']
 
 function kind (doc) {
   return doc.getMap('meta').get('kind') || 'sheet'

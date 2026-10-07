@@ -2,13 +2,12 @@ import React from 'react'
 import { FileText, PresentationChart, Table, X } from '@phosphor-icons/react'
 import { MemberAvatar } from './Avatar.jsx'
 
-// The kinds of file PearOffice makes. Slides come later
-// (proposals/2026-10-06-rename-to-pearoffice.md); until then New shows them
-// as coming soon.
+// The kinds of file PearOffice makes (proposals/2026-10-06-rename-to-pearoffice.md,
+// 2026-10-06-slides.md). A kind marked `soon` shows in New as coming soon.
 export const KINDS = [
   { kind: 'sheet', label: 'Spreadsheet', Icon: Table },
   { kind: 'doc', label: 'Document', Icon: FileText },
-  { kind: 'slides', label: 'Slides', Icon: PresentationChart, soon: true }
+  { kind: 'slides', label: 'Slides', Icon: PresentationChart }
 ]
 
 const byKind = (kind) => KINDS.find((k) => k.kind === kind) || KINDS[0]

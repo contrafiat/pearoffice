@@ -23,5 +23,6 @@ test('invite links carry the kind', () => {
   assert.equal(m.parseInviteLink(link).kind, 'sheet')
   assert.equal(m.parseInviteLink(link.replace('&f=sheet', '')).kind, 'sheet', 'a link without a kind is a sheet')
   assert.equal(m.parseInviteLink(link.replace('f=sheet', 'f=doc')).kind, 'doc')
-  assert.throws(() => m.parseInviteLink(link.replace('f=sheet', 'f=slides')), /newer version/)
+  assert.equal(m.parseInviteLink(link.replace('f=sheet', 'f=slides')).kind, 'slides')
+  assert.throws(() => m.parseInviteLink(link.replace('f=sheet', 'f=drawing')), /newer version/)
 })

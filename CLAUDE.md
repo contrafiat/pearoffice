@@ -51,17 +51,22 @@ stored inside each sheet (proposals/2026-10-04-profiles-with-avatars.md).
 On desktop, PearOffice can start hidden in the tray at login
 (`desktop/login.js`; XDG autostart on Linux, a LaunchAgent on macOS, login
 items on Windows). `PEAROFFICE_DEBUG=1` turns on logging in an installed copy.
+Slides part 1 is built (proposals/2026-10-06-slides.md): decks with a slide
+list, layouts, text boxes, moving, resizing, rotating and snapping, one
+theme and presence. Presenting, pictures, shapes and .pptx come next.
 See `TODO.md`.
 
 ## Layout
 
 Code that works for any kind of file sits apart from each editor's own
 (proposals/2026-10-06-rename-to-pearoffice.md, step 3). Documents have
-`src/doc/` and `src/ui/doc/` the same way.
+`src/doc/` and `src/ui/doc/` the same way, and slides `src/slides/` and
+`src/ui/slides/`.
 
 - `src/shared/` - runs anywhere, for any file: `ids.js`, `phrase.js`
   (recovery phrase), `qr.js`, Bare shims.
 - `src/doc/` and `src/ui/doc/` - documents (proposals/2026-10-06-documents.md): `docModel.js` (the Yjs doc: `meta`, `body`), `docMethods.js` (`doc:create`, `doc:state`, `doc:update`), `DocView.jsx` (TipTap 3 editor), `docFiles.js` (import .docx/.md/.txt/.html, export .docx/.md/.txt/PDF, pictures included; `node scripts/check-doc-export.js [dir]` has LibreOffice read an exported .docx), `pictures.js` (shrinking before upload, the per-document picture cache, the picture node view). Pictures are `image` nodes (`extensions.js`, `Picture`) and move a document to schema version 2 (`docModel.js`); `doc:addPicture` and `doc:picture` are in `docMethods.js`. The editor keeps a Yjs replica and sends batched updates; `doc:updated` brings others' edits.
+- `src/slides/` and `src/ui/slides/` - slide decks (proposals/2026-10-06-slides.md): `slidesModel.js` (the Yjs doc: `meta`, `deck`, `slides`; order by fractional index keys; every change goes through its functions), `layouts.js`, `slidesMethods.js` (`slides:create`, `slides:state`, `slides:update`). `SlidesView.jsx` (the replica, toolbar, notes, presence and one Y.UndoManager over `slides` and `deck`, shared with TipTap's undo plugin through `text.js`, so text and moves undo in one history), `SlideList.jsx` (thumbnails as static DOM, reorder by drag, Ctrl+Up/Down or the slide menu), `Stage.jsx` (the slide scaled with a CSS transform; selection, our own move, resize and rotate handles, snapping with guides in `geometry.js`; a drag writes the frame once, on release), `TextBox.jsx` (a live TipTap editor only in the box being edited, static DOM for the rest; text is drawn 1.5 times larger so sizes are PowerPoint points), `TextTools.jsx`, `Notes.jsx`, `themes.js` (one theme, `plain`). The schema is `slideExtensions()` in `src/ui/doc/extensions.js`. Phones edit text, notes and slide order only.
 - `src/sheet/` - the spreadsheet, runs anywhere (Bare, Node, browser):
   `sheetModel.js` (the Yjs document), `refs.js` (A1 <-> id formula
   references), `formula/` (evaluator, deterministic maths, formulajs fills,
@@ -245,13 +250,17 @@ builds are signed and notarized; Linux and Windows builds are unsigned
   bundle must create, edit and read a sheet over stdin/stdout, and the seeder
   bundle must start and print a pairing link.
 - `npm run smoke:desktop`: drives the real UI in Electron with an offscreen
-  window and real key and mouse events, in four parts. Each part is its own
+  window and real key and mouse events, in five parts. Each part is its own
   launch with a throwaway data folder and a 60 s limit, and prints one
   `ok`/`not ok` line, then a summary line. `sheets` is the grid editor
   (typing, formulas, spilling, fill, charts, copy and paste, undo, zoom; about
   21 s). `sheet-files` is cell formats, filters, comments, validation, colour
   rules and names, then .xlsx, .csv, .json and PDF out, tabs, tidy up and
   .json, .csv and .xlsx in (about 32 s). `docs` is documents (about 9 s).
+  `slides` is a deck: two layouts, typing a title, undo and redo, moving,
+  resizing and rotating a box with the mouse, nudging, a text box added and
+  deleted, someone else's selection, reordering by keys and by drag,
+  duplicate, delete, speaker notes and reopening (about 6 s).
   `app` is the shell: the New picker, theme, Seeder and Devices panels, the
   local seeder, keep online, start at login, profile picture, About, sharing,
   backups, removing a file and the file list (about 16 s). The parts are in

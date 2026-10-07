@@ -19,7 +19,7 @@ import * as Clipboard from 'expo-clipboard'
 import b4a from 'b4a'
 import { requestLocalNetworkPermission } from '../modules/local-network'
 
-const ALLOWED = /^(sheet|file|doc|app|seeder|link|donation):[A-Za-z]+$/
+const ALLOWED = /^(sheet|file|doc|slides|app|seeder|link|donation):[A-Za-z]+$/
 // iOS file types for the share sheet, by MIME type.
 const UTIS = {
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'org.openxmlformats.spreadsheetml.sheet',

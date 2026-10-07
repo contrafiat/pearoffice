@@ -84,6 +84,10 @@ test('presence between members, and nothing for anyone else', async (t) => {
     assert.equal(cleanState({ open: true }).cursor, null)
     const sheet = cleanState({ open: true, tab: 'abc', row: 3, col: 7, editing: true })
     assert.equal([sheet.tab, sheet.row, sheet.col, sheet.editing].join(','), 'abc,3,7,true')
+    const deck = cleanState({ open: true, slide: 's1', sel: ['a', 'b', 'a', 5, 'x'.repeat(65), ...Array.from({ length: 30 }, (_, i) => 'e' + i)], box: 'a' })
+    assert.equal([deck.slide, deck.box, deck.sel.length, deck.sel.slice(0, 3).join()].join('|'), 's1|a|20|a,b,e0')
+    const bad = cleanState({ open: true, slide: 'x'.repeat(65), sel: 'a', box: 7 })
+    assert.equal([bad.slide, bad.box, bad.sel.length].join('|'), '||0')
   })
 
   await t.test('a device that is not a member sees nothing', async () => {
