@@ -218,6 +218,31 @@ test('follow-up fields: opacity, anchor, wrap, crop, arrowheads and custom shape
   assert.equal(s.style(s.element(a, sl, tri)).shape + '|' + s.style(s.element(a, sl, line)).fillOpacity, 'rect|1')
 })
 
+test('charts: added, cleaned, changed and duplicated', () => {
+  const { a } = deck(1)
+  const sl = s.slideIds(a)[0]
+  let c
+  change(a, (d) => {
+    c = s.addChart(d, sl, {
+      chart: { type: 'pie', title: 'Sales', legend: 'sideways', dataLabels: 'yes' },
+      data: { categories: ['Q1', 2, {}], series: [{ name: 'A', values: [1, 'x', 3, Infinity], color: '#ff0000' }, { values: [2], color: 'red' }, ...Array(20).fill({ name: 'z', values: [] })] }
+    })
+  })
+  const got = () => s.chartOf(s.element(a, sl, c))
+  assert.equal(JSON.stringify(got().chart), '{"type":"pie","title":"Sales"}')
+  assert.equal(got().data.categories.join('|'), 'Q1|2|')
+  assert.equal(got().data.series.length, 10)
+  assert.equal(JSON.stringify(got().data.series.slice(0, 2)), '[{"name":"A","values":[1,null,3,null],"color":"#ff0000"},{"name":"Series 2","values":[2]}]')
+  change(a, (d) => s.setChart(d, sl, c, { chart: { type: 'line', stacked: true } }))
+  assert.equal(JSON.stringify(got().chart), '{"type":"line","title":"Sales","stacked":true}')
+  change(a, (d) => s.setChart(d, sl, c, { chart: { type: 'gantt' } }))
+  assert.equal(got().chart.type, 'column', 'unknown types draw as columns')
+  let dup
+  change(a, (d) => { dup = s.duplicateSlide(d, sl) })
+  const copy = s.elements(a, dup).find((e) => e.map.get('type') === 'chart')
+  assert.equal(s.chartOf(copy.map).data.series[0].name, 'A')
+})
+
 test('concurrent: different fields of one shape both survive', () => {
   const { state, a, b } = deck(1)
   const sl = s.slideIds(a)[0]

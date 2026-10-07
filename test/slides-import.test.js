@@ -547,7 +547,76 @@ test('a pptxgenjs deck with every feature the reader handles', async () => {
   assert.equal(runs(two.find((e) => e.role === 'title').map).join(), 'Dark slide|textStyle=color:#ffffff')
 
   const lost = built.lost
-  assert.equal(JSON.stringify(Object.keys(lost).sort().map((x) => x + '=' + lost[x])), JSON.stringify(['charts=1', 'otherShapes=1', 'tables=1']))
+  assert.equal(JSON.stringify(Object.keys(lost).sort().map((x) => x + '=' + lost[x])), JSON.stringify(['otherShapes=1', 'tables=1']))
+  // The chart is kept (proposals/2026-10-06-slides-followups.md, "Charts").
+  const chart = two.find((e) => e.type === 'chart')
+  assert.equal(JSON.stringify(sm.chartOf(chart.map).data), JSON.stringify({ categories: ['a', 'b'], series: [{ name: 'S', values: [1, 2], color: '#c0504d' }] }))
+})
+
+// A chart element as one string: type and settings, then each series.
+function chartLine (map) {
+  const { chart, data } = sm.chartOf(map)
+  const settings = Object.keys(chart).sort().map((k) => k + '=' + chart[k]).join(' ')
+  return settings + ' | ' + data.categories.join(',') + ' | ' + data.series.map((x) => x.name + ':' + x.values.join(',') + ':' + (x.color || '-')).join(' ; ')
+}
+
+test('charts: a pptxgenjs deck with a stacked bar, a line, a pie, a doughnut, a scatter and a radar chart', async () => {
+  const p = new PptxGenJS()
+  p.layout = 'LAYOUT_WIDE'
+  const s = p.addSlide()
+  s.addChart(p.ChartType.bar, [{ name: 'Apples', labels: ['North', 'South', 'East'], values: [42, 17, 23] }, { name: 'Pears', labels: ['North', 'South', 'East'], values: [11, 29, 5] }], { x: 0.5, y: 0.5, w: 6, h: 3, barDir: 'bar', barGrouping: 'stacked', chartColors: ['D32F2F', '1976D2'], showTitle: true, title: 'Fruit', showLegend: true, legendPos: 'r', showValue: true })
+  s.addChart(p.ChartType.line, [{ name: 'Visits', labels: ['Mon', 'Tue', 'Wed'], values: [5, 6.5, 7] }], { x: 7, y: 0.5, w: 6, h: 3, chartColors: ['388E3C'], showLegend: false })
+  s.addChart(p.ChartType.pie, [{ name: 'Hours', labels: ['Work', 'Play', 'Sleep'], values: [8, 6, 10] }], { x: 0.5, y: 4, w: 4, h: 3, showLegend: true, legendPos: 't', showTitle: true, title: 'Day' })
+  s.addChart(p.ChartType.doughnut, [{ name: 'Share', labels: ['A', 'B'], values: [3, 1] }], { x: 4.5, y: 4, w: 4, h: 3 })
+  s.addChart(p.ChartType.scatter, [{ name: 'X', values: [150, 160, 170] }, { name: 'Weight', values: [50, 58, 66] }], { x: 8.5, y: 4, w: 4, h: 3, chartColors: ['7B1FA2'] })
+  const s2 = p.addSlide()
+  s2.addChart(p.ChartType.radar, [{ name: 'Team', labels: ['Speed', 'Care', 'Cost'], values: [3, 4, 2] }], { x: 1, y: 1, w: 5, h: 4 })
+  const bytes = await p.write({ outputType: 'nodebuffer' })
+  const { doc, built } = await imported(bytes)
+  const [one, two] = sm.slideIds(doc)
+  const charts = els(doc, one).filter((e) => e.type === 'chart')
+  assert.equal(charts.length, 5)
+  const k = 1920 / 12192000
+  assert.ok(near(charts[0].frame.x, 0.5 * 914400 * k, 1920) && near(charts[0].frame.y, 0.5 * 914400 * k, 1080) && near(charts[0].frame.w, 6 * 914400 * k, 1920) && near(charts[0].frame.h, 3 * 914400 * k, 1080), JSON.stringify(charts[0].frame))
+  assert.equal(chartLine(charts[0].map), 'dataLabels=true legend=right stacked=true title=Fruit type=bar | North,South,East | Apples:42,17,23:#d32f2f ; Pears:11,29,5:#1976d2')
+  // One series and no title shown: the automatic title was deleted.
+  assert.equal(chartLine(charts[1].map), 'legend=none type=line | Mon,Tue,Wed | Visits:5,6.5,7:#388e3c')
+  // A pie's slices take the theme's colours; legend at the top reads as
+  // below; pptxgenjs shows percentages on pies.
+  assert.equal(chartLine(charts[2].map), 'dataLabels=true legend=bottom title=Day type=pie | Work,Play,Sleep | Hours:8,6,10:-')
+  assert.equal(chartLine(charts[3].map), 'dataLabels=true legend=none type=doughnut | A,B | Share:3,1:-')
+  assert.equal(chartLine(charts[4].map), 'legend=none type=scatter | 150,160,170 | Weight:50,58,66:#7b1fa2')
+  const radar = els(doc, two).find((e) => e.type === 'chart')
+  assert.equal(chartLine(radar.map).replace(/:#[0-9a-f]{6}$/, ':c'), 'legend=none type=radar | Speed,Care,Cost | Team:3,4,2:c')
+  assert.equal(built.lost.charts || 0, 0)
+  assert.equal(built.lost.chartTypes || 0, 0)
+})
+
+test('charts: a hand-made chart part with a combined chart, scheme colours, holes and an unreadable chart', async () => {
+  const chartXml = (plot) => '<?xml version="1.0" encoding="UTF-8"?><c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><c:chart>' +
+    '<c:title><c:tx><c:rich><a:bodyPr/><a:p><a:r><a:t>Made</a:t></a:r><a:r><a:t> by hand</a:t></a:r></a:p></c:rich></c:tx></c:title><c:autoTitleDeleted val="0"/><c:plotArea>' + plot + '</c:plotArea><c:legend><c:legendPos val="t"/></c:legend></c:chart></c:chartSpace>'
+  const ser = (i, name, colour, cats, vals) => '<c:ser><c:idx val="' + i + '"/><c:tx><c:v>' + name + '</c:v></c:tx>' + (colour ? '<c:spPr><a:solidFill>' + colour + '</a:solidFill></c:spPr>' : '') +
+    '<c:cat><c:numRef><c:numCache><c:ptCount val="' + cats.length + '"/>' + cats.map((c, k) => '<c:pt idx="' + k + '"><c:v>' + c + '</c:v></c:pt>').join('') + '</c:numCache></c:numRef></c:cat>' +
+    '<c:val><c:numRef><c:numCache><c:ptCount val="' + vals.length + '"/>' + vals.map((v, k) => (v === null ? '' : '<c:pt idx="' + k + '"><c:v>' + v + '</c:v></c:pt>')).join('') + '</c:numCache></c:numRef></c:val></c:ser>'
+  const combo = '<c:areaChart><c:grouping val="percentStacked"/>' + ser(0, 'Low', '<a:schemeClr val="accent2"/>', [2020, 2021, 2022], [1, null, 3]) + ser(1, 'High', '<a:srgbClr val="00AA00"/>', [2020, 2021, 2022], [4, 5, 6]) + '<c:dLbls><c:showVal val="1"/></c:dLbls></c:areaChart>' +
+    '<c:lineChart>' + ser(2, 'Extra', null, [2020, 2021, 2022], [1, 1, 1]) + '</c:lineChart>'
+  const frame = (id, rid, y) => '<p:graphicFrame><p:nvGraphicFramePr><p:cNvPr id="' + id + '" name="Chart ' + id + '"/><p:cNvGraphicFramePr/><p:nvPr/></p:nvGraphicFramePr><p:xfrm><a:off x="914400" y="' + y + '"/><a:ext cx="3657600" cy="1828800"/></p:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" r:id="' + rid + '"/></a:graphicData></a:graphic></p:graphicFrame>'
+  const bytes = await craft({
+    slides: [{
+      xml: slideXml(frame(2, 'rIdC1', 914400) + frame(3, 'rIdC2', 3657600)),
+      rels: [['rIdC1', 'chart', '../charts/chart1.xml'], ['rIdC2', 'chart', '../charts/chart2.xml']]
+    }],
+    extraFiles: {
+      'ppt/charts/chart1.xml': chartXml(combo),
+      'ppt/charts/chart2.xml': chartXml('<c:bubbleChart>' + ser(0, 'B', null, [1], [1]) + '</c:bubbleChart>')
+    }
+  })
+  const { doc, built } = await imported(bytes)
+  const charts = els(doc, sm.slideIds(doc)[0]).filter((e) => e.type === 'chart')
+  assert.equal(charts.length, 1)
+  assert.equal(chartLine(charts[0].map), 'dataLabels=true legend=bottom stacked=true title=Made by hand type=area | 2020,2021,2022 | Low:1,,3:#c0504d ; High:4,5,6:#00aa00')
+  assert.equal(built.lost.chartTypes, 1)
+  assert.equal(built.lost.charts, 1)
 })
 
 test('bounds: too big, too many slides, a part that unpacks too far and elements past the limit', async () => {
@@ -602,7 +671,7 @@ test('slides:import makes the deck, stores its pictures and points them at it', 
   const r = await f.importPresentation(bytes, 'Quarterly.pptx', { prepare, Y, call: (method, args) => call(e, method, args) })
   assert.equal(r.slides, 3)
   assert.equal(r.dropped, true)
-  assert.equal(r.notice, 'Left out: 1 chart. Kept as text only: 1 table. Drawn as boxes: 1 shape PearOffice does not have. Fonts and the theme are the closest PearOffice has.')
+  assert.equal(r.notice, 'Kept as text only: 1 table. Drawn as boxes: 1 shape PearOffice does not have. Fonts and the theme are the closest PearOffice has.')
   const s = await call(e, 'slides:state', { sheetId: r.sheetId })
   assert.equal(s.title, 'Quarterly')
   assert.equal(s.myRole, 'owner')
@@ -659,6 +728,16 @@ test('LibreOffice templates', { skip: !soffice() || !templateDir ? 'needs LibreO
       // shapes and Forestbird 177 design shapes before the follow-ups).
       assert.equal(built.lost.customShapes || 0, 0, n)
       assert.ok((built.lost.designShapes || 0) <= 2, n + ' ' + JSON.stringify(built.lost))
+      assert.equal(built.lost.charts || 0, 0, n)
+      // Freshes has a column chart (slide 6) and a line chart (slide 7),
+      // with LibreOffice's values and colours.
+      if (n === 'Freshes') {
+        const charts = ids.flatMap((id, i) => els(doc, id).filter((e) => e.type === 'chart').map((e) => (i + 1) + ': ' + chartLine(e.map)))
+        assert.equal(charts.join('\n'), [
+          '6: legend=none type=column | 2016,2017,2018,2019 | Series 1:25,15,40,20:#ffffff',
+          '7: legend=bottom type=line | 2016,2017,2018,2019 | Series 1:27,13,10,50:#ff420e ; Series 2:25,15,40,20:#2499be'
+        ].join('\n'))
+      }
     }
   } finally {
     fs.rmSync(out, { recursive: true, force: true })

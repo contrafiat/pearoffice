@@ -884,6 +884,30 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 .doc-tools .shape-palette .opacity-button { flex: 1; min-width: 0; height: 26px; padding: 0 4px; font-size: 12px; }
 .doc-tools .shape-palette .opacity-button.on { background: var(--pear-soft); border-color: var(--pear); color: var(--pear-dark); }
 .slides-tools .line-head, .slides-tools .line-tail { width: 116px; }
+.slides-tools .chart-title-input { width: 130px; height: 30px; box-sizing: border-box; border: 1px solid var(--line); border-radius: 6px; padding: 0 8px; background: var(--panel); color: var(--ink); font: inherit; font-size: 13px; }
+.slides-tools .chart-title-input:focus { outline: none; border-color: var(--pear); }
+.slides-tools .chart-legend { width: 116px; }
+.slides-tools .chart-edit-data { gap: 6px; padding: 0 10px; border-color: var(--line); }
+.chart-type-menu { grid-template-columns: repeat(4, 40px); }
+/* Chart data on a slide (ChartTools.jsx). */
+.chart-data-panel { gap: 10px; }
+.chart-data-scroll { overflow: auto; max-height: 50vh; border: 1px solid var(--line); border-radius: 8px; }
+.chart-data { border-collapse: collapse; width: 100%; font-size: 13px; }
+.chart-data th, .chart-data td { padding: 2px; border-bottom: 1px solid var(--line); }
+.chart-data th { position: sticky; top: 0; background: var(--panel); z-index: 1; font-weight: 500; color: var(--muted); text-align: center; }
+.chart-data .cat-head { min-width: 90px; }
+.panel .chart-data input { width: 100%; min-width: 64px; box-sizing: border-box; padding: 5px 6px; border-radius: 6px; border-color: transparent; background: transparent; }
+.panel .chart-data input:hover { border-color: var(--line); }
+.panel .chart-data input:focus { border-color: var(--pear); background: var(--paper); }
+.panel .chart-data input.value { text-align: right; font-variant-numeric: tabular-nums; }
+.panel .chart-data input.value.bad { border-color: var(--danger); }
+.panel .chart-data input.series-name { font-weight: 500; text-align: center; color: var(--ink); }
+.chart-data .series-head { display: flex; align-items: center; gap: 2px; }
+.chart-data .row-tools { width: 28px; }
+.chart-data button { background: none; border: 0; padding: 4px; border-radius: 6px; color: var(--muted); cursor: pointer; display: inline-flex; }
+.chart-data button:hover:not(:disabled) { background: var(--head); color: var(--ink); }
+.chart-data button:disabled { opacity: 0.3; cursor: default; }
+.chart-data-panel .row button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
 .icon-swatch .swatch-bar.none { background: repeating-linear-gradient(135deg, transparent 0 3px, var(--line-strong) 3px 4px) !important; }
 .alt-edit { position: fixed; display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: var(--panel); border: 1px solid var(--line-strong); border-radius: 8px; box-shadow: 0 6px 24px rgb(0 0 0 / 0.16); }
 .alt-edit label { font-size: 13px; color: var(--muted); }
@@ -947,6 +971,8 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 .slide-picture { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; display: block; user-select: none; pointer-events: none; }
 /* A cropped picture: the whole picture, larger, moved inside a clipping box. */
 .slide-picture-crop { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.slide-chart { position: absolute; inset: 0; pointer-events: none; user-select: none; }
+.slide-chart svg { display: block; width: 100%; height: 100%; overflow: visible; }
 .slide-picture-wait { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; padding: 16px; box-sizing: border-box; overflow: hidden; background: #c8cbd0; color: #464b52; font-size: 28px; text-align: center; }
 .slide-empty-mark { display: none; }
 .slide-text { position: absolute; left: 0; top: 0; transform-origin: 0 0; font-size: var(--slide-body-size); line-height: 1.2; overflow-wrap: break-word; }

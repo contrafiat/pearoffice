@@ -12,6 +12,11 @@
 // shaft or a picture's crop, so the slides it writes are tidied up after
 // (tidySlide). Opacity, where text sits, wrapping, line ends and custom
 // shapes (custGeom from the path, svgPath.js) it writes itself.
+//
+// Charts are written as PowerPoint charts (pptxChart) with their values,
+// series names and colours, so PowerPoint and LibreOffice can edit them.
+// pptxgenjs cannot stack a line chart and writes empty points for missing
+// values; tidyChart puts those right.
 
 import PptxGenJS from 'pptxgenjs'
 import JSZip from 'jszip'
@@ -50,6 +55,85 @@ export function customPoints (d, w, h) {
     else if (sg.c === 'Q') out.push({ x: X(sg.x), y: Y(sg.y), curve: { type: 'quadratic', x1: X(sg.x1), y1: Y(sg.y1) } })
   }
   return out
+}
+
+// --- charts --------------------------------------------------------------------
+
+const CHART_KINDS = { column: 'bar', bar: 'bar', line: 'line', area: 'area', pie: 'pie', doughnut: 'doughnut', scatter: 'scatter', radar: 'radar' }
+
+// A chart's data as it is drawn: a scatter chart whose X values are all
+// missing (text, from another type) puts its points at 1, 2, 3 and on, as
+// PowerPoint does.
+export function chartData ({ chart, data }) {
+  if (chart.type !== 'scatter' || !data.categories.length || data.categories.some((x) => x !== null)) return data
+  return { ...data, categories: data.categories.map((_, i) => i + 1) }
+}
+
+// A chart element ({ chart, data }, slidesModel.chartOf) as pptxgenjs
+// addChart's arguments: { type, data, options }. Colours and text follow
+// the slide theme as the chart is drawn (SlideChart.jsx); sizes are its
+// ECharts sizes in points.
+export function pptxChart (value, theme) {
+  const chart = value.chart
+  const data = chartData(value)
+  const type = CHART_KINDS[chart.type] || 'bar'
+  const pie = type === 'pie' || type === 'doughnut'
+  const accents = theme.accents.map(hexOf)
+  const font = fontName(theme.bodyFont)
+  const ink = hexOf(theme.text)
+  const labels = data.categories.map((c) => (c === null || c === undefined ? '' : String(c)))
+  let rows
+  if (type === 'scatter') {
+    // pptxgenjs takes the X values first, then each series' Y values.
+    rows = [{ name: 'X', values: data.categories.map((x) => (typeof x === 'number' ? x : null)) }, ...data.series.map((sr) => ({ name: sr.name, values: sr.values }))]
+  } else {
+    rows = (pie ? data.series.slice(0, 1) : data.series).map((sr) => ({ name: sr.name, labels, values: sr.values }))
+  }
+  const legend = chart.legend || (data.series.length > 1 || pie ? 'bottom' : 'none')
+  const colours = pie
+    ? labels.map((_, i) => accents[i % accents.length])
+    : data.series.map((sr, i) => hexOf(sr.color) || accents[i % accents.length])
+  const options = {
+    chartColors: colours.length ? colours : accents,
+    showLegend: legend !== 'none',
+    legendPos: legend === 'right' ? 'r' : 'b',
+    legendColor: ink,
+    legendFontFace: font,
+    legendFontSize: 12,
+    showTitle: !!chart.title,
+    title: chart.title || undefined,
+    titleColor: ink,
+    titleFontFace: font,
+    titleFontSize: 14,
+    showValue: !!chart.dataLabels,
+    dataLabelColor: ink,
+    dataLabelFontFace: font,
+    dataLabelFontSize: 12,
+    catAxisLabelColor: ink,
+    catAxisLabelFontFace: font,
+    catAxisLabelFontSize: 12,
+    valAxisLabelColor: ink,
+    valAxisLabelFontFace: font,
+    valAxisLabelFontSize: 12
+  }
+  if (type === 'bar') {
+    options.barDir = chart.type === 'bar' ? 'bar' : 'col'
+    options.barGrouping = chart.stacked ? 'stacked' : 'clustered'
+  }
+  if (type === 'area' && chart.stacked) options.barGrouping = 'stacked'
+  if (type === 'doughnut') options.holeSize = 60
+  if (pie && chart.dataLabels) options.showPercent = false
+  if (type === 'scatter') options.lineSize = 0
+  if (type === 'radar') options.radarStyle = 'marker'
+  return { type, data: rows, options }
+}
+
+// A chart part from pptxgenjs, tidied: a stacked line chart gets its
+// grouping and points with no value go.
+export function tidyChart (xml, { stackedLine = false } = {}) {
+  xml = xml.replace(/<c:pt idx="\d+"><c:v><\/c:v><\/c:pt>/g, '')
+  if (stackedLine) xml = xml.replace(/<c:lineChart>(?!<c:grouping)/g, '<c:lineChart><c:grouping val="stacked"/>')
+  return xml
 }
 
 // --- colours and fonts ----------------------------------------------------------
@@ -276,6 +360,7 @@ export async function deckToPptx (doc, { title = '', pictures = new Map() } = {}
   pptx.theme = { headFontFace: fontName(theme.headingFont), bodyFontFace: fontName(theme.bodyFont) }
   const arrows = new Map() // object name -> its avLst
   const crops = new Map() // object name -> its srcRect
+  const charts = new Map() // chart part name -> tidyChart's options
 
   for (const s of slidesModel.slides(doc)) {
     const slide = pptx.addSlide()
@@ -285,6 +370,14 @@ export async function deckToPptx (doc, { title = '', pictures = new Map() } = {}
       const type = e.map.get('type')
       const f = slidesModel.frame(e.map)
       const box = { x: inch(f.x), y: inch(f.y), w: inch(f.w), h: inch(f.h), rotate: f.rot || undefined, objectName: type + ' ' + e.id }
+      if (type === 'chart') {
+        const value = slidesModel.chartOf(e.map)
+        const c = pptxChart(value, theme)
+        slide.addChart(pptx.ChartType[c.type], c.data, { ...box, ...c.options })
+        const made = slide._relsChart && slide._relsChart[slide._relsChart.length - 1]
+        if (made) charts.set('ppt/charts/' + made.fileName, { stackedLine: c.type === 'line' && !!value.chart.stacked })
+        continue
+      }
       if (type === 'picture') {
         const p = pictures.get(String(e.map.get('ref') || ''))
         if (!p || !PICTURE_TYPES.includes(p.mime)) continue
@@ -358,6 +451,7 @@ export async function deckToPptx (doc, { title = '', pictures = new Map() } = {}
   const raw = await pptx.write({ outputType: 'uint8array', compression: true })
   const zip = await JSZip.loadAsync(raw)
   for (const name of Object.keys(zip.files)) {
+    if (/^ppt\/charts\/chart\d+\.xml$/.test(name)) zip.file(name, tidyChart(await zip.file(name).async('string'), charts.get(name)))
     if (!/^ppt\/slides\/slide\d+\.xml$/.test(name)) continue
     zip.file(name, tidySlide(await zip.file(name).async('string'), arrows, crops))
   }

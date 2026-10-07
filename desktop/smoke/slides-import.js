@@ -2,8 +2,9 @@
 // zlib, so the packaged app can run it too) imported through Import a file
 // (src/ui/slides/pptxImport.js). The deck must open with its two slides in
 // order, the title in the title box, the bullets, a shape, a see-through
-// custom shape, the picture drawn from its stored bytes and the notice of
-// what was left out.
+// custom shape, the picture drawn from its stored bytes, a chart drawn in
+// the editor and the show (proposals/2026-10-06-slides-followups.md) and
+// the notice of what was left out.
 //
 // PEAROFFICE_SMOKE_IMPORT_FILE=<a .pptx> imports that file instead (only
 // checks that it opens) and PEAROFFICE_SMOKE_IMPORT_SHOTS=<folder> saves a
@@ -94,7 +95,8 @@ const ph = (id, type, idx, body) => `<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="P
 const p = (text, lvl = 0) => `<a:p><a:pPr lvl="${lvl}"/><a:r><a:rPr lang="en-US"/><a:t>${text}</a:t></a:r></a:p>`
 
 // Two 16:9 slides: a title and bullets placed by the layout, then a
-// picture, a shape and a text box, with a transition that is left out.
+// picture, a shape, a text box and a column chart, with a transition that
+// is left out.
 function smokeDeck () {
   const pic = png(64, 32, [200, 40, 40])
   const master = `<p:sldMaster ${NS}><p:cSld><p:spTree>${HEAD}` +
@@ -110,7 +112,13 @@ function smokeDeck () {
     // A custom shape with a curve (proposals/2026-10-06-slides-followups.md).
     `<p:sp><p:nvSpPr><p:cNvPr id="7" name="C"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr>${xfrm(9500000, 1000000, 2000000, 2000000)}<a:custGeom><a:pathLst><a:path w="100" h="100"><a:moveTo><a:pt x="0" y="100"/></a:moveTo><a:cubicBezTo><a:pt x="0" y="0"/><a:pt x="100" y="0"/><a:pt x="100" y="100"/></a:cubicBezTo><a:close/></a:path></a:pathLst></a:custGeom><a:solidFill><a:srgbClr val="CC8822"><a:alpha val="50000"/></a:srgbClr></a:solidFill></p:spPr></p:sp>` +
     `<p:sp><p:nvSpPr><p:cNvPr id="6" name="X"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr><p:spPr>${xfrm(1000000, 4000000, 6000000, 800000)}<a:prstGeom prst="rect"/><a:noFill/></p:spPr><p:txBody><a:bodyPr/><a:p><a:r><a:rPr lang="en-US" sz="2400" b="1"/><a:t>Picture slide</a:t></a:r></a:p></p:txBody></p:sp>` +
+    `<p:graphicFrame><p:nvGraphicFramePr><p:cNvPr id="8" name="Chart"/><p:cNvGraphicFramePr/><p:nvPr/></p:nvGraphicFramePr><p:xfrm><a:off x="7000000" y="3500000"/><a:ext cx="4500000" cy="2800000"/></p:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart"><c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" r:id="rIdC"/></a:graphicData></a:graphic></p:graphicFrame>` +
     '</p:spTree></p:cSld><p:transition><p:fade/></p:transition></p:sld>'
+  const pt = (vals) => `<c:ptCount val="${vals.length}"/>` + vals.map((v, i) => `<c:pt idx="${i}"><c:v>${v}</c:v></c:pt>`).join('')
+  const chart = '<?xml version="1.0"?><c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><c:chart>' +
+    '<c:title><c:tx><c:rich><a:bodyPr/><a:p><a:r><a:t>Imported chart</a:t></a:r></a:p></c:rich></c:tx></c:title><c:autoTitleDeleted val="0"/><c:plotArea><c:barChart><c:barDir val="col"/><c:grouping val="clustered"/>' +
+    `<c:ser><c:idx val="0"/><c:tx><c:v>Sales</c:v></c:tx><c:spPr><a:solidFill><a:srgbClr val="2266CC"/></a:solidFill></c:spPr><c:cat><c:strRef><c:strCache>${pt(['Q1', 'Q2', 'Q3'])}</c:strCache></c:strRef></c:cat><c:val><c:numRef><c:numCache>${pt([3, 5, 2])}</c:numCache></c:numRef></c:val></c:ser>` +
+    '</c:barChart></c:plotArea><c:legend><c:legendPos val="b"/></c:legend></c:chart></c:chartSpace>'
   const theme = `<a:theme ${NS} name="T"><a:themeElements><a:clrScheme name="C"><a:dk1><a:srgbClr val="000000"/></a:dk1><a:lt1><a:srgbClr val="FFFFFF"/></a:lt1></a:clrScheme><a:fontScheme name="F"><a:majorFont><a:latin typeface="Arial"/></a:majorFont><a:minorFont><a:latin typeface="Arial"/></a:minorFont></a:fontScheme></a:themeElements></a:theme>`
   const files = [
     ['[Content_Types].xml', '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>'],
@@ -125,7 +133,8 @@ function smokeDeck () {
     ['ppt/slides/slide1.xml', slide1],
     ['ppt/slides/_rels/slide1.xml.rels', rels([['rId1', 'slideLayout', '../slideLayouts/slideLayout1.xml']])],
     ['ppt/slides/slide2.xml', slide2],
-    ['ppt/slides/_rels/slide2.xml.rels', rels([['rId1', 'slideLayout', '../slideLayouts/slideLayout1.xml'], ['rIdP', 'image', '../media/image1.png']])]
+    ['ppt/slides/_rels/slide2.xml.rels', rels([['rId1', 'slideLayout', '../slideLayouts/slideLayout1.xml'], ['rIdP', 'image', '../media/image1.png'], ['rIdC', 'chart', '../charts/chart1.xml']])],
+    ['ppt/charts/chart1.xml', chart]
   ].map(([n, s]) => [n, Buffer.from(s)])
   files.push(['ppt/media/image1.png', pic])
   return zip(files)
@@ -196,6 +205,18 @@ async function run (t) {
   result.importCustom = await js("(() => { const p = document.querySelector('.slide-stage .slide-el[data-type=shape] svg[data-shape=custom] path'); return !!p && /C/.test(p.getAttribute('d')) && p.parentNode.getAttribute('fill') === '#cc8822' && p.parentNode.getAttribute('fill-opacity') === '0.5' })()")
   if (!result.importCustom) throw new Error('custom shape not drawn')
   step('slide 2: picture, shapes and text')
+
+  // The chart: its title and three bars in its own colour, in the editor
+  // and the show.
+  const chartDrawn = (root) => `(() => { const s = document.querySelector('${root} .slide-el[data-type=chart] .slide-chart svg'); return !!s && [...s.querySelectorAll('text')].some((x) => x.textContent === 'Imported chart') && [...s.querySelectorAll('path[ecmeta_ssr_type=chart]')].filter((x) => x.getAttribute('fill') === '#2266cc').length === 3 })()`
+  await waitFor('chart drawn', chartDrawn('.slide-stage'))
+  process.env.PEAROFFICE_FAKE_DISPLAYS = '1'
+  await js("document.querySelector('.present-button').click()")
+  await waitFor('chart in the show', chartDrawn('.show'))
+  await t.key('Escape')
+  await waitFor('show ended', "!document.querySelector('.show')")
+  result.importChart = true
+  step('chart in the editor and the show')
 
   const notice = await js("(document.querySelector('.banner.info') || {}).textContent || ''")
   if (!notice.includes('Left out: 1 slide transition.')) throw new Error('notice: ' + JSON.stringify(notice))

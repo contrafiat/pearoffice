@@ -7,9 +7,10 @@
 // speaker notes; see-through fills and outlines, where text sits and
 // whether it wraps, picture crops, arrowheads, custom shapes (their paths
 // scaled into a 1000 x 1000 box, customGeom.js) and SmartArt (from the
-// drawing PowerPoint saves with it). What has no place in a PearOffice deck
-// is counted for the notice: animations, transitions, charts, media,
-// gradients (their first colour) and the rest. Tables keep their text, as
+// drawing PowerPoint saves with it) and charts (with the values PowerPoint
+// keeps with them, importChart.js). What has no place in a PearOffice deck
+// is counted for the notice: animations, transitions, charts it cannot
+// read, media, gradients (their first colour) and the rest. Tables keep their text, as
 // does SmartArt saved with no drawing.
 //
 // readPresentation turns the file into plain data, buildDeck turns that into
@@ -30,6 +31,7 @@ import {
 } from './importOoxml.js'
 import { readParagraphs, isBlank, parasToJson, notesJson, writeFragment } from './importText.js'
 import { customPath } from './customGeom.js'
+import { readChart } from './importChart.js'
 
 export const isPptxFile = (name) => /\.pptx$/i.test(String(name || ''))
 
@@ -79,9 +81,9 @@ const emu = (v, dflt) => (Number.isFinite(v) && v >= 100000 && v <= 51206400 * 4
 
 // The file as plain data: { size, slides, media (path -> MIME type),
 // readMedia(path), lost (kind -> count) }. Each slide is { layoutType,
-// els, notes, bg }; an element is { kind: 'text' | 'shape' | 'picture',
-// frame (slide units), ph ('title' | 'body' | ...), phType, paras, shape,
-// fill, line, lineW, media, alt }.
+// els, notes, bg }; an element is { kind: 'text' | 'shape' | 'picture' |
+// 'chart', frame (slide units), ph ('title' | 'body' | ...), phType, paras,
+// shape, fill, line, lineW, media, alt, chart, data }.
 export async function readPresentation (bytes) {
   const zip = await openPackage(bytes)
   const rootRels = await readRels(zip, '')
@@ -647,8 +649,9 @@ async function diagramDrawing (sc, part, data) {
 }
 
 // Tables keep their text as a text box, as does SmartArt saved with no
-// drawing; SmartArt with its drawing becomes its shapes and text; charts,
-// embedded objects and the rest are counted.
+// drawing; SmartArt with its drawing becomes its shapes and text; charts
+// become chart elements; charts that cannot be read, embedded objects and
+// the rest are counted.
 async function frameEl (sc, part, el, xf, key, depth, source) {
   const raw = rawXfrm(el)
   const gd = dig(el, 'graphic', 'graphicData')
@@ -671,7 +674,15 @@ async function frameEl (sc, part, el, xf, key, depth, source) {
       return { level: 0, bullet: null, align: null, lnSpc: null, runs: runs.map((x) => ({ b: false, i: false, u: false, s: false, size: 18, color: null, font: null, href: null, ...x })) }
     })
     if (!isBlank(rows)) sc.els.push({ kind: 'text', frame, ph: null, paras: rows })
-  } else if (/\/chart$/.test(uri) || /chartex$/.test(uri)) {
+  } else if (/\/chart$/.test(uri)) {
+    const id = attr(kid(gd, 'chart'), 'r:id')
+    const rel = id && part.rels.get(id)
+    const root = rel && !rel.external ? await readXml(sc.st.zip, rel.target) : null
+    const got = root && readChart(root, ctx)
+    if (!got) { lose(sc.st, 'charts', key); return }
+    if (got.extra) lose(sc.st, 'chartTypes', key, got.extra)
+    sc.els.push({ kind: 'chart', frame, chart: got.chart, data: got.data })
+  } else if (/chartex$/.test(uri)) {
     lose(sc.st, 'charts', key)
   } else if (/\/diagram$/.test(uri)) {
     const dm = attr(kid(gd, 'relIds'), 'r:dm')
@@ -817,9 +828,11 @@ export function buildDeck (parsed, { Y: Yx = Y, title = 'Imported slides', pictu
             if (!p) continue // could not be read; counted already
             made = slidesModel.addPicture(doc, id, { ref: refFor(el.media), hash: '', mime: p.mime, w: p.w, h: p.h, alt: el.alt }, el.frame)
             if (made && el.crop) slidesModel.setCrop(doc, id, made, el.crop)
+          } else if (el.kind === 'chart') {
+            made = slidesModel.addChart(doc, id, { chart: el.chart, data: el.data }, el.frame)
           }
           add(made)
-          if (!made || el.kind === 'picture') continue
+          if (!made || el.kind === 'picture' || el.kind === 'chart') continue
           if (el.anchor) slidesModel.setAnchor(doc, id, made, el.anchor)
           if (el.wrap === false) slidesModel.setWrap(doc, id, made, false)
           const map = slidesModel.element(doc, id, made)
@@ -845,7 +858,8 @@ export function buildDeck (parsed, { Y: Yx = Y, title = 'Imported slides', pictu
 const LEFT_OUT = {
   animations: ['animation', 'animations'],
   transitions: ['slide transition', 'slide transitions'],
-  charts: ['chart', 'charts'],
+  charts: ['chart PearOffice cannot read', 'charts PearOffice cannot read'],
+  chartTypes: ['extra chart type in a combined chart', 'extra chart types in combined charts'],
   media: ['video or sound', 'videos and sounds'],
   objects: ['embedded object', 'embedded objects'],
   pictures: ['picture in a format PearOffice cannot show', 'pictures in formats PearOffice cannot show'],

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as Y from 'yjs'
-import { ArrowCounterClockwise, ArrowClockwise, Textbox, SelectionForeground, SelectionBackground, Trash, ArrowUUpLeft, Play, Shapes, Crop, Image as ImageIcon } from '@phosphor-icons/react'
+import { ArrowCounterClockwise, ArrowClockwise, Textbox, SelectionForeground, SelectionBackground, Trash, ArrowUUpLeft, Play, Shapes, Crop, Image as ImageIcon, ChartBar } from '@phosphor-icons/react'
 import { call, on } from '../bridge.js'
 import { FileBar, useMembers } from '../FileBar.jsx'
 import { colourFor } from '../Avatar.jsx'
@@ -20,6 +20,8 @@ import { Show, Presenter } from './Present.jsx'
 import { PicturesContext, usePictureCache, hasText } from './objects.jsx'
 import { InsertShape, ShapeTools, AnchorButtons } from './ShapeTools.jsx'
 import { exportDeck } from './pdfExport.jsx'
+import { ChartTools, ChartDataPanel } from './ChartTools.jsx'
+import { sampleChart } from './SlideChart.jsx'
 
 // The slide deck editor (proposals/2026-10-06-slides.md). As with documents
 // it keeps its own copy of the deck's Yjs doc: loaded whole with
@@ -31,7 +33,8 @@ import { exportDeck } from './pdfExport.jsx'
 //
 // Phones edit text, speaker notes and slide order; moving, resizing,
 // rotating, adding boxes, shapes and pictures, styling shapes, layouts and
-// themes are for desktop. Every device draws shapes and pictures.
+// themes are for desktop. Every device draws shapes, pictures and charts;
+// adding and editing charts is for desktop too.
 
 const SEND_MS = 300
 const CURSOR_MS = 150
@@ -301,6 +304,16 @@ export function SlidesView ({ sheetId, onTitleChange, onError, onGone }) {
   })
   const [cropping, setCropping] = useState(null) // the picture being cropped
 
+  // A column chart with sample data in the middle of the slide, selected.
+  const addChart = () => {
+    const [sw, sh] = deck.size
+    const w = Math.min(1000, sw - 160)
+    const h = Math.min(600, sh - 160)
+    const id = change((doc) => slidesModel.addChart(doc, current, sampleChart(), { x: Math.round((sw - w) / 2), y: Math.round((sh - h) / 2), w, h, rot: 0 }))
+    if (id) { stopEditing(); setSel([id]); setTimeout(focusStage, 0) }
+  }
+  const [dataPanel, setDataPanel] = useState(null) // the chart whose data is open
+
   // Pictures from the file picker or the clipboard: shrunk and stored as in
   // documents (src/ui/doc/pictures.js), then put on this slide, selected.
   const [toast, setToast] = useState(null)
@@ -404,6 +417,10 @@ export function SlidesView ({ sheetId, onTitleChange, onError, onGone }) {
   const notes = slideMap && slideMap.get('notes')
   const selShapes = layoutEdit && !editing ? els.filter((el) => el.type === 'shape' && shownSel.includes(el.id)) : []
   const selPicture = layoutEdit && !editing && shownSel.length === 1 ? els.find((el) => el.id === shownSel[0] && el.type === 'picture') : null
+  const selChart = layoutEdit && !editing && shownSel.length === 1 ? els.find((el) => el.id === shownSel[0] && el.type === 'chart') : null
+  const chartSlide = current
+  // The data panel closes when its chart is no longer the one selected.
+  if (dataPanel && !(selChart && selChart.id === dataPanel)) setDataPanel(null)
   // Top, middle and bottom act on the box being edited or the selected
   // boxes that hold text.
   const anchorEls = !layoutEdit ? [] : editingBox ? [editingBox] : els.filter((el) => shownSel.includes(el.id) && hasText(el))
@@ -456,6 +473,7 @@ export function SlidesView ({ sheetId, onTitleChange, onError, onGone }) {
               {btn('Add a text box', Textbox, undefined, addBox, { disabled: !slide, className: 'add-box' })}
               <InsertShape btn={btn} Icon={Shapes} disabled={!slide} onPick={addShape} />
               {btn('Insert a picture', ImageIcon, undefined, () => fileRef.current.click(), { disabled: !slide, className: 'add-picture' })}
+              {btn('Insert a chart', ChartBar, undefined, addChart, { disabled: !slide, className: 'add-chart' })}
               <input ref={fileRef} type='file' accept='image/*' multiple hidden className='slide-picture-input' onChange={(e) => { const files = [...e.target.files]; e.target.value = ''; if (files.length) addPictures(files) }} />
               {btn('Bring forward', SelectionForeground, undefined, () => restackSelected(change, current, els, shownSel, 1), { disabled: !shownSel.length, className: 'bring-forward' })}
               {btn('Send backward', SelectionBackground, undefined, () => restackSelected(change, current, els, shownSel, -1), { disabled: !shownSel.length, className: 'send-backward' })}
@@ -467,7 +485,9 @@ export function SlidesView ({ sheetId, onTitleChange, onError, onGone }) {
             ? <><ShapeTools shapes={selShapes} theme={deck.theme} phone={phone} setStyle={setShapeStyle} setOpacity={setShapeOpacity} setArrows={setShapeArrows} />{selShapes.some((el) => el.style.shape !== 'line') && <span className='sep' />}{selShapes.some((el) => el.style.shape !== 'line') && anchorTools}</>
             : selPicture
               ? btn(cropping ? 'Finish cropping (Enter)' : 'Crop', Crop, !!cropping, () => (cropping ? setCropping(null) : setCropping(selPicture.id)), { className: 'crop-button' + (cropping ? ' on' : '') })
-              : canEdit && <TextTools editor={toolEditor} defaultSize={defaultSize(deck.theme, editingBox ? editingBox.role : 'body')} phone={phone} btn={btn} afterAlign={anchorTools} />}
+              : selChart
+                ? <ChartTools value={selChart.chart} btn={btn} phone={phone} setChart={(patch) => change((doc) => slidesModel.setChart(doc, chartSlide, selChart.id, { chart: patch }))} onEditData={() => setDataPanel(selChart.id)} />
+                : canEdit && <TextTools editor={toolEditor} defaultSize={defaultSize(deck.theme, editingBox ? editingBox.role : 'body')} phone={phone} btn={btn} afterAlign={anchorTools} />}
           <button className='present-button' title={phone ? 'Present' : 'Present (F5, or Shift+F5 from this slide)'} onMouseDown={(e) => e.preventDefault()} onClick={() => startShow(true)} disabled={!deck.slides.length}><Play size={ICON} weight='fill' /> Present</button>
         </div>
         <div className='slides-row'>
@@ -481,7 +501,7 @@ export function SlidesView ({ sheetId, onTitleChange, onError, onGone }) {
                 </div>
                 )
               : slide
-                ? <Stage size={deck.size} theme={deck.theme} slideId={current} layout={slide.layout} els={els} sel={shownSel} setSel={setSel} editing={editing} startEditing={startEditing} stopEditing={stopEditing} editStart={editStart} canEdit={canEdit} layoutEdit={layoutEdit} phone={phone} undo={undo} change={change} others={others} onCursor={onCursor} onEditor={setBoxEditor} onPastePictures={addPictures} cropping={cropping} setCropping={setCropping} />
+                ? <Stage size={deck.size} theme={deck.theme} slideId={current} layout={slide.layout} els={els} sel={shownSel} setSel={setSel} editing={editing} startEditing={startEditing} stopEditing={stopEditing} editStart={editStart} canEdit={canEdit} layoutEdit={layoutEdit} phone={phone} undo={undo} change={change} others={others} onCursor={onCursor} onEditor={setBoxEditor} onPastePictures={addPictures} cropping={cropping} setCropping={setCropping} onEditChart={(id) => { setSel([id]); setDataPanel(id) }} />
                 : <div className='slide-stage' />}
             {phone && <SlideList slides={deck.slides} current={current} onPick={setCurrent} size={deck.size} theme={deck.theme} canEdit={canEdit} phone={phone} people={bySlide} sheetId={sheetId} onAdd={addSlide} onDuplicate={duplicate} onDelete={remove} onMove={move} />}
             {notes instanceof Y.XmlFragment && <Notes key={current} fragment={notes} undo={undo} canEdit={canEdit} phone={phone} onFocus={setNotesEditor} />}
@@ -490,6 +510,9 @@ export function SlidesView ({ sheetId, onTitleChange, onError, onGone }) {
         {presenting && (presenting.mode === 'presenter'
           ? <Presenter deck={deck} ydoc={ydoc} startId={presenting.start} onEnd={endShow} />
           : <Show deck={deck} ydoc={ydoc} startId={presenting.start} phone={phone} onEnd={endShow} />)}
+        {selChart && dataPanel === selChart.id && (
+          <ChartDataPanel key={selChart.id} value={selChart.chart} onData={(data) => change((doc) => slidesModel.setChart(doc, chartSlide, selChart.id, { data }))} onClose={() => { setDataPanel(null); setTimeout(focusStage, 0) }} />
+        )}
         {toast && <div className='toast' role='status'>{toast}</div>}
       </div>
     </PicturesContext.Provider>
