@@ -1,6 +1,6 @@
 # Slides follow-ups
 
-**Status:** draft, 2026-10-06. Follows `proposals/2026-10-06-slides.md` (v1,
+**Status:** approved by Tim 2026-10-06. Follows `proposals/2026-10-06-slides.md` (v1,
 parts 1 to 4, PRs #123, #126, #127 and #128).
 
 **Goal:** close the gaps .pptx import showed: see-through fills, custom
@@ -99,7 +99,11 @@ drawing ignores them.
 2. Custom shapes and SmartArt drawings on import.
 3. Charts (if approved as above).
 
+## Decided 2026-10-06
+
+1. Charts: a `chart` element drawn with the sheet's chart code, keeping the
+   data (option 1).
+
 ## Open questions
 
-1. Charts: the `chart` element with the sheet's chart code (recommended),
-   or leave charts out for now?
+None.
