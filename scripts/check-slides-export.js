@@ -312,7 +312,7 @@ const FORMATTED = {
     'four charts written as PowerPoint charts': ourCharts.length === 4 && (await xml('ppt/slides/slide4.xml')).split('<p:graphicFrame>').length === 5,
     'stacked column chart written': /<c:barDir val="col"\/><c:grouping val="stacked"\/>/.test(ourCharts[0] || '') && vals(ourCharts[0] || '') === '42,17,23|11,29' && names(ourCharts[0] || '') === 'Apples,Pears' && (ourCharts[0] || '').includes('<a:srgbClr val="D32F2F"') && /<c:legendPos val="r"\/>/.test(ourCharts[0] || ''),
     'stacked line chart written': /<c:lineChart><c:grouping val="stacked"\/>/.test(ourCharts[1] || ''),
-    'pie with values written': chartLike(ourCharts[2] || '', 'pieChart') && /<c:showVal val="1"\/>/.test(ourCharts[2] || ''),
+    'pie with percentages written': chartLike(ourCharts[2] || '', 'pieChart') && /<c:showPercent val="1"\/>/.test(ourCharts[2] || '') && /<c:showVal val="0"\/>/.test(ourCharts[2] || ''),
     'scatter chart written': chartLike(ourCharts[3] || '', 'scatterChart') && vals(ourCharts[3] || '') === '50,58,66,79',
     'chart titles drawn by LibreOffice': ['Sales by region', 'Stacked visits', 'Share of time', 'Height and weight'].every((x) => !!find(3, x)),
     'column chart read back by LibreOffice': (() => { const x = loChart('barChart', 'Apples'); return /<c:grouping val="stacked"\/>/.test(x) && vals(x).startsWith('42,17,23|11,29') && /d32f2f/i.test(x) })(),
