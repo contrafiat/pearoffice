@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { ArrowCounterClockwise, CaretLeft, DeviceMobile, Key, X } from '@phosphor-icons/react'
 import { QrCode, ScanButton } from './Qr.jsx'
 import { call, on } from './bridge.js'
-import { linkDevice, phraseWordCount, restorePhrase } from './takeIdentity.js'
+import { hasFilesError, linkDevice, phraseWordCount, restorePhrase } from './takeIdentity.js'
 
 // Linking a person's devices and the recovery phrase
 // (proposals/2026-10-03-device-linking.md).
@@ -14,6 +14,7 @@ export function DevicesPanel ({ initialLink = '', startWith = null, onBack = nul
   const [phrase, setPhrase] = useState(null)
   const [busy, setBusy] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [replacing, setReplacing] = useState(null) // { how: 'link' | 'restore', back, files }
 
   useEffect(() => on('link:done', () => setLinked(true)), [])
   // Opened straight at the phrase (the first-run tour's Show my phrase).
@@ -22,15 +23,22 @@ export function DevicesPanel ({ initialLink = '', startWith = null, onBack = nul
     call('link:phrase').then((r) => { setPhrase(r.phrase); call('app:phraseNudged').catch(() => {}) }).catch((err) => { onError(err.message); onClose() })
   }, [])
 
-  async function restartAfter (take) {
+  // `how` and `back` say what to offer if this device already has files.
+  async function restartAfter (take, how, back) {
     setBusy(true)
     try {
-      await take()
+      await take(false)
     } catch (err) {
-      onError(err.message)
       setBusy(false)
+      if (how && hasFilesError(err)) {
+        try { setReplacing({ how, back, take, files: await call('link:filesHere') }); setMode('replace'); return } catch {}
+      }
+      onError(err.message)
     }
   }
+
+  const link1 = (l) => (replace) => linkDevice(l, { replace })
+  const restore1 = (replace) => restorePhrase(input, { replace, before: () => call('app:setWelcomeBack', { show: true }) })
 
   return (
     <div className='panel-backdrop' onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
@@ -80,15 +88,36 @@ export function DevicesPanel ({ initialLink = '', startWith = null, onBack = nul
         )}
 
         {mode === 'use' && (
-          <form className='stack' onSubmit={(e) => { e.preventDefault(); restartAfter(() => linkDevice(input)) }}>
-            <p>Paste the link from your other device. This device must not have any sheets yet; it takes on your identity.</p>
+          <form className='stack' onSubmit={(e) => { e.preventDefault(); restartAfter(link1(input), 'link', 'use') }}>
+            <p>Paste the link from your other device. This device takes on your identity and gets your files.</p>
             <input aria-label='Device link' placeholder='pearoffice://link?...' value={input} onChange={(e) => setInput(e.target.value)} autoFocus />
-            <ScanButton prefix='pearoffice://link?' what='a PearOffice device link' onError={onError} onLink={(l) => { setInput(l); restartAfter(() => linkDevice(l)) }} />
+            <ScanButton prefix='pearoffice://link?' what='a PearOffice device link' onError={onError} onLink={(l) => { setInput(l); restartAfter(link1(l), 'link', 'use') }} />
             <div className='row end'>
               <button type='button' onClick={() => setMode('menu')}>Back</button>
               <button className='primary' type='submit' disabled={busy || !input.trim()}>{busy ? 'Linking...' : 'Link'}</button>
             </div>
           </form>
+        )}
+
+        {mode === 'replace' && replacing && (
+          <div className='stack replace-files'>
+            <h3>This device already has files</h3>
+            <p>
+              {replacing.how === 'link' ? 'Linking makes this device you, as on your other device.' : 'Restoring makes this device the person your phrase belongs to.'}{' '}
+              First, {replacing.files.total === 1 ? 'its 1 file is' : 'its ' + replacing.files.total + ' files are'} removed from this device.{replacing.files.onlyHere.length < replacing.files.total ? ' People you shared them with keep them.' : ''}
+            </p>
+            {replacing.files.onlyHere.length > 0 && (
+              <div className='warn'>
+                <p>{replacing.files.onlyHere.length === 1 ? 'This file is' : 'These files are'} only on this device and will be gone for good:</p>
+                <ul>{replacing.files.onlyHere.map((t, i) => <li key={i}>{t}</li>)}</ul>
+                <p>To keep {replacing.files.onlyHere.length === 1 ? 'it' : 'them'}, go back, export {replacing.files.onlyHere.length === 1 ? 'it' : 'them'} or share {replacing.files.onlyHere.length === 1 ? 'it' : 'them'} with your other identity first.</p>
+              </div>
+            )}
+            <div className='row end'>
+              <button type='button' onClick={() => { setMode(replacing.back); setReplacing(null) }}>Back</button>
+              <button className='danger' disabled={busy} onClick={() => restartAfter(() => replacing.take(true))}>{busy ? 'Working...' : replacing.how === 'link' ? 'Remove files and link' : 'Remove files and restore'}</button>
+            </div>
+          </div>
         )}
 
         {mode === 'phrase' && phrase && (
@@ -100,8 +129,8 @@ export function DevicesPanel ({ initialLink = '', startWith = null, onBack = nul
         )}
 
         {mode === 'restore' && (
-          <form className='stack' onSubmit={(e) => { e.preventDefault(); restartAfter(() => restorePhrase(input, { before: () => call('app:setWelcomeBack', { show: true }) })) }}>
-            <p>Type your 24 words. This works on a device with no sheets yet. Your sheets come back when you link from another device or are invited again.</p>
+          <form className='stack' onSubmit={(e) => { e.preventDefault(); restartAfter(restore1, 'restore', 'restore') }}>
+            <p>Type your 24 words. This brings back your identity. Your files come back when you link from another device or their owners invite you again.</p>
             <textarea aria-label='Recovery phrase' rows='4' value={input} onChange={(e) => setInput(e.target.value)} autoFocus />
             <div className='row end'>
               <button type='button' onClick={() => setMode('menu')}>Back</button>

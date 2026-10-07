@@ -96,10 +96,17 @@ function createSheetEngine (opts = {}) {
     },
     'sheet:deleteForEveryone': async ({ sheetId }) => deleting.deleteForEveryone(sheetId),
     'link:start': async () => linking.start(),
-    'link:join': async ({ link }) => linking.join(link),
+    'link:join': async ({ link, replace }) => linking.join(link, { replace: replace === true }),
+    // What taking on another identity would remove from this device: every
+    // file here, and which of them nobody else is in (those are gone for good).
+    'link:filesHere': async (args, ctx) => {
+      const files = (await methods['file:list']({}, ctx)).filter((f) => !f.joining && !f.removed)
+      const only = files.filter((f) => (f.people || 0) <= 1).map((f) => f.title || 'Untitled')
+      return { total: files.length, onlyHere: only }
+    },
     'link:cancel': async () => linking.cancel(),
     'link:phrase': async () => ({ phrase: linking.phrase() }),
-    'app:restorePhrase': async ({ phrase }) => linking.restore(phrase),
+    'app:restorePhrase': async ({ phrase, replace }) => linking.restore(phrase, { replace: replace === true }),
     // Close stores cleanly, then exit. The desktop shell calls this on quit.
     'app:close': async () => {
       setTimeout(async () => {
@@ -167,7 +174,17 @@ function createSheetEngine (opts = {}) {
       seeding = createSeeding({ engine, getPictures: () => pictures, log })
       setTimeout(() => seeding.start(), 0)
       moves = createMoves({ engine, sheets, getJoin: () => join, getDeleting: () => deleting, getPictures: () => pictures, emit, log })
-      linking = createLinking({ engine, log })
+      linking = createLinking({
+        engine,
+        log,
+        // Every file on this device, frozen copies included (deleting.js).
+        removeFiles: async () => {
+          const ids = []
+          for await (const { value } of engine.localDb.createReadStream({ gt: 'groups:joined:', lt: 'groups:joined:~' })) if (value && value.groupId) ids.push(value.groupId)
+          for (const id of ids) await deleting.removeLocal(id, { reason: 'removed' })
+          log('removed ' + ids.length + ' files to take on another identity')
+        }
+      })
       deleting = createDeleting({ engine, sheets, getSeeding: () => seeding, getPictures: () => pictures, emit, log })
       // Core has no hook for "init finished", so catch up a little after
       // start, and once more later: open sheets that came with a device link,
