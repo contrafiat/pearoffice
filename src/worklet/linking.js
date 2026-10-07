@@ -51,6 +51,7 @@ function parseLink (link) {
 
 function createLinking ({ engine, log = () => {}, now = () => Date.now() }) {
   let active = null // A's open link: { rv, topic, pub, expiresAt, used, timer }
+  let waiting = null // B's join while it looks for A: stops it early (cancel)
 
   async function hasSheets () {
     for await (const _ of engine.localDb.createReadStream({ gt: 'groups:joined:', lt: 'groups:joined:~', limit: 1 })) return true
@@ -137,7 +138,7 @@ function createLinking ({ engine, log = () => {}, now = () => Date.now() }) {
   function join (link, { timeoutMs = 120000 } = {}) {
     const { rv, secret, deviceA } = parseLink(link)
     return (async () => {
-      if (await hasSheets()) throw new Error('This device already has sheets. Linking replaces its identity, so it only works on a device with no sheets yet.')
+      if (await hasSheets()) throw new Error('This device already has files. Linking replaces its identity, so it only works on a device with no files yet.')
       const welcome = await new Promise((resolve, reject) => {
         const swarm = engine.swarm
         const topic = linkTopic(rv)
@@ -146,6 +147,7 @@ function createLinking ({ engine, log = () => {}, now = () => Date.now() }) {
         const finish = (err, value) => {
           if (done) return
           done = true
+          if (waiting === finish) waiting = null
           clearTimeout(timer)
           clearInterval(again)
           // Close our channels, so a later attempt on the same connection can
@@ -171,6 +173,7 @@ function createLinking ({ engine, log = () => {}, now = () => Date.now() }) {
           })
           ch.open()
         }
+        waiting = finish
         const timer = setTimeout(() => finish(new Error('Could not reach your other device. Open PearOffice on it, stay on the screen with the link and try again.')), timeoutMs)
         swarm.on('connection', onConnection)
         for (const conn of swarm.connections) onConnection(conn)
@@ -180,6 +183,13 @@ function createLinking ({ engine, log = () => {}, now = () => Date.now() }) {
       await adopt(welcome)
       return { restart: true, sheets: welcome.sheets.length }
     })()
+  }
+
+  // Stop a join that is still looking for the other device. One that has
+  // already heard back goes on to take the identity.
+  function cancel () {
+    if (waiting) waiting(new Error('Linking was cancelled'))
+    return { ok: true }
   }
 
   // Store the identity and what comes with it; the sheets open after the
@@ -233,12 +243,12 @@ function createLinking ({ engine, log = () => {}, now = () => Date.now() }) {
 
   async function restore (words) {
     const seed = phraseToSeed(words)
-    if (await hasSheets()) throw new Error('This device already has sheets. Restoring replaces its identity, so it only works on a device with no sheets yet.')
+    if (await hasSheets()) throw new Error('This device already has files. Restoring replaces its identity, so it only works on a device with no files yet.')
     await replaceIdentity(seed)
     return { restart: true }
   }
 
-  return { start, join, listen, close, resume, phrase, restore }
+  return { start, join, cancel, listen, close, resume, phrase, restore }
 }
 
 module.exports = { createLinking, parseLink, linkTopic }

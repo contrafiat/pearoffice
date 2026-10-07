@@ -261,7 +261,7 @@ builds are signed and notarized; Linux and Windows builds are unsigned
   bundle must create, edit and read a sheet over stdin/stdout, and the seeder
   bundle must start and print a pairing link.
 - `npm run smoke:desktop`: drives the real UI in Electron with an offscreen
-  window and real key and mouse events, in twelve parts. Each part is its own
+  window and real key and mouse events, in thirteen parts. Each part is its own
   launch with a throwaway data folder and a 60 s limit, and prints one
   `ok`/`not ok` line, then a summary line. `sheets` is the grid editor
   (typing, formulas, spilling, fill, charts, copy and paste, undo, zoom; about
@@ -310,9 +310,11 @@ builds are signed and notarized; Linux and Windows builds are unsigned
   local seeder, keep online, start at login, profile picture, About, sharing,
   backups, removing a file and the file list (about 16 s). `onboarding` is
   the first-run welcome, name and tour, Show my phrase, finishing with New
-  file, a device with a file skipping it and the tour from Settings and
-  About (about 16 s; `PEAROFFICE_SMOKE_ONBOARDING_SHOTS=<folder>` saves
-  every step, light, dark and phone). The other parts start with it done
+  file, a started tour coming back, "I already use PearOffice" (link and
+  restore steps, errors, waiting and Cancel) and the tour from Settings and
+  About (about 6 s; `PEAROFFICE_SMOKE_ONBOARDING_SHOTS=<folder>` saves
+  every step, light, dark and phone). `onboarding-restore` restores from a
+  phrase through the real restart and the welcome back note (about 2 s). The other parts start with it done
   (`PEAROFFICE_NO_ONBOARDING=1`, honoured only in a smoke run). The parts are in
   `desktop/smoke/<part>.js`, `desktop/smoke-run.js` picks one from
   `PEAROFFICE_SMOKE_PART` and `desktop/smoke/launch.js` runs them in turn.

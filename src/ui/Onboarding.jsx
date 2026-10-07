@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { ArrowLeft, ArrowRight, ArrowsClockwise, Camera, Devices, GearSix, HardDrives, Key, LinkSimple, Plus, RocketLaunch, ShieldCheck } from '@phosphor-icons/react'
+import { ArrowCounterClockwise, ArrowLeft, ArrowRight, ArrowsClockwise, Camera, CaretRight, CircleNotch, Devices, GearSix, HardDrives, Key, LinkSimple, Plus, RocketLaunch, ShieldCheck } from '@phosphor-icons/react'
 import { call } from './bridge.js'
 import { Avatar, shrinkPicture } from './Avatar.jsx'
 import { KINDS } from './Files.jsx'
+import { ScanButton } from './Qr.jsx'
+import { CANCELLED, cancelLink, linkDevice, phraseWordCount, plainError, restorePhrase } from './takeIdentity.js'
 
 // The first-run welcome, your name and a short tour of what is different
 // from cloud office apps. Shown once per device (app:onboarding), and the
@@ -59,15 +61,28 @@ export const CARDS = [
     id: 'phrase',
     Icon: Key,
     title: 'Keep your recovery phrase',
-    text: 'Your recovery phrase is 24 words. If you lose every device, it is the only way back in. There is no password reset, so write it down and keep it safe.'
+    text: 'Your recovery phrase is 24 words that bring back your identity if you lose every device. It does not hold your files: the owners of your files invite you back. Files only you own survive if you link a second device.'
   }
+]
+
+// "I already use PearOffice": take this person's identity from another of
+// their devices or from the recovery phrase. Both skip the name step, since
+// the name comes with the identity.
+const HAVE = [
+  { id: 'link', Icon: Devices, title: 'Link to my other device', text: 'Use the same identity and files as your other device.' },
+  { id: 'restore', Icon: ArrowCounterClockwise, title: 'Restore from my recovery phrase', text: 'Lost every device? Get your identity back. The owners of your files can then invite you back in.' }
 ]
 
 const START = { id: 'start', Icon: RocketLaunch, title: 'You are all set', text: 'Make a new file, bring one in from your computer or join one with a link you were sent.' }
 
 export function Onboarding ({ tourOnly = false, hidden = false, me, onMe, onPhrase, onNew, onJoin, importButton, onDone, onError }) {
   // 'welcome', 'name', then 0..CARDS.length (the last is the start card).
+  // From the welcome, 'have' leads to 'link' or 'restore'.
   const [step, setStep] = useState(tourOnly ? 0 : 'welcome')
+  const [linkText, setLinkText] = useState('')
+  const [phraseText, setPhraseText] = useState('')
+  const [waiting, setWaiting] = useState(false) // linking, or restoring
+  const [problem, setProblem] = useState(null)
   const [nameDraft, setNameDraft] = useState((me && me.name) || '')
   const [saving, setSaving] = useState(false)
   const picRef = useRef(null)
@@ -78,6 +93,43 @@ export function Onboarding ({ tourOnly = false, hidden = false, me, onMe, onPhra
 
   // Each step puts the focus on its main button, so Enter moves on.
   useEffect(() => { if (!hidden && focusRef.current) focusRef.current.focus() }, [step, hidden])
+  useEffect(() => setProblem(null), [step])
+
+  // Onboarding counts as done before the restart, so the app opens straight
+  // into the files (or, after a restore, the welcome back note).
+  async function linkNow (link) {
+    const text = String(link || '').trim()
+    if (!text || waiting) return
+    setProblem(null)
+    setWaiting(true)
+    try {
+      await linkDevice(text, { before: () => call('app:onboarded') })
+    } catch (err) {
+      const msg = plainError(err)
+      if (!msg.includes(CANCELLED)) setProblem(msg)
+      setWaiting(false)
+    }
+  }
+
+  async function restoreNow (e) {
+    e.preventDefault()
+    if (waiting) return
+    const words = phraseWordCount(phraseText)
+    if (words !== 24) { setProblem('A recovery phrase has 24 words. This has ' + words + '.'); return }
+    setProblem(null)
+    setWaiting(true)
+    try {
+      await restorePhrase(phraseText, { before: async () => { await call('app:onboarded'); await call('app:setWelcomeBack', { show: true }) } })
+    } catch (err) {
+      setProblem(plainError(err))
+      setWaiting(false)
+    }
+  }
+
+  function back (to) {
+    if (waiting) return
+    setStep(to)
+  }
 
   function finish () {
     call('app:onboarded').catch(() => {})
@@ -107,7 +159,9 @@ export function Onboarding ({ tourOnly = false, hidden = false, me, onMe, onPhra
   }
 
   const avatar = me && me.avatar
-  const label = step === 'welcome' ? 'Welcome to PearOffice' : step === 'name' ? 'Your name' : card.title
+  const have = HAVE.find((h) => h.id === step)
+  const label = step === 'welcome' ? 'Welcome to PearOffice' : step === 'name' ? 'Your name' : step === 'have' ? 'I already use PearOffice' : have ? have.title : card.title
+  const words = phraseWordCount(phraseText)
 
   return (
     <div className={'ob-backdrop' + (hidden ? ' hidden' : '')}>
@@ -134,9 +188,98 @@ export function Onboarding ({ tourOnly = false, hidden = false, me, onMe, onPhra
           </div>
         )}
         {step === 'welcome' && (
-          <div className='ob-foot one'>
+          <div className='ob-foot one ob-welcome-foot'>
             <button ref={focusRef} className='primary ob-start' onClick={() => setStep('name')}>Get started <ArrowRight size={16} aria-hidden='true' /></button>
+            <button className='link-button ob-have' onClick={() => setStep('have')}>I already use PearOffice</button>
           </div>
+        )}
+
+        {step === 'have' && (
+          <div className='ob-body'>
+            <span className='ob-icon' aria-hidden='true'><Devices size={40} weight='duotone' /></span>
+            <h2 className='ob-title'>Welcome back</h2>
+            <p>Use PearOffice here as the same person you are on your other devices.</p>
+            <div className='ob-choices'>
+              {HAVE.map((h, i) => (
+                <button key={h.id} ref={i === 0 ? focusRef : null} className={'ob-choice ob-choice-' + h.id} onClick={() => setStep(h.id)}>
+                  <span className='ob-choice-icon' aria-hidden='true'><h.Icon size={24} weight='duotone' /></span>
+                  <span className='ob-choice-text'><b>{h.title}</b><span>{h.text}</span></span>
+                  <CaretRight className='ob-choice-go' size={16} aria-hidden='true' />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        {step === 'have' && (
+          <div className='ob-foot one'>
+            <button className='ob-back' onClick={() => back('welcome')}><ArrowLeft size={16} aria-hidden='true' /> Back</button>
+          </div>
+        )}
+
+        {step === 'link' && !waiting && (
+          <form className='ob-name-form ob-link-form' onSubmit={(e) => { e.preventDefault(); linkNow(linkText) }}>
+            <div className='ob-body'>
+              <span className='ob-icon' aria-hidden='true'><Devices size={40} weight='duotone' /></span>
+              <h2 className='ob-title'>Link to my other device</h2>
+              <p>On your other device, open Settings, then Devices, then Link a new device. Keep PearOffice open on that screen.</p>
+              <p>Then paste the link it shows here.</p>
+              <input
+                ref={focusRef}
+                className='ob-name ob-link'
+                aria-label='Device link'
+                placeholder='pearoffice://link?...'
+                autoComplete='off'
+                spellCheck={false}
+                value={linkText}
+                onChange={(e) => setLinkText(e.target.value)}
+              />
+              <ScanButton prefix='pearoffice://link?' what='a PearOffice device link' onError={setProblem} onLink={(l) => { setLinkText(l); linkNow(l) }} />
+              {problem && <p className='ob-error' role='alert'>{problem}</p>}
+            </div>
+            <div className='ob-foot'>
+              <button type='button' className='ob-back' onClick={() => back('have')}><ArrowLeft size={16} aria-hidden='true' /> Back</button>
+              <button type='submit' className='primary ob-next' disabled={!linkText.trim()}>Link</button>
+            </div>
+          </form>
+        )}
+        {step === 'link' && waiting && (
+          <div className='ob-body ob-waiting' role='status'>
+            <CircleNotch className='join-spinner' size={44} aria-hidden='true' />
+            <h2 className='ob-title'>Looking for your other device...</h2>
+            <p>This can take up to 2 minutes. Keep PearOffice open on your other device.</p>
+          </div>
+        )}
+        {step === 'link' && waiting && (
+          <div className='ob-foot one'>
+            <button className='ob-cancel' onClick={() => cancelLink()}>Cancel</button>
+          </div>
+        )}
+
+        {step === 'restore' && (
+          <form className='ob-name-form ob-restore-form' onSubmit={restoreNow}>
+            <div className='ob-body'>
+              <span className='ob-icon' aria-hidden='true'><Key size={40} weight='duotone' /></span>
+              <h2 className='ob-title'>Restore from my recovery phrase</h2>
+              <p>Type your 24 words in order. This brings back your identity. Your files come back when their owners invite you again.</p>
+              <textarea
+                ref={focusRef}
+                className='ob-phrase'
+                aria-label='Recovery phrase'
+                rows='4'
+                autoComplete='off'
+                autoCapitalize='none'
+                spellCheck={false}
+                value={phraseText}
+                onChange={(e) => setPhraseText(e.target.value)}
+              />
+              <p className='ob-count'>{words === 1 ? '1 word' : words + ' words'} of 24</p>
+              {problem && <p className='ob-error' role='alert'>{problem}</p>}
+            </div>
+            <div className='ob-foot'>
+              <button type='button' className='ob-back' disabled={waiting} onClick={() => back('have')}><ArrowLeft size={16} aria-hidden='true' /> Back</button>
+              <button type='submit' className='primary ob-next' disabled={waiting || words === 0}>{waiting ? 'Restoring...' : 'Restore'}</button>
+            </div>
+          </form>
         )}
 
         {step === 'name' && (

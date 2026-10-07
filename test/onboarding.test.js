@@ -11,6 +11,7 @@ function fakeDb () {
     rows,
     async get (key) { return rows.has(key) ? { key, value: rows.get(key) } : null },
     async put (key, value) { rows.set(key, value) },
+    async del (key) { rows.delete(key) },
     async * createReadStream ({ gt, lt, limit = Infinity }) {
       const keys = [...rows.keys()].filter((k) => k > gt && k < lt).sort().slice(0, limit)
       for (const key of keys) yield { key, value: rows.get(key) }
@@ -63,4 +64,15 @@ test('a name set during onboarding does not skip the rest of it', async () => {
   assert.equal((await methods['app:onboarding']({}, ctx)).done, false, 'the tour comes back')
   await methods['app:onboarded']({}, ctx)
   assert.equal((await methods['app:onboarding']({}, ctx)).done, true)
+})
+
+test('the welcome back note shows after a restore until it is dismissed', async () => {
+  const { methods, ctx } = setup()
+  assert.equal((await methods['app:welcomeBack']({}, ctx)).show, false)
+  assert.equal((await methods['app:setWelcomeBack']({ show: true }, ctx)).show, true)
+  assert.equal((await methods['app:welcomeBack']({}, ctx)).show, true)
+  assert.equal((await methods['app:welcomeBack']({}, ctx)).show, true, 'asking does not clear it')
+  assert.equal((await methods['app:setWelcomeBack']({ show: false }, ctx)).show, false)
+  assert.equal((await methods['app:welcomeBack']({}, ctx)).show, false)
+  assert.equal(ctx.localDb.rows.has('welcomeBack'), false)
 })

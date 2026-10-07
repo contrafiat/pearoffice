@@ -261,6 +261,14 @@ function createFileMethods (sheets, { getJoin, getMoves, getProfiles }) {
       return { done: false }
     },
     'app:onboarded': async (args, ctx) => { await ctx.localDb.put('onboarded', { at: Date.now() }); return { ok: true } },
+    // A note after a restore from the recovery phrase: the identity is back
+    // but the files are not. Set before the restart, cleared when dismissed.
+    'app:welcomeBack': async (args, ctx) => ({ show: !!(await ctx.localDb.get('welcomeBack')) }),
+    'app:setWelcomeBack': async ({ show } = {}, ctx) => {
+      if (show) await ctx.localDb.put('welcomeBack', { at: Date.now() })
+      else await ctx.localDb.del('welcomeBack')
+      return { show: !!show }
+    },
 
     // A nudge to donate, once, two weeks after first use (as in the other
     // PeerLoom apps). The UI never shows it on iOS before the first release.

@@ -61,6 +61,66 @@ module.exports = async function onboarding (t) {
   await snap('1-welcome')
   if (shots) await phoneShots(t, shots)
 
+  // I already use PearOffice: the choice, both steps and Back.
+  await click('.ob-have')
+  await waitTitle('Welcome back')
+  result.choices = await js("[...document.querySelectorAll('.ob-choice b')].map((b) => b.textContent).join(' | ')")
+  await snap('4-have')
+  await click('.ob-back')
+  await waitTitle('Welcome to PearOffice')
+  await click('.ob-have')
+  await waitTitle('Welcome back')
+  await click('.ob-choice-restore')
+  await waitTitle('Restore from my recovery phrase')
+  await waitFor('phrase focused', "document.activeElement === document.querySelector('.ob-phrase')", 3000)
+  // Too few words: stopped before asking the worklet.
+  await wc.insertText('Apple banana\ncherry ')
+  result.wordCount = await js("document.querySelector('.ob-count').textContent")
+  await click('.ob-restore-form button[type=submit]')
+  await waitFor('word count error', "!!document.querySelector('.ob-error')", 3000)
+  result.countError = await js("document.querySelector('.ob-error').textContent")
+  // 24 words that are not recovery words: the worklet's error, inline.
+  await js("document.querySelector('.ob-phrase').select(); true")
+  await wc.insertText(Array(24).fill('zzz').join(' '))
+  await click('.ob-restore-form button[type=submit]')
+  await waitFor('bad phrase error', "(document.querySelector('.ob-error') || {}).textContent?.includes('not a recovery phrase word')", 5000)
+  result.badPhrase = await js("document.querySelector('.ob-error').textContent")
+  result.stillHere = (await ask('app:onboarding')).done === false
+  await snap('5-restore-error')
+  await click('.ob-back')
+  await waitTitle('Welcome back')
+  await click('.ob-choice-link')
+  await waitTitle('Link to my other device')
+  result.linkOff = await js("document.querySelector('.ob-link-form button[type=submit]').disabled")
+  await snap('6-link')
+  // A link to a device that is not there waits until Cancel.
+  const b64 = (n) => Buffer.alloc(32, n).toString('base64url')
+  await js("document.querySelector('.ob-link').focus(); true")
+  await wc.insertText('pearoffice://link?rv=' + b64(7) + '&k=' + b64(9) + '&a=' + 'ab'.repeat(32) + '&v=1')
+  await click('.ob-link-form button[type=submit]')
+  await waitFor('waiting', "!!document.querySelector('.ob-waiting')", 3000)
+  result.waitingTitle = await title()
+  await snap('7-link-waiting')
+  const cancelAt = Date.now()
+  await click('.ob-cancel')
+  await waitTitle('Link to my other device')
+  result.cancelMs = Date.now() - cancelAt
+  result.cancelQuiet = await js("!document.querySelector('.ob-error')")
+  result.linkKept = (await js("document.querySelector('.ob-link').value")).startsWith('pearoffice://link?')
+  // A damaged link: the worklet's error, inline.
+  await js("document.querySelector('.ob-link').select(); true")
+  await wc.insertText('pearoffice://link?v=1')
+  await click('.ob-link-form button[type=submit]')
+  await waitFor('bad link error', "(document.querySelector('.ob-error') || {}).textContent === 'This device link is damaged'", 5000)
+  await click('.ob-back')
+  await waitTitle('Welcome back')
+  await click('.ob-back')
+  await waitTitle('Welcome to PearOffice')
+  result.haveDone = result.choices === 'Link to my other device | Restore from my recovery phrase' && result.wordCount === '3 words of 24' &&
+    result.countError === 'A recovery phrase has 24 words. This has 3.' && result.stillHere && result.linkOff === true &&
+    result.waitingTitle === 'Looking for your other device...' && result.cancelMs < 5000 && result.cancelQuiet && result.linkKept
+  step('i already use it: choice, restore errors, link wait and cancel')
+
   // Your name.
   await click('.ob-start')
   await waitTitle('What should we call you?')
@@ -135,7 +195,7 @@ module.exports = async function onboarding (t) {
   await waitFor('tour closed by Escape', "!document.querySelector('.ob-backdrop')", 3000)
   step('about tour and escape')
 
-  return result.freshNotDone && result.noNudge && result.startedStays && result.continueOff && result.name === 'Ada Lovelace' &&
+  return result.haveDone && result.freshNotDone && result.noNudge && result.startedStays && result.continueOff && result.name === 'Ada Lovelace' &&
     result.titles && result.dots === 7 && result.laterLabel === 'Later' && result.phrase && result.doneAfter && result.notAgain && result.tourNoName && result.backOff
 }
 
@@ -159,6 +219,22 @@ async function phoneShots (t, shots) {
     await phone.loadURL(wc.getURL())
     await title('Welcome to PearOffice')
     await pshot('1-welcome')
+    await pjs("document.querySelector('.ob-have').click(); true")
+    await title('Welcome back')
+    await pshot('4-have')
+    await pjs("document.querySelector('.ob-choice-link').click(); true")
+    await title('Link to my other device')
+    await pshot('6-link')
+    await pjs("document.querySelector('.ob-back').click(); true")
+    await title('Welcome back')
+    await pjs("document.querySelector('.ob-choice-restore').click(); true")
+    await title('Restore from my recovery phrase')
+    await pshot('5-restore')
+    await pshot('5-restore', 'dark')
+    await pjs("document.querySelector('.ob-back').click(); true")
+    await title('Welcome back')
+    await pjs("document.querySelector('.ob-back').click(); true")
+    await title('Welcome to PearOffice')
     await pjs("document.querySelector('.ob-start').click(); true")
     await title('What should we call you?')
     await pshot('2-name')
@@ -171,7 +247,13 @@ async function phoneShots (t, shots) {
     await pshot('3-card-2', 'dark')
     for (let i = 2; i <= 3; i++) { await pjs("document.querySelector('.ob-next').click(); true"); await title(TITLES[i]) }
     await pshot('3-card-4')
-    for (let i = 4; i <= 6; i++) { await pjs("document.querySelector('.ob-next').click(); true"); await title(TITLES[i]) }
+    await pjs("document.querySelector('.ob-next').click(); true")
+    await title(TITLES[4])
+    await pjs("document.querySelector('.ob-next').click(); true")
+    await title(TITLES[5])
+    await pshot('3-card-6')
+    await pjs("document.querySelector('.ob-next').click(); true")
+    await title(TITLES[6])
     await pshot('3-card-7')
     await pshot('3-card-7', 'dark')
   } finally {

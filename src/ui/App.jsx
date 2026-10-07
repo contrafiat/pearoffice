@@ -107,6 +107,9 @@ export function App () {
   const [startAtLogin, setStartAtLogin] = useState(false)
   // The first-run welcome and tour: null, or { tourOnly } while it is open.
   const [onboarding, setOnboarding] = useState(null)
+  // After a restore from the recovery phrase: the identity is back, the
+  // files are not, so a note says how to get them (app:welcomeBack).
+  const [welcomeBack, setWelcomeBack] = useState(false)
 
   const refresh = useCallback(async () => {
     try {
@@ -146,6 +149,7 @@ export function App () {
     refresh()
     loadMe()
     call('app:onboarding').then((r) => { if (r && !r.done) setOnboarding({ tourOnly: false }) }).catch(() => {})
+    call('app:welcomeBack').then((r) => setWelcomeBack(!!(r && r.show))).catch(() => {})
     if (desktop) call('app:settings').then((s) => { setKeepOnline(!!s.keepOnline); setStartAtLogin(!!s.startAtLogin) }).catch(() => {})
     const offs = [
       on('worklet:exit', () => setError('The sync engine stopped. Restart PearOffice.')),
@@ -321,6 +325,12 @@ export function App () {
       <main className='main'>
         {desktop && <UpdateBar />}
         {notice && <div className='banner info'>{notice} <button className='link-button' onClick={() => setNotice(null)}>OK</button></div>}
+        {welcomeBack && !onboarding && (
+          <div className='banner info welcome-back'>
+            Welcome back. Ask the owners of your files to invite you again; you will be back as yourself.{' '}
+            <button className='link-button' onClick={() => { setWelcomeBack(false); call('app:setWelcomeBack', { show: false }).catch(() => {}) }}>OK</button>
+          </div>
+        )}
         {nudge && !onboarding && (
           <div className='banner info'>
             Write down your recovery phrase so you can get your identity back if you lose this device.{' '}

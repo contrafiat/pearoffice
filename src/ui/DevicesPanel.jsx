@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { ArrowCounterClockwise, CaretLeft, DeviceMobile, Key, X } from '@phosphor-icons/react'
 import { QrCode, ScanButton } from './Qr.jsx'
 import { call, on } from './bridge.js'
+import { linkDevice, phraseWordCount, restorePhrase } from './takeIdentity.js'
 
 // Linking a person's devices and the recovery phrase
 // (proposals/2026-10-03-device-linking.md).
@@ -21,11 +22,10 @@ export function DevicesPanel ({ initialLink = '', startWith = null, onBack = nul
     call('link:phrase').then((r) => { setPhrase(r.phrase); call('app:phraseNudged').catch(() => {}) }).catch((err) => { onError(err.message); onClose() })
   }, [])
 
-  async function restartAfter (method, args) {
+  async function restartAfter (take) {
     setBusy(true)
     try {
-      const r = await call(method, args)
-      if (r && r.restart) await call('app:restart')
+      await take()
     } catch (err) {
       onError(err.message)
       setBusy(false)
@@ -80,10 +80,10 @@ export function DevicesPanel ({ initialLink = '', startWith = null, onBack = nul
         )}
 
         {mode === 'use' && (
-          <form className='stack' onSubmit={(e) => { e.preventDefault(); restartAfter('link:join', { link: input.trim() }) }}>
+          <form className='stack' onSubmit={(e) => { e.preventDefault(); restartAfter(() => linkDevice(input)) }}>
             <p>Paste the link from your other device. This device must not have any sheets yet; it takes on your identity.</p>
             <input aria-label='Device link' placeholder='pearoffice://link?...' value={input} onChange={(e) => setInput(e.target.value)} autoFocus />
-            <ScanButton prefix='pearoffice://link?' what='a PearOffice device link' onError={onError} onLink={(l) => { setInput(l); restartAfter('link:join', { link: l }) }} />
+            <ScanButton prefix='pearoffice://link?' what='a PearOffice device link' onError={onError} onLink={(l) => { setInput(l); restartAfter(() => linkDevice(l)) }} />
             <div className='row end'>
               <button type='button' onClick={() => setMode('menu')}>Back</button>
               <button className='primary' type='submit' disabled={busy || !input.trim()}>{busy ? 'Linking...' : 'Link'}</button>
@@ -100,12 +100,12 @@ export function DevicesPanel ({ initialLink = '', startWith = null, onBack = nul
         )}
 
         {mode === 'restore' && (
-          <form className='stack' onSubmit={(e) => { e.preventDefault(); restartAfter('app:restorePhrase', { phrase: input }) }}>
+          <form className='stack' onSubmit={(e) => { e.preventDefault(); restartAfter(() => restorePhrase(input, { before: () => call('app:setWelcomeBack', { show: true }) })) }}>
             <p>Type your 24 words. This works on a device with no sheets yet. Your sheets come back when you link from another device or are invited again.</p>
             <textarea aria-label='Recovery phrase' rows='4' value={input} onChange={(e) => setInput(e.target.value)} autoFocus />
             <div className='row end'>
               <button type='button' onClick={() => setMode('menu')}>Back</button>
-              <button className='primary' type='submit' disabled={busy || input.trim().split(/\s+/).length !== 24}>{busy ? 'Restoring...' : 'Restore'}</button>
+              <button className='primary' type='submit' disabled={busy || phraseWordCount(input) !== 24}>{busy ? 'Restoring...' : 'Restore'}</button>
             </div>
           </form>
         )}

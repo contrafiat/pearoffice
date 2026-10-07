@@ -1152,6 +1152,24 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 .ob-card input.ob-name:focus { outline: none; border-color: var(--pear); box-shadow: 0 0 0 3px var(--pear-soft); }
 .ob-card button.ob-picture { position: relative; flex: none; padding: 0; border: 0; border-radius: 50%; background: none; }
 .ob-card button.ob-picture:hover { background: none; }
+.ob-welcome-foot { flex-direction: column; align-items: center; }
+.ob-foot.ob-welcome-foot button { flex: none; }
+.ob-foot.ob-welcome-foot button.primary { width: min(280px, 100%); }
+.ob-card .ob-have { font: inherit; font-size: 14.5px; color: var(--pear-dark); padding: 6px 8px; }
+.ob-choices { display: flex; flex-direction: column; gap: 10px; width: min(360px, 100%); margin-top: 6px; }
+.ob-card button.ob-choice { flex: none; justify-content: flex-start; gap: 14px; padding: 14px 14px 14px 12px; border-radius: 12px; text-align: left; white-space: normal; }
+.ob-choice-icon { flex: none; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: var(--pear-soft); color: var(--pear-dark); }
+.ob-choice-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.ob-choice-text b { font-weight: 500; font-size: 15px; }
+.ob-choice-text span { color: var(--muted); font-size: 13.5px; line-height: 1.4; }
+.ob-choice-go { flex: none; color: var(--muted); }
+.ob-card input.ob-link { font-size: 14px; }
+.ob-card textarea.ob-phrase { width: min(340px, 100%); box-sizing: border-box; padding: 11px 14px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--paper); color: var(--ink); font: inherit; font-size: 15px; line-height: 1.5; resize: none; }
+.ob-card textarea.ob-phrase:focus { outline: none; border-color: var(--pear); box-shadow: 0 0 0 3px var(--pear-soft); }
+.ob-body p.ob-count { font-size: 13px; margin-top: -6px; }
+.ob-body p.ob-error { color: var(--error); font-size: 14px; }
+.ob-card button.scan-button { flex: none; width: min(300px, 100%); }
+.ob-waiting .join-spinner { margin-bottom: 4px; }
 .ob-camera { position: absolute; right: -2px; bottom: -2px; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--pear); color: var(--panel); border: 3px solid var(--panel); }
 @media (max-width: 720px) {
   .ob-backdrop { padding: 0; background: var(--panel); backdrop-filter: none; }

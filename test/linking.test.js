@@ -82,7 +82,21 @@ test('linking a new device and the recovery phrase', async (t) => {
     await call(E, 'link:join', { link })
     await assert.rejects(call(D, 'link:join', { link }), /already been used|closed/)
     const { link: fresh } = await call(A, 'link:start')
-    await assert.rejects(call(C, 'link:join', { link: fresh }), /already has sheets/)
+    await assert.rejects(call(C, 'link:join', { link: fresh }), /already has files/)
+  })
+
+  await t.test('a join still looking for the other device can be cancelled', async () => {
+    const G = await device(null)
+    const { link } = await call(A, 'link:start')
+    // A link to a device that is not there: the join waits until cancelled.
+    const nowhere = link.replace(/a=[0-9a-f]{64}/, 'a=' + 'ab'.repeat(32))
+    const started = Date.now()
+    const joining = call(G, 'link:join', { link: nowhere }).then(() => 'joined', (err) => err.message)
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    assert.equal((await call(G, 'link:cancel')).ok, true)
+    assert.equal(await joining, 'Linking was cancelled')
+    assert.ok(Date.now() - started < 10000, 'stopped well before the 2 minute limit')
+    assert.equal((await call(G, 'link:cancel')).ok, true, 'cancelling with nothing waiting is fine')
   })
 
   await t.test('the recovery phrase restores the identity on a fresh install', async () => {
@@ -94,6 +108,6 @@ test('linking a new device and the recovery phrase', async (t) => {
     await F.close()
     F = await device(null, dirF)
     assert.equal(hex(F.identity.publicKey), hex(A.identity.publicKey))
-    await assert.rejects(call(C, 'app:restorePhrase', { phrase }), /already has sheets/)
+    await assert.rejects(call(C, 'app:restorePhrase', { phrase }), /already has files/)
   })
 })
