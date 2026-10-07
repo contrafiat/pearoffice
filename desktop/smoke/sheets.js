@@ -158,15 +158,14 @@ module.exports = async function sheets (t) {
   await waitFor('chart inserted', "!!document.querySelector('.chart-frame svg') && !!document.querySelector('.chart-panel')")
   await js("[...document.querySelectorAll('.chart-panel label')].find((l) => l.textContent.includes('Show values')).querySelector('input').click()")
   await waitFor('values shown', "[...document.querySelectorAll('.chart-frame svg text')].some((t) => t.textContent === '1200')")
-  await js("document.querySelector('.chart-types [title=\"Line\"]').click()")
+  // A click that lands while the panel redraws can be lost, so each wait
+  // clicks again until the type is picked (picking it twice changes nothing).
+  const pick = (t) => "((b) => (b && b.getAttribute('aria-checked') === 'true' && !!document.querySelector('.chart-frame svg')) || (b && b.click(), false))(document.querySelector('.chart-types [title=\"" + t + "\"]'))"
+  await waitFor('line chart', pick('Line'))
   // Each newer type draws (proposals/2026-10-05-more-chart-types.md).
-  for (const t of ['Radar', 'Bubble', 'Stock', 'Histogram', 'Waterfall']) {
-    await js("document.querySelector('.chart-types [title=\"" + t + "\"]').click()")
-    await waitFor(t + ' chart', "document.querySelector('.chart-types [title=\"" + t + "\"]').getAttribute('aria-checked') === 'true' && !!document.querySelector('.chart-frame svg')")
-  }
+  for (const t of ['Radar', 'Bubble', 'Stock', 'Histogram', 'Waterfall']) await waitFor(t + ' chart', pick(t))
   result.moreChartTypes = true
-  await js("document.querySelector('.chart-types [title=\"Line\"]').click()")
-  await waitFor('line chart', "document.querySelector('.chart-types [title=\"Line\"]').getAttribute('aria-checked') === 'true'")
+  await waitFor('line chart again', pick('Line'))
   await js("document.querySelector('.chart-panel .close').click()")
   await js("document.querySelector('.grid .body').focus()")
   await sendMod('Home', ['control'])
