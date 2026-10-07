@@ -1,8 +1,8 @@
 # PearOffice seeder
 
-An always-on helper that keeps an encrypted copy of your PearOffice sheets, so
+An always-on helper that keeps an encrypted copy of your PearOffice files, so
 the people in them can catch up when nobody else is online. It never gets a
-sheet's key and cannot read your sheets.
+file's key and cannot read your files.
 
 ## Run it
 
@@ -12,10 +12,10 @@ sheet's key and cannot read your sheets.
 
 It prints a QR code and a pairing link that work for 5 minutes. In PearOffice,
 open **Seeder** and paste the link (or scan the code on a phone). Type `pair`
-for a new code and `status` to see how many devices and sheets it holds.
+for a new code and `status` to see how many devices and files it holds.
 
 `devices` lists the paired devices and `forget <device key>` stops accepting
-one (the first 6 or more characters of the key are enough). Sheets that no
+one (the first 6 or more characters of the key are enough). Files that no
 other paired device backs up are deleted after 7 days. When it runs as a
 service, start it once with `--forget <device key>` instead.
 
@@ -39,5 +39,5 @@ published checksum, replaces the program and restarts the
 
 ## What it stores
 
-Only sheets that a device paired with this seeder has registered, plus the
-other members' copies of those sheets. Anything else is refused.
+Only files that a device paired with this seeder has registered, plus the
+other members' copies of those files. Anything else is refused.

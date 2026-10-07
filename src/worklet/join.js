@@ -135,7 +135,7 @@ function createJoinService ({ engine, emit, onProfile = async () => {}, kindOf =
       return reject('This invite does not check out')
     }
     const mine = (await engine.localDb.get('groups:joined:' + sheetId))?.value
-    if (!mine || !mine.encryptionKey) return reject('This device cannot share that sheet')
+    if (!mine || !mine.encryptionKey) return reject('This device cannot share that file')
     log('welcome ' + String(msg.inviteId).slice(0, 8))
     const kind = await kindOf(sheetId).catch(() => 'sheet')
     ch.msg.send({ t: 'welcome', groupKey: mine.groupKey, bootstrap: mine.bootstrap, encryptionKey: mine.encryptionKey, name: mine.name || '', role: invite.role, kind })
@@ -209,7 +209,7 @@ function createJoinService ({ engine, emit, onProfile = async () => {}, kindOf =
     const link = m.parseInviteLink(rawLink)
     const sheetId = link.sheetId
     if (await engine.localDb.get('groups:joined:' + sheetId) && !(await engine.localDb.get('joins:pending:' + sheetId))) {
-      throw new Error('You already have this sheet')
+      throw new Error('You already have this file')
     }
     if (joins.has(sheetId)) return { sheetId }
     // Invited back after removing the sheet from this device: allow it.

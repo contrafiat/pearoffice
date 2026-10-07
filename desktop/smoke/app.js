@@ -122,7 +122,7 @@ module.exports = async function app (t) {
   seederMs.start = Date.now() - t0
   t0 = Date.now()
   await js("[...document.querySelectorAll('.panel button')].find((b) => b.textContent.trim() === 'Pair this device with it').click()")
-  await waitFor('paired with the local seeder', "document.querySelector('.panel').textContent.includes('Paired. Your sheets are backing up.')", 60000)
+  await waitFor('paired with the local seeder', "document.querySelector('.panel').textContent.includes('Paired. Your files are backing up.')", 60000)
   seederMs.pair = Date.now() - t0
   t0 = Date.now()
   await js("[...document.querySelectorAll('.panel button')].find((b) => b.textContent.trim() === 'Show pairing code').click()")

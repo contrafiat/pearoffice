@@ -122,7 +122,7 @@ test('a copy keeps the bytes of its pictures for a later paste', async () => {
   const r = await p.adoptPictures([{ ref: 'r1', hash: 'h', mime: 'image/png', w: 1, h: 1, file: 'gone' }], {
     sheetId: 'b',
     call: async (method, args) => {
-      if (method === 'doc:picture') throw new Error('unknown sheet')
+      if (method === 'doc:picture') throw new Error('unknown file')
       return { ref: 'new', hash: hashOf(Buffer.from(args.bytes, 'base64')), mime: args.mime, w: args.width, h: args.height }
     }
   })

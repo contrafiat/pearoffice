@@ -30,7 +30,7 @@ function desktopEntry (command) {
     '[Desktop Entry]',
     'Type=Application',
     'Name=PearOffice',
-    'Comment=Keep your sheets online',
+    'Comment=Keep your files online',
     'Exec=' + [...command, HIDDEN_FLAG].map(quote).join(' '),
     'Terminal=false',
     'X-GNOME-Autostart-enabled=true',

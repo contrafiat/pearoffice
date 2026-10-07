@@ -69,7 +69,7 @@ export function SlidesView ({ sheetId, onTitleChange, onError, onGone }) {
       delete s.state
       setInfo(s)
     } catch (err) {
-      if (/^unknown sheet/.test(err.message)) { goneRef.current(); return }
+      if (/^unknown file/.test(err.message)) { goneRef.current(); return }
       errorRef.current(err.message)
     }
   }, [sheetId, ydoc])

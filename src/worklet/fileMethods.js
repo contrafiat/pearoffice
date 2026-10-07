@@ -22,7 +22,7 @@ function createFileHelpers (sheets) {
 
   async function viewGet (ctx, sheetId, key) {
     const base = ctx.bases.get(sheetId)
-    if (!base) throw new Error('unknown sheet: ' + sheetId)
+    if (!base) throw new Error('unknown file: ' + sheetId)
     await base.ready()
     const node = await base.view.get(key)
     return node ? node.value : null
@@ -69,11 +69,11 @@ function createFileHelpers (sheets) {
   }
 
   async function requireEdit (ctx, sheetId) {
-    if (await isFrozen(ctx, sheetId)) throw new Error('This copy of the sheet is frozen')
+    if (await isFrozen(ctx, sheetId)) throw new Error('This copy of the file is frozen')
     const role = await myRole(ctx, sheetId)
     if (role !== 'owner' && role !== 'editor') throw new Error('You can view this file but not edit it')
     const base = ctx.bases.get(sheetId)
-    if (!base.writable) throw new Error('Still getting edit access to this sheet. Try again in a moment.')
+    if (!base.writable) throw new Error('Still getting edit access to this file. Try again in a moment.')
   }
 
   async function commit (ctx, sheetId, update) {
@@ -183,7 +183,7 @@ function createFileMethods (sheets, { getJoin, getMoves, getProfiles }) {
     setRole: async ({ sheetId, identity, role }, ctx) => {
       await requireOwner(ctx, sheetId)
       const member = await viewGet(ctx, sheetId, 'member/' + identity)
-      if (!member) throw new Error('Not a member of this sheet')
+      if (!member) throw new Error('Not a member of this file')
       if (member.role === 'owner') throw new Error('The owner role cannot change')
       if (member.role === role) return { changed: false }
       await ctx.append(sheetId, m.roleOp({ sheetId, owner: ctx.identity, identity, role, v: (member.v || 1) + 1 }))
@@ -192,7 +192,7 @@ function createFileMethods (sheets, { getJoin, getMoves, getProfiles }) {
 
     members: async ({ sheetId }, ctx) => {
       const base = ctx.bases.get(sheetId)
-      if (!base) throw new Error('unknown sheet: ' + sheetId)
+      if (!base) throw new Error('unknown file: ' + sheetId)
       await base.ready()
       const me = hex(ctx.identity.publicKey)
       const members = []
@@ -219,7 +219,7 @@ function createFileMethods (sheets, { getJoin, getMoves, getProfiles }) {
     compact: async ({ sheetId }) => getMoves().compact(sheetId),
     history: async ({ sheetId }) => {
       const base = sheets.getBase(sheetId)
-      if (!base) throw new Error('unknown sheet: ' + sheetId)
+      if (!base) throw new Error('unknown file: ' + sheetId)
       return { updates: base.view.core.length, openInvites: await getMoves().openInvites(sheetId) }
     },
 
