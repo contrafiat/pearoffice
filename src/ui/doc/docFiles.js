@@ -109,22 +109,38 @@ function tidy (html, styles, paste = false) {
     const last = code.lastChild
     if (last && last.nodeType === 3) last.textContent = last.textContent.replace(/\n$/, '')
   }
-  // Markdown task lists: <li><input type=checkbox> text</li>.
-  for (const ul of [...body.querySelectorAll('ul')]) {
-    const items = [...ul.children].filter((x) => x.tagName === 'LI')
-    const box = (li) => li.querySelector(':scope > input[type=checkbox], :scope > p:first-child > input[type=checkbox]')
-    if (!items.length || !items.some(box)) continue
+  // Markdown task lists: <li><input type=checkbox> text</li>. A list mixing
+  // plain items and tasks becomes a bulleted list or a checklist for each run
+  // of either kind.
+  const box = (li) => li.querySelector(':scope > input[type=checkbox], :scope > p:first-child > input[type=checkbox]')
+  const markTasks = (ul, items) => {
     ul.setAttribute('data-type', 'taskList')
     for (const li of items) {
       const input = box(li)
       li.setAttribute('data-type', 'taskItem')
-      li.setAttribute('data-checked', input && input.hasAttribute('checked') ? 'true' : 'false')
-      if (input) {
-        const after = input.nextSibling
-        input.remove()
-        if (after && after.nodeType === 3) after.textContent = after.textContent.replace(/^\s+/, '')
-      }
+      li.setAttribute('data-checked', input.hasAttribute('checked') ? 'true' : 'false')
+      const after = input.nextSibling
+      input.remove()
+      if (after && after.nodeType === 3) after.textContent = after.textContent.replace(/^\s+/, '')
     }
+  }
+  for (const ul of [...body.querySelectorAll('ul')]) {
+    const items = [...ul.children].filter((x) => x.tagName === 'LI')
+    if (!items.length || !items.some(box)) continue
+    if (items.every(box)) { markTasks(ul, items); continue }
+    const runs = []
+    for (const li of items) {
+      const task = !!box(li)
+      if (!runs.length || runs[runs.length - 1].task !== task) runs.push({ task, items: [] })
+      runs[runs.length - 1].items.push(li)
+    }
+    for (const run of runs) {
+      const part = doc.createElement('ul')
+      ul.before(part)
+      for (const li of run.items) part.appendChild(li)
+      if (run.task) markTasks(part, run.items)
+    }
+    ul.remove()
   }
   // Our .docx checklists: paragraphs starting with ☐, ☒ or ☑ in a row (we
   // write ☒, which LibreOffice draws; older exports wrote ☑).
@@ -182,6 +198,7 @@ function foreign (body) {
   const comments = []
   for (let n = walker.nextNode(); n; n = walker.nextNode()) comments.push(n)
   for (const c of comments) c.remove()
+  const libre = !!body.querySelector('meta[name="generator" i][content^="LibreOffice" i]')
   for (const el of [...body.querySelectorAll(QUIET)]) el.remove()
   // Office's own tags: o:p (an empty paragraph's filler), v: drawings, the rest
   // unwrapped.
@@ -224,7 +241,25 @@ function foreign (body) {
     if (/^(P|H[1-6]|DIV|TD|TH)$/.test(el.tagName)) el.setAttribute('style', 'text-align:' + el.getAttribute('align').toLowerCase() + ';' + (el.getAttribute('style') || ''))
     el.removeAttribute('align')
   }
+  if (libre) libreOffice(body)
   return dropped
+}
+
+// LibreOffice writes Title and Subtitle as centred paragraphs in their
+// default sizes, 28pt bold and 18pt, with the style's font.
+function libreOffice (body) {
+  for (const p of [...body.querySelectorAll('p')]) {
+    if (p.closest('li, td, th') || p.hasAttribute('data-style') || p.style.textAlign !== 'center') continue
+    const spans = [...p.querySelectorAll('span')].filter((s) => s.textContent.trim() && !s.querySelector('span'))
+    const inSpans = spans.map((s) => s.textContent).join('').replace(/\s/g, '')
+    if (!spans.length || inSpans !== p.textContent.replace(/\s/g, '')) continue
+    const sizes = new Set(spans.map((s) => parseStyle(s.getAttribute('style')).get('font-size')))
+    const style = sizes.size !== 1 ? null : sizes.has('28pt') ? 'title' : sizes.has('18pt') ? 'subtitle' : null
+    if (!style) continue
+    p.setAttribute('data-style', style)
+    for (const s of p.querySelectorAll('span')) { s.style.removeProperty('font-size'); s.style.removeProperty('font-family') }
+    if (style === 'title') for (const b of [...p.querySelectorAll('b, strong')]) unwrap(b)
+  }
 }
 
 // Google Docs: empty lines come as <br> between paragraphs, Title and
