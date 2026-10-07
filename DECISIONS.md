@@ -2,6 +2,19 @@
 
 Append-only, newest on top. Per Constitution §4.
 
+## 2026-10-06 - Slides: optional element fields and a chart element
+Tier: T2
+Context: .pptx import lost see-through fills, custom shapes, text anchoring,
+crops, arrowheads, SmartArt and charts (proposals/2026-10-06-slides-followups.md).
+Choice: optional fields on elements (`fillOpacity`, `lineOpacity`, `anchor`,
+`wrap`, `crop`, `head`, `tail`), a `custom` shape with checked SVG `path`
+data in a 1000 x 1000 box, SmartArt from its saved drawing, and a `chart`
+element drawn with the sheet's chart code that keeps the data.
+Alternatives: dropping these on import; charts as pictures only; leaving
+charts out.
+Consequences: older builds draw these plainly (opaque, top, uncropped,
+boxes) and skip charts; `meta.version` stays 1.
+
 ## 2026-10-06 - Slides: DOM slides with position keys
 Tier: T2
 Context: PearOffice's third file kind (proposals/2026-10-06-slides.md,

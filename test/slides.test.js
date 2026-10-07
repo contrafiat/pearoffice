@@ -181,6 +181,60 @@ test('shapes and pictures: added, styled, duplicated and listed', () => {
   assert.equal(s.pictureRefs(a).length, 2, 'a deleted slide keeps its pictures for Restore')
 })
 
+test('follow-up fields: opacity, anchor, wrap, crop, arrowheads and custom shapes', () => {
+  const { a } = deck(1)
+  const sl = s.slideIds(a)[0]
+  const title = box(a, sl, 'title')
+  const body = box(a, sl, 'body')
+  let tri, bad, line, pic
+  change(a, (d) => {
+    tri = s.addShape(d, sl, 'custom', undefined, { path: 'M0 0 L1000 0 L500 1000 Z' })
+    bad = s.addShape(d, sl, 'custom', undefined, { path: 'M0 0 <script>' })
+    line = s.addShape(d, sl, 'line')
+    pic = s.addPicture(d, sl, { ref: 'aa:bb', hash: 'cc', w: 100, h: 100 })
+  })
+  assert.equal(bad, null, 'a bad path is refused')
+  const look = (id) => { const x = s.style(s.element(a, sl, id)); return [x.shape, x.fillOpacity, x.lineOpacity, x.head, x.tail].join() }
+  assert.equal(look(tri), 'custom,1,1,none,none')
+  assert.equal(s.style(s.element(a, sl, tri)).path, 'M0 0 L1000 0 L500 1000 Z')
+  assert.equal([s.textLayout(s.element(a, sl, title)).anchor, s.textLayout(s.element(a, sl, body)).anchor, s.textLayout(s.element(a, sl, tri)).anchor].join(), 'middle,top,middle')
+  change(a, (d) => {
+    s.setOpacity(d, sl, tri, { fill: 0.25, line: 9 })
+    s.setArrows(d, sl, line, { head: 'oval', tail: 'bomb' })
+    assert.equal(s.setArrows(d, sl, tri, { head: 'arrow' }), false, 'only lines have arrowheads')
+    s.setAnchor(d, sl, body, 'bottom')
+    assert.equal(s.setAnchor(d, sl, body, 'sideways'), false)
+    s.setWrap(d, sl, body, false)
+    s.setCrop(d, sl, pic, { l: 0.1, t: 0.5, b: 0.6, r: -3 })
+  })
+  assert.equal(look(tri), 'custom,0.25,1,none,none')
+  assert.equal(look(line), 'line,1,1,oval,none')
+  assert.equal(JSON.stringify(s.textLayout(s.element(a, sl, body))), '{"anchor":"bottom","wrap":false}')
+  assert.equal(JSON.stringify(s.crop(s.element(a, sl, pic))), '{"l":0.1,"t":0,"r":0,"b":0}', 'top and bottom over 0.95 dropped')
+  change(a, (d) => { s.setWrap(d, sl, body, true); s.setCrop(d, sl, pic, { l: 0 }) })
+  assert.equal(s.element(a, sl, body).has('wrap') + '|' + s.element(a, sl, pic).has('crop'), 'false|false')
+  // Stored nonsense draws safely: a custom shape with a bad path is a box.
+  change(a, (d) => { s.element(d, sl, tri).set('path', 'javascript:1'); s.element(d, sl, line).set('fillOpacity', 'x') })
+  assert.equal(s.style(s.element(a, sl, tri)).shape + '|' + s.style(s.element(a, sl, line)).fillOpacity, 'rect|1')
+})
+
+test('concurrent: different fields of one shape both survive', () => {
+  const { state, a, b } = deck(1)
+  const sl = s.slideIds(a)[0]
+  let el
+  const u0 = change(a, (d) => { el = s.addShape(d, sl, 'rect') })
+  Y.applyUpdate(b, u0)
+  const start = Y.encodeStateAsUpdate(a)
+  const ua = change(a, (d) => s.setOpacity(d, sl, el, { fill: 0.5 }))
+  const ub = change(b, (d) => { s.setAnchor(d, sl, el, 'bottom'); s.setStyle(d, sl, el, { fill: '#00ff00' }) })
+  const [x, y] = bothOrders(start, ua, ub)
+  for (const d of [x, y]) {
+    const st = s.style(s.element(d, sl, el))
+    assert.equal([st.fillOpacity, st.fill, s.textLayout(s.element(d, sl, el)).anchor].join(), '0.5,#00ff00,bottom')
+  }
+  assert.equal(state.byteLength > 0, true)
+})
+
 test('bad values from another member are clamped or skipped', () => {
   const { a } = deck(1)
   const sl = s.slideIds(a)[0]

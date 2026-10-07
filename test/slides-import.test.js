@@ -200,7 +200,7 @@ function craftedDeck () {
     {}
   )
   const slide2 = slideXml(
-    // A see-through tint: left out.
+    // A see-through tint: kept, with its opacity.
     '<p:sp>' + nv(3, 'Tint') + '<p:spPr>' + xfrm(0, 0, 9144000, 6858000) + '<a:prstGeom prst="rect"/><a:solidFill><a:srgbClr val="0D84A1"><a:alpha val="30000"/></a:srgbClr></a:solidFill></p:spPr></p:sp>' +
     '<p:sp>' + nv(2, 'Box', '', 'Sp') + '<p:spPr>' + xfrm(914400, 914400, 4572000, 914400) + '<a:prstGeom prst="rect"/><a:noFill/></p:spPr><p:txBody><a:bodyPr/>' +
       '<a:p><a:r><a:rPr lang="en-US" sz="2000"><a:solidFill><a:schemeClr val="bg1"/></a:solidFill></a:rPr><a:t>Light on dark</a:t></a:r></a:p></p:txBody></p:sp>',
@@ -283,14 +283,15 @@ test('a hand-made deck: size, inheritance, groups, shapes, notes and what was lo
   assert.equal(built.theme, 'plain')
   const two = els(doc, ids[1])
   assert.equal(sm.slide(doc, ids[1]).get('layout'), 'blank')
-  assert.equal(two.map((e) => e.type).join(), 'shape,shape,text')
+  assert.equal(two.map((e) => e.type).join(), 'shape,shape,shape,text')
   assert.equal(style(two[0]) + ' ' + JSON.stringify(two[0].frame), 'rect:#161a26:none:0 {"x":0,"y":0,"w":1440,"h":1080,"rot":0}')
-  assert.equal(runs(two[2].map).join(), 'Light on dark|textStyle=color:#ffffff,fontSize:20pt')
+  assert.equal(style(two[2]) + ' ' + sm.style(two[2].map).fillOpacity, 'rect:#0d84a1:none:0 0.3')
+  assert.equal(runs(two[3].map).join(), 'Light on dark|textStyle=color:#ffffff,fontSize:20pt')
 
   // What was lost, each counted once.
   const lost = built.lost
-  assert.equal(JSON.stringify(Object.keys(lost).sort().map((x) => x + '=' + lost[x])), JSON.stringify(['animations=2', 'customShapes=1', 'designShapes=1', 'fonts=1', 'gradients=1', 'seeThrough=1', 'transitions=1']))
-  assert.equal(f.noticeFor(lost), 'Left out: 2 animations, 1 slide transition, 1 drawn shape from the slide design and 1 embedded font. Drawn as boxes: 1 custom shape. Filled with their first colour: 1 gradient. Made solid or left out: 1 see-through fill. Fonts and the theme are the closest PearOffice has.')
+  assert.equal(JSON.stringify(Object.keys(lost).sort().map((x) => x + '=' + lost[x])), JSON.stringify(['animations=2', 'customShapes=1', 'designShapes=1', 'fonts=1', 'gradients=1', 'transitions=1']))
+  assert.equal(f.noticeFor(lost), 'Left out: 2 animations, 1 slide transition, 1 drawn shape from the slide design and 1 embedded font. Drawn as boxes: 1 custom shape PearOffice cannot read. Filled with their first colour: 1 gradient. Fonts and the theme are the closest PearOffice has.')
 })
 
 test('the text reads back in the editor schema', async () => {
@@ -314,6 +315,127 @@ test('the text reads back in the editor schema', async () => {
   }
   assert.equal(texts.sort().join('|'), 'Crafted title|First pointSub point|Light on dark')
   doc.destroy()
+})
+
+// The follow-ups (proposals/2026-10-06-slides-followups.md): see-through
+// fills and outlines, where text sits, no wrapping, a crop, line ends,
+// custom shapes and SmartArt with and without its drawing.
+const DGM = 'http://schemas.openxmlformats.org/drawingml/2006/diagram'
+const DSP = 'http://schemas.microsoft.com/office/drawing/2008/diagram'
+const smartArt = (id, name, x, dm) => '<p:graphicFrame><p:nvGraphicFramePr><p:cNvPr id="' + id + '" name="' + name + '"/><p:cNvGraphicFramePr/><p:nvPr/></p:nvGraphicFramePr>' +
+  '<p:xfrm><a:off x="' + x + '" y="4000000"/><a:ext cx="3000000" cy="2000000"/></p:xfrm><a:graphic><a:graphicData uri="' + DGM + '"><dgm:relIds xmlns:dgm="' + DGM + '" r:dm="' + dm + '" r:lo="rIdLo" r:qs="rIdQs" r:cs="rIdCs"/></a:graphicData></a:graphic></p:graphicFrame>'
+const dataModel = (texts, drawingRel) => '<dgm:dataModel xmlns:dgm="' + DGM + '" ' + NS + '><dgm:ptLst>' +
+  texts.map((t, i) => '<dgm:pt modelId="' + (i + 1) + '"><dgm:t><a:bodyPr/>' + para(t) + '</dgm:t></dgm:pt>').join('') + '</dgm:ptLst>' +
+  (drawingRel ? '<dgm:extLst><a:ext uri="http://schemas.microsoft.com/office/drawing/2008/diagram"><dsp:dataModelExt xmlns:dsp="' + DSP + '" relId="' + drawingRel + '" minVer="http://schemas.openxmlformats.org/drawingml/2006/diagram"/></a:ext></dgm:extLst>' : '') + '</dgm:dataModel>'
+// The drawing: shapes placed from the graphic frame's corner.
+const DRAWING = '<dsp:drawing xmlns:dsp="' + DSP + '" ' + NS + '><dsp:spTree><dsp:nvGrpSpPr><dsp:cNvPr id="0" name=""/><dsp:cNvGrpSpPr/></dsp:nvGrpSpPr><dsp:grpSpPr/>' +
+  '<dsp:sp modelId="{A}"><dsp:nvSpPr><dsp:cNvPr id="0" name=""/><dsp:cNvSpPr/></dsp:nvSpPr><dsp:spPr>' + xfrm(0, 0, 1000000, 800000) + '<a:prstGeom prst="roundRect"><a:avLst/></a:prstGeom><a:solidFill><a:srgbClr val="2266AA"/></a:solidFill></dsp:spPr>' +
+    '<dsp:txBody><a:bodyPr anchor="ctr"/>' + para('Step A') + '</dsp:txBody></dsp:sp>' +
+  '<dsp:sp modelId="{B}"><dsp:nvSpPr><dsp:cNvPr id="0" name=""/><dsp:cNvSpPr/></dsp:nvSpPr><dsp:spPr>' + xfrm(1500000, 0, 1000000, 800000) + '<a:prstGeom prst="ellipse"><a:avLst/></a:prstGeom><a:solidFill><a:srgbClr val="AA6622"/></a:solidFill></dsp:spPr>' +
+    '<dsp:txBody><a:bodyPr/>' + para('Step B') + '</dsp:txBody></dsp:sp>' +
+  '</dsp:spTree></dsp:drawing>'
+
+function followUpsDeck () {
+  const geom = (paths, gd = '') => '<a:custGeom><a:avLst/><a:gdLst>' + gd + '</a:gdLst><a:pathLst>' + paths + '</a:pathLst></a:custGeom>'
+  const slide = slideXml(
+    // A see-through fill and outline.
+    '<p:sp>' + nv(2, 'Glass') + '<p:spPr>' + xfrm(500000, 500000, 2000000, 1000000) + '<a:prstGeom prst="rect"/><a:solidFill><a:srgbClr val="FF0000"><a:alpha val="40000"/></a:srgbClr></a:solidFill><a:ln w="25400"><a:solidFill><a:srgbClr val="0000FF"><a:alpha val="60000"/></a:srgbClr></a:solidFill></a:ln></p:spPr></p:sp>' +
+    // A text box at the bottom that does not wrap.
+    '<p:sp>' + nv(3, 'Low', '', 'Sp') + '<p:spPr>' + xfrm(3000000, 500000, 2000000, 1500000) + '<a:prstGeom prst="rect"/><a:noFill/></p:spPr><p:txBody><a:bodyPr anchor="b" wrap="none"/>' + para('Low text') + '</p:txBody></p:sp>' +
+    // A shape with its text at the top.
+    '<p:sp>' + nv(4, 'Top') + '<p:spPr>' + xfrm(5500000, 500000, 1000000, 1000000) + '<a:prstGeom prst="ellipse"/><a:solidFill><a:srgbClr val="00AA00"/></a:solidFill></p:spPr><p:txBody><a:bodyPr anchor="t"/>' + para('Up here') + '</p:txBody></p:sp>' +
+    // A cropped picture.
+    '<p:pic><p:nvPicPr><p:cNvPr id="5" name="Pic" descr="Cropped"/><p:cNvPicPr/><p:nvPr/></p:nvPicPr><p:blipFill><a:blip r:embed="rIdP"/><a:srcRect l="10000" t="20000" r="30000" b="-5000"/><a:stretch><a:fillRect/></a:stretch></p:blipFill><p:spPr>' + xfrm(7000000, 500000, 1000000, 1000000) + '<a:prstGeom prst="rect"/></p:spPr></p:pic>' +
+    // A connector with a triangle at its start and a stealth arrow at its end.
+    '<p:cxnSp><p:nvCxnSpPr><p:cNvPr id="6" name="Ends"/><p:cNvCxnSpPr/><p:nvPr/></p:nvCxnSpPr><p:spPr>' + xfrm(500000, 2000000, 2000000, 0) + '<a:prstGeom prst="straightConnector1"/><a:ln w="19050"><a:solidFill><a:srgbClr val="333333"/></a:solidFill><a:headEnd type="triangle"/><a:tailEnd type="stealth" w="med" len="med"/></a:ln></p:spPr></p:cxnSp>' +
+    // An isosceles triangle as a custom shape: our triangle.
+    '<p:sp>' + nv(7, 'Tri') + '<p:spPr>' + xfrm(500000, 2500000, 1000000, 1000000) + geom('<a:path w="2" h="2"><a:moveTo><a:pt x="1" y="0"/></a:moveTo><a:lnTo><a:pt x="2" y="2"/></a:lnTo><a:lnTo><a:pt x="0" y="2"/></a:lnTo><a:close/></a:path>') + '<a:solidFill><a:srgbClr val="AA00AA"/></a:solidFill></p:spPr></p:sp>' +
+    // A lopsided triangle, flipped: a custom shape.
+    '<p:sp>' + nv(8, 'Lop') + '<p:spPr>' + xfrm(2000000, 2500000, 1000000, 1000000, ' flipH="1"') + geom('<a:path w="100" h="100"><a:moveTo><a:pt x="0" y="0"/></a:moveTo><a:lnTo><a:pt x="100" y="100"/></a:lnTo><a:lnTo><a:pt x="0" y="100"/></a:lnTo><a:close/></a:path>') + '<a:solidFill><a:srgbClr val="00AAAA"/></a:solidFill></p:spPr></p:sp>' +
+    // Curves: a cubic, a quadratic and a quarter arc, points from guides,
+    // plus an unfilled path that goes.
+    '<p:sp>' + nv(9, 'Wave') + '<p:spPr>' + xfrm(3500000, 2500000, 2000000, 1000000) +
+      geom('<a:path><a:moveTo><a:pt x="l" y="b"/></a:moveTo><a:cubicBezTo><a:pt x="l" y="t"/><a:pt x="hc" y="t"/><a:pt x="hc" y="vc"/></a:cubicBezTo><a:quadBezTo><a:pt x="x1" y="b"/><a:pt x="r" y="vc"/></a:quadBezTo>' +
+        '<a:arcTo wR="wd4" hR="hd2" stAng="0" swAng="5400000"/><a:close/></a:path><a:path fill="none"><a:moveTo><a:pt x="0" y="0"/></a:moveTo><a:lnTo><a:pt x="r" y="t"/></a:lnTo></a:path>',
+      '<a:gd name="x1" fmla="*/ w 3 4"/>') + '<a:solidFill><a:srgbClr val="FFAA00"/></a:solidFill></p:spPr><p:txBody><a:bodyPr anchor="b"/>' + para('Wave text') + '</p:txBody></p:sp>' +
+    // SmartArt with its drawing, and one without.
+    smartArt(10, 'Diagram', 500000, 'rIdD1') + smartArt(11, 'Plain', 5000000, 'rIdD2')
+  )
+  return craft({
+    size: [12192000, 6858000],
+    slides: [{
+      xml: slide,
+      rels: [['rIdP', 'image', '../media/pic.png'], ['rIdD1', 'diagramData', '../diagrams/data1.xml'], ['rIdD2', 'diagramData', '../diagrams/data2.xml']]
+    }],
+    extraFiles: {
+      'ppt/media/pic.png': png(40, 40, [10, 200, 10]),
+      'ppt/diagrams/data1.xml': dataModel(['Step A', 'Step B'], 'rIdDr'),
+      'ppt/diagrams/data2.xml': dataModel(['Only text'], null),
+      'ppt/diagrams/drawing1.xml': DRAWING
+    }
+  }).then(async (bytes) => {
+    // The drawing's relationship has Microsoft's own type.
+    const zip = await JSZip.loadAsync(bytes)
+    const relsName = 'ppt/slides/_rels/slide1.xml.rels'
+    const xml = await zip.file(relsName).async('string')
+    zip.file(relsName, xml.replace('</Relationships>', '<Relationship Id="rIdDr" Type="http://schemas.microsoft.com/office/2007/relationships/diagramDrawing" Target="../diagrams/drawing1.xml"/></Relationships>'))
+    return zip.generateAsync({ type: 'uint8array' })
+  })
+}
+
+test('follow-ups: opacity, text position, no wrap, crop, line ends, custom shapes and SmartArt', async () => {
+  const { doc, built, f } = await imported(await followUpsDeck())
+  const [id] = sm.slideIds(doc)
+  const all = els(doc, id)
+  const named = (text) => all.find((e) => e.text === text)
+  const shapes = all.filter((e) => e.type === 'shape')
+  const st = (e) => sm.style(e.map)
+
+  const glass = shapes.find((e) => st(e).fill === '#ff0000')
+  assert.equal([st(glass).fillOpacity, st(glass).line, st(glass).lineOpacity].join(), '0.4,#0000ff,0.6')
+
+  const low = named('Low text')
+  assert.equal(low.type, 'text')
+  const lowLayout = sm.textLayout(low.map)
+  assert.equal(lowLayout.anchor + ' ' + lowLayout.wrap, 'bottom false')
+  const up = named('Up here')
+  assert.equal(up.type + ' ' + sm.textLayout(up.map).anchor, 'shape top')
+
+  const pic = all.find((e) => e.type === 'picture')
+  const c = sm.crop(pic.map)
+  assert.equal([c.l, c.t, c.r, c.b].join(), '0.1,0.2,0.3,0')
+
+  const line = shapes.find((e) => st(e).shape === 'line')
+  assert.equal(st(line).head + ' ' + st(line).tail, 'triangle arrow')
+
+  assert.equal(shapes.find((e) => st(e).fill === '#aa00aa').map.get('shape'), 'triangle')
+  const lop = shapes.find((e) => st(e).fill === '#00aaaa')
+  // Flipped left to right: the right angle is at the bottom right.
+  assert.equal(st(lop).shape + ' ' + st(lop).path, 'custom M1000 0L0 1000L1000 1000Z')
+  const wave = named('Wave text')
+  assert.equal(st(wave).shape, 'custom')
+  // l,b; cubic to the middle; quadratic to the right edge at 3/4 across;
+  // a quarter of an ellipse a quarter wide and half high, from its right
+  // end downwards; the unfilled path is left out.
+  const path = st(wave).path
+  assert.ok(path.startsWith('M0 1000C0 0 500 0 500 500Q750 1000 1000 500C'), path)
+  assert.ok(path.endsWith('750 1000Z'), path)
+  assert.equal(sm.textLayout(wave.map).anchor, 'bottom')
+  assert.equal(built.lost.approximated, 1) // the unfilled path
+
+  // SmartArt with its drawing: its shapes and text, from the frame's corner.
+  const k = 1920 / 12192000
+  const stepA = named('Step A')
+  const stepB = named('Step B')
+  assert.equal(st(stepA).shape + ' ' + st(stepA).fill + ' ' + st(stepB).shape, 'roundRect #2266aa ellipse')
+  assert.ok(near(stepA.frame.x, 500000 * k, 1920) && near(stepA.frame.y, 4000000 * k, 1080), JSON.stringify(stepA.frame))
+  assert.ok(near(stepB.frame.x, 2000000 * k, 1920) && near(stepB.frame.w, 1000000 * k, 1920), JSON.stringify(stepB.frame))
+  // Without one: its text only.
+  assert.equal(named('Only text').type, 'text')
+  assert.equal(built.lost.smartArt, 1)
+  // The master's empty custom shape (craft's MASTER) is the design shape.
+  assert.equal(JSON.stringify(Object.keys(built.lost).sort()), JSON.stringify(['approximated', 'designShapes', 'smartArt']))
+  assert.equal(f.noticeFor(built.lost), 'Left out: 1 drawn shape from the slide design. Kept as text only: 1 SmartArt graphic. Drawn close to the original: 1 custom shape. Fonts and the theme are the closest PearOffice has.')
 })
 
 async function pptxgenDeck () {
@@ -510,7 +632,7 @@ const templateDir = [TEMPLATES, '/usr/lib/libreoffice/share/template/common/pres
 test('LibreOffice templates', { skip: !soffice() || !templateDir ? 'needs LibreOffice and its templates' : false, timeout: 120000 }, async () => {
   const out = fs.mkdtempSync(path.join(os.tmpdir(), 'pearoffice-pptx-'))
   try {
-    const names = ['Candy', 'Freshes', 'Vintage', 'Yellow_Idea'].filter((n) => fs.existsSync(path.join(templateDir, n + '.otp')))
+    const names = ['Candy', 'Forestbird', 'Freshes', 'Vintage', 'Yellow_Idea'].filter((n) => fs.existsSync(path.join(templateDir, n + '.otp')))
     execFileSync(soffice(), ['--headless', '-env:UserInstallation=file://' + path.join(out, 'profile'), '--convert-to', 'pptx', '--outdir', out, ...names.map((n) => path.join(templateDir, n + '.otp'))], { stdio: 'ignore', timeout: 100000 })
     for (const n of names) {
       const bytes = fs.readFileSync(path.join(out, n + '.pptx'))
@@ -533,6 +655,10 @@ test('LibreOffice templates', { skip: !soffice() || !templateDir ? 'needs LibreO
         assert.ok(near(title.frame.x, x * w / cx, w) && near(title.frame.y, y * h / cy, h) && near(title.frame.w, tw * w / cx, w), n + ' ' + JSON.stringify(title.frame))
       }
       assert.equal(typeof built.lost, 'object')
+      // Custom shapes and design shapes are drawn now (Candy lost 57 custom
+      // shapes and Forestbird 177 design shapes before the follow-ups).
+      assert.equal(built.lost.customShapes || 0, 0, n)
+      assert.ok((built.lost.designShapes || 0) <= 2, n + ' ' + JSON.stringify(built.lost))
     }
   } finally {
     fs.rmSync(out, { recursive: true, force: true })

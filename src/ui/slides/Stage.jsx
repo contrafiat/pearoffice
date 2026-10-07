@@ -2,8 +2,8 @@ import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import slidesModel from '../../slides/slidesModel.js'
 import { themeStyle } from './themes.js'
 import { LiveText, StaticText, TextFrame, boxStyle, placeholderFor } from './TextBox.jsx'
-import { SNAP_PX, moved, resized, rotated, snapMove, snapTargets, unionOf } from './geometry.js'
-import { ElementBody, hasText } from './objects.jsx'
+import { SNAP_PX, moved, resized, rotated, snapMove, snapTargets, unionOf, cropped, uncropped } from './geometry.js'
+import { ElementBody, SlidePicture, hasText } from './objects.jsx'
 
 // The slide being edited (proposals/2026-10-06-slides.md, Rendering): a div
 // of the deck's size scaled to fit with a CSS transform, each box placed
@@ -19,6 +19,12 @@ import { ElementBody, hasText } from './objects.jsx'
 // keeps its shape when resized by a corner (Shift frees it); other elements
 // keep theirs only with Shift. A shape other than a line takes text inside
 // on a double click. A line has handles only at its ends.
+//
+// Cropping a picture (the toolbar's Crop, the box menu's Crop or a double
+// click) shows the whole picture faintly with crop handles on the frame.
+// Dragging a handle cuts or uncovers that side; the picture keeps its size
+// on the slide. Enter or a click outside writes the crop and frame once,
+// Escape leaves them as they were.
 
 const NUDGE = 5 // slide units per arrow key, ten times with Shift
 const HANDLES = [
@@ -34,7 +40,7 @@ const HANDLES = [
 const CURSORS = ['ns-resize', 'nesw-resize', 'ew-resize', 'nwse-resize']
 const cursorFor = (angle, rot) => CURSORS[Math.round((angle + rot) / 45) % 4]
 
-export function Stage ({ size, theme, slideId, layout, els, sel, setSel, editing, startEditing, stopEditing, editStart, canEdit, layoutEdit, phone, undo, change, others, onCursor, onEditor, onPastePictures }) {
+export function Stage ({ size, theme, slideId, layout, els, sel, setSel, editing, startEditing, stopEditing, editStart, canEdit, layoutEdit, phone, undo, change, others, onCursor, onEditor, onPastePictures, cropping, setCropping }) {
   const viewRef = useRef(null)
   const slideRef = useRef(null)
   const [scale, setScale] = useState(0)
@@ -42,6 +48,7 @@ export function Stage ({ size, theme, slideId, layout, els, sel, setSel, editing
   const [guides, setGuides] = useState(null) // { xs, ys } in slide units
   const [menu, setMenu] = useState(null) // { x, y, alt } for the box menu; alt while its alt text is edited
   const dragRef = useRef(null)
+  const [cropDraft, setCropDraft] = useState(null) // { id, frame, crop } while cropping
 
   // Fit the slide to the space, with a margin.
   useLayoutEffect(() => {
@@ -61,10 +68,58 @@ export function Stage ({ size, theme, slideId, layout, els, sel, setSel, editing
   // A drag ends if the slide changes under it.
   useEffect(() => () => { if (dragRef.current) dragRef.current.end() }, [slideId])
 
-  const frameOf = (el) => (drafts && drafts[el.id]) || el.frame
+  // Cropping starts from the picture as stored and stops if it goes. When
+  // it stops (Enter, a click outside, the toolbar's button, another slide)
+  // the crop and frame are written once, unless Escape cancelled it.
+  const cropEl = cropping && layoutEdit ? els.find((el) => el.id === cropping && el.type === 'picture') : null
+  const draftRef = useRef(null)
+  draftRef.current = cropDraft
+  const cancelRef = useRef(false)
+  useEffect(() => {
+    if (!cropping) return
+    if (!cropEl) { setCropping(null); return }
+    cancelRef.current = false
+    setCropDraft((d) => (d && d.id === cropEl.id ? d : { id: cropEl.id, slideId, frame: cropEl.frame, crop: cropEl.crop, frame0: cropEl.frame, crop0: cropEl.crop }))
+    if (viewRef.current) viewRef.current.focus({ preventScroll: true }) // for Enter and Escape
+  }, [cropping, !!cropEl])
+  useEffect(() => {
+    if (cropping) return
+    const d = draftRef.current
+    if (!d) return
+    setCropDraft(null)
+    if (cancelRef.current) return
+    const same = ['x', 'y', 'w', 'h'].every((k) => d.frame0[k] === d.frame[k]) && ['l', 't', 'r', 'b'].every((k) => d.crop0[k] === d.crop[k])
+    if (!same) change((doc) => { slidesModel.setFrame(doc, d.slideId, d.id, d.frame); slidesModel.setCrop(doc, d.slideId, d.id, d.crop) })
+  }, [cropping])
+  useEffect(() => { if (cropping) setCropping(null) }, [slideId])
+  function finishCrop (keep) {
+    cancelRef.current = !keep
+    setCropping(null)
+  }
+
+  const frameOf = (el) => (cropDraft && cropDraft.id === el.id ? cropDraft.frame : (drafts && drafts[el.id]) || el.frame)
   const toSlide = (e) => {
     const r = slideRef.current.getBoundingClientRect()
     return { x: (e.clientX - r.left) / scale, y: (e.clientY - r.top) / scale }
+  }
+
+  // A crop handle dragged: the draft changes, nothing is written yet.
+  function startCropDrag (e, dir) {
+    if (e.button !== 0 || !cropDraft) return
+    e.preventDefault()
+    e.stopPropagation()
+    const d0 = cropDraft
+    const onMove = (ev) => setCropDraft({ ...d0, ...cropped(d0.frame, d0.crop, dir, toSlide(ev)) })
+    const end = () => {
+      window.removeEventListener('pointermove', onMove)
+      window.removeEventListener('pointerup', end)
+      window.removeEventListener('pointercancel', end)
+      dragRef.current = null
+    }
+    window.addEventListener('pointermove', onMove)
+    window.addEventListener('pointerup', end)
+    window.addEventListener('pointercancel', end)
+    dragRef.current = { end }
   }
 
   // A move, resize or rotate with the pointer. The frames are written once,
@@ -130,6 +185,11 @@ export function Stage ({ size, theme, slideId, layout, els, sel, setSel, editing
 
   function onBoxDown (e, el) {
     if (editing === el.id || e.button !== 0) return
+    if (cropping) {
+      e.stopPropagation()
+      if (el.id !== cropping) finishCrop(true)
+      return
+    }
     e.stopPropagation()
     viewRef.current.focus({ preventScroll: true }) // for Delete, arrows and typing
     if (!layoutEdit) {
@@ -149,6 +209,10 @@ export function Stage ({ size, theme, slideId, layout, els, sel, setSel, editing
   }
 
   function onKeyDown (e) {
+    if (cropping) {
+      if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); finishCrop(e.key === 'Enter') }
+      return
+    }
     if (e.target.closest('[contenteditable="true"]')) {
       if (e.key === 'Escape') { e.preventDefault(); stopEditing(true) }
       return
@@ -187,6 +251,9 @@ export function Stage ({ size, theme, slideId, layout, els, sel, setSel, editing
     setMenu(null)
     viewRef.current.focus({ preventScroll: true })
   }
+  // Wrap text in the box menu: on when every selected box with text wraps.
+  const wrapTargets = els.filter((el) => sel.includes(el.id) && hasText(el))
+  const wrapOn = wrapTargets.every((el) => el.layout.wrap)
   const holder = { width: size[0] * scale, height: size[1] * scale }
   const px = (f) => ({ left: f.x * scale, top: f.y * scale, width: f.w * scale, height: f.h * scale, transform: f.rot ? 'rotate(' + f.rot + 'deg)' : undefined })
 
@@ -206,6 +273,7 @@ export function Stage ({ size, theme, slideId, layout, els, sel, setSel, editing
       }}
       onPointerDown={(e) => {
         if (e.target.closest('.slide-el, .handle, .rotate-handle, .menu, .alt-edit')) return
+        if (cropping) { finishCrop(true); return }
         setSel([])
         if (editing) stopEditing()
         viewRef.current.focus({ preventScroll: true })
@@ -226,19 +294,22 @@ export function Stage ({ size, theme, slideId, layout, els, sel, setSel, editing
                   data-role={el.role || undefined}
                   style={boxStyle(f)}
                   onPointerDown={(e) => onBoxDown(e, el)}
-                  onDoubleClick={(e) => { if (canEdit && !live && hasText(el)) startEditing(el.id, { point: { x: e.clientX, y: e.clientY } }) }}
+                  onDoubleClick={(e) => {
+                    if (canEdit && !live && hasText(el)) startEditing(el.id, { point: { x: e.clientX, y: e.clientY } })
+                    else if (layoutEdit && el.type === 'picture' && !cropping) { setSel([el.id]); setCropping(el.id) }
+                  }}
                   onContextMenu={(e) => {
-                    if (!layoutEdit || live) return
+                    if (!layoutEdit || live || cropping) return
                     e.preventDefault()
                     if (!sel.includes(el.id)) setSel([el.id])
                     setMenu({ x: e.clientX, y: e.clientY, alt: null })
                   }}
                 >
                   <ElementBody
-                    el={el}
+                    el={cropDraft && cropDraft.id === el.id ? { ...el, crop: cropDraft.crop } : el}
                     frame={f}
                     text={
-                      <TextFrame frame={f} role={el.role}>
+                      <TextFrame frame={f} role={el.role} layout={el.layout}>
                         {live
                           ? <LiveText fragment={el.text} undo={undo} placeholder={placeholderFor(el.role, phone)} canEdit={canEdit} cursors={others.filter((p) => p.box === el.id && p.cursor)} onCursor={onCursor} onEditor={onEditor} start={editStart} label={el.role === 'title' ? 'Slide title' : el.type === 'shape' ? 'Text in the shape' : 'Text box'} />
                           : <StaticText fragment={el.text} placeholder={canEdit ? placeholderFor(el.role, phone) : ''} markEmpty={canEdit && el.type === 'text' && !el.role} />}
@@ -248,6 +319,11 @@ export function Stage ({ size, theme, slideId, layout, els, sel, setSel, editing
                 </div>
               )
             })}
+            {cropDraft && cropEl && (
+              <div className='crop-ghost' style={boxStyle(uncropped(cropDraft.frame, cropDraft.crop))}>
+                <SlidePicture pic={cropEl.pic} />
+              </div>
+            )}
           </div>
           <div className='slide-overlay'>
             {others.flatMap((p) => els.filter((el) => (p.sel || []).includes(el.id) || p.box === el.id).map((el, i) => (
@@ -255,7 +331,14 @@ export function Stage ({ size, theme, slideId, layout, els, sel, setSel, editing
                 {i === 0 && <span className='presence-tag'>{p.name}</span>}
               </div>
             )))}
-            {els.filter((el) => sel.includes(el.id)).map((el) => {
+            {cropDraft && cropEl && (
+              <div className='sel-frame cropping' style={px(cropDraft.frame)}>
+                {HANDLES.map((h) => (
+                  <span key={h.name} className={'handle crop-handle h-' + h.name} style={{ cursor: cursorFor(h.angle, cropDraft.frame.rot) }} onPointerDown={(e) => startCropDrag(e, h)} />
+                ))}
+              </div>
+            )}
+            {els.filter((el) => sel.includes(el.id) && !(cropDraft && cropDraft.id === el.id)).map((el) => {
               const f = frameOf(el)
               const handles = layoutEdit && single && single.id === el.id
               return (
@@ -295,6 +378,12 @@ export function Stage ({ size, theme, slideId, layout, els, sel, setSel, editing
       {menu && menu.alt === null && (
         <ul className='menu doc-pop box-menu' role='menu' style={{ top: Math.min(menu.y, window.innerHeight - 240), left: Math.min(menu.x, window.innerWidth - 200) }}>
           {single && single.type === 'picture' && <li role='menuitem' className='alt-text' onClick={() => setMenu({ ...menu, alt: single.pic.alt })}>Alt text</li>}
+          {single && single.type === 'picture' && <li role='menuitem' className='crop-picture' onClick={() => { setMenu(null); setCropping(single.id) }}>Crop</li>}
+          {wrapTargets.length > 0 && (
+            <li role='menuitemcheckbox' aria-checked={wrapOn} className={'wrap-text' + (wrapOn ? ' on' : '')} onClick={() => { setMenu(null); change((doc) => { for (const el of wrapTargets) slidesModel.setWrap(doc, slideId, el.id, !wrapOn) }) }}>
+              <span className='check'>{wrapOn ? '✓' : ''}</span> Wrap text
+            </li>
+          )}
           <li role='menuitem' onClick={() => restack('front')}>Bring to front</li>
           <li role='menuitem' onClick={() => restack(1)}>Bring forward</li>
           <li role='menuitem' onClick={() => restack(-1)}>Send backward</li>
