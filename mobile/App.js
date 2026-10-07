@@ -4,7 +4,7 @@
 // src/ui/mobile-entry.js on top of the WebView bridge.
 
 import React, { useEffect, useRef, useState } from 'react'
-import { ActivityIndicator, Keyboard, Linking, Modal, Platform, Share, StatusBar, StyleSheet, Text, TouchableOpacity, View, useColorScheme } from 'react-native'
+import { ActivityIndicator, BackHandler, Keyboard, Linking, Modal, Platform, Share, StatusBar, StyleSheet, Text, TouchableOpacity, View, useColorScheme } from 'react-native'
 import { CameraView, useCameraPermissions } from 'expo-camera'
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
 import { WebView } from 'react-native-webview'
@@ -174,6 +174,9 @@ export default function App () {
   const scanDone = useRef(null) // resolves the pending app:scanQr call
   const loaded = useRef(false)
   const queued = useRef([])
+  // A slide show is on (src/ui/slides/Present.jsx): no status bar, the page
+  // edge to edge and Back ends the show.
+  const [presenting, setPresenting] = useState(false)
 
   const inject = (code) => {
     if (loaded.current && web.current) web.current.injectJavaScript(code + ';true;')
@@ -215,6 +218,15 @@ export default function App () {
     return () => { alive = false; listeners.delete(onEvent); sub.remove() }
   }, [])
 
+  useEffect(() => {
+    if (!presenting) return
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      inject("window.__psEvent && window.__psEvent('app:presentBack', null)")
+      return true
+    })
+    return () => sub.remove()
+  }, [presenting])
+
   const onMessage = async (e) => {
     let msg
     try { msg = JSON.parse(e.nativeEvent.data) } catch { return }
@@ -227,6 +239,8 @@ export default function App () {
       const text = await new Promise((resolve) => { scanDone.current = resolve; setScanning(true) })
       return reply({ result: { text } })
     }
+    if (method === 'app:presentStart') { setPresenting(true); return reply({ result: { mode: 'single' } }) }
+    if (method === 'app:presentEnd') { setPresenting(false); return reply({ result: { ok: true } }) }
     if (method === 'app:restart') {
       try { await restartWorklet() } catch (err) { return reply({ error: String(err && err.message ? err.message : err) }) }
       reply({ result: { ok: true } })
@@ -263,8 +277,8 @@ export default function App () {
   }
   return (
     <SafeAreaProvider>
-      <StatusBar barStyle={dark ? 'light-content' : 'dark-content'} backgroundColor={bg} />
-      <SafeAreaView style={{ flex: 1, backgroundColor: bg }} edges={['top', 'bottom']}>
+      <StatusBar hidden={presenting} barStyle={dark ? 'light-content' : 'dark-content'} backgroundColor={bg} />
+      <SafeAreaView style={{ flex: 1, backgroundColor: presenting ? '#000' : bg }} edges={presenting ? [] : ['top', 'bottom']}>
         <WebView
           ref={web}
           source={{ html, baseUrl: 'https://localhost/' }}

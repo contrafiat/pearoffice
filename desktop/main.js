@@ -2,7 +2,7 @@
 // (the same bundle the phones will run), opens the window and relays calls and
 // events between the UI and the worklet. See proposal section 9.
 
-const { app, BrowserWindow, Tray, Menu, ipcMain, shell, clipboard, dialog, nativeImage } = require('electron')
+const { app, BrowserWindow, Tray, Menu, ipcMain, shell, clipboard, dialog, nativeImage, screen } = require('electron')
 const path = require('node:path')
 const fs = require('node:fs')
 const { Worklet } = require('./worklet')
@@ -148,19 +148,111 @@ function startWorklet () {
     dataDir,
     onLog: (kind, text) => log(kind, text.trimEnd())
   })
-  worklet.on('event', (msg) => {
-    if (win && !win.isDestroyed()) win.webContents.send('worklet:event', msg)
-  })
+  // Events go to every window: the audience window of a slide show keeps
+  // its own copy of the deck too.
+  worklet.on('event', (msg) => sendAll(msg))
   worklet.on('exit', ({ code, signal }) => {
     log('worklet exited', code, signal)
-    if (!quitting && win && !win.isDestroyed()) {
-      win.webContents.send('worklet:event', { name: 'worklet:exit', data: { code, signal } })
-    }
+    if (!quitting) sendAll({ name: 'worklet:exit', data: { code, signal } })
   })
   return worklet.start()
 }
 
+function sendTo (w, msg) {
+  if (w && !w.isDestroyed()) w.webContents.send('worklet:event', msg)
+}
+function sendAll (msg) {
+  sendTo(win, msg)
+  sendTo(audience, msg)
+}
+
+// --- slide shows (src/ui/slides/Present.jsx) ---------------------------------
+// With one display the main window goes full screen. With two or more, a
+// second window shows the slides full screen on another display and the main
+// window becomes the presenter view; the presenter sends app:presentGo and
+// this relays it to the audience window, which sends its keys and clicks
+// back as app:presentInput. Ending the show in either window, or closing
+// either, closes the audience window and tells the main window
+// (app:presentEnded). PEAROFFICE_FAKE_DISPLAYS=1 or 2 pretends there are
+// that many displays, for the smoke test.
+
+let audience = null
+let presenting = false
+let wasFullScreen = false
+
+function otherDisplay () {
+  const here = screen.getDisplayMatching(win.getBounds())
+  const fake = Number(process.env.PEAROFFICE_FAKE_DISPLAYS)
+  if (fake) return fake >= 2 ? { bounds: { ...here.bounds, x: here.bounds.x + here.bounds.width } } : null
+  return screen.getAllDisplays().find((d) => d.id !== here.id) || null
+}
+
+function presentStart ({ sheetId, slideId }) {
+  presentEnd({ quiet: true })
+  if (!win || win.isDestroyed()) return { mode: 'single' }
+  presenting = true
+  const other = otherDisplay()
+  if (!other) {
+    wasFullScreen = win.isFullScreen()
+    if (!SMOKE && !wasFullScreen) win.setFullScreen(true)
+    return { mode: 'single' }
+  }
+  const b = other.bounds
+  const show = audience = new BrowserWindow({
+    x: b.x,
+    y: b.y,
+    width: b.width,
+    height: b.height,
+    show: false,
+    frame: false,
+    title: 'PearOffice slide show',
+    icon: process.platform === 'linux' ? ICON : undefined,
+    backgroundColor: '#000000',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      offscreen: SMOKE
+    }
+  })
+  show.removeMenu()
+  show.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+  show.webContents.on('will-navigate', (e) => e.preventDefault())
+  show.once('ready-to-show', () => {
+    if (SMOKE || show.isDestroyed()) return
+    show.show()
+    show.setFullScreen(true)
+    // Keys stay with the presenter view.
+    if (win && !win.isDestroyed()) win.focus()
+  })
+  show.on('closed', () => {
+    if (audience === show) audience = null
+    if (presenting) presentEnd()
+  })
+  show.loadFile(paths.ui, { query: { audience: String(sheetId || ''), slide: String(slideId || '') } })
+  return { mode: 'presenter' }
+}
+
+function presentEnd ({ quiet = false } = {}) {
+  const was = presenting
+  presenting = false
+  const show = audience
+  audience = null
+  if (show && !show.isDestroyed()) show.close()
+  if (win && !win.isDestroyed() && win.isFullScreen() && !wasFullScreen) win.setFullScreen(false)
+  wasFullScreen = false
+  if (was && !quiet) sendTo(win, { name: 'app:presentEnded', data: {} })
+  return { ok: true }
+}
+
 ipcMain.handle('worklet:call', async (_e, method, args) => {
+  if (method === 'app:presentStart') return presentStart(args || {})
+  if (method === 'app:presentEnd') return presentEnd()
+  if (method === 'app:presentGo') { sendTo(audience, { name: 'app:presentGo', data: { slideId: String((args && args.slideId) || ''), blank: (args && args.blank) || null } }); return { ok: true } }
+  if (method === 'app:presentInput') { sendTo(win, { name: 'app:presentInput', data: { key: String((args && args.key) || '') } }); return { ok: true } }
+  // Is a show on, and in which window (the smoke test asks).
+  if (method === 'app:presentState') return { presenting, audience: !!(audience && !audience.isDestroyed()), fullScreen: !!(win && !win.isDestroyed() && win.isFullScreen()) }
   // The UI asks for a link that arrived before it was listening.
   if (method === 'app:takeLink') { const url = pendingLink; pendingLink = null; return { url } }
   // The cell menu's Cut, Copy and Paste.
@@ -257,6 +349,7 @@ function createWindow () {
   })
   win.removeMenu()
   win.on('close', (e) => {
+    if (presenting) presentEnd()
     if (!quitting && stayRunning()) {
       e.preventDefault()
       win.hide()
