@@ -49,8 +49,15 @@ function parseLink (link) {
   return { rv, secret, deviceA: b4a.from(a, 'hex') }
 }
 
-function createLinking ({ engine, log = () => {}, now = () => Date.now() }) {
+// HAS_FILES starts the error when the device already has files: the UI then
+// offers to remove them from this device and try again with `replace`.
+const HAS_FILES = 'This device already has files.'
+
+// removeFiles: removes every file from this device (deleting.js removeLocal),
+// for taking on another identity on a device that was already in use.
+function createLinking ({ engine, removeFiles = async () => {}, log = () => {}, now = () => Date.now() }) {
   let active = null // A's open link: { rv, topic, pub, expiresAt, used, timer }
+  let waiting = null // B's join while it looks for A: stops it early (cancel)
 
   async function hasSheets () {
     for await (const _ of engine.localDb.createReadStream({ gt: 'groups:joined:', lt: 'groups:joined:~', limit: 1 })) return true
@@ -134,10 +141,12 @@ function createLinking ({ engine, log = () => {}, now = () => Date.now() }) {
 
   // --- B: take on the identity ---------------------------------------------
 
-  function join (link, { timeoutMs = 60000 } = {}) {
+  // replace: the device's own files are removed first, but only once the
+  // other device has answered, so a link that fails costs nothing.
+  function join (link, { timeoutMs = 120000, replace = false } = {}) {
     const { rv, secret, deviceA } = parseLink(link)
     return (async () => {
-      if (await hasSheets()) throw new Error('This device already has sheets. Linking replaces its identity, so it only works on a device with no sheets yet.')
+      if (!replace && await hasSheets()) throw new Error(HAS_FILES + ' Linking replaces its identity, so its files must be removed from it first.')
       const welcome = await new Promise((resolve, reject) => {
         const swarm = engine.swarm
         const topic = linkTopic(rv)
@@ -146,6 +155,7 @@ function createLinking ({ engine, log = () => {}, now = () => Date.now() }) {
         const finish = (err, value) => {
           if (done) return
           done = true
+          if (waiting === finish) waiting = null
           clearTimeout(timer)
           clearInterval(again)
           // Close our channels, so a later attempt on the same connection can
@@ -171,15 +181,24 @@ function createLinking ({ engine, log = () => {}, now = () => Date.now() }) {
           })
           ch.open()
         }
-        const timer = setTimeout(() => finish(new Error('Could not reach your other device. Keep PearOffice open on it and try again.')), timeoutMs)
+        waiting = finish
+        const timer = setTimeout(() => finish(new Error('Could not reach your other device. Open PearOffice on it, stay on the screen with the link and try again.')), timeoutMs)
         swarm.on('connection', onConnection)
         for (const conn of swarm.connections) onConnection(conn)
         const discovery = swarm.join(topic, { server: false, client: true })
         const again = setInterval(() => discovery.refresh({ server: false, client: true }).catch(() => {}), 4000)
       })
+      if (replace) await removeFiles()
       await adopt(welcome)
       return { restart: true, sheets: welcome.sheets.length }
     })()
+  }
+
+  // Stop a join that is still looking for the other device. One that has
+  // already heard back goes on to take the identity.
+  function cancel () {
+    if (waiting) waiting(new Error('Linking was cancelled'))
+    return { ok: true }
   }
 
   // Store the identity and what comes with it; the sheets open after the
@@ -231,14 +250,17 @@ function createLinking ({ engine, log = () => {}, now = () => Date.now() }) {
     return seedToPhrase(engine.identity.secretKey.subarray(0, 32))
   }
 
-  async function restore (words) {
-    const seed = phraseToSeed(words)
-    if (await hasSheets()) throw new Error('This device already has sheets. Restoring replaces its identity, so it only works on a device with no sheets yet.')
+  async function restore (words, { replace = false } = {}) {
+    const seed = phraseToSeed(words) // a bad phrase throws before anything is removed
+    if (await hasSheets()) {
+      if (!replace) throw new Error(HAS_FILES + ' Restoring replaces its identity, so its files must be removed from it first.')
+      await removeFiles()
+    }
     await replaceIdentity(seed)
     return { restart: true }
   }
 
-  return { start, join, listen, close, resume, phrase, restore }
+  return { start, join, cancel, listen, close, resume, phrase, restore }
 }
 
-module.exports = { createLinking, parseLink, linkTopic }
+module.exports = { createLinking, parseLink, linkTopic, HAS_FILES }

@@ -327,7 +327,7 @@ function createSeeding ({ engine, getPictures = () => null, log = () => {} }) {
   // The seeders a sheet backs up to, and our paired ones it could.
   async function sheetSeeders (sheetId) {
     const base = engine.bases.get(sheetId)
-    if (!base) throw new Error('No such sheet')
+    if (!base) throw new Error('No such file')
     await base.ready()
     const mine = new Set(await pairedSeeders())
     const listed = []
@@ -343,9 +343,9 @@ function createSeeding ({ engine, getPictures = () => null, log = () => {} }) {
 
   async function removeFromSheet (sheetId, seederKey) {
     const base = engine.bases.get(sheetId)
-    if (!base) throw new Error('No such sheet')
+    if (!base) throw new Error('No such file')
     const listing = (await base.view.get('seeder/' + seederKey))?.value
-    if (!listing) throw new Error('This sheet does not back up to that seeder')
+    if (!listing) throw new Error('This file does not back up to that seeder')
     if (!(await canStop(base, listing))) throw new Error('Only the owner or whoever added this seeder can stop it')
     await engine.append(sheetId, m.seederOffOp({ sheetId, identity: engine.identity, seederKey }))
     await sweep()
@@ -353,7 +353,7 @@ function createSeeding ({ engine, getPictures = () => null, log = () => {} }) {
 
   async function addToSheet (sheetId, seederKey) {
     const base = engine.bases.get(sheetId)
-    if (!base) throw new Error('No such sheet')
+    if (!base) throw new Error('No such file')
     if (!(await pairedSeeders()).includes(seederKey)) throw new Error('This device is not paired with that seeder')
     await engine.append(sheetId, m.seederOp({ sheetId, identity: engine.identity, seederKey }))
     // Listed again: cancel the drop that taking it off scheduled, then

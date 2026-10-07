@@ -22,7 +22,7 @@ function createFileHelpers (sheets) {
 
   async function viewGet (ctx, sheetId, key) {
     const base = ctx.bases.get(sheetId)
-    if (!base) throw new Error('unknown sheet: ' + sheetId)
+    if (!base) throw new Error('unknown file: ' + sheetId)
     await base.ready()
     const node = await base.view.get(key)
     return node ? node.value : null
@@ -69,11 +69,11 @@ function createFileHelpers (sheets) {
   }
 
   async function requireEdit (ctx, sheetId) {
-    if (await isFrozen(ctx, sheetId)) throw new Error('This copy of the sheet is frozen')
+    if (await isFrozen(ctx, sheetId)) throw new Error('This copy of the file is frozen')
     const role = await myRole(ctx, sheetId)
     if (role !== 'owner' && role !== 'editor') throw new Error('You can view this file but not edit it')
     const base = ctx.bases.get(sheetId)
-    if (!base.writable) throw new Error('Still getting edit access to this sheet. Try again in a moment.')
+    if (!base.writable) throw new Error('Still getting edit access to this file. Try again in a moment.')
   }
 
   async function commit (ctx, sheetId, update) {
@@ -183,7 +183,7 @@ function createFileMethods (sheets, { getJoin, getMoves, getProfiles }) {
     setRole: async ({ sheetId, identity, role }, ctx) => {
       await requireOwner(ctx, sheetId)
       const member = await viewGet(ctx, sheetId, 'member/' + identity)
-      if (!member) throw new Error('Not a member of this sheet')
+      if (!member) throw new Error('Not a member of this file')
       if (member.role === 'owner') throw new Error('The owner role cannot change')
       if (member.role === role) return { changed: false }
       await ctx.append(sheetId, m.roleOp({ sheetId, owner: ctx.identity, identity, role, v: (member.v || 1) + 1 }))
@@ -192,7 +192,7 @@ function createFileMethods (sheets, { getJoin, getMoves, getProfiles }) {
 
     members: async ({ sheetId }, ctx) => {
       const base = ctx.bases.get(sheetId)
-      if (!base) throw new Error('unknown sheet: ' + sheetId)
+      if (!base) throw new Error('unknown file: ' + sheetId)
       await base.ready()
       const me = hex(ctx.identity.publicKey)
       const members = []
@@ -219,7 +219,7 @@ function createFileMethods (sheets, { getJoin, getMoves, getProfiles }) {
     compact: async ({ sheetId }) => getMoves().compact(sheetId),
     history: async ({ sheetId }) => {
       const base = sheets.getBase(sheetId)
-      if (!base) throw new Error('unknown sheet: ' + sheetId)
+      if (!base) throw new Error('unknown file: ' + sheetId)
       return { updates: base.view.core.length, openInvites: await getMoves().openInvites(sheetId) }
     },
 
@@ -243,6 +243,32 @@ function createFileMethods (sheets, { getJoin, getMoves, getProfiles }) {
       return { identity: hex(ctx.identity.publicKey), name: p.name, avatar: p.avatar, phraseNudge: hasSheet && !nudged }
     },
     'app:phraseNudged': async (args, ctx) => { await ctx.localDb.put('phraseNudged', { at: Date.now() }); return { ok: true } },
+
+    // The first-run welcome and tour, once per device. A device that already
+    // has a file or a name was in use before the tour existed, so it counts
+    // as done.
+    // Whether this device has been through onboarding. A device that had a
+    // file or a name before onboarding existed counts as done. Once
+    // onboarding has been shown, only finishing or skipping it counts, so
+    // setting a name and quitting halfway brings the tour back.
+    'app:onboarding': async (args, ctx) => {
+      if (await ctx.localDb.get('onboarded')) return { done: true }
+      if (await ctx.localDb.get('onboardingStarted')) return { done: false }
+      for await (const row of ctx.localDb.createReadStream({ gt: 'groups:joined:', lt: 'groups:joined:~', limit: 1 })) if (row) return { done: true }
+      const p = await getProfiles().local()
+      if (p && p.name) return { done: true }
+      await ctx.localDb.put('onboardingStarted', { at: Date.now() })
+      return { done: false }
+    },
+    'app:onboarded': async (args, ctx) => { await ctx.localDb.put('onboarded', { at: Date.now() }); return { ok: true } },
+    // A note after a restore from the recovery phrase: the identity is back
+    // but the files are not. Set before the restart, cleared when dismissed.
+    'app:welcomeBack': async (args, ctx) => ({ show: !!(await ctx.localDb.get('welcomeBack')) }),
+    'app:setWelcomeBack': async ({ show } = {}, ctx) => {
+      if (show) await ctx.localDb.put('welcomeBack', { at: Date.now() })
+      else await ctx.localDb.del('welcomeBack')
+      return { show: !!show }
+    },
 
     // A nudge to donate, once, two weeks after first use (as in the other
     // PeerLoom apps). The UI never shows it on iOS before the first release.

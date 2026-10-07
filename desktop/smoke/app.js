@@ -9,6 +9,12 @@ const path = require('node:path')
 module.exports = async function app (t) {
   const { js, step, waitFor, openSettings, win, getTray, dataDir, result, sleep } = t
 
+  // The About button sits level with the Settings gear.
+  result.aboutLevel = await js("(() => { const c = (el) => { const r = el.getBoundingClientRect(); return r.top + r.height / 2 }; return Math.round((c(document.querySelector('.me-bar .about-button svg')) - c(document.querySelector('.me-row .gear'))) * 10) / 10 })()")
+  // The empty screen's start buttons (PEAROFFICE_SMOKE_EMPTY_SHOT=<file>).
+  await t.shot('PEAROFFICE_SMOKE_EMPTY_SHOT')
+  result.startButtonSizes = await js("[...document.querySelectorAll('.empty-actions > *')].map((b) => { const r = b.getBoundingClientRect(); return b.tagName + ' ' + Math.round(r.width) + 'x' + Math.round(r.height) }).join(', ')")
+  result.startButtonsEqual = await js("(() => { const w = [...document.querySelectorAll('.empty-actions > *')].map((b) => Math.round(b.getBoundingClientRect().width)); const h = [...document.querySelectorAll('.empty-actions > *')].map((b) => Math.round(b.getBoundingClientRect().height)); return w.length === 3 && Math.max(...w) - Math.min(...w) <= 1 && Math.max(...h) - Math.min(...h) <= 1 })()")
   // New asks the kind: spreadsheet, document or slides.
   await js("document.querySelector('.sidebar .new-sheet').click()")
   await waitFor('kind choices', "document.querySelectorAll('.kind-choice').length === 3")
@@ -52,6 +58,56 @@ module.exports = async function app (t) {
   await js("[...document.querySelectorAll('.panel button')].find((b) => b.textContent.trim() === 'Show phrase').click()")
   await waitFor('recovery phrase', "document.querySelectorAll('.phrase li').length === 24")
   await js("document.querySelector('.panel .close').click()")
+  // Linking on a device that has files: it says what would be removed and
+  // which files only it has, and Back goes back (nothing is removed).
+  await openSettings()
+  await js("document.querySelector('.panel .settings-devices').click()")
+  await js("[...document.querySelectorAll('.panel button')].find((b) => b.textContent.trim() === 'This is the new device').click()")
+  await waitFor('link field', "!!document.querySelector('.panel input[aria-label=\"Device link\"]')")
+  await js("(() => { const i = document.querySelector('.panel input[aria-label=\"Device link\"]'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(i, 'pearoffice://link?rv=' + 'A'.repeat(43) + '&k=' + 'B'.repeat(43) + '&a=' + 'c'.repeat(64) + '&v=1'); i.dispatchEvent(new Event('input', { bubbles: true })) })()")
+  await js("document.querySelector('.panel form button[type=submit]').click()")
+  await waitFor('replace screen', "!!document.querySelector('.replace-files')")
+  await t.shot('PEAROFFICE_SMOKE_REPLACE_SHOT')
+  result.replaceScreen = await js("(() => { const r = document.querySelector('.replace-files'); return r.textContent.includes('already has files') && r.querySelectorAll('.warn li').length === 2 && !!r.querySelector('button.danger') })()")
+  await js("[...document.querySelectorAll('.replace-files button')].find((b) => b.textContent.trim() === 'Back').click()")
+  await waitFor('back at the link field', "!!document.querySelector('.panel input[aria-label=\"Device link\"]')")
+  await js("document.querySelector('.panel .close').click()")
+  // Linked devices (proposals/2026-10-07-device-names.md): this device, named
+  // from its platform, renamed in place; Esc cancels, Enter saves.
+  await openSettings()
+  await js("document.querySelector('.panel .settings-devices').click()")
+  const defaultName = { linux: 'Linux computer', win32: 'Windows computer', darwin: 'Mac' }[process.platform] || 'Computer'
+  const rowText = "[...document.querySelectorAll('.linked-devices .device-row')].map((r) => r.querySelector('.device-name')?.textContent + '|' + (r.querySelector('.device-status')?.textContent || '')).join(',')"
+  await waitFor('this device listed', rowText + " === '" + defaultName + "|This device' && document.querySelector('.linked-devices').textContent.includes('Link another device to see it here.')")
+  await js("document.querySelector('.device-row .icon-button').click()")
+  await waitFor('rename field', "document.activeElement === document.querySelector('.device-row input')")
+  await t.type('Nope', 10)
+  await t.key('Escape')
+  await waitFor('Esc cancels', rowText + " === '" + defaultName + "|This device'")
+  await js("document.querySelector('.device-row .icon-button').click()")
+  await waitFor('rename field again', "document.activeElement === document.querySelector('.device-row input') && document.querySelector('.device-row input').placeholder === 'e.g. Work laptop'")
+  await t.type('Work laptop', 10)
+  await t.shot('PEAROFFICE_SMOKE_DEVICE_RENAME_SHOT')
+  await t.key('Enter')
+  await waitFor('renamed', rowText + " === 'Work laptop|This device'")
+  await js("document.querySelector('.panel .close').click()")
+  await openSettings()
+  await js("document.querySelector('.panel .settings-devices').click()")
+  await waitFor('name kept after reopening', rowText + " === 'Work laptop|This device'")
+  await js("document.querySelector('.panel .close').click()")
+  // And after the window reloads (the name comes from the worklet).
+  win.webContents.reload()
+  await waitFor('reloaded', "!!document.querySelector('.me-row .gear')", 20000)
+  await openSettings()
+  await js("document.querySelector('.panel .settings-devices').click()")
+  await waitFor('name kept after a reload', rowText + " === 'Work laptop|This device'")
+  result.linkedDevices = await js(rowText)
+  await devicesShot(t)
+  // The reload closed the open sheet: open one again for the steps below.
+  await js("document.querySelector('.panel .close').click()")
+  await waitFor('file list back', "!!document.querySelector('.sheet-link:not(.all-files)')")
+  await js("document.querySelector('.sheet-link:not(.all-files)').click()")
+  await waitFor('sheet open again', "!!document.querySelector('.grid .body') && !!document.querySelector('.toolbar .share')")
   step('seeder and devices panels')
 
   // Run a seeder on this computer, pair this device with it, show its QR.
@@ -66,7 +122,7 @@ module.exports = async function app (t) {
   seederMs.start = Date.now() - t0
   t0 = Date.now()
   await js("[...document.querySelectorAll('.panel button')].find((b) => b.textContent.trim() === 'Pair this device with it').click()")
-  await waitFor('paired with the local seeder', "document.querySelector('.panel').textContent.includes('Paired. Your sheets are backing up.')", 60000)
+  await waitFor('paired with the local seeder', "document.querySelector('.panel').textContent.includes('Paired. Your files are backing up.')", 60000)
   seederMs.pair = Date.now() - t0
   t0 = Date.now()
   await js("[...document.querySelectorAll('.panel button')].find((b) => b.textContent.trim() === 'Show pairing code').click()")
@@ -115,7 +171,7 @@ module.exports = async function app (t) {
   await waitFor('own picture shown', "!!document.querySelector('.panel .me-picture img.avatar') && !!document.querySelector('.me-row img.avatar')")
   result.avatar = await js("document.querySelector('.me-row img.avatar').src.startsWith('data:image/jpeg;base64,')")
   // About: version and the open-source list.
-  await js("document.querySelector('.panel .about-link').click()")
+  await js("document.querySelector('.sidebar .about-button').click()")
   await waitFor('about', "document.querySelector('.panel').textContent.includes('Open-source software') && /Version \\d/.test(document.querySelector('.panel').textContent)")
   // Support development opens the Bitcoin sheet; back returns to About.
   await js("[...document.querySelectorAll('.about-toggle')].find((b) => b.textContent.trim() === 'Support development').click()")
@@ -172,5 +228,36 @@ module.exports = async function app (t) {
   await waitFor('opened from the list', "!!document.querySelector('.grid .body')")
   step('file list')
 
-  return result.about && result.donation && result.kinds === 'Spreadsheet, Document, Slides' && result.fileIcons === result.sheetsAfter && result.keepOnline && result.avatar && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.inviteLink.startsWith('pearoffice://join?s=')
+  return Math.abs(result.aboutLevel) <= 0.5 && result.startButtonsEqual && result.replaceScreen && result.about && result.donation && result.kinds === 'Spreadsheet, Document, Slides' && result.fileIcons === result.sheetsAfter && result.keepOnline && result.avatar && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.inviteLink.startsWith('pearoffice://join?s=')
+}
+
+// Screenshots of the Linked devices list with a second device, light and dark
+// (PEAROFFICE_SMOKE_DEVICES_SHOT=<file>, -dark added for the second). Only
+// for pictures: a made-up phone is added to what app:devices returns.
+async function devicesShot (t) {
+  const file = process.env.PEAROFFICE_SMOKE_DEVICES_SHOT
+  if (!file) return
+  const { ipcMain } = require('electron')
+  const handlers = ipcMain._invokeHandlers
+  const real = handlers && handlers.get('worklet:call')
+  if (!real) return
+  handlers.set('worklet:call', async (e, method, args) => {
+    const out = await real(e, method, args)
+    if (method !== 'app:devices') return out
+    return [...out, { deviceKey: 'f'.repeat(64), name: 'Pixel 9', kind: 'phone', thisDevice: false, online: false, lastSeen: Date.now() - 3 * 3600 * 1000, files: 2 }]
+  })
+  try {
+    await t.js("document.querySelector('.panel .close').click()")
+    await t.openSettings()
+    await t.js("document.querySelector('.panel .settings-devices').click()")
+    await t.waitFor('two devices', "document.querySelectorAll('.linked-devices .device-row').length === 2")
+    await t.js("document.documentElement.dataset.theme = 'light'")
+    await t.shot('PEAROFFICE_SMOKE_DEVICES_SHOT', 300)
+    await t.js("document.documentElement.dataset.theme = 'dark'")
+    process.env.PEAROFFICE_SMOKE_DEVICES_SHOT_DARK = file.replace(/(\.png)?$/, '-dark.png')
+    await t.shot('PEAROFFICE_SMOKE_DEVICES_SHOT_DARK', 300)
+    await t.js("delete document.documentElement.dataset.theme")
+  } finally {
+    handlers.set('worklet:call', real)
+  }
 }

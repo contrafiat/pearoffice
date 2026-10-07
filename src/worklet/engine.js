@@ -16,13 +16,16 @@ const { createMoves } = require('./moves')
 const { createLinking } = require('./linking')
 const { createDeleting } = require('./deleting')
 const { createProfiles } = require('./profiles')
+const { createDevices } = require('./devices')
 const { createPresence } = require('./presence')
 const { createRediscover } = require('./rediscover')
+const { createWake } = require('./wake')
 const { createPictures } = require('./pictures')
 const model = require('../sheet/sheetModel')
 
 function createSheetEngine (opts = {}) {
-  const { createSwarm: makeSwarm, log = () => {}, ...rest } = opts
+  // platform: for tests; by default the host's (devices.js).
+  const { createSwarm: makeSwarm, log = () => {}, platform, ...rest } = opts
   let engine = null
   let join = null
   let seeding = null
@@ -30,6 +33,7 @@ function createSheetEngine (opts = {}) {
   let linking = null
   let deleting = null
   let profiles = null
+  let devices = null
   let presence = null
   let rediscover = null
   let pictures = null
@@ -65,7 +69,7 @@ function createSheetEngine (opts = {}) {
     }
   }
 
-  const deps = { getJoin: () => join, getMoves: () => moves, getProfiles: () => profiles, getPictures: () => pictures }
+  const deps = { getJoin: () => join, getMoves: () => moves, getProfiles: () => profiles, getDevices: () => devices, getPictures: () => pictures }
   const methods = {
     ...createFileMethods(sheets, deps),
     ...createSheetMethods(sheets, deps),
@@ -77,6 +81,9 @@ function createSheetEngine (opts = {}) {
     // A sheet came on screen or left it: look again for its other devices
     // while it is open and nobody is connected (src/worklet/rediscover.js).
     'sheet:visible': async ({ sheetId, visible }) => { if (rediscover) rediscover.visible(sheetId, !!visible); return {} },
+    // Your linked devices and their names (proposals/2026-10-07-device-names.md).
+    'app:devices': async () => (devices ? devices.list() : []),
+    'app:renameDevice': async ({ deviceKey, name }) => { await devices.rename(deviceKey, name); return { ok: true } },
     'seeder:pair': async ({ link }) => seeding.pair(link),
     'seeder:list': async () => seeding.list(),
     'seeder:sheet': async ({ sheetId }) => seeding.sheetSeeders(sheetId),
@@ -95,9 +102,17 @@ function createSheetEngine (opts = {}) {
     },
     'sheet:deleteForEveryone': async ({ sheetId }) => deleting.deleteForEveryone(sheetId),
     'link:start': async () => linking.start(),
-    'link:join': async ({ link }) => linking.join(link),
+    'link:join': async ({ link, replace }) => linking.join(link, { replace: replace === true }),
+    // What taking on another identity would remove from this device: every
+    // file here, and which of them nobody else is in (those are gone for good).
+    'link:filesHere': async (args, ctx) => {
+      const files = (await methods['file:list']({}, ctx)).filter((f) => !f.joining && !f.removed)
+      const only = files.filter((f) => (f.people || 0) <= 1).map((f) => f.title || 'Untitled')
+      return { total: files.length, onlyHere: only }
+    },
+    'link:cancel': async () => linking.cancel(),
     'link:phrase': async () => ({ phrase: linking.phrase() }),
-    'app:restorePhrase': async ({ phrase }) => linking.restore(phrase),
+    'app:restorePhrase': async ({ phrase, replace }) => linking.restore(phrase, { replace: replace === true }),
     // Close stores cleanly, then exit. The desktop shell calls this on quit.
     'app:close': async () => {
       setTimeout(async () => {
@@ -141,6 +156,8 @@ function createSheetEngine (opts = {}) {
         if (type === 'delete' && deleting) untilShown('delete:' + sheetId, () => deleting.onDeleted(sheetId))
         // Bring this person's name and picture in step with the sheet.
         if (profiles) setTimeout(() => profiles.reconcile(sheetId).catch(() => {}), 200)
+        if (devices) setTimeout(() => devices.reconcile(sheetId).catch(() => {}), 200)
+        if (type === 'deviceName') setTimeout(() => emit('devices:changed', {}), 300)
       },
       log
     }),
@@ -155,8 +172,9 @@ function createSheetEngine (opts = {}) {
     createSwarm: (args) => {
       const swarm = makeSwarm ? makeSwarm(args) : new (require('hyperswarm'))(args)
       profiles = createProfiles({ engine, getJoin: () => join, emit, log })
-      join = createJoinService({ engine, emit, onProfile: (sheetId, op) => profiles.take(sheetId, op), kindOf: async (sheetId) => model.kind((await sheets.load(sheetId)).guarded.doc), log })
-      presence = createPresence({ engine, emit, log })
+      devices = createDevices({ engine, getJoin: () => join, getPresence: () => presence, emit, log, platform })
+      join = createJoinService({ engine, emit, onProfile: (sheetId, op) => (op && op.type === 'deviceName' ? devices.take(sheetId, op) : profiles.take(sheetId, op)), kindOf: async (sheetId) => model.kind((await sheets.load(sheetId)).guarded.doc), log })
+      presence = createPresence({ engine, emit, onSeen: (identity, device) => devices.seen(identity, device), log })
       rediscover = createRediscover({ engine, log })
       // Let core attach replication first, then add our channels.
       swarm.on('connection', (conn) => { Promise.resolve().then(() => { join.onConnection(conn); presence.onConnection(conn); if (linking) linking.listen(conn) }) })
@@ -165,7 +183,17 @@ function createSheetEngine (opts = {}) {
       seeding = createSeeding({ engine, getPictures: () => pictures, log })
       setTimeout(() => seeding.start(), 0)
       moves = createMoves({ engine, sheets, getJoin: () => join, getDeleting: () => deleting, getPictures: () => pictures, emit, log })
-      linking = createLinking({ engine, log })
+      linking = createLinking({
+        engine,
+        log,
+        // Every file on this device, frozen copies included (deleting.js).
+        removeFiles: async () => {
+          const ids = []
+          for await (const { value } of engine.localDb.createReadStream({ gt: 'groups:joined:', lt: 'groups:joined:~' })) if (value && value.groupId) ids.push(value.groupId)
+          for (const id of ids) await deleting.removeLocal(id, { reason: 'removed' })
+          log('removed ' + ids.length + ' files to take on another identity')
+        }
+      })
       deleting = createDeleting({ engine, sheets, getSeeding: () => seeding, getPictures: () => pictures, emit, log })
       // Core has no hook for "init finished", so catch up a little after
       // start, and once more later: open sheets that came with a device link,
@@ -176,6 +204,7 @@ function createSheetEngine (opts = {}) {
           try { await moves.resume() } catch {}
           try { await deleting.resume() } catch {}
           try { await profiles.reconcileAll() } catch {}
+          try { await devices.reconcileAll() } catch {}
           try { await pictures.resume() } catch {}
         }, ms)
         if (t.unref) t.unref()
@@ -193,11 +222,19 @@ function createSheetEngine (opts = {}) {
     if (deleting) deleting.close()
     if (linking) linking.close()
     if (profiles) profiles.close()
+    if (devices) devices.close()
     if (presence) presence.close()
     if (rediscover) rediscover.close()
     if (pictures) await pictures.close()
     return coreClose()
   }
+  // Phones: rebuild the swarm when the worklet resumes after a pause.
+  const wake = createWake({ getSwarm: () => engine.swarm, log })
+  if (typeof Bare !== 'undefined' && Bare.on) {
+    Bare.on('suspend', () => wake.suspended())
+    Bare.on('resume', () => { wake.resumed().catch(() => {}) })
+  }
+  engine.wake = wake
   engine.sheets = sheets
   engine.autoCompact = autoCompact // for tests
   engine.checkTidied = (sheetId) => deleting.checkTidied(sheetId) // for tests
@@ -206,6 +243,7 @@ function createSheetEngine (opts = {}) {
   Object.defineProperty(engine, 'seeding', { get: () => seeding })
   Object.defineProperty(engine, 'deleting', { get: () => deleting })
   Object.defineProperty(engine, 'profiles', { get: () => profiles })
+  Object.defineProperty(engine, 'devices', { get: () => devices })
   Object.defineProperty(engine, 'presence', { get: () => presence })
   Object.defineProperty(engine, 'rediscover', { get: () => rediscover })
   Object.defineProperty(engine, 'pictures', { get: () => pictures })

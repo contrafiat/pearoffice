@@ -231,7 +231,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
       if (!tabId) setTabId(v.tabId)
     } catch (err) {
       // The sheet left this device (removed, deleted, moved): go back.
-      if (/^unknown sheet/.test(err.message)) { goneRef.current(); return }
+      if (/^unknown file/.test(err.message)) { goneRef.current(); return }
       onError(err.message)
     }
   }, [sheetId, tabId, onError])

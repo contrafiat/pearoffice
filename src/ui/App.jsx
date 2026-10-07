@@ -11,9 +11,11 @@ import { Avatar, MemberAvatar } from './Avatar.jsx'
 import { SettingsPanel } from './SettingsPanel.jsx'
 import { UpdateBar } from './UpdateBar.jsx'
 import { applyTheme } from './theme.js'
-import { FileHome, NewPanel } from './Files.jsx'
+import { FileHome, NewPanel, untitled } from './Files.jsx'
 import { DonationReminder, donationsShown } from './About.jsx'
-import { FileArrowUp, GearSix, House, LinkSimple, List, Plus } from '@phosphor-icons/react'
+import { Onboarding } from './Onboarding.jsx'
+import { FileArrowUp, GearSix, House, Info, LinkSimple, List, Plus } from '@phosphor-icons/react'
+import { PearMark } from './PearMark.jsx'
 
 applyTheme()
 
@@ -84,7 +86,11 @@ function StartActions ({ onNew, onJoin, onImported, onError }) {
 export function App () {
   const [sheets, setSheets] = useState(null)
   const [current, setCurrent] = useState(null)
-  const [error, setError] = useState(null)
+  const [error, setErrorNow] = useState(null)
+  // While the worklet restarts with another identity (a link or a restore),
+  // calls in flight fail; those errors would flash in a banner just before
+  // the page reloads (src/ui/takeIdentity.js sets the flag).
+  const setError = useCallback((m) => { if (m && window.__pearRestarting) return; setErrorNow(m) }, [])
   const [joining, setJoining] = useState(null) // initial link text, or '' for an empty panel
   const [name, setName] = useState(null)
   const [avatar, setAvatar] = useState(null) // { data, mime, hash } or null
@@ -104,6 +110,11 @@ export function App () {
   const desktop = !!(window.pearoffice && window.pearoffice.platform === 'desktop')
   const [keepOnline, setKeepOnline] = useState(null)
   const [startAtLogin, setStartAtLogin] = useState(false)
+  // The first-run welcome and tour: null, or { tourOnly } while it is open.
+  const [onboarding, setOnboarding] = useState(null)
+  // After a restore from the recovery phrase: the identity is back, the
+  // files are not, so a note says how to get them (app:welcomeBack).
+  const [welcomeBack, setWelcomeBack] = useState(false)
 
   const refresh = useCallback(async () => {
     try {
@@ -142,6 +153,8 @@ export function App () {
   useEffect(() => {
     refresh()
     loadMe()
+    call('app:onboarding').then((r) => { if (r && !r.done) setOnboarding({ tourOnly: false }) }).catch(() => {})
+    call('app:welcomeBack').then((r) => setWelcomeBack(!!(r && r.show))).catch(() => {})
     if (desktop) call('app:settings').then((s) => { setKeepOnline(!!s.keepOnline); setStartAtLogin(!!s.startAtLogin) }).catch(() => {})
     const offs = [
       on('worklet:exit', () => setError('The sync engine stopped. Restart PearOffice.')),
@@ -151,12 +164,12 @@ export function App () {
         setCurrent(sheetId)
         setWaitingJoin((w) => (w === sheetId ? null : w))
         const s = list && list.find((x) => x.sheetId === sheetId)
-        setToast('Joined ' + (s && s.title ? '"' + s.title + '"' : 'the sheet'))
+        setToast('Joined ' + (s && s.title ? '"' + s.title + '"' : 'the file'))
       }),
       // A sheet moved to fresh keys: follow it if it is the one on screen.
       on('sheet:moved', async ({ from, to }) => { await refresh(); setCurrent((c) => (c === from ? to : c)) }),
       on('sheet:removed', refresh),
-      on('sheet:tidied', () => setNotice('PearOffice tidied up a long sheet: devices now keep it as it is, not every change ever made.')),
+      on('sheet:tidied', () => setNotice('PearOffice tidied up a long file: devices now keep it as it is, not every change ever made.')),
       // Any edit or membership change anywhere: titles, roles and people in
       // the sidebar stay live. Batched, since edits arrive in bursts.
       on('sheet:changed', refreshSoon),
@@ -166,8 +179,8 @@ export function App () {
       // A sheet left this device (removed here, deleted by its owner, or an
       // old copy after a move).
       on('sheet:gone', async ({ sheetId }) => { forget(sheetId); await refresh() }),
-      on('join:gaveUp', async () => { setNotice('PearOffice stopped waiting to join a sheet after 7 days. Ask for a new invite.'); await refresh() }),
-      on('sheet:deleted', ({ title }) => setNotice('"' + (title || 'A sheet') + '" was deleted by its owner.')),
+      on('join:gaveUp', async () => { setNotice('PearOffice stopped waiting to join a file after 7 days. Ask for a new invite.'); await refresh() }),
+      on('sheet:deleted', ({ title }) => setNotice('"' + (title || 'A file') + '" was deleted by its owner.')),
       on('app:deeplink', ({ url }) => { call('app:takeLink').catch(() => {}); openLink(url) })
     ]
     // A link that opened the app before this page was listening.
@@ -214,7 +227,7 @@ export function App () {
       {navOpen && <div className='nav-scrim' onClick={() => setNavOpen(false)} />}
       <aside className='sidebar' onClick={(e) => { if (e.target.closest('button')) setNavOpen(false) }}>
         <div className='brand'>
-          <span className='brand-mark' aria-hidden='true' />
+          <PearMark size={20} />
           PearOffice
         </div>
         <button className='new-sheet' onClick={() => setNewFile(true)}><Plus size={16} /> New</button>
@@ -232,7 +245,7 @@ export function App () {
             <button
               key={s.sheetId}
               className={'sheet-link' + (s.sheetId === current ? ' active' : '') + (s.joining ? ' joining' : '') + (s.waiting ? ' waiting' : '') + (s.removed ? ' removed' : '')}
-              title={s.waiting ? 'Waiting for someone in this sheet to come online' : s.removed ? 'You were removed from this sheet' : undefined}
+              title={s.waiting ? 'Waiting for someone in this file to come online' : s.removed ? 'You were removed from this file' : undefined}
               onClick={() => (s.waiting ? setWaitingJoin(s.sheetId) : setCurrent(s.sheetId))}
             >
               {s.owner
@@ -242,7 +255,7 @@ export function App () {
                   </span>
                   )
                 : <span className='sheet-owner placeholder' aria-hidden='true' />}
-              <span className='sheet-title'>{s.waiting ? 'Joining...' : (s.title || 'Untitled sheet')}</span>
+              <span className='sheet-title'>{s.waiting ? 'Joining...' : (s.title || untitled(s.kind))}</span>
               {s.joining && !s.waiting && <span className='badge'>joining</span>}
               {!s.joining && s.people > 1 && (
                 <span className='people-count' title={s.people + ' people'} aria-label={s.people + ' people'}>
@@ -253,11 +266,14 @@ export function App () {
             </button>
           ))}
         </nav>
-        <button className='me-row' onClick={() => setSettings(true)} aria-label='Settings'>
-          <Avatar name={name} src={avatar ? 'data:' + avatar.mime + ';base64,' + avatar.data : null} seed={myId} size={32} />
-          <span className='me-name'>{name || 'Set your name'}</span>
-          <GearSix className='gear' size={20} aria-hidden='true' />
-        </button>
+        <div className='me-bar'>
+          <button className='me-row' onClick={() => setSettings(true)} aria-label='Settings'>
+            <Avatar name={name} src={avatar ? 'data:' + avatar.mime + ';base64,' + avatar.data : null} seed={myId} size={32} />
+            <span className='me-name'>{name || 'Set your name'}</span>
+            <GearSix className='gear' size={20} aria-hidden='true' />
+          </button>
+          <button className='icon-button about-button' aria-label='About PearOffice' title='About PearOffice' onClick={() => setSettings({ mode: 'about' })}><Info size={20} /></button>
+        </div>
       </aside>
       {newFile && <NewPanel onPick={create} onClose={() => setNewFile(false)} />}
       {joining !== null && (
@@ -270,6 +286,7 @@ export function App () {
       )}
       {settings && (
         <SettingsPanel
+          key={typeof settings === 'object' ? 'start-' + settings.mode + '-' + (settings.section || '') : 'settings'}
           me={{ name, avatar, identity: myId }}
           onMe={loadMe}
           desktop={desktop}
@@ -281,6 +298,7 @@ export function App () {
           }}
           onDevices={() => { setSettings(false); setDevices({ fromSettings: true }) }}
           onSeeder={() => { setSettings(false); setSeeder('fromSettings') }}
+          onTour={() => { setSettings(false); setOnboarding({ tourOnly: true }) }}
           onClose={() => setSettings(false)}
           onError={setError}
           startIn={typeof settings === 'object' ? settings : null}
@@ -299,10 +317,30 @@ export function App () {
       {toast && <div className='toast' role='status'>{toast}</div>}
       {devices && <DevicesPanel initialLink={devices.link || ''} startWith={devices.startWith || null} onBack={devices.fromSettings ? () => { setDevices(null); setSettings(true) } : null} onClose={() => setDevices(null)} onError={setError} />}
       {seeder && <SeederPanel initialLink={typeof seeder === 'string' && seeder !== 'fromSettings' ? seeder : ''} onBack={seeder === 'fromSettings' ? () => { setSeeder(false); setSettings(true) } : null} onClose={() => setSeeder(false)} onError={setError} />}
+      {onboarding && (
+        <Onboarding
+          tourOnly={onboarding.tourOnly}
+          hidden={!!devices}
+          me={{ name, avatar, identity: myId }}
+          onMe={loadMe}
+          onPhrase={() => setDevices({ startWith: 'phrase' })}
+          onNew={() => setNewFile(true)}
+          onJoin={() => setJoining('')}
+          importButton={(finish) => <ImportButton className='ob-import' onImported={async (id, r) => { finish(); await opened(id, r) }} onError={setError} />}
+          onDone={() => setOnboarding(null)}
+          onError={setError}
+        />
+      )}
       <main className='main'>
         {desktop && <UpdateBar />}
         {notice && <div className='banner info'>{notice} <button className='link-button' onClick={() => setNotice(null)}>OK</button></div>}
-        {nudge && (
+        {welcomeBack && !onboarding && (
+          <div className='banner info welcome-back'>
+            Welcome back. Ask the owners of your files to invite you again; you will be back as yourself.{' '}
+            <button className='link-button' onClick={() => { setWelcomeBack(false); call('app:setWelcomeBack', { show: false }).catch(() => {}) }}>OK</button>
+          </div>
+        )}
+        {nudge && !onboarding && (
           <div className='banner info'>
             Write down your recovery phrase so you can get your identity back if you lose this device.{' '}
             <button className='link-button' onClick={() => { setNudge(false); setDevices({ startWith: 'menu' }) }}>Show it</button>
@@ -336,7 +374,7 @@ export function App () {
                 : (
                   <div className='empty'>
                     <h1>Shared files, device to device.</h1>
-                    <p>No accounts and no servers. Create a file, join one with a link or import a spreadsheet.</p>
+                    <p>No accounts and no servers. Create a file, join one with a link or import one.</p>
                     <StartActions onNew={() => setNewFile(true)} onJoin={() => setJoining('')} onImported={opened} onError={setError} />
                   </div>
                   )}

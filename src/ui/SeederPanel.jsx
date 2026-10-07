@@ -35,7 +35,7 @@ function LocalSeeder ({ onPaired, onError }) {
       {settings.runSeeder && host && !host.running && <p className='muted'>Starting the seeder...</p>}
       {host && host.running && (
         <>
-          <p className='muted small'>Holding {host.sheets} sheet{host.sheets === 1 ? '' : 's'} for {host.pairedDevices} paired device{host.pairedDevices === 1 ? '' : 's'}. It runs in the background while PearOffice is open or in the tray.</p>
+          <p className='muted small'>Holding {host.sheets} file{host.sheets === 1 ? '' : 's'} for {host.pairedDevices} paired device{host.pairedDevices === 1 ? '' : 's'}. It runs in the background while PearOffice is open or in the tray.</p>
           <div className='row'>
             <button type='button' onClick={async () => { try { setPairing(await call('app:seederHostPair')) } catch (err) { onError(err.message) } }}><QrIcon size={16} /> Show pairing code</button>
             <button
@@ -82,7 +82,7 @@ function HostDevices ({ onError }) {
     <ul className='people host-devices'>
       {devices.map((d) => (
         <li key={d.deviceKey}>
-          <span className='who'><span className='mono'>{d.deviceKey.slice(0, 12)}...</span> <span className='muted'>{d.sheets} sheet{d.sheets === 1 ? '' : 's'}</span></span>
+          <span className='who'><span className='mono'>{d.deviceKey.slice(0, 12)}...</span> <span className='muted'>{d.sheets} file{d.sheets === 1 ? '' : 's'}</span></span>
           {confirming === d.deviceKey
             ? (
               <span className='confirm'>
@@ -103,7 +103,7 @@ function HostDevices ({ onError }) {
             : <button type='button' className='link-button' onClick={() => setConfirming(d.deviceKey)}>Forget</button>}
         </li>
       ))}
-      {confirming && <li className='muted small'>The seeder stops accepting that device. Sheets no other paired device backs up are deleted from it after 7 days.</li>}
+      {confirming && <li className='muted small'>The seeder stops accepting that device. Files no other paired device backs up are deleted from it after 7 days.</li>}
     </ul>
   )
 }
@@ -119,12 +119,12 @@ function StopUsing ({ seederKey, onDone, onError }) {
       </button>
     )
   }
-  const names = (list) => list.map((x) => x.title || 'Untitled sheet').join(', ')
+  const names = (list) => list.map((x) => x.title || 'Untitled file').join(', ')
   return (
     <div className='stop-using'>
       {preview.stop.length > 0 && <p className='small'>Stops backing up: {names(preview.stop)}. The seeder deletes its copies after 7 days.</p>}
       {preview.keep.length > 0 && <p className='small muted'>Still backed up there by other people: {names(preview.keep)}.</p>}
-      {!preview.stop.length && !preview.keep.length && <p className='small muted'>No sheets back up to it.</p>}
+      {!preview.stop.length && !preview.keep.length && <p className='small muted'>No files back up to it.</p>}
       <div className='row'>
         <button
           type='button'
@@ -178,8 +178,8 @@ export function SeederPanel ({ initialLink = '', onBack = null, onClose, onError
           <button type='button' className='close' aria-label='Close' onClick={onClose}><X size={18} /></button>
         </header>
         <p>
-          A seeder is an always-on computer that keeps an encrypted copy of your sheets, so people can catch up
-          even when nobody else is online. It cannot read your sheets: it never gets their keys.
+          A seeder is an always-on computer that keeps an encrypted copy of your files, so people can catch up
+          even when nobody else is online. It cannot read your files: it never gets their keys.
         </p>
         <p>Start the seeder, then paste the pairing link it shows. Links work for 5 minutes.</p>
         <input
@@ -190,7 +190,7 @@ export function SeederPanel ({ initialLink = '', onBack = null, onClose, onError
         />
         <ScanButton prefix='pearoffice://seeder?' what='a PearOffice seeder code' onError={onError} onLink={(l) => { setLink(l); pair(null, l) }} />
         <div className='row end'>
-          {done && <span className='muted'>Paired. Your sheets are backing up.</span>}
+          {done && <span className='muted'>Paired. Your files are backing up.</span>}
           <button className='primary' type='submit' disabled={busy || !link.trim()}>{busy ? 'Pairing...' : 'Pair'}</button>
         </div>
         {window.pearoffice && window.pearoffice.platform === 'desktop' && <LocalSeeder onPaired={() => { setDone(true); load() }} onError={onError} />}

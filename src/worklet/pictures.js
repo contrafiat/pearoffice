@@ -86,7 +86,7 @@ function createPictures ({ engine, sheets, getSeeding = () => null, log = () => 
 
   function fileKey (sheetId) {
     const base = engine.bases.get(sheetId)
-    if (!base || !base.encryptionKey) throw new Error('unknown sheet: ' + sheetId)
+    if (!base || !base.encryptionKey) throw new Error('unknown file: ' + sheetId)
     return base.encryptionKey
   }
 
@@ -174,11 +174,11 @@ function createPictures ({ engine, sheets, getSeeding = () => null, log = () => 
     if (!r) throw new Error('This picture reference is not valid')
     if (!sizeOk(r)) throw new Error('This picture is too big to show')
     const from = doc || (sheets.peek(sheetId) || { guarded: {} }).guarded.doc
-    if (from && !(await allowedKeys(sheetId, from)).has(r.key)) throw new Error('This picture is not from this document')
+    if (from && !(await allowedKeys(sheetId, from)).has(r.key)) throw new Error('This picture is not from this file')
     const { blobs } = await byKey(sheetId, r.key)
     const bytes = await blobs.get(r.id, { timeout }).catch(() => null)
     if (!bytes) throw new Error('This picture is not available yet')
-    if (bytes.byteLength !== r.id.byteLength || hashOf(bytes) !== String(hash || '')) throw new Error('This picture does not match the document and was not shown')
+    if (bytes.byteLength !== r.id.byteLength || hashOf(bytes) !== String(hash || '')) throw new Error('This picture does not match the file and was not shown')
     return bytes
   }
 

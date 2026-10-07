@@ -5,7 +5,7 @@
 #   loginctl enable-linger "$USER"     (keeps it running when you are logged out)
 # Pairing code: journalctl --user -u pearoffice-seeder, or run it once by hand.
 [Unit]
-Description=PearOffice seeder (stores encrypted sheet data, cannot read it)
+Description=PearOffice seeder (stores encrypted file data, cannot read it)
 After=network-online.target
 Wants=network-online.target
 

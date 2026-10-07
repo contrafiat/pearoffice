@@ -84,7 +84,7 @@ export function DocView ({ sheetId, onTitleChange, onError, onGone }) {
       setInfo(s)
     } catch (err) {
       // The document left this device (removed, deleted, moved): go back.
-      if (/^unknown sheet/.test(err.message)) { goneRef.current(); return }
+      if (/^unknown file/.test(err.message)) { goneRef.current(); return }
       errorRef.current(err.message)
     }
   }, [sheetId, ydoc])

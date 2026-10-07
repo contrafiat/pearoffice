@@ -58,7 +58,7 @@
 <body>
 <main>
   <h1>PearOffice Seeder</h1>
-  <p class="muted center">Keeps your shared sheets online when every device is off. It stores them encrypted and cannot read them.</p>
+  <p class="muted center">Keeps your shared files online when every device is off. It stores them encrypted and cannot read them.</p>
 
   <form class="card" id="login" hidden>
     <h2 style="margin-top:0">Enter the password</h2>
@@ -72,7 +72,7 @@
   <div id="dashboard" hidden>
   <div class="card">
     <div class="stats">
-      <div class="stat"><b id="sheets">-</b><span class="muted small" id="sheets-label">Sheets held</span></div>
+      <div class="stat"><b id="sheets">-</b><span class="muted small" id="sheets-label">Files held</span></div>
       <div class="stat"><b id="devices-count">-</b><span class="muted small" id="devices-label">Paired devices</span></div>
     </div>
     <div class="actions">
@@ -92,7 +92,7 @@
 
   <h2>Paired devices</h2>
   <div class="card" style="margin-top:8px">
-    <p class="muted small center" id="no-devices">No devices yet. Pair one to start backing up its sheets.</p>
+    <p class="muted small center" id="no-devices">No devices yet. Pair one to start backing up its files.</p>
     <ul id="device-list"></ul>
   </div>
 
@@ -140,7 +140,7 @@
     try {
       const [s, devices] = await Promise.all([api('GET', 'api/status'), api('GET', 'api/devices')])
       $('sheets').textContent = s.sheets
-      $('sheets-label').textContent = plural(s.sheets, 'Sheet held', 'Sheets held')
+      $('sheets-label').textContent = plural(s.sheets, 'File held', 'Files held')
       $('devices-count').textContent = s.pairedDevices
       $('devices-label').textContent = plural(s.pairedDevices, 'Paired device', 'Paired devices')
       $('key').textContent = s.seederKey.slice(0, 16) + '...'
@@ -165,7 +165,7 @@
       key.textContent = d.deviceKey.slice(0, 16) + '...'
       const info = document.createElement('div')
       info.className = 'muted small'
-      info.textContent = d.sheets + ' ' + plural(d.sheets, 'sheet', 'sheets') + (d.pairedAt ? ', paired ' + new Date(d.pairedAt).toLocaleDateString() : '')
+      info.textContent = d.sheets + ' ' + plural(d.sheets, 'file', 'files') + (d.pairedAt ? ', paired ' + new Date(d.pairedAt).toLocaleDateString() : '')
       who.append(key, info)
       row.append(who)
       if (confirming !== d.deviceKey) {
@@ -181,7 +181,7 @@
         box.className = 'confirm'
         const p = document.createElement('p')
         p.className = 'muted small'
-        p.textContent = 'The seeder stops accepting this device. Sheets no other paired device backs up are deleted from it after 7 days.'
+        p.textContent = 'The seeder stops accepting this device. Files no other paired device backs up are deleted from it after 7 days.'
         const buttons = document.createElement('div')
         buttons.className = 'row'
         const yes = document.createElement('button')

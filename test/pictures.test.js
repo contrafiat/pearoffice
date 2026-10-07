@@ -298,7 +298,7 @@ test('pictures after a move: a removed person cannot read new ones', async (t) =
   assert.equal(await pictureHash(editor, newId, pic.ref), want)
   await waitFor('gone knows it was removed', async () => !!(await gone.localDb.get('moves:' + oldId))?.value?.removed, { timeout: 40000 })
   assert.equal(!!gone.bases.get(newId), false)
-  await assert.rejects(call(gone, 'doc:picture', { sheetId: newId, ref: pic.ref, hash: want }), /unknown sheet/)
+  await assert.rejects(call(gone, 'doc:picture', { sheetId: newId, ref: pic.ref, hash: want }), /unknown file/)
 
   // Given the core key and range anyway, with the only key it has (the old
   // file's picture key) or none, it gets ciphertext.
@@ -383,7 +383,7 @@ test('pictures: references to other cores are bounded and fail cleanly', async (
     const st = owner.pictures.stats(sheetId)
     assert.equal(st.cores <= 4, true, st.cores + ' cores')
     assert.equal(st.running <= 4, true)
-    await assert.rejects(call(owner, 'doc:picture', { sheetId, ref: bogus[150] }), /not from this document/)
+    await assert.rejects(call(owner, 'doc:picture', { sheetId, ref: bogus[150] }), /not from this file/)
     await assert.rejects(owner.pictures.get(sheetId, bogus[0], hashOf(b4a.from(bogus[0])), { timeout: 1000 }), /not available yet/)
     assert.equal((await call(owner, 'doc:state', { sheetId, withState: false })).myRole, 'owner')
   })

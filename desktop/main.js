@@ -301,6 +301,8 @@ ipcMain.handle('worklet:call', async (_e, method, args) => {
     if (!updates) throw new Error('Updates are off in this copy')
     return updates.apply()
   }
+  // The smoke parts other than onboarding start with the tour already done.
+  if (method === 'app:onboarding' && SMOKE && process.env.PEAROFFICE_NO_ONBOARDING === '1') return { done: true }
   if (method === 'app:settings') return { ...settings, startAtLogin: settings.startAtLogin && loginItem.isEnabled() }
   if (method === 'app:setSetting') {
     const patch = {}
@@ -332,8 +334,21 @@ ipcMain.handle('worklet:call', async (_e, method, args) => {
   }
   if (typeof method !== 'string' || !/^(sheet|file|doc|slides|app|seeder|link|donation):[A-Za-z]+$/.test(method)) throw new Error('bad method')
   await worklet.ready()
-  return worklet.call(method, args || {})
+  return worklet.call(method, args || {}, { timeoutMs: CALL_TIMEOUTS[method] || 15000 })
 })
+
+// Calls that wait on another device or do heavy work get longer than the
+// default 15 s: linking waits up to 2 minutes for the other device, pairing with a
+// seeder up to its 5 minute window (src/seeder/protocol.js).
+const CALL_TIMEOUTS = {
+  'link:join': 135000,
+  'seeder:pair': 330000,
+  'file:compact': 180000,
+  'sheet:compact': 180000,
+  'sheet:import': 120000,
+  'doc:import': 120000,
+  'slides:import': 120000
+}
 
 // A picture on the system clipboard, for pasting into a document or slide
 // when the page itself gets none: a picture copied in a browser or photo

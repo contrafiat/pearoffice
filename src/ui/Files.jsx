@@ -12,6 +12,9 @@ export const KINDS = [
 
 const byKind = (kind) => KINDS.find((k) => k.kind === kind) || KINDS[0]
 
+// The name shown for a file with no title, as New names them.
+export const untitled = (kind) => 'Untitled ' + (kind === 'sheet' || !kind ? 'sheet' : byKind(kind).label.toLowerCase())
+
 export function KindIcon ({ kind, size = 20 }) {
   const { Icon, label } = byKind(kind)
   return <span className={'kind-icon kind-' + byKind(kind).kind} title={label}><Icon size={size} weight='duotone' aria-hidden='true' /></span>
@@ -55,7 +58,7 @@ export function FileHome ({ files, actions, onOpen, onWaiting }) {
               onClick={() => (f.waiting ? onWaiting(f.sheetId) : onOpen(f.sheetId))}
             >
               <KindIcon kind={f.kind} size={28} />
-              <span className='file-title'>{f.waiting ? 'Joining...' : (f.title || 'Untitled ' + (f.kind === 'sheet' || !f.kind ? 'sheet' : byKind(f.kind).label.toLowerCase()))}</span>
+              <span className='file-title'>{f.waiting ? 'Joining...' : (f.title || untitled(f.kind))}</span>
               <span className='file-meta'>
                 {f.owner && (
                   <span className='sheet-owner' title={f.owner.isMe ? 'Yours' : 'Owned by ' + (f.owner.name || 'someone')}>

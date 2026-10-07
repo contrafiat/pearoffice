@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { ArrowSquareOut, CaretDown, CheckCircle, EnvelopeSimple, Lightning, ShareNetwork } from '@phosphor-icons/react'
+import { ArrowSquareOut, CaretDown, CheckCircle, Compass, EnvelopeSimple, Lightning, ShareNetwork } from '@phosphor-icons/react'
 import { call } from './bridge.js'
 
 /* global __APP_VERSION__ */
@@ -17,7 +17,7 @@ const LIGHTNING_WALLETS = [
   { name: 'Wallet of Satoshi', url: 'https://walletofsatoshi.com', desc: 'Beginner-friendly Lightning wallet' },
   { name: 'Phoenix', url: 'https://phoenix.acinq.co', desc: 'Self-custodial Lightning wallet' }
 ]
-const SHARE_TEXT = 'Check out PearOffice - private, peer-to-peer spreadsheets with no servers or accounts.\n\nhttps://peerloomllc.com/'
+const SHARE_TEXT = 'Check out PearOffice - private, peer-to-peer spreadsheets, documents and slides with no servers or accounts.\n\nhttps://peerloomllc.com/'
 
 // The main open-source parts of PearOffice and their licences.
 const CREDITS = [
@@ -74,7 +74,7 @@ function CopyButton ({ text, label, done = 'Copied' }) {
 }
 
 // About, one section open at a time, as in the other PeerLoom apps.
-export function AboutContent ({ startSection = null, onBitcoin }) {
+export function AboutContent ({ startSection = null, onBitcoin, onTour }) {
   const [open, setOpen] = useState(startSection)
   const toggle = (id) => setOpen((s) => (s === id ? null : id))
   const donate = donationsShown()
@@ -95,7 +95,10 @@ export function AboutContent ({ startSection = null, onBitcoin }) {
       </div>
       <Section id='how' title='How it works' open={open === 'how'} onToggle={toggle}>
         <p>Your files live on your devices. When you share one, it syncs straight between the devices of the people in it, encrypted, with no company server in between. A seeder you run can keep a copy online while everyone is offline, and it cannot read it. No accounts, no subscriptions and no data collection.</p>
-        <div className='row center'><button onClick={() => openUrl('https://pears.com/')}><ArrowSquareOut size={16} /> Learn about peer-to-peer</button></div>
+        <div className='row equal'>
+          {onTour && <button className='about-tour' onClick={onTour}><Compass size={16} /> Take the tour</button>}
+          <button onClick={() => openUrl('https://pears.com/')}><ArrowSquareOut size={16} /> Learn more</button>
+        </div>
       </Section>
       {donate && (
         <Section id='support' title='Support development' open={open === 'support'} onToggle={toggle}>
@@ -113,7 +116,7 @@ export function AboutContent ({ startSection = null, onBitcoin }) {
         </Section>
       )}
       <Section id='share' title='Share the app' open={open === 'share'} onToggle={toggle}>
-        <p>Know someone who would want private, serverless spreadsheets they can share? Tell them about PearOffice.</p>
+        <p>Know someone who would want private spreadsheets, documents and slides they can share without a server? Tell them about PearOffice.</p>
         <div className='row center'>
           {mobile()
             ? <button onClick={() => call('app:share', { text: SHARE_TEXT }).catch(() => {})}><ShareNetwork size={16} /> Share PearOffice</button>
