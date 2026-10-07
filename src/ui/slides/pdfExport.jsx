@@ -33,6 +33,7 @@ const SLIDE_CSS = [
   '.slide-picture-wait{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;overflow:hidden;background:#c8cbd0;color:#464b52;font-size:28px;text-align:center}',
   '.slide-text{position:absolute;left:0;top:0;transform-origin:0 0;font-size:var(--slide-body-size);line-height:1.2;overflow-wrap:break-word}',
   '.slide-text.role-title{font-family:var(--slide-heading);font-size:var(--slide-title-size);font-weight:var(--slide-title-weight);line-height:1.1}',
+  '.slide-text strong,.slide-text b{font-weight:600}',
   '.slide-text .slide-body{height:100%}',
   '.slide-body{white-space:pre-wrap;padding:6px 10px;box-sizing:border-box}',
   '.slide-text.role-title .slide-body{display:flex;flex-direction:column;justify-content:center}',
