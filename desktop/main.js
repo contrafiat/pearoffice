@@ -259,6 +259,7 @@ ipcMain.handle('worklet:call', async (_e, method, args) => {
   // This Electron's clipboard calls return promises.
   if (method === 'app:setClipboard') { await clipboard.writeText(String((args && args.text) || '')); return { ok: true } }
   if (method === 'app:getClipboard') return { text: String((await clipboard.readText()) || '') }
+  if (method === 'app:clipboardPicture') return clipboardPicture()
   // A tab as PDF or on paper: the UI sends a printable page. A4 unless it
   // sends pageSize ({ width, height } in inches, no margins: a deck's slides).
   if (method === 'app:savePdf' || method === 'app:print') {
@@ -334,6 +335,69 @@ ipcMain.handle('worklet:call', async (_e, method, args) => {
   return worklet.call(method, args || {})
 })
 
+// A picture on the system clipboard, for pasting into a document or slide
+// when the page itself gets none: a picture copied in a browser or photo
+// viewer often reaches the page only as HTML with a link, and a picture file
+// copied in a file manager only as its path. { data (base64), mime, name }
+// or null. At most 20 MB.
+const PICTURE_TYPES = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', bmp: 'image/bmp' }
+const CLIPBOARD_PICTURE_MAX = 20 * 1024 * 1024
+async function clipboardPicture () {
+  // This Electron's clipboard is the asynchronous one: items, each with
+  // MIME types and their data as Blobs.
+  let items = []
+  try { items = await clipboard.read() } catch { return null }
+  for (const item of items) {
+    const type = item.types.find((t) => Object.values(PICTURE_TYPES).includes(t))
+    if (!type) continue
+    try {
+      const buf = Buffer.from(await (await item.getType(type)).arrayBuffer())
+      if (buf.length && buf.length <= CLIPBOARD_PICTURE_MAX) return { data: buf.toString('base64'), mime: type, name: 'Pasted picture.' + (type.split('/')[1] === 'jpeg' ? 'jpg' : type.split('/')[1]) }
+    } catch {}
+  }
+  for (const item of items) {
+    if (!item.types.includes('text/uri-list')) continue
+    let uris = ''
+    try { uris = await (await item.getType('text/uri-list')).text() } catch { continue }
+    for (const line of uris.split(/\r?\n/)) {
+      if (!line.startsWith('file://')) continue
+      let file
+      try { file = require('node:url').fileURLToPath(line.trim()) } catch { continue }
+      const mime = PICTURE_TYPES[(path.extname(file).slice(1) || '').toLowerCase()]
+      if (!mime) continue
+      try {
+        const st = await fs.promises.stat(file)
+        if (!st.isFile() || st.size > CLIPBOARD_PICTURE_MAX) continue
+        return { data: (await fs.promises.readFile(file)).toString('base64'), mime, name: path.basename(file) }
+      } catch {}
+    }
+  }
+  return null
+}
+
+// The right-click menu for text: spelling suggestions, cut, copy, paste and
+// select all. Pages that show their own menu (the sheet grid, slides) stop
+// the browser's, so this never appears over theirs.
+function editMenu (contents, params) {
+  const items = []
+  for (const word of (params.dictionarySuggestions || []).slice(0, 5)) items.push({ label: word, click: () => contents.replaceMisspelling(word) })
+  if (params.misspelledWord) items.push({ label: 'Add to dictionary', click: () => contents.session.addWordToSpellCheckerDictionary(params.misspelledWord) })
+  if (items.length) items.push({ type: 'separator' })
+  const f = params.editFlags || {}
+  if (params.isEditable) {
+    items.push({ label: 'Cut', role: 'cut', enabled: !!f.canCut })
+    items.push({ label: 'Copy', role: 'copy', enabled: !!f.canCopy })
+    items.push({ label: 'Paste', role: 'paste', enabled: !!f.canPaste })
+    items.push({ type: 'separator' })
+    items.push({ label: 'Select all', role: 'selectAll' })
+  } else if (params.selectionText && params.selectionText.trim()) {
+    items.push({ label: 'Copy', role: 'copy' })
+  }
+  while (items.length && items[items.length - 1].type === 'separator') items.pop()
+  if (!items.length) return null
+  return Menu.buildFromTemplate(items)
+}
+
 function createWindow () {
   win = new BrowserWindow({
     width: 1280,
@@ -367,6 +431,10 @@ function createWindow () {
     return { action: 'deny' }
   })
   win.webContents.on('will-navigate', (e) => e.preventDefault())
+  win.webContents.on('context-menu', (e, params) => {
+    const menu = editMenu(win.webContents, params)
+    if (menu) menu.popup({ window: win })
+  })
   win.loadFile(paths.ui)
   return win
 }

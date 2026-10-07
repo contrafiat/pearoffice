@@ -1,4 +1,5 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { clipboardPictureFile, looksLikePicture, pastedPictures } from '../clipboardPicture.js'
 import slidesModel from '../../slides/slidesModel.js'
 import { themeStyle } from './themes.js'
 import { LiveText, StaticText, TextFrame, boxStyle, placeholderFor } from './TextBox.jsx'
@@ -268,10 +269,12 @@ export function Stage ({ size, theme, slideId, layout, els, sel, setSel, editing
       onPaste={(e) => {
         // A picture pasted onto the slide (not into a box being edited).
         if (!layoutEdit || !onPastePictures || e.target.closest('[contenteditable="true"], input')) return
-        const files = [...(e.clipboardData ? e.clipboardData.files : [])].filter((f) => /^image\//.test(f.type))
-        if (!files.length) return
+        const files = pastedPictures(e.clipboardData)
+        if (files.length) { e.preventDefault(); onPastePictures(files); return }
+        // No picture file in the paste: the desktop app reads the clipboard.
+        if (!looksLikePicture(e.clipboardData)) return
         e.preventDefault()
-        onPastePictures(files)
+        clipboardPictureFile().then((file) => { if (file) onPastePictures([file]) }).catch(() => {})
       }}
       onPointerDown={(e) => {
         if (e.target.closest('.slide-el, .handle, .rotate-handle, .menu, .alt-edit')) return
