@@ -1,6 +1,6 @@
 # Your devices keep the same files
 
-**Status:** draft, 2026-10-07. Tim linked his Linux desktop and Pixel,
+**Status:** approved by Tim 2026-10-07. Tim linked his Linux desktop and Pixel,
 made a document on the desktop and it never appeared on the Pixel.
 
 **Goal:** a file you make, join or are invited to on one of your devices
@@ -96,7 +96,10 @@ Stop joining `T`. Files already shared stay; nothing else depends on it.
 2. Live `file` messages on create, join and move.
 3. Tests and the phone check.
 
+## Decided 2026-10-07
+
+1. "Remove from all my devices" is left for later.
+
 ## Open questions
 
-1. Should removing a file from one device offer "Remove from all my
-   devices"? Recommended: later, as a choice in the Remove panel.
+None.
