@@ -3,6 +3,7 @@ import slidesModel from '../../slides/slidesModel.js'
 import { themeStyle } from './themes.js'
 import { LiveText, StaticText, TextFrame, boxStyle, placeholderFor } from './TextBox.jsx'
 import { SNAP_PX, moved, resized, rotated, snapMove, snapTargets, unionOf } from './geometry.js'
+import { ElementBody, hasText } from './objects.jsx'
 
 // The slide being edited (proposals/2026-10-06-slides.md, Rendering): a div
 // of the deck's size scaled to fit with a CSS transform, each box placed
@@ -13,6 +14,11 @@ import { SNAP_PX, moved, resized, rotated, snapMove, snapTargets, unionOf } from
 // once, on release, so others see a box jump rather than a stream of
 // frames. Snapping to the slide's edges and centre lines and to the other
 // boxes is on unless Alt is held.
+//
+// Shapes and pictures move, resize and rotate as text boxes do. A picture
+// keeps its shape when resized by a corner (Shift frees it); other elements
+// keep theirs only with Shift. A shape other than a line takes text inside
+// on a double click. A line has handles only at its ends.
 
 const NUDGE = 5 // slide units per arrow key, ten times with Shift
 const HANDLES = [
@@ -28,13 +34,13 @@ const HANDLES = [
 const CURSORS = ['ns-resize', 'nesw-resize', 'ew-resize', 'nwse-resize']
 const cursorFor = (angle, rot) => CURSORS[Math.round((angle + rot) / 45) % 4]
 
-export function Stage ({ size, theme, slideId, layout, els, sel, setSel, editing, startEditing, stopEditing, editStart, canEdit, layoutEdit, phone, undo, change, others, onCursor, onEditor }) {
+export function Stage ({ size, theme, slideId, layout, els, sel, setSel, editing, startEditing, stopEditing, editStart, canEdit, layoutEdit, phone, undo, change, others, onCursor, onEditor, onPastePictures }) {
   const viewRef = useRef(null)
   const slideRef = useRef(null)
   const [scale, setScale] = useState(0)
   const [drafts, setDrafts] = useState(null) // id -> frame while a drag lasts
   const [guides, setGuides] = useState(null) // { xs, ys } in slide units
-  const [menu, setMenu] = useState(null) // { x, y } for the box menu
+  const [menu, setMenu] = useState(null) // { x, y, alt } for the box menu; alt while its alt text is edited
   const dragRef = useRef(null)
 
   // Fit the slide to the space, with a margin.
@@ -91,7 +97,8 @@ export function Stage ({ size, theme, slideId, layout, els, sel, setSel, editing
         out = {}
         for (const id of ids) out[id] = moved(frames0[id], dx, dy)
       } else if (kind === 'resize') {
-        const r = resized(frames0[ids[0]], dir, p, { keepRatio: ev.shiftKey, targets: snap ? targets : null, limit })
+        const pic = els.find((el) => el.id === ids[0] && el.type === 'picture')
+        const r = resized(frames0[ids[0]], dir, p, { keepRatio: pic ? !ev.shiftKey : ev.shiftKey, targets: snap ? targets : null, limit })
         out = { [ids[0]]: r.frame }
         lines = r.guides
       } else {
@@ -128,7 +135,7 @@ export function Stage ({ size, theme, slideId, layout, els, sel, setSel, editing
     if (!layoutEdit) {
       // Phones and viewers: a tap edits the text (when allowed) or selects.
       setSel([el.id])
-      if (canEdit && phone) startEditing(el.id, { point: { x: e.clientX, y: e.clientY } })
+      if (canEdit && phone && hasText(el)) startEditing(el.id, { point: { x: e.clientX, y: e.clientY } })
       return
     }
     if (e.shiftKey) {
@@ -165,13 +172,21 @@ export function Stage ({ size, theme, slideId, layout, els, sel, setSel, editing
       }, { merge: true })
       return
     }
-    if (one && (e.key === 'Enter' || e.key === 'F2')) { e.preventDefault(); startEditing(one, {}) }
-    else if (one && e.key.length === 1) { e.preventDefault(); startEditing(one, { text: e.key }) }
+    const typable = one && hasText(els.find((el) => el.id === one))
+    if (typable && (e.key === 'Enter' || e.key === 'F2')) { e.preventDefault(); startEditing(one, {}) }
+    else if (typable && e.key.length === 1) { e.preventDefault(); startEditing(one, { text: e.key }) }
   }
 
   const restack = (step) => { setMenu(null); restackSelected(change, slideId, els, sel, step) }
 
   const single = sel.length === 1 && els.find((el) => el.id === sel[0])
+  const saveAlt = (text) => {
+    if (single && single.type === 'picture' && text !== single.pic.alt) {
+      change((doc) => slidesModel.setAlt(doc, slideId, single.id, text))
+    }
+    setMenu(null)
+    viewRef.current.focus({ preventScroll: true })
+  }
   const holder = { width: size[0] * scale, height: size[1] * scale }
   const px = (f) => ({ left: f.x * scale, top: f.y * scale, width: f.w * scale, height: f.h * scale, transform: f.rot ? 'rotate(' + f.rot + 'deg)' : undefined })
 
@@ -181,8 +196,16 @@ export function Stage ({ size, theme, slideId, layout, els, sel, setSel, editing
       ref={viewRef}
       tabIndex={-1}
       onKeyDown={onKeyDown}
+      onPaste={(e) => {
+        // A picture pasted onto the slide (not into a box being edited).
+        if (!layoutEdit || !onPastePictures || e.target.closest('[contenteditable="true"], input')) return
+        const files = [...(e.clipboardData ? e.clipboardData.files : [])].filter((f) => /^image\//.test(f.type))
+        if (!files.length) return
+        e.preventDefault()
+        onPastePictures(files)
+      }}
       onPointerDown={(e) => {
-        if (e.target.closest('.slide-el, .handle, .rotate-handle, .menu')) return
+        if (e.target.closest('.slide-el, .handle, .rotate-handle, .menu, .alt-edit')) return
         setSel([])
         if (editing) stopEditing()
         viewRef.current.focus({ preventScroll: true })
@@ -199,22 +222,29 @@ export function Stage ({ size, theme, slideId, layout, els, sel, setSel, editing
                   key={el.id}
                   className={'slide-el' + (live ? ' editing' : '')}
                   data-id={el.id}
+                  data-type={el.type}
                   data-role={el.role || undefined}
                   style={boxStyle(f)}
                   onPointerDown={(e) => onBoxDown(e, el)}
-                  onDoubleClick={(e) => { if (canEdit && !live) startEditing(el.id, { point: { x: e.clientX, y: e.clientY } }) }}
+                  onDoubleClick={(e) => { if (canEdit && !live && hasText(el)) startEditing(el.id, { point: { x: e.clientX, y: e.clientY } }) }}
                   onContextMenu={(e) => {
                     if (!layoutEdit || live) return
                     e.preventDefault()
                     if (!sel.includes(el.id)) setSel([el.id])
-                    setMenu({ x: e.clientX, y: e.clientY })
+                    setMenu({ x: e.clientX, y: e.clientY, alt: null })
                   }}
                 >
-                  <TextFrame frame={f} role={el.role}>
-                    {live
-                      ? <LiveText fragment={el.text} undo={undo} placeholder={placeholderFor(el.role, phone)} canEdit={canEdit} cursors={others.filter((p) => p.box === el.id && p.cursor)} onCursor={onCursor} onEditor={onEditor} start={editStart} label={el.role === 'title' ? 'Slide title' : 'Text box'} />
-                      : <StaticText fragment={el.text} placeholder={canEdit ? placeholderFor(el.role, phone) : ''} markEmpty={canEdit && !el.role} />}
-                  </TextFrame>
+                  <ElementBody
+                    el={el}
+                    frame={f}
+                    text={
+                      <TextFrame frame={f} role={el.role}>
+                        {live
+                          ? <LiveText fragment={el.text} undo={undo} placeholder={placeholderFor(el.role, phone)} canEdit={canEdit} cursors={others.filter((p) => p.box === el.id && p.cursor)} onCursor={onCursor} onEditor={onEditor} start={editStart} label={el.role === 'title' ? 'Slide title' : el.type === 'shape' ? 'Text in the shape' : 'Text box'} />
+                          : <StaticText fragment={el.text} placeholder={canEdit ? placeholderFor(el.role, phone) : ''} markEmpty={canEdit && el.type === 'text' && !el.role} />}
+                      </TextFrame>
+                    }
+                  />
                 </div>
               )
             })}
@@ -230,7 +260,7 @@ export function Stage ({ size, theme, slideId, layout, els, sel, setSel, editing
               const handles = layoutEdit && single && single.id === el.id
               return (
                 <div key={el.id} className={'sel-frame' + (editing === el.id ? ' editing' : '')} style={px(f)}>
-                  {handles && HANDLES.map((h) => (
+                  {handles && HANDLES.filter((h) => !(el.type === 'shape' && el.style.shape === 'line') || !h.y).map((h) => (
                     <span key={h.name} className={'handle h-' + h.name} style={{ cursor: cursorFor(h.angle, f.rot) }} onPointerDown={(e) => startDrag(e, 'resize', [el.id], h)} />
                   ))}
                   {handles && <span className='rotate-handle' title='Rotate (Shift: steps of 15 degrees)' onPointerDown={(e) => startDrag(e, 'rotate', [el.id])} />}
@@ -242,9 +272,29 @@ export function Stage ({ size, theme, slideId, layout, els, sel, setSel, editing
           </div>
         </div>
       )}
-      {menu && <div className='doc-scrim' onPointerDown={(e) => { e.stopPropagation(); setMenu(null) }} />}
-      {menu && (
-        <ul className='menu doc-pop box-menu' role='menu' style={{ top: Math.min(menu.y, window.innerHeight - 200), left: Math.min(menu.x, window.innerWidth - 200) }}>
+      {menu && <div className='doc-scrim' onPointerDown={(e) => { e.stopPropagation(); if (menu.alt !== null) saveAlt(menu.alt.trim()); else setMenu(null) }} />}
+      {menu && menu.alt !== null && single && single.type === 'picture' && (
+        <div className='doc-pop box-menu alt-edit' style={{ top: Math.min(menu.y, window.innerHeight - 120), left: Math.min(menu.x, window.innerWidth - 300) }}>
+          <label htmlFor='slide-alt'>Alt text</label>
+          <input
+            id='slide-alt'
+            autoFocus
+            placeholder='Describe the picture.'
+            value={menu.alt}
+            maxLength={500}
+            onChange={(e) => setMenu({ ...menu, alt: e.target.value })}
+            onKeyDown={(e) => {
+              e.stopPropagation()
+              if (e.key === 'Enter') { e.preventDefault(); saveAlt(menu.alt.trim()) }
+              if (e.key === 'Escape') { e.preventDefault(); setMenu(null); viewRef.current.focus({ preventScroll: true }) }
+            }}
+          />
+          <button className='alt-save' onClick={() => saveAlt(menu.alt.trim())}>Save</button>
+        </div>
+      )}
+      {menu && menu.alt === null && (
+        <ul className='menu doc-pop box-menu' role='menu' style={{ top: Math.min(menu.y, window.innerHeight - 240), left: Math.min(menu.x, window.innerWidth - 200) }}>
+          {single && single.type === 'picture' && <li role='menuitem' className='alt-text' onClick={() => setMenu({ ...menu, alt: single.pic.alt })}>Alt text</li>}
           <li role='menuitem' onClick={() => restack('front')}>Bring to front</li>
           <li role='menuitem' onClick={() => restack(1)}>Bring forward</li>
           <li role='menuitem' onClick={() => restack(-1)}>Send backward</li>

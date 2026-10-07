@@ -56,7 +56,7 @@ list, layouts, text boxes, moving, resizing, rotating and snapping, one
 theme and presence. Part 2 presents: full screen with keys and clickers, a
 presenter view on a second display (an audience window opened by
 `desktop/main.js`) and phones (landscape fills the screen, portrait shows
-notes). Pictures, shapes, themes and .pptx come next.
+notes). Part 3 adds shapes, pictures and four themes. .pptx comes next.
 See `TODO.md`.
 
 ## Layout
@@ -69,7 +69,7 @@ Code that works for any kind of file sits apart from each editor's own
 - `src/shared/` - runs anywhere, for any file: `ids.js`, `phrase.js`
   (recovery phrase), `qr.js`, Bare shims.
 - `src/doc/` and `src/ui/doc/` - documents (proposals/2026-10-06-documents.md): `docModel.js` (the Yjs doc: `meta`, `body`), `docMethods.js` (`doc:create`, `doc:state`, `doc:update`), `DocView.jsx` (TipTap 3 editor), `docFiles.js` (import .docx/.md/.txt/.html, export .docx/.md/.txt/PDF, pictures included; `node scripts/check-doc-export.js [dir]` has LibreOffice read an exported .docx), `pictures.js` (shrinking before upload, the per-document picture cache, the picture node view). Pictures are `image` nodes (`extensions.js`, `Picture`) and move a document to schema version 2 (`docModel.js`); `doc:addPicture` and `doc:picture` are in `docMethods.js`. The editor keeps a Yjs replica and sends batched updates; `doc:updated` brings others' edits.
-- `src/slides/` and `src/ui/slides/` - slide decks (proposals/2026-10-06-slides.md): `slidesModel.js` (the Yjs doc: `meta`, `deck`, `slides`; order by fractional index keys; every change goes through its functions), `layouts.js`, `slidesMethods.js` (`slides:create`, `slides:state`, `slides:update`). `SlidesView.jsx` (the replica, toolbar, notes, presence and one Y.UndoManager over `slides` and `deck`, shared with TipTap's undo plugin through `text.js`, so text and moves undo in one history), `SlideList.jsx` (thumbnails as static DOM, reorder by drag, Ctrl+Up/Down or the slide menu), `Stage.jsx` (the slide scaled with a CSS transform; selection, our own move, resize and rotate handles, snapping with guides in `geometry.js`; a drag writes the frame once, on release), `TextBox.jsx` (a live TipTap editor only in the box being edited, static DOM for the rest; text is drawn 1.5 times larger so sizes are PowerPoint points), `TextTools.jsx`, `Notes.jsx`, `themes.js` (one theme, `plain`), `deck.js` (the deck as drawn from a replica), `StaticSlide.jsx` (a slide as static DOM, for thumbnails and the show), `Present.jsx` (presenting: Present or F5 from the first slide, Shift+F5 from this one, for viewers too; PowerPoint's keys; one display goes full screen; with two, `desktop/main.js` opens an audience window on the other display, which loads the UI with `?audience=<id>` and keeps its own replica, and the main window becomes the presenter view with notes, next slide and a timer; `app:presentStart`, `app:presentGo`, `app:presentInput` and `app:presentEnd` are handled in main; on phones, tap halves or swipe in landscape, notes under the slide in portrait; `mobile/App.js` hides the status bar and ends the show on Back). The schema is `slideExtensions()` in `src/ui/doc/extensions.js`. Phones edit text, notes and slide order only.
+- `src/slides/` and `src/ui/slides/` - slide decks (proposals/2026-10-06-slides.md): `slidesModel.js` (the Yjs doc: `meta`, `deck`, `slides`; order by fractional index keys; every change goes through its functions), `layouts.js`, `slidesMethods.js` (`slides:create`, `slides:state`, `slides:update`). `SlidesView.jsx` (the replica, toolbar, notes, presence and one Y.UndoManager over `slides` and `deck`, shared with TipTap's undo plugin through `text.js`, so text and moves undo in one history), `SlideList.jsx` (thumbnails as static DOM, reorder by drag, Ctrl+Up/Down or the slide menu), `Stage.jsx` (the slide scaled with a CSS transform; selection, our own move, resize and rotate handles, snapping with guides in `geometry.js`; a drag writes the frame once, on release), `TextBox.jsx` (a live TipTap editor only in the box being edited, static DOM for the rest; text is drawn 1.5 times larger so sizes are PowerPoint points), `TextTools.jsx`, `Notes.jsx`, `themes.js` (four themes: `plain`, `midnight`, `paper`, `vivid`; colours and fonts as CSS variables on the slide), `objects.jsx` (shapes as inline SVG filling the frame, a line across the middle of its frame; pictures as `<img>` from a per-deck cache fetched with `slides:picture`, grey with the alt text until they arrive; `PicturesContext`, which the editor and the audience window each provide; a theme colour slot is drawn as the slide's CSS variable, so a new theme recolours shapes), `ShapeTools.jsx` (Insert shape menu; fill, outline colour and width for the selected shapes; desktop only), `deck.js` (the deck as drawn from a replica), `StaticSlide.jsx` (a slide as static DOM, for thumbnails and the show), `Present.jsx` (presenting: Present or F5 from the first slide, Shift+F5 from this one, for viewers too; PowerPoint's keys; one display goes full screen; with two, `desktop/main.js` opens an audience window on the other display, which loads the UI with `?audience=<id>` and keeps its own replica, and the main window becomes the presenter view with notes, next slide and a timer; `app:presentStart`, `app:presentGo`, `app:presentInput` and `app:presentEnd` are handled in main; on phones, tap halves or swipe in landscape, notes under the slide in portrait; `mobile/App.js` hides the status bar and ends the show on Back). Pictures are added with `slides:addPicture` after the same shrinking as documents (`src/ui/doc/pictures.js`), then `slidesModel.addPicture`; a corner handle keeps a picture's shape (Shift frees it). The schema is `slideExtensions()` in `src/ui/doc/extensions.js`. Phones edit text (in boxes and shapes), notes and slide order only; they and viewers draw shapes and pictures.
 - `src/sheet/` - the spreadsheet, runs anywhere (Bare, Node, browser):
   `sheetModel.js` (the Yjs document), `refs.js` (A1 <-> id formula
   references), `formula/` (evaluator, deterministic maths, formulajs fills,
@@ -257,7 +257,7 @@ builds are signed and notarized; Linux and Windows builds are unsigned
   bundle must create, edit and read a sheet over stdin/stdout, and the seeder
   bundle must start and print a pairing link.
 - `npm run smoke:desktop`: drives the real UI in Electron with an offscreen
-  window and real key and mouse events, in six parts. Each part is its own
+  window and real key and mouse events, in seven parts. Each part is its own
   launch with a throwaway data folder and a 60 s limit, and prints one
   `ok`/`not ok` line, then a summary line. `sheets` is the grid editor
   (typing, formulas, spilling, fill, charts, copy and paste, undo, zoom; about
@@ -276,6 +276,14 @@ builds are signed and notarized; Linux and Windows builds are unsigned
   black screen, keys from the audience window and Esc closing both (about
   7 s). With `PEAROFFICE_SMOKE_PHONE_SHOT=<png>` it also saves the phone
   show in portrait and landscape (`desktop/smoke/phone-preload.js`).
+  `slides-objects` is shapes and pictures: each of the six shapes inserted,
+  resized and moved, a fill, outline and outline width, text in a
+  rectangle, a picture from a generated PNG (the pixels match the stored
+  bytes), resized keeping its shape, moved and given alt text, the four
+  themes in the stage and a thumbnail, the slide duplicated with its
+  picture, the show and reopening (about 8 s). With
+  `PEAROFFICE_SMOKE_OBJECTS_SHOTS=<folder>` it saves a screenshot per theme
+  and one of the colour menu.
   `app` is the shell: the New picker, theme, Seeder and Devices panels, the
   local seeder, keep online, start at login, profile picture, About, sharing,
   backups, removing a file and the file list (about 16 s). The parts are in

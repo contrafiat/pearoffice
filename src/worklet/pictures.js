@@ -23,6 +23,7 @@ const b4a = require('b4a')
 const sodium = require('sodium-universal')
 const Hyperblobs = require('hyperblobs')
 const docModel = require('../doc/docModel')
+const slidesModel = require('../slides/slidesModel')
 const model = require('../sheet/sheetModel')
 
 const MAX_BYTES = 1024 * 1024 // per picture, after the UI shrank it
@@ -62,6 +63,12 @@ function parseRef (ref) {
 }
 
 // A reference whose size is within the limit and whose blocks fit its size.
+// Kinds of file that can hold pictures.
+function hasPictures (doc) {
+  const kind = model.kind(doc)
+  return kind === 'doc' || kind === 'slides'
+}
+
 function sizeOk (r) {
   const len = r.id.byteLength
   return len >= 1 && len <= MAX_FETCH && r.id.blockLength >= 1 && r.id.blockLength <= Math.ceil(len / BLOCK) + 1
@@ -175,12 +182,21 @@ function createPictures ({ engine, sheets, getSeeding = () => null, log = () => 
     return bytes
   }
 
-  // Every picture the document references: [{ ref, hash, node }].
+  // Every picture the file references: [{ ref, hash, alt, point }], where
+  // point(ref) changes that one reference (inside a transaction). Documents
+  // hold them in image nodes, decks in picture elements.
   function refsIn (doc) {
     const out = []
-    for (const node of docModel.images(doc)) {
-      const ref = node.getAttribute('ref')
-      if (parseRef(ref)) out.push({ ref, hash: node.getAttribute('hash'), node })
+    const kind = model.kind(doc)
+    if (kind === 'doc') {
+      for (const node of docModel.images(doc)) {
+        const ref = node.getAttribute('ref')
+        if (parseRef(ref)) out.push({ ref, hash: node.getAttribute('hash'), alt: node.getAttribute('alt') || '', point: (r) => node.setAttribute('ref', r) })
+      }
+    } else if (kind === 'slides') {
+      for (const p of slidesModel.pictureRefs(doc)) {
+        if (parseRef(p.ref)) out.push({ ref: p.ref, hash: p.hash, alt: p.alt, point: (r) => p.map.set('ref', r) })
+      }
     }
     return out
   }
@@ -190,7 +206,7 @@ function createPictures ({ engine, sheets, getSeeding = () => null, log = () => 
   async function fetchAll (sheetId) {
     if (closed || !engine.bases.get(sheetId)) return
     const e = sheets.peek(sheetId)
-    if (!e || model.kind(e.guarded.doc) !== 'doc') return
+    if (!e || !hasPictures(e.guarded.doc)) return
     const allowed = await allowedKeys(sheetId, e.guarded.doc)
     for (const { ref } of refsIn(e.guarded.doc)) {
       const k = sheetId + ' ' + ref
@@ -255,8 +271,8 @@ function createPictures ({ engine, sheets, getSeeding = () => null, log = () => 
   // the references that could not be fetched.
   async function ensureAll (sheetId, doc, { timeout = GET_TIMEOUT_MS } = {}) {
     const missing = []
-    for (const { ref, hash, node } of refsIn(doc)) {
-      try { await get(sheetId, ref, hash, { timeout, doc }) } catch { missing.push({ ref, alt: node.getAttribute('alt') || '' }) }
+    for (const { ref, hash, alt } of refsIn(doc)) {
+      try { await get(sheetId, ref, hash, { timeout, doc }) } catch { missing.push({ ref, alt }) }
     }
     return missing
   }
@@ -267,16 +283,16 @@ function createPictures ({ engine, sheets, getSeeding = () => null, log = () => 
   async function rehome (fromId, toId, doc, which = () => true) {
     const done = new Map() // old ref -> new ref
     const changes = []
-    for (const { ref, hash, node } of refsIn(doc)) {
+    for (const { ref, hash, point } of refsIn(doc)) {
       if (!which(ref)) continue
       if (!done.has(ref)) {
         const bytes = await get(fromId, ref, hash, { doc })
         done.set(ref, (await put(toId, bytes)).ref)
       }
-      changes.push([node, done.get(ref)])
+      changes.push([point, done.get(ref)])
     }
     if (!changes.length) return null
-    return docModel.capture(doc, () => { for (const [node, ref] of changes) node.setAttribute('ref', ref) })
+    return docModel.capture(doc, () => { for (const [point, ref] of changes) point(ref) })
   }
 
   // The open picture cores of a file, for seeding.js.
@@ -321,4 +337,4 @@ function createPictures ({ engine, sheets, getSeeding = () => null, log = () => 
   return { put, get, own, ownKey, stats, fetchAll, changed, resume, ensureAll, rehome, refsIn, cores, forget, close }
 }
 
-module.exports = { createPictures, pictureKey, hashOf, parseRef, formatRef, MAX_BYTES, MAX_FETCH, MIMES, TOO_BIG }
+module.exports = { createPictures, hasPictures, pictureKey, hashOf, parseRef, formatRef, MAX_BYTES, MAX_FETCH, MIMES, TOO_BIG }

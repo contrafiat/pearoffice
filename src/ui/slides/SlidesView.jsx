@@ -1,15 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as Y from 'yjs'
-import { ArrowCounterClockwise, ArrowClockwise, Textbox, SelectionForeground, SelectionBackground, Trash, ArrowUUpLeft, Play } from '@phosphor-icons/react'
+import { ArrowCounterClockwise, ArrowClockwise, Textbox, SelectionForeground, SelectionBackground, Trash, ArrowUUpLeft, Play, Shapes, Image as ImageIcon } from '@phosphor-icons/react'
 import { call, on } from '../bridge.js'
 import { FileBar, useMembers } from '../FileBar.jsx'
 import { colourFor } from '../Avatar.jsx'
 import { readPref } from '../prefs.js'
 import { isMobile } from '../save.js'
-import { toB64, fromB64 } from '../doc/pictures.js'
+import { toB64, fromB64, preparePicture, isPicture } from '../doc/pictures.js'
 import slidesModel from '../../slides/slidesModel.js'
 import { LAYOUTS, LAYOUT_IDS } from '../../slides/layouts.js'
-import { defaultSize } from './themes.js'
+import { defaultSize, THEMES, THEME_IDS } from './themes.js'
 import { useDeck, boxesOf } from './deck.js'
 import { LOCAL, deckUndo } from './text.js'
 import { Stage, restackSelected } from './Stage.jsx'
@@ -17,6 +17,8 @@ import { SlideList } from './SlideList.jsx'
 import { TextTools } from './TextTools.jsx'
 import { Notes } from './Notes.jsx'
 import { Show, Presenter } from './Present.jsx'
+import { PicturesContext, usePictureCache } from './objects.jsx'
+import { InsertShape, ShapeTools } from './ShapeTools.jsx'
 
 // The slide deck editor (proposals/2026-10-06-slides.md). As with documents
 // it keeps its own copy of the deck's Yjs doc: loaded whole with
@@ -27,7 +29,8 @@ import { Show, Presenter } from './Present.jsx'
 // notes, so Ctrl+Z undoes a move and typing in the order they were made.
 //
 // Phones edit text, speaker notes and slide order; moving, resizing,
-// rotating, adding boxes and layouts are for desktop.
+// rotating, adding boxes, shapes and pictures, styling shapes, layouts and
+// themes are for desktop. Every device draws shapes and pictures.
 
 const SEND_MS = 300
 const CURSOR_MS = 150
@@ -40,6 +43,7 @@ export function SlidesView ({ sheetId, onTitleChange, onError, onGone }) {
   const [title, setTitle] = useState('')
   const [arrived, setArrived] = useState(false)
   const members = useMembers(sheetId)
+  const pictures = usePictureCache(sheetId)
   const phone = isMobile()
   const errorRef = useRef(onError)
   errorRef.current = onError
@@ -278,6 +282,43 @@ export function SlidesView ({ sheetId, onTitleChange, onError, onGone }) {
     if (id) startEditing(id, {})
   }
 
+  // A shape in the middle of the slide, selected. A line is a wide, low box.
+  const addShape = (shape) => {
+    const [sw, sh] = deck.size
+    const f = shape === 'line' ? { w: 600, h: 40 } : shape === 'arrow' ? { w: 480, h: 280 } : { w: 400, h: 400 }
+    const id = change((doc) => slidesModel.addShape(doc, current, shape, { x: Math.round((sw - f.w) / 2), y: Math.round((sh - f.h) / 2), w: f.w, h: f.h, rot: 0 }))
+    if (id) { stopEditing(); setSel([id]); setTimeout(focusStage, 0) }
+  }
+  const setShapeStyle = (fn) => change((doc) => {
+    for (const el of els) if (shownSel.includes(el.id) && el.type === 'shape') slidesModel.setStyle(doc, current, el.id, fn(el))
+  })
+
+  // Pictures from the file picker or the clipboard: shrunk and stored as in
+  // documents (src/ui/doc/pictures.js), then put on this slide, selected.
+  const [toast, setToast] = useState(null)
+  const toastTimer = useRef(null)
+  useEffect(() => () => clearTimeout(toastTimer.current), [])
+  const showToast = (text) => {
+    clearTimeout(toastTimer.current)
+    setToast(text)
+    toastTimer.current = setTimeout(() => setToast(null), 4000)
+  }
+  const fileRef = useRef(null)
+  const addPictures = async (files) => {
+    const list = [...files].filter((f) => isPicture(f.type))
+    if (!list.length) { showToast('This kind of picture cannot be added.'); return }
+    const slideId = current
+    for (const file of list) {
+      try {
+        const p = await preparePicture(file)
+        const a = await call('slides:addPicture', { sheetId, bytes: toB64(p.bytes), mime: p.mime, width: p.w, height: p.h })
+        pictures.put(a.ref, p.bytes, p.mime)
+        const id = change((doc) => slidesModel.addPicture(doc, slideId, { ref: a.ref, hash: a.hash, mime: a.mime, w: a.w, h: a.h, alt: '' }))
+        if (id) { stopEditing(); setSel([id]); setTimeout(focusStage, 0) }
+      } catch (err) { showToast(err.message) }
+    }
+  }
+
   // --- presenting (Present.jsx) ---------------------------------------------
 
   // Open to everyone who can see the deck, viewers too. On desktop the main
@@ -353,64 +394,76 @@ export function SlidesView ({ sheetId, onTitleChange, onError, onGone }) {
   const others = people.filter((p) => p.slide === current)
   const slideMap = (slide || deleted) && slidesModel.slide(ydoc, current)
   const notes = slideMap && slideMap.get('notes')
+  const selShapes = layoutEdit && !editing ? els.filter((el) => el.type === 'shape' && shownSel.includes(el.id)) : []
 
   return (
-    <div className={'slides' + (phone ? ' phone' : '')} ref={rootRef} onKeyDown={onKeyDown}>
-      <FileBar
-        sheetId={sheetId}
-        noun='deck'
-        title={title}
-        myRole={info.myRole}
-        frozen={info.frozen}
-        canEdit={canEdit}
-        badge={!canEdit && <span className='badge view-only'>{hasEditRole && !info.writable && !info.frozen ? 'Getting edit access...' : 'View only'}</span>}
-        phone={phone}
-        members={members}
-        present={presentWhere}
-        onTitleChange={onTitleChange}
-        onError={onError}
-        onGone={onGone}
-      />
-      {note && <div className='banner info'>{note}</div>}
-      <div className={'doc-tools slides-tools' + (phone ? ' phone' : '')} role='toolbar' aria-label='Slide tools'>
-        {canEdit && btn('Undo (Ctrl+Z)', ArrowCounterClockwise, undefined, () => undo.undo(), { disabled: !undo.undoStack.length, className: 'undo-button' })}
-        {canEdit && btn('Redo (Ctrl+Y)', ArrowClockwise, undefined, () => undo.redo(), { disabled: !undo.redoStack.length, className: 'redo-button' })}
-        {canEdit && <span className='sep' />}
-        {layoutEdit && (
-          <>
-            <select aria-label='Layout' title='Layout' className='layout-select' disabled={!slide} value={(slide && slide.layout) || 'blank'} onChange={(e) => change((doc) => slidesModel.setLayout(doc, current, e.target.value))}>
-              {LAYOUT_IDS.map((id) => <option key={id} value={id}>{LAYOUTS[id].label}</option>)}
-            </select>
-            {btn('Add a text box', Textbox, undefined, addBox, { disabled: !slide, className: 'add-box' })}
-            {btn('Bring forward', SelectionForeground, undefined, () => restackSelected(change, current, els, shownSel, 1), { disabled: !shownSel.length, className: 'bring-forward' })}
-            {btn('Send backward', SelectionBackground, undefined, () => restackSelected(change, current, els, shownSel, -1), { disabled: !shownSel.length, className: 'send-backward' })}
-            {btn('Delete the box', Trash, undefined, () => { change((doc) => { for (const id of shownSel) slidesModel.removeElement(doc, current, id) }); setSel([]) }, { disabled: !shownSel.length, className: 'delete-box' })}
-            <span className='sep' />
-          </>
-        )}
-        {canEdit && <TextTools editor={toolEditor} defaultSize={defaultSize(deck.theme, editingBox ? editingBox.role : 'body')} phone={phone} btn={btn} />}
-        <button className='present-button' title={phone ? 'Present' : 'Present (F5, or Shift+F5 from this slide)'} onMouseDown={(e) => e.preventDefault()} onClick={() => startShow(true)} disabled={!deck.slides.length}><Play size={ICON} weight='fill' /> Present</button>
-      </div>
-      <div className='slides-row'>
-        {!phone && <SlideList slides={deck.slides} current={current} onPick={setCurrent} size={deck.size} theme={deck.theme} canEdit={canEdit} phone={phone} people={bySlide} sheetId={sheetId} onAdd={addSlide} onDuplicate={duplicate} onDelete={remove} onMove={move} />}
-        <div className='slides-main' onPointerDownCapture={(e) => { if (!e.target.closest('.slide-notes')) setNotesEditor(null) }}>
-          {deleted
-            ? (
-              <div className='slide-stage slide-deleted'>
-                <p>{deletedBy ? (members.find((x) => x.identity === deletedBy && x.isMe) ? 'You' : nameOf(deletedBy)) + ' deleted this slide.' : 'This slide was deleted.'}</p>
-                {canEdit && <button className='restore-slide' onClick={() => change((doc) => slidesModel.restoreSlide(doc, current))}><ArrowUUpLeft size={16} /> Restore</button>}
-              </div>
-              )
-            : slide
-              ? <Stage size={deck.size} theme={deck.theme} slideId={current} layout={slide.layout} els={els} sel={shownSel} setSel={setSel} editing={editing} startEditing={startEditing} stopEditing={stopEditing} editStart={editStart} canEdit={canEdit} layoutEdit={layoutEdit} phone={phone} undo={undo} change={change} others={others} onCursor={onCursor} onEditor={setBoxEditor} />
-              : <div className='slide-stage' />}
-          {phone && <SlideList slides={deck.slides} current={current} onPick={setCurrent} size={deck.size} theme={deck.theme} canEdit={canEdit} phone={phone} people={bySlide} sheetId={sheetId} onAdd={addSlide} onDuplicate={duplicate} onDelete={remove} onMove={move} />}
-          {notes instanceof Y.XmlFragment && <Notes key={current} fragment={notes} undo={undo} canEdit={canEdit} phone={phone} onFocus={setNotesEditor} />}
+    <PicturesContext.Provider value={pictures}>
+      <div className={'slides' + (phone ? ' phone' : '')} ref={rootRef} onKeyDown={onKeyDown}>
+        <FileBar
+          sheetId={sheetId}
+          noun='deck'
+          title={title}
+          myRole={info.myRole}
+          frozen={info.frozen}
+          canEdit={canEdit}
+          badge={!canEdit && <span className='badge view-only'>{hasEditRole && !info.writable && !info.frozen ? 'Getting edit access...' : 'View only'}</span>}
+          phone={phone}
+          members={members}
+          present={presentWhere}
+          onTitleChange={onTitleChange}
+          onError={onError}
+          onGone={onGone}
+        />
+        {note && <div className='banner info'>{note}</div>}
+        <div className={'doc-tools slides-tools' + (phone ? ' phone' : '')} role='toolbar' aria-label='Slide tools'>
+          {canEdit && btn('Undo (Ctrl+Z)', ArrowCounterClockwise, undefined, () => undo.undo(), { disabled: !undo.undoStack.length, className: 'undo-button' })}
+          {canEdit && btn('Redo (Ctrl+Y)', ArrowClockwise, undefined, () => undo.redo(), { disabled: !undo.redoStack.length, className: 'redo-button' })}
+          {canEdit && <span className='sep' />}
+          {layoutEdit && (
+            <>
+              <select aria-label='Layout' title='Layout' className='layout-select' disabled={!slide} value={(slide && slide.layout) || 'blank'} onChange={(e) => change((doc) => slidesModel.setLayout(doc, current, e.target.value))}>
+                {LAYOUT_IDS.map((id) => <option key={id} value={id}>{LAYOUTS[id].label}</option>)}
+              </select>
+              <select aria-label='Theme' title='Theme' className='theme-select' value={deck.theme.id} onChange={(e) => change((doc) => slidesModel.setTheme(doc, e.target.value))}>
+                {THEME_IDS.map((id) => <option key={id} value={id}>{THEMES[id].label}</option>)}
+              </select>
+              {btn('Add a text box', Textbox, undefined, addBox, { disabled: !slide, className: 'add-box' })}
+              <InsertShape btn={btn} Icon={Shapes} disabled={!slide} onPick={addShape} />
+              {btn('Insert a picture', ImageIcon, undefined, () => fileRef.current.click(), { disabled: !slide, className: 'add-picture' })}
+              <input ref={fileRef} type='file' accept='image/*' multiple hidden className='slide-picture-input' onChange={(e) => { const files = [...e.target.files]; e.target.value = ''; if (files.length) addPictures(files) }} />
+              {btn('Bring forward', SelectionForeground, undefined, () => restackSelected(change, current, els, shownSel, 1), { disabled: !shownSel.length, className: 'bring-forward' })}
+              {btn('Send backward', SelectionBackground, undefined, () => restackSelected(change, current, els, shownSel, -1), { disabled: !shownSel.length, className: 'send-backward' })}
+              {btn('Delete', Trash, undefined, () => { change((doc) => { for (const id of shownSel) slidesModel.removeElement(doc, current, id) }); setSel([]) }, { disabled: !shownSel.length, className: 'delete-box' })}
+              <span className='sep' />
+            </>
+          )}
+          {selShapes.length
+            ? <ShapeTools shapes={selShapes} theme={deck.theme} phone={phone} setStyle={setShapeStyle} />
+            : canEdit && <TextTools editor={toolEditor} defaultSize={defaultSize(deck.theme, editingBox ? editingBox.role : 'body')} phone={phone} btn={btn} />}
+          <button className='present-button' title={phone ? 'Present' : 'Present (F5, or Shift+F5 from this slide)'} onMouseDown={(e) => e.preventDefault()} onClick={() => startShow(true)} disabled={!deck.slides.length}><Play size={ICON} weight='fill' /> Present</button>
         </div>
+        <div className='slides-row'>
+          {!phone && <SlideList slides={deck.slides} current={current} onPick={setCurrent} size={deck.size} theme={deck.theme} canEdit={canEdit} phone={phone} people={bySlide} sheetId={sheetId} onAdd={addSlide} onDuplicate={duplicate} onDelete={remove} onMove={move} />}
+          <div className='slides-main' onPointerDownCapture={(e) => { if (!e.target.closest('.slide-notes')) setNotesEditor(null) }}>
+            {deleted
+              ? (
+                <div className='slide-stage slide-deleted'>
+                  <p>{deletedBy ? (members.find((x) => x.identity === deletedBy && x.isMe) ? 'You' : nameOf(deletedBy)) + ' deleted this slide.' : 'This slide was deleted.'}</p>
+                  {canEdit && <button className='restore-slide' onClick={() => change((doc) => slidesModel.restoreSlide(doc, current))}><ArrowUUpLeft size={16} /> Restore</button>}
+                </div>
+                )
+              : slide
+                ? <Stage size={deck.size} theme={deck.theme} slideId={current} layout={slide.layout} els={els} sel={shownSel} setSel={setSel} editing={editing} startEditing={startEditing} stopEditing={stopEditing} editStart={editStart} canEdit={canEdit} layoutEdit={layoutEdit} phone={phone} undo={undo} change={change} others={others} onCursor={onCursor} onEditor={setBoxEditor} onPastePictures={addPictures} />
+                : <div className='slide-stage' />}
+            {phone && <SlideList slides={deck.slides} current={current} onPick={setCurrent} size={deck.size} theme={deck.theme} canEdit={canEdit} phone={phone} people={bySlide} sheetId={sheetId} onAdd={addSlide} onDuplicate={duplicate} onDelete={remove} onMove={move} />}
+            {notes instanceof Y.XmlFragment && <Notes key={current} fragment={notes} undo={undo} canEdit={canEdit} phone={phone} onFocus={setNotesEditor} />}
+          </div>
+        </div>
+        {presenting && (presenting.mode === 'presenter'
+          ? <Presenter deck={deck} ydoc={ydoc} startId={presenting.start} onEnd={endShow} />
+          : <Show deck={deck} ydoc={ydoc} startId={presenting.start} phone={phone} onEnd={endShow} />)}
+        {toast && <div className='toast' role='status'>{toast}</div>}
       </div>
-      {presenting && (presenting.mode === 'presenter'
-        ? <Presenter deck={deck} ydoc={ydoc} startId={presenting.start} onEnd={endShow} />
-        : <Show deck={deck} ydoc={ydoc} startId={presenting.start} phone={phone} onEnd={endShow} />)}
-    </div>
+    </PicturesContext.Provider>
   )
 }

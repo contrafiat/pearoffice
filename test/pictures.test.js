@@ -388,3 +388,127 @@ test('pictures: references to other cores are bounded and fail cleanly', async (
     assert.equal((await call(owner, 'doc:state', { sheetId, withState: false })).myRole, 'owner')
   })
 })
+
+// Slide decks hold pictures in picture elements (proposals/2026-10-06-slides.md,
+// "Pictures"), with the same cores, seeding and moves as documents.
+const slidesModel = require('../src/slides/slidesModel')
+
+async function deckReplica (engine, sheetId) {
+  const s = await call(engine, 'slides:state', { sheetId })
+  const doc = new Y.Doc()
+  Y.applyUpdate(doc, b4a.from(s.state, 'base64'))
+  return doc
+}
+
+async function deckEdit (engine, sheetId, fn) {
+  const doc = await deckReplica(engine, sheetId)
+  const before = Y.encodeStateVector(doc)
+  let out
+  doc.transact(() => { out = fn(doc) })
+  await call(engine, 'slides:update', { sheetId, update: b4a.toString(Y.encodeStateAsUpdate(doc, before), 'base64') })
+  doc.destroy()
+  return out
+}
+
+async function deckRefs (engine, sheetId) {
+  const doc = await deckReplica(engine, sheetId)
+  const out = slidesModel.pictureRefs(doc).map((p) => p.ref + '#' + p.hash).sort().join(',')
+  doc.destroy()
+  return out
+}
+
+async function deckPicture (engine, sheetId, bytes) {
+  const a = await call(engine, 'slides:addPicture', { sheetId, bytes: b4a.toString(bytes, 'base64'), mime: 'image/jpeg', width: 800, height: 600 })
+  const elId = await deckEdit(engine, sheetId, (doc) => {
+    const slideId = slidesModel.addSlide(doc, { layout: 'blank' })
+    return { slideId, elId: slidesModel.addPicture(doc, slideId, { ...a, alt: 'Picture ' + bytes.length }) }
+  })
+  return { ...a, ...elId }
+}
+
+async function deckPictureHash (engine, sheetId, ref) {
+  const r = await call(engine, 'slides:picture', { sheetId, ref })
+  return hashOf(b4a.from(r.data, 'base64'))
+}
+
+test('pictures in slide decks: shared, backed up blind, tidied up and read from the seeder', async (t) => {
+  const ctx = setup(t)
+  await ctx.start()
+  const { seeder } = ctx
+  const owner = await ctx.device('Owner')
+  await call(owner, 'seeder:pair', { link: seeder.openPairing().link })
+  const editor = await ctx.device('Editor')
+  const lateDir = tmpDir()
+  const late = await ctx.device('Late', lateDir)
+  const { sheetId: oldId } = await call(owner, 'slides:create', { title: 'Album deck' })
+  await ctx.join(owner, editor, oldId, 'editor')
+  await ctx.join(owner, late, oldId, 'editor')
+
+  const pics = []
+  for (const seed of [11, 12, 13, 14, 15]) pics.push(await deckPicture(owner, oldId, pictureBytes(60 * 1024 + seed, seed)))
+
+  await t.test('a picture element is placed centred at most half the slide', async () => {
+    const doc = await deckReplica(owner, oldId)
+    const f = slidesModel.frame(slidesModel.element(doc, pics[0].slideId, pics[0].elId))
+    doc.destroy()
+    assert.equal([f.x, f.y, f.w, f.h].join(), '600,270,720,540')
+  })
+
+  await t.test('the other devices get the references and the same bytes', async () => {
+    const want = await deckRefs(owner, oldId)
+    await waitFor('editor has the refs', async () => (await deckRefs(editor, oldId)) === want)
+    for (const p of pics) assert.equal(await deckPictureHash(editor, oldId, p.ref), p.hash)
+  })
+
+  await t.test('a wrong hash is refused', async () => {
+    await assert.rejects(call(editor, 'slides:picture', { sheetId: oldId, ref: pics[0].ref, hash: 'ab'.repeat(32) }), /does not match/)
+  })
+
+  await t.test('the seeder stores the picture core, as ciphertext', async () => {
+    const key = b4a.from(parseRef(pics[0].ref).key, 'hex')
+    const length = pics.reduce((n, p) => Math.max(n, parseRef(p.ref).id.blockOffset + parseRef(p.ref).id.blockLength), 0)
+    await waitFor('seeder has the picture core', seederHas(seeder, key, length), { timeout: 40000 })
+    assert.equal((await rawHits(seeder.peer.store, key)).hits, 0)
+  })
+
+  // Two picture elements go; one picture's slide is deleted but stays (Restore).
+  await deckEdit(owner, oldId, (doc) => {
+    slidesModel.removeElement(doc, pics[1].slideId, pics[1].elId)
+    slidesModel.removeElement(doc, pics[3].slideId, pics[3].elId)
+    slidesModel.deleteSlide(doc, pics[4].slideId)
+  })
+  const live = [pics[0], pics[2], pics[4]]
+  await waitFor('editor has three', async () => (await deckRefs(editor, oldId)).split(',').length === 3)
+
+  let newId = null
+  await t.test('a tidy-up of 5 pictures with 2 deleted copies the 3 under the new key', async () => {
+    newId = (await call(owner, 'file:compact', { sheetId: oldId })).sheetId
+    const mine = await owner.pictures.ownKey(newId)
+    const refs = (await deckRefs(owner, newId)).split(',')
+    assert.equal(refs.length, 3)
+    assert.equal(refs.map((x) => x.split('#')[1]).sort().join(), live.map((p) => p.hash).sort().join())
+    assert.equal(refs.every((x) => parseRef(x.split('#')[0]).key === mine), true)
+    const own = await owner.pictures.own(newId)
+    assert.equal(own.core.length, live.reduce((n, p) => n + parseRef(p.ref).id.blockLength, 0))
+    for (const x of refs) assert.equal(await deckPictureHash(owner, newId, x.split('#')[0]), x.split('#')[1])
+  })
+
+  await t.test('the editor follows and reads them', async () => {
+    await waitFor('editor in the new file', async () => !!editor.bases.get(newId) && (await deckRefs(editor, newId)).split(',').length === 3, { timeout: 40000 })
+    for (const x of (await deckRefs(editor, newId)).split(',')) assert.equal(await deckPictureHash(editor, newId, x.split('#')[0]), x.split('#')[1])
+  })
+
+  await t.test('a member who comes back when only the seeder is up gets the pictures', async () => {
+    const want = await deckRefs(owner, newId)
+    await waitFor('the seeder has the new picture core', seederHas(seeder, b4a.from(parseRef(want.split(',')[0].split('#')[0]).key, 'hex'), (await owner.pictures.own(newId)).core.length), { timeout: 40000 })
+    await late.close()
+    // The others follow first, so the late device has somewhere to go.
+    await waitFor('editor still there', async () => !!editor.bases.get(newId))
+    for (const e of [owner, editor]) await e.close()
+    await sleep(500)
+    const back = await ctx.device('Late again', lateDir)
+    await waitFor('late follows to the new file', async () => !!(await back.localDb.get('moves:' + oldId))?.value?.to, { timeout: 60000 })
+    await waitFor('late has the refs', async () => !!back.bases.get(newId) && (await deckRefs(back, newId)) === want, { timeout: 60000 })
+    for (const x of want.split(',')) assert.equal(await deckPictureHash(back, newId, x.split('#')[0]), x.split('#')[1])
+  })
+})
