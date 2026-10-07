@@ -53,7 +53,9 @@ async function runParts ({ command, args, label, parts, shot, timeout, echo }) {
   const failed = []
   for (const part of parts) {
     const { seconds, result } = await runPart({ command, args, part, shot, timeout, echo })
-    if (result.ok) console.log('ok - ' + label + ' ' + part + ' (' + seconds + ' s): ' + result.steps.filter((s) => typeof s === 'string').slice(2).join(', '))
+    // Timings a part records (result.timings, in ms) go on its line.
+    const timings = result.timings ? ' [' + Object.entries(result.timings).map(([k, v]) => k + ' ' + v + ' ms').join(', ') + ']' : ''
+    if (result.ok) console.log('ok - ' + label + ' ' + part + ' (' + seconds + ' s): ' + result.steps.filter((s) => typeof s === 'string').slice(2).join(', ') + timings)
     else {
       failed.push(part)
       console.error('not ok - ' + label + ' ' + part + ' (' + seconds + ' s) ' + JSON.stringify(result))

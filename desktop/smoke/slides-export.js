@@ -9,7 +9,8 @@
 const fs = require('node:fs')
 const path = require('node:path')
 const { execFileSync } = require('node:child_process')
-const JSZip = require('jszip')
+// jszip is only in the checkout; a packaged app checks the file is a zip.
+const JSZip = (() => { try { return require('jszip') } catch { return null } })()
 
 module.exports = async function slidesExport (t) {
   await t.js("window.__slideErrors = []; window.addEventListener('error', (e) => window.__slideErrors.push(String(e.message)))")
@@ -140,20 +141,26 @@ async function run (t) {
   const pptx = await newFile(downloads, '.pptx', pptBefore, sleep)
   if (!pptx) throw new Error('no .pptx saved')
   const pptMs = Date.now() - t1
-  const zip = await JSZip.loadAsync(fs.readFileSync(pptx))
-  const slides = Object.keys(zip.files).filter((n) => /^ppt\/slides\/slide\d+\.xml$/.test(n)).sort()
-  const s1 = zip.file('ppt/slides/slide1.xml') ? await zip.file('ppt/slides/slide1.xml').async('string') : ''
-  const s2 = zip.file('ppt/slides/slide2.xml') ? await zip.file('ppt/slides/slide2.xml').async('string') : ''
-  const checks = {
-    slides: slides.length === 2,
-    title: s1.includes('<a:t>Export smoke</a:t>'),
-    shape: s1.includes('prst="rect"'),
-    picture: s1.includes('<p:pic>') && Object.keys(zip.files).some((n) => n.startsWith('ppt/media/')),
-    second: s2.includes('<a:t>Second page</a:t>')
+  const bytes = fs.readFileSync(pptx)
+  let checks = { zip: bytes.length > 1000 && bytes.slice(0, 2).toString() === 'PK' }
+  let slideCount = '?'
+  if (JSZip) {
+    const zip = await JSZip.loadAsync(bytes)
+    const slides = Object.keys(zip.files).filter((n) => /^ppt\/slides\/slide\d+\.xml$/.test(n)).sort()
+    const s1 = zip.file('ppt/slides/slide1.xml') ? await zip.file('ppt/slides/slide1.xml').async('string') : ''
+    const s2 = zip.file('ppt/slides/slide2.xml') ? await zip.file('ppt/slides/slide2.xml').async('string') : ''
+    slideCount = slides.length
+    checks = {
+      slides: slides.length === 2,
+      title: s1.includes('<a:t>Export smoke</a:t>'),
+      shape: s1.includes('prst="rect"'),
+      picture: s1.includes('<p:pic>') && Object.keys(zip.files).some((n) => n.startsWith('ppt/media/')),
+      second: s2.includes('<a:t>Second page</a:t>')
+    }
   }
   result.exportPptx = Object.values(checks).every(Boolean)
   if (!result.exportPptx) throw new Error('pptx: ' + JSON.stringify(checks))
-  step('PowerPoint saved: ' + slides.length + ' slides, ' + pptMs + ' ms')
+  step('PowerPoint saved: ' + slideCount + ' slides, ' + pptMs + ' ms')
 
   if (shots) {
     fs.copyFileSync(pdf, path.join(shots, 'export-app.pdf'))
