@@ -6,7 +6,7 @@
 
 const { helpers } = require('./smoke/common')
 
-const PARTS = ['sheets', 'sheet-files', 'docs', 'slides', 'slides-present', 'app']
+const PARTS = ['sheets', 'sheet-files', 'docs', 'slides', 'slides-present', 'slides-objects', 'app']
 
 async function run ({ app, win, ready, log, dataDir, getTray }) {
   const part = process.env.PEAROFFICE_SMOKE_PART

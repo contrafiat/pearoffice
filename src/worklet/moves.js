@@ -27,7 +27,7 @@ const { defaultEncodeInvite } = require('@peerloom/core/engine')
 const model = require('../sheet/sheetModel')
 const m = require('./membership')
 const { yOps } = require('./yOps')
-const { parseRef } = require('./pictures')
+const { parseRef, hasPictures } = require('./pictures')
 
 const hex = (buf) => b4a.toString(buf, 'hex')
 const DEVICE_RESEND_MS = 3000
@@ -99,13 +99,13 @@ function createMoves ({ engine, sheets, getJoin, getDeleting = () => null, getPi
     const me = hex(engine.identity.publicKey)
     const old = await sheets.load(oldId)
     const title = model.title(old.guarded.doc)
-    const pictures = model.kind(old.guarded.doc) === 'doc' ? getPictures() : null
+    const pictures = hasPictures(old.guarded.doc) ? getPictures() : null
     if (pictures) {
       const missing = await pictures.ensureAll(oldId, old.guarded.doc)
       if (missing.length) {
         const n = missing.length
         const alts = missing.map((x) => x.alt).filter(Boolean).join(', ')
-        throw new Error((n === 1 ? 'A picture in this document is' : n + ' pictures in this document are') + ' not on this device yet' + (alts ? ' (' + alts + ')' : '') + '. Try again once ' + (n === 1 ? 'it has' : 'they have') + ' arrived.')
+        throw new Error((n === 1 ? 'A picture in this file is' : n + ' pictures in this file are') + ' not on this device yet' + (alts ? ' (' + alts + ')' : '') + '. Try again once ' + (n === 1 ? 'it has' : 'they have') + ' arrived.')
       }
     }
     let state = model.encodeState(old.guarded.doc)
@@ -246,7 +246,7 @@ function createMoves ({ engine, sheets, getJoin, getDeleting = () => null, getPi
       const scratch = model.createDoc()
       model.applyUpdate(scratch, model.encodeState(into.guarded.doc))
       if (missing) model.applyUpdate(scratch, missing)
-      if (pictures && model.kind(scratch) === 'doc') {
+      if (pictures && hasPictures(scratch)) {
         const mine = await pictures.ownKey(oldId)
         await pictures.rehome(oldId, newId, scratch, (ref) => parseRef(ref).key === mine)
       }

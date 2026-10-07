@@ -5,7 +5,13 @@
 //   meta    title, kind 'slides', version
 //   deck    theme (an id from src/ui/slides/themes.js), size ([1920, 1080])
 //   slides  slide id -> Y.Map { pos, layout, gone, goneBy, notes, els }
-//           els: element id -> Y.Map { type, frame, z, role, text }
+//           els: element id -> Y.Map { type, frame, z, role, text, ... }
+//
+// Element types: `text` (a text box), `shape` (shape, fill, line, lineW, and
+// text inside) and `picture` (ref, hash, mime, pw, ph, alt, as the document
+// image node: the bytes are in the writer's picture core,
+// src/worklet/pictures.js). A colour is a theme slot ('accent1') or a hex
+// value.
 //
 // Order is by fractional index keys (`pos` for slides, `z` for elements),
 // then id, never by position in a Y.Array: a move sets one key, so two
@@ -23,7 +29,9 @@ const { LAYOUTS, ROLES, boxesFor } = require('./layouts')
 const VERSION = 1
 const SIZE = [1920, 1080]
 const THEME = 'plain'
-const TYPES = ['text']
+const TYPES = ['text', 'shape', 'picture']
+const SHAPES = ['rect', 'roundRect', 'ellipse', 'triangle', 'arrow', 'line']
+const COLOR = /^(#[0-9a-fA-F]{6}|none|text|background|accent[1-6])$/
 const MAX_ELEMENTS = 1000
 const FRAME_MIN = -10000
 const FRAME_MAX = 30000
@@ -148,7 +156,7 @@ function frame (map) {
 
 // --- writing (call inside doc.transact) ---------------------------------------
 
-function newElement (type, frameValue, z, role) {
+function newElement (type, frameValue, z, role) { // text and shape
   const map = new Y.Map()
   map.set('type', type)
   map.set('frame', cleanFrame(frameValue))
@@ -320,6 +328,94 @@ function addText (doc, slideId, frameValue = { x: 560, y: 440, w: 800, h: 200, r
   return id
 }
 
+// A new shape on top. Returns its id.
+function addShape (doc, slideId, shape, frameValue = { x: 760, y: 340, w: 400, h: 400, rot: 0 }) {
+  const els = elsOf(slide(doc, slideId))
+  if (!els || !SHAPES.includes(shape) || elements(doc, slideId).length >= MAX_ELEMENTS) return null
+  const id = newId()
+  const map = newElement('shape', frameValue, topZ(doc, slideId))
+  map.set('shape', shape)
+  map.set('fill', shape === 'line' ? 'none' : 'accent1')
+  map.set('line', shape === 'line' ? 'text' : 'none')
+  map.set('lineW', shape === 'line' ? 6 : 0)
+  els.set(id, map)
+  return id
+}
+
+// A new picture on top: `pic` is the reference from slides:addPicture
+// ({ ref, hash, mime, w, h }) plus alt. Placed centred, at most half the
+// slide, keeping its shape. Returns its id.
+function addPicture (doc, slideId, pic, frameValue = null) {
+  const els = elsOf(slide(doc, slideId))
+  if (!els || !pic || typeof pic.ref !== 'string' || elements(doc, slideId).length >= MAX_ELEMENTS) return null
+  const pw = Math.max(1, Math.round(Number(pic.w)) || 1)
+  const ph = Math.max(1, Math.round(Number(pic.h)) || 1)
+  if (!frameValue) {
+    const [sw, sh] = size(doc)
+    const k = Math.min(1, (sw / 2) / pw, (sh / 2) / ph)
+    const w = Math.round(pw * k)
+    const h = Math.round(ph * k)
+    frameValue = { x: Math.round((sw - w) / 2), y: Math.round((sh - h) / 2), w, h, rot: 0 }
+  }
+  const id = newId()
+  const map = new Y.Map()
+  map.set('type', 'picture')
+  map.set('frame', cleanFrame(frameValue))
+  map.set('z', topZ(doc, slideId))
+  map.set('ref', pic.ref)
+  map.set('hash', String(pic.hash || ''))
+  map.set('mime', String(pic.mime || ''))
+  map.set('pw', pw)
+  map.set('ph', ph)
+  map.set('alt', String(pic.alt || '').slice(0, 500))
+  els.set(id, map)
+  return id
+}
+
+// A shape's fill, outline colour and outline width, as stored, made safe.
+function style (map) {
+  const col = (v, dflt) => (typeof v === 'string' && COLOR.test(v) ? v : dflt)
+  return {
+    shape: SHAPES.includes(map.get('shape')) ? map.get('shape') : 'rect',
+    fill: col(map.get('fill'), 'accent1'),
+    line: col(map.get('line'), 'none'),
+    lineW: clampNum(map.get('lineW'), 0, 100, 0)
+  }
+}
+
+// Change a shape's fill, line or lineW (others are left alone).
+function setStyle (doc, slideId, elId, changes = {}) {
+  const map = element(doc, slideId, elId)
+  if (!map || map.get('type') !== 'shape') return false
+  for (const k of ['fill', 'line']) if (typeof changes[k] === 'string' && COLOR.test(changes[k])) map.set(k, changes[k])
+  if (Number.isFinite(changes.lineW)) map.set('lineW', clampNum(changes.lineW, 0, 100, 0))
+  return true
+}
+
+// A picture's alt text (what it shows, for screen readers and exports).
+function setAlt (doc, slideId, elId, text) {
+  const map = element(doc, slideId, elId)
+  if (!map || map.get('type') !== 'picture') return false
+  map.set('alt', String(text || '').slice(0, 500))
+  return true
+}
+
+// Every picture element in the deck, deleted slides included (Restore
+// brings them back), as { ref, hash, alt, map }.
+function pictureRefs (doc) {
+  const out = []
+  for (const s of slides(doc, { gone: true })) {
+    const els = elsOf(s.map)
+    if (!els) continue
+    for (const map of els.values()) {
+      if (!(map instanceof Y.Map) || map.get('type') !== 'picture') continue
+      const ref = map.get('ref')
+      if (typeof ref === 'string') out.push({ ref, hash: String(map.get('hash') || ''), alt: String(map.get('alt') || ''), map })
+    }
+  }
+  return out
+}
+
 function setFrame (doc, slideId, elId, frameValue) {
   const map = element(doc, slideId, elId)
   if (!map) return false
@@ -367,7 +463,8 @@ function plainOf (node) {
 // The deck as plain text, for tests: one block per slide, each box's text
 // (back to front) on its own line.
 function plainText (doc) {
-  return slides(doc).map((s) => elements(doc, s.id).map((e) => plainOf(e.map.get('text') || new Y.XmlFragment())).join('\n')).join('\n---\n')
+  const textOf = (map) => (map.get('text') instanceof Y.XmlFragment ? plainOf(map.get('text')) : '')
+  return slides(doc).map((s) => elements(doc, s.id).map((e) => textOf(e.map)).join('\n')).join('\n---\n')
 }
 
 module.exports = {
@@ -375,6 +472,7 @@ module.exports = {
   SIZE,
   THEME,
   TYPES,
+  SHAPES,
   MAX_ELEMENTS,
   newId,
   keyBetween,
@@ -397,6 +495,12 @@ module.exports = {
   duplicateSlide,
   setLayout,
   addText,
+  addShape,
+  addPicture,
+  style,
+  setStyle,
+  setAlt,
+  pictureRefs,
   setFrame,
   removeElement,
   restack,

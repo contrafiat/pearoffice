@@ -24,10 +24,20 @@ export function useDeckVersion (ydoc) {
   return version
 }
 
+// Each element as drawn: { id, type, role, frame, text }, plus `style` for
+// shapes (slidesModel.style) and `pic` for pictures.
 export function boxesOf (ydoc, slideId) {
   return slidesModel.elements(ydoc, slideId).map((e) => {
     const role = e.map.get('role')
-    return { id: e.id, role: ROLES.includes(role) ? role : null, frame: slidesModel.frame(e.map), text: e.map.get('text') }
+    const type = e.map.get('type')
+    const el = { id: e.id, type, role: type === 'text' && ROLES.includes(role) ? role : null, frame: slidesModel.frame(e.map), text: e.map.get('text') }
+    if (type === 'shape') el.style = slidesModel.style(e.map)
+    if (type === 'picture') {
+      const str = (k) => String(e.map.get(k) || '')
+      el.pic = { ref: str('ref'), hash: str('hash'), mime: str('mime'), w: e.map.get('pw') || 1, h: e.map.get('ph') || 1, alt: str('alt').slice(0, 500) }
+      el.text = null
+    }
+    return el
   })
 }
 

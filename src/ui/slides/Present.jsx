@@ -7,6 +7,7 @@ import slidesModel from '../../slides/slidesModel.js'
 import { StaticSlide } from './StaticSlide.jsx'
 import { fragmentDom } from './text.js'
 import { useDeck } from './deck.js'
+import { PicturesContext, usePictureCache } from './objects.jsx'
 
 // Presenting a deck (proposals/2026-10-06-slides.md, Presenting). Slides are
 // drawn with the same static DOM as the thumbnails, scaled to fill the screen
@@ -347,12 +348,15 @@ export function Audience ({ sheetId, startId }) {
   useShowKeys((k) => { if (k === 'Escape') call('app:presentEnd').catch(() => {}); else input(k) })
   const taps = useTaps({ blank: show.blank, unblank: () => input('Unblank'), next: () => input('ArrowRight'), prev: () => input('ArrowLeft') })
   const idle = useIdle()
+  const pictures = usePictureCache(sheetId)
   return (
-    <div className={'show audience' + (idle ? ' idle' : '')} role='main' aria-label='Slide show'>
-      <div className='show-screen' {...taps}>
-        <FitSlide slide={show.slide} size={deck.size} theme={deck.theme} />
-        {show.blank && <div className={'show-blank ' + show.blank} />}
+    <PicturesContext.Provider value={pictures}>
+      <div className={'show audience' + (idle ? ' idle' : '')} role='main' aria-label='Slide show'>
+        <div className='show-screen' {...taps}>
+          <FitSlide slide={show.slide} size={deck.size} theme={deck.theme} />
+          {show.blank && <div className={'show-blank ' + show.blank} />}
+        </div>
       </div>
-    </div>
+    </PicturesContext.Provider>
   )
 }

@@ -11,11 +11,13 @@ const m = require('../worklet/membership')
 const { createFileHelpers } = require('../worklet/fileMethods')
 const docModel = require('../doc/docModel')
 const slidesModel = require('./slidesModel')
+const model = require('../sheet/sheetModel')
+const { MIMES, TOO_BIG, MAX_BYTES } = require('../worklet/pictures')
 
 const hex = (buf) => b4a.toString(buf, 'hex')
 
-function createSlidesMethods (sheets, { getJoin }) {
-  const { profileName, commit, replicaState, replicaUpdate } = createFileHelpers(sheets)
+function createSlidesMethods (sheets, { getJoin, getPictures }) {
+  const { profileName, commit, replicaState, replicaUpdate, requireEdit, docFor } = createFileHelpers(sheets)
 
   return {
     'slides:create': async ({ title = 'Untitled slides' } = {}, ctx) => {
@@ -37,7 +39,34 @@ function createSlidesMethods (sheets, { getJoin }) {
     'slides:state': ({ sheetId, withState = true }, ctx) =>
       replicaState(ctx, sheetId, { withState, newer: (doc) => slidesModel.version(doc) > slidesModel.VERSION }),
 
-    'slides:update': ({ sheetId, update }, ctx) => replicaUpdate(ctx, sheetId, update, 'slides', 'a slide deck')
+    'slides:update': ({ sheetId, update }, ctx) => replicaUpdate(ctx, sheetId, update, 'slides', 'a slide deck'),
+
+    // A picture for the deck, as for documents (doc:addPicture): stored in
+    // this device's picture core for the file. Returns the reference; the
+    // editor adds the picture element (slidesModel.addPicture).
+    'slides:addPicture': async ({ sheetId, bytes, mime, width, height } = {}, ctx) => {
+      await requireEdit(ctx, sheetId)
+      const { doc } = await docFor(sheetId)
+      if (model.kind(doc) !== 'slides') throw new Error('Not a slide deck')
+      if (!MIMES.includes(mime)) throw new Error('This kind of picture cannot be added.')
+      if (typeof bytes !== 'string' || !bytes) throw new Error('This picture is empty.')
+      if (bytes.length > Math.ceil(MAX_BYTES / 3) * 4 + 4) throw new Error(TOO_BIG)
+      const stored = await getPictures().put(sheetId, b4a.from(bytes, 'base64'))
+      return { ref: stored.ref, hash: stored.hash, mime, w: Math.max(1, Math.round(Number(width)) || 1), h: Math.max(1, Math.round(Number(height)) || 1), size: stored.size }
+    },
+
+    // A picture's bytes (base64), checked against the hash the deck holds
+    // for it (or the one given).
+    'slides:picture': async ({ sheetId, ref, hash } = {}, ctx) => {
+      const { doc } = await docFor(sheetId)
+      if (!hash) {
+        const p = slidesModel.pictureRefs(doc).find((x) => x.ref === ref)
+        if (!p) throw new Error('This picture is not in the deck')
+        hash = p.hash
+      }
+      const data = await getPictures().get(sheetId, ref, hash)
+      return { data: b4a.toString(data, 'base64') }
+    }
   }
 }
 

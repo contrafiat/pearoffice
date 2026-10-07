@@ -150,6 +150,35 @@ test('stacking order: forward, back, front and back', () => {
   assert.equal(ids().join(), [title, body, t2, t1].join())
 })
 
+test('shapes and pictures: added, styled, duplicated and listed', () => {
+  const { a } = deck(1)
+  const sl = s.slideIds(a)[0]
+  let rect, line, pic, bad
+  change(a, (d) => {
+    rect = s.addShape(d, sl, 'roundRect')
+    line = s.addShape(d, sl, 'line')
+    bad = s.addShape(d, sl, 'hexagram')
+    pic = s.addPicture(d, sl, { ref: 'aa:bb', hash: 'cc', mime: 'image/png', w: 4000, h: 1000, alt: 'Wide' })
+  })
+  assert.equal(bad, null)
+  const st = (id, on = sl) => { const x = s.style(s.element(a, on, id)); return [x.shape, x.fill, x.line, x.lineW].join() }
+  assert.equal(st(rect), 'roundRect,accent1,none,0')
+  assert.equal(st(line), 'line,none,text,6')
+  change(a, (d) => s.setStyle(d, sl, rect, { fill: '#ff0000', line: 'javascript:x', lineW: 500 }))
+  assert.equal(st(rect), 'roundRect,#ff0000,none,100')
+  const f = s.frame(s.element(a, sl, pic))
+  assert.equal([f.x, f.y, f.w, f.h].join(), '480,420,960,240')
+  assert.equal(s.elements(a, sl).map((e) => e.map.get('type')).join(), 'text,text,shape,shape,picture')
+  change(a, (d) => { s.setAlt(d, sl, pic, 'A wide picture'); s.setAlt(d, sl, rect, 'not a picture') })
+  assert.equal(s.element(a, sl, pic).get('alt') + '|' + String(s.element(a, sl, rect).get('alt')), 'A wide picture|undefined')
+  let dup
+  change(a, (d) => { dup = s.duplicateSlide(d, sl) })
+  assert.equal(s.pictureRefs(a).map((p) => p.ref).join(), 'aa:bb,aa:bb', 'a copy keeps the reference')
+  assert.equal(st(s.elements(a, dup).find((e) => e.map.get('type') === 'shape').id, dup), 'roundRect,#ff0000,none,100')
+  change(a, (d) => s.deleteSlide(d, dup))
+  assert.equal(s.pictureRefs(a).length, 2, 'a deleted slide keeps its pictures for Restore')
+})
+
 test('bad values from another member are clamped or skipped', () => {
   const { a } = deck(1)
   const sl = s.slideIds(a)[0]
