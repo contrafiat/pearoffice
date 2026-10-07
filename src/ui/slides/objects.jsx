@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useMemo, useState } from '
 import { call } from '../bridge.js'
 import { pictureCache, fromB64 } from '../doc/pictures.js'
 import { fitPath } from './svgPath.js'
+import { SlideChart } from './SlideChart.jsx'
 
 // Shapes and pictures on a slide (proposals/2026-10-06-slides.md, part 3),
 // drawn the same way in the editor's stage, the slide list and the show.
@@ -11,7 +12,8 @@ import { fitPath } from './svgPath.js'
 // Its head is the left end and its tail the right. A custom shape's path is
 // stretched from its 1000 x 1000 box to the frame. A picture is an <img> of
 // bytes fetched with slides:picture, its uncropped part stretched to its
-// frame, with a grey box and its alt text until they arrive.
+// frame, with a grey box and its alt text until they arrive. A chart is
+// drawn by SlideChart.jsx.
 
 const RETRY_MS = 15000
 
@@ -212,9 +214,10 @@ function inkOn (fill, opacity = 1) {
 }
 
 // What a slide element draws inside its frame div: `text` is the element's
-// text, drawn by the caller (static or live).
-export function ElementBody ({ el, frame, text }) {
+// text, drawn by the caller (static or live). Charts take the slide's theme.
+export function ElementBody ({ el, frame, text, theme }) {
   if (el.type === 'picture') return <SlidePicture pic={el.pic} crop={el.crop} />
+  if (el.type === 'chart') return theme ? <SlideChart value={el.chart} theme={theme} w={frame.w} h={frame.h} /> : null
   if (el.type === 'shape') {
     return (
       <>

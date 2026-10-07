@@ -15,8 +15,8 @@ import { deckToPptx, deckPictures, PPTX } from './pptxExport.js'
 // Saving a deck (proposals/2026-10-06-slides.md, "Import and export"): as
 // PowerPoint (pptxExport.js), as a PDF with one page per slide or on paper.
 // The PDF and print pages are the slides drawn by StaticSlide, as in the
-// slide list and the show, with pictures as data: URLs and the theme's
-// colours and fonts inline. Text stays text. Deleted slides are left out.
+// slide list and the show, with pictures as data: URLs, charts as inline
+// SVG and the theme's colours and fonts inline. Text stays text. Deleted slides are left out.
 
 const PER_IN = 144 // slide units to the inch (pptxExport.js)
 const CSS_PX = 96 // CSS pixels to the inch
@@ -31,6 +31,8 @@ const SLIDE_CSS = [
   '.shape-ink{display:contents}',
   '.slide-picture{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;display:block}',
   '.slide-picture-crop{position:absolute;inset:0;overflow:hidden}',
+  '.slide-chart{position:absolute;inset:0}',
+  '.slide-chart svg{display:block;width:100%;height:100%;overflow:visible}',
   '.slide-picture-wait{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;box-sizing:border-box;overflow:hidden;background:#c8cbd0;color:#464b52;font-size:28px;text-align:center}',
   '.slide-text{position:absolute;left:0;top:0;transform-origin:0 0;font-size:var(--slide-body-size);line-height:1.2;overflow-wrap:break-word}',
   '.slide-text.role-title{font-family:var(--slide-heading);font-size:var(--slide-title-size);font-weight:var(--slide-title-weight);line-height:1.1}',

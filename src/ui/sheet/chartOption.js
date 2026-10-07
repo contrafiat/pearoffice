@@ -1,6 +1,8 @@
 // A chart's settings and data (proposals/2026-10-04-charts.md) as ECharts
 // options. The look follows the app: its palette, ink and line colours, light
-// or dark.
+// or dark. A theme may also carry `palette` (series colours) and `font`, as
+// slides pass theirs (src/ui/slides/SlideChart.jsx); a series with its own
+// `color` (#rrggbb) is drawn in it.
 
 import { SSF } from 'xlsx/dist/xlsx.mini.min.js'
 import { histogram, waterfall } from '../../sheet/charts.js'
@@ -46,11 +48,13 @@ export function chartOption (chart, data, theme = themeColors()) {
   const fmt = formatter(chart.yFormat || cellFmt)
   const tipFmt = chart.percent ? (v) => (typeof v === 'number' ? Number(v.toFixed(1)) + '%' : v) : fmt
   const legend = chart.legend || (data.series.length > 1 || type === 'pie' || type === 'doughnut' ? 'bottom' : 'none')
-  const text = { color: theme.ink, fontFamily: "'Manrope', system-ui, sans-serif" }
+  const text = { color: theme.ink, fontFamily: theme.font || "'Manrope', system-ui, sans-serif" }
+  const palette = theme.palette || PALETTE
+  const own = (s) => (s && typeof s.color === 'string' && /^#[0-9a-fA-F]{6}$/.test(s.color) ? s.color : undefined)
   const option = {
     animation: false,
     backgroundColor: 'transparent',
-    color: PALETTE,
+    color: palette,
     textStyle: text,
     title: chart.title ? { text: chart.title, left: 'center', top: 6, textStyle: { ...text, fontSize: 14, fontWeight: 500 } } : undefined,
     tooltip: { trigger: type === 'pie' || type === 'doughnut' || type === 'scatter' ? 'item' : 'axis', valueFormatter: tipFmt },
@@ -89,7 +93,10 @@ export function chartOption (chart, data, theme = themeColors()) {
       splitArea: { show: false }
     }
     option.tooltip = { trigger: 'item' }
-    option.series = [{ type: 'radar', data: data.series.map((s) => ({ name: s.name, value: s.values.map((v) => (v === null ? 0 : v)), areaStyle: { opacity: 0.15 } })), label }]
+    option.series = [{ type: 'radar', data: data.series.map((s) => {
+      const c = own(s)
+      return { name: s.name, value: s.values.map((v) => (v === null ? 0 : v)), areaStyle: c ? { opacity: 0.15, color: c } : { opacity: 0.15 }, itemStyle: c ? { color: c } : undefined, lineStyle: c ? { color: c } : undefined }
+    }), label }]
     return option
   }
 
@@ -111,7 +118,7 @@ export function chartOption (chart, data, theme = themeColors()) {
   if (type === 'scatter') {
     option.xAxis = { type: 'value', scale: true, axisLabel: { color: theme.muted, formatter: formatter(data.xFormat) }, axisLine, splitLine, ...axisName(chart.xTitle) }
     option.yAxis = valueAxis({ scale: true })
-    option.series = data.series.map((s) => ({ type: 'scatter', name: s.name, data: data.categories.map((x, i) => [x, s.values[i]]).filter((p) => p[0] !== null && p[1] !== null), label }))
+    option.series = data.series.map((s) => ({ type: 'scatter', name: s.name, color: own(s), data: data.categories.map((x, i) => [x, s.values[i]]).filter((p) => p[0] !== null && p[1] !== null), label }))
   } else if (type === 'bubble') {
     // X in the first column, then Y and size for each series. Circle area
     // follows the size; the largest is 48 pixels across.
@@ -185,12 +192,14 @@ export function chartOption (chart, data, theme = themeColors()) {
     option.series = data.series.map((s, i) => {
       const asLine = type === 'line' || type === 'area' || (type === 'combo' && lines.has(i))
       // Each series shows its own cells' format in the tooltip and labels.
-      const own = chart.percent ? tipFmt : formatter(chart.yFormat || s.format || cellFmt)
+      const sFmt = chart.percent ? tipFmt : formatter(chart.yFormat || s.format || cellFmt)
       return {
-        tooltip: { valueFormatter: own },
+        tooltip: { valueFormatter: sFmt },
         type: asLine ? 'line' : 'bar',
-        // One series: each category its own colour, as pie slices are.
-        colorBy: !asLine && data.series.length === 1 && type !== 'combo' ? 'data' : 'series',
+        // One series: each category its own colour, as pie slices are,
+        // unless the series has its own.
+        colorBy: !asLine && data.series.length === 1 && type !== 'combo' && !own(s) ? 'data' : 'series',
+        color: own(s),
         name: s.name,
         data: values[i],
         stack: chart.stacked || chart.percent ? 'total' : undefined,
@@ -198,7 +207,7 @@ export function chartOption (chart, data, theme = themeColors()) {
         yAxisIndex: type === 'combo' && second.has(i) ? 1 : 0,
         connectNulls: asLine,
         symbolSize: 5,
-        label: label && { ...label, formatter: (p) => own(p.value), position: horizontal ? 'right' : chart.stacked || chart.percent ? 'inside' : 'top' }
+        label: label && { ...label, formatter: (p) => sFmt(p.value), position: horizontal ? 'right' : chart.stacked || chart.percent ? 'inside' : 'top' }
       }
     })
   }
@@ -212,8 +221,8 @@ export function chartOption (chart, data, theme = themeColors()) {
     if (!t) continue
     const name = 'Trend: ' + s.name + ' (R² ' + t.r2.toFixed(3) + ')'
     option.series.push(type === 'scatter'
-      ? { type: 'line', name, data: [Math.min(...xs.filter((x) => x !== null)), Math.max(...xs.filter((x) => x !== null))].map((x) => [x, t.at(x)]), symbol: 'none', lineStyle: { type: 'dashed', width: 1.5 }, color: PALETTE[i % PALETTE.length] }
-      : { type: 'line', name, data: xs.map((x) => t.at(x)), symbol: 'none', lineStyle: { type: 'dashed', width: 1.5 }, color: PALETTE[i % PALETTE.length] })
+      ? { type: 'line', name, data: [Math.min(...xs.filter((x) => x !== null)), Math.max(...xs.filter((x) => x !== null))].map((x) => [x, t.at(x)]), symbol: 'none', lineStyle: { type: 'dashed', width: 1.5 }, color: own(s) || palette[i % palette.length] }
+      : { type: 'line', name, data: xs.map((x) => t.at(x)), symbol: 'none', lineStyle: { type: 'dashed', width: 1.5 }, color: own(s) || palette[i % palette.length] })
   }
   return option
 }

@@ -29,7 +29,13 @@ const { LAYOUTS, ROLES, boxesFor } = require('./layouts')
 const VERSION = 1
 const SIZE = [1920, 1080]
 const THEME = 'plain'
-const TYPES = ['text', 'shape', 'picture']
+const TYPES = ['text', 'shape', 'picture', 'chart']
+// Charts (proposals/2026-10-06-slides-followups.md, "Charts"): drawn with the
+// sheet's chart code from data kept in the element.
+const CHART_TYPES = ['column', 'bar', 'line', 'area', 'pie', 'doughnut', 'scatter', 'radar']
+const CHART_SERIES = 10
+const CHART_POINTS = 1000
+const HEX = /^#[0-9a-fA-F]{6}$/
 const SHAPES = ['rect', 'roundRect', 'ellipse', 'triangle', 'arrow', 'line', 'custom']
 const ENDS = ['none', 'arrow', 'triangle', 'oval']
 const ANCHORS = ['top', 'middle', 'bottom']
@@ -386,6 +392,67 @@ function cleanPath (v) {
 
 const opacity = (v) => clampNum(v, 0, 1, 1)
 
+const str = (v, max) => (typeof v === 'string' ? v.slice(0, max) : '')
+const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null)
+
+// A chart's settings and data, as stored, made safe: { chart, data } in the
+// shapes src/ui/sheet/chartOption.js takes. Settings: type, title, legend
+// ('bottom', 'right' or 'none'), dataLabels, stacked. Data: categories and
+// up to 10 series of up to 1000 values, each with a name and an optional
+// colour.
+function cleanChart (value) {
+  const v = value && typeof value === 'object' ? value : {}
+  const c = v.chart && typeof v.chart === 'object' ? v.chart : {}
+  const d = v.data && typeof v.data === 'object' ? v.data : {}
+  const chart = { type: CHART_TYPES.includes(c.type) ? c.type : 'column' }
+  if (str(c.title, 200)) chart.title = str(c.title, 200)
+  if (['bottom', 'right', 'none'].includes(c.legend)) chart.legend = c.legend
+  if (c.dataLabels === true) chart.dataLabels = true
+  if (c.stacked === true) chart.stacked = true
+  const cats = Array.isArray(d.categories) ? d.categories.slice(0, CHART_POINTS) : []
+  const categories = cats.map((x) => (chart.type === 'scatter' ? num(x) : typeof x === 'number' && Number.isFinite(x) ? String(x) : str(x, 200)))
+  const series = (Array.isArray(d.series) ? d.series : []).slice(0, CHART_SERIES).map((s, i) => {
+    const out = {
+      name: str(s && s.name, 200) || 'Series ' + (i + 1),
+      values: (Array.isArray(s && s.values) ? s.values : []).slice(0, CHART_POINTS).map(num)
+    }
+    if (s && typeof s.color === 'string' && HEX.test(s.color)) out.color = s.color
+    return out
+  })
+  return { chart, data: { categories, series } }
+}
+
+function chartOf (map) {
+  return cleanChart({ chart: map.get('chart'), data: map.get('data') })
+}
+
+// A new chart on top. Returns its id.
+function addChart (doc, slideId, value, frameValue = { x: 460, y: 240, w: 1000, h: 600, rot: 0 }) {
+  const els = elsOf(slide(doc, slideId))
+  if (!els || elements(doc, slideId).length >= MAX_ELEMENTS) return null
+  const { chart, data } = cleanChart(value)
+  const id = newId()
+  const map = new Y.Map()
+  map.set('type', 'chart')
+  map.set('frame', cleanFrame(frameValue))
+  map.set('z', topZ(doc, slideId))
+  map.set('chart', chart)
+  map.set('data', data)
+  els.set(id, map)
+  return id
+}
+
+// Change a chart's settings or data (either may be left out).
+function setChart (doc, slideId, elId, { chart, data } = {}) {
+  const map = element(doc, slideId, elId)
+  if (!map || map.get('type') !== 'chart') return false
+  const now = chartOf(map)
+  const next = cleanChart({ chart: chart ? { ...now.chart, ...chart } : now.chart, data: data || now.data })
+  if (chart) map.set('chart', next.chart)
+  if (data) map.set('data', next.data)
+  return true
+}
+
 // A shape's look, as stored, made safe (proposals/2026-10-06-slides.md and
 // 2026-10-06-slides-followups.md). A custom shape whose path is bad draws as
 // its box.
@@ -577,6 +644,7 @@ module.exports = {
   THEME,
   TYPES,
   SHAPES,
+  CHART_TYPES,
   ENDS,
   ANCHORS,
   MAX_ELEMENTS,
@@ -603,6 +671,9 @@ module.exports = {
   addText,
   addShape,
   addPicture,
+  addChart,
+  setChart,
+  chartOf,
   style,
   textLayout,
   crop,

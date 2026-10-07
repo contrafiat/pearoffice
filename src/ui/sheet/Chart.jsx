@@ -30,14 +30,22 @@ export function ChartView ({ chart, width, height }) {
   return <div ref={el} className='chart-view' style={{ width, height }} />
 }
 
+// ECharts options drawn off screen, as SVG text. Slides draw their charts
+// with this too (src/ui/slides/SlideChart.jsx).
+export function optionSvg (option, width, height) {
+  const inst = echarts.init(null, null, { renderer: 'svg', ssr: true, width, height })
+  try {
+    inst.setOption(option)
+    return inst.renderToSVGString()
+  } finally {
+    inst.dispose()
+  }
+}
+
 // The chart as SVG text, drawn off screen.
 export function chartSvg (chart, width = chart.size.w, height = chart.size.h, theme = themeColors()) {
   if (!chart.resolved || chart.resolved.error) return null
-  const inst = echarts.init(null, null, { renderer: 'svg', ssr: true, width, height })
-  inst.setOption(chartOption(chart, chart.resolved, theme))
-  const svg = inst.renderToSVGString()
-  inst.dispose()
-  return svg
+  return optionSvg(chartOption(chart, chart.resolved, theme), width, height)
 }
 
 // The chart as a PNG (base64), at twice its size for sharp text.

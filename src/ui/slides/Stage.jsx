@@ -25,6 +25,8 @@ import { ElementBody, SlidePicture, hasText } from './objects.jsx'
 // Dragging a handle cuts or uncovers that side; the picture keeps its size
 // on the slide. Enter or a click outside writes the crop and frame once,
 // Escape leaves them as they were.
+//
+// A double click on a chart opens its data (ChartTools.jsx).
 
 const NUDGE = 5 // slide units per arrow key, ten times with Shift
 const HANDLES = [
@@ -40,7 +42,7 @@ const HANDLES = [
 const CURSORS = ['ns-resize', 'nesw-resize', 'ew-resize', 'nwse-resize']
 const cursorFor = (angle, rot) => CURSORS[Math.round((angle + rot) / 45) % 4]
 
-export function Stage ({ size, theme, slideId, layout, els, sel, setSel, editing, startEditing, stopEditing, editStart, canEdit, layoutEdit, phone, undo, change, others, onCursor, onEditor, onPastePictures, cropping, setCropping }) {
+export function Stage ({ size, theme, slideId, layout, els, sel, setSel, editing, startEditing, stopEditing, editStart, canEdit, layoutEdit, phone, undo, change, others, onCursor, onEditor, onPastePictures, cropping, setCropping, onEditChart }) {
   const viewRef = useRef(null)
   const slideRef = useRef(null)
   const [scale, setScale] = useState(0)
@@ -297,6 +299,7 @@ export function Stage ({ size, theme, slideId, layout, els, sel, setSel, editing
                   onDoubleClick={(e) => {
                     if (canEdit && !live && hasText(el)) startEditing(el.id, { point: { x: e.clientX, y: e.clientY } })
                     else if (layoutEdit && el.type === 'picture' && !cropping) { setSel([el.id]); setCropping(el.id) }
+                    else if (layoutEdit && el.type === 'chart' && onEditChart) onEditChart(el.id)
                   }}
                   onContextMenu={(e) => {
                     if (!layoutEdit || live || cropping) return
@@ -308,6 +311,7 @@ export function Stage ({ size, theme, slideId, layout, els, sel, setSel, editing
                   <ElementBody
                     el={cropDraft && cropDraft.id === el.id ? { ...el, crop: cropDraft.crop } : el}
                     frame={f}
+                    theme={theme}
                     text={
                       <TextFrame frame={f} role={el.role} layout={el.layout}>
                         {live

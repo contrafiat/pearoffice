@@ -6,7 +6,10 @@
 // (proposals/2026-10-06-slides-followups.md): see-through fill and outline,
 // bottom-anchored and unwrapped text, a cropped picture, arrowheads and
 // custom shapes; LibreOffice saves the deck again as .pptx and its XML must
-// still have each of them. Needs `soffice` and `pdftotext` (poppler).
+// still have each of them. Slide 4 has four charts (a stacked column, a
+// stacked line, a pie and a scatter chart): written as PowerPoint charts,
+// LibreOffice must draw their titles and keep their series and values when
+// it saves the deck again. Needs `soffice` and `pdftotext` (poppler).
 // Usage: node scripts/check-slides-export.js [out-dir]
 // With an out-dir it also keeps the .pptx, LibreOffice's PDF and a PNG of
 // each page for a look.
@@ -107,7 +110,7 @@ const FORMATTED = {
   const schema = m.slideSchema()
   const fill = (map, json) => m.prosemirrorJSONToYXmlFragment(schema, json, map.get('text'))
   const els = (slideId) => S.elements(doc, slideId)
-  let s1, s2, s3, s4
+  let s1, s2, s3, s4, s5
   const ids = {}
   const picRef = 'core0:blob0'
   const PIC = png(320, 160)
@@ -165,7 +168,13 @@ const FORMATTED = {
     ids.curve = S.addShape(doc, s4, 'custom', { x: 1500, y: 560, w: 300, h: 300, rot: 0 }, { path: 'M0 1000C0 0 1000 0 1000 1000Z' })
     fill(S.element(doc, s4, ids.curve), { type: 'doc', content: [p([t('Curved')])] })
 
-    s3 = S.addSlide(doc, { after: s4, layout: 'blank' })
+    s5 = S.addSlide(doc, { after: s4, layout: 'blank' })
+    S.addChart(doc, s5, { chart: { type: 'column', title: 'Sales by region', stacked: true, legend: 'right' }, data: { categories: ['North', 'South', 'East'], series: [{ name: 'Apples', values: [42, 17, 23], color: '#d32f2f' }, { name: 'Pears', values: [11, 29, null] }] } }, { x: 60, y: 60, w: 880, h: 460, rot: 0 })
+    S.addChart(doc, s5, { chart: { type: 'line', title: 'Stacked visits', stacked: true }, data: { categories: ['Mon', 'Tue', 'Wed', 'Thu'], series: [{ name: 'Web', values: [5, 6, 7, 8] }, { name: 'App', values: [2, 3, 4, 5] }] } }, { x: 980, y: 60, w: 880, h: 460, rot: 0 })
+    S.addChart(doc, s5, { chart: { type: 'pie', title: 'Share of time', dataLabels: true }, data: { categories: ['Work', 'Play', 'Sleep'], series: [{ name: 'Hours', values: [8, 6, 10] }] } }, { x: 60, y: 560, w: 880, h: 460, rot: 0 })
+    S.addChart(doc, s5, { chart: { type: 'scatter', title: 'Height and weight', legend: 'none' }, data: { categories: [150, 160, 170, 180], series: [{ name: 'People', values: [50, 58, 66, 79], color: '#1976d2' }] } }, { x: 980, y: 560, w: 880, h: 460, rot: 0 })
+
+    s3 = S.addSlide(doc, { after: s5, layout: 'blank' })
     const gone = S.addText(doc, s3)
     fill(S.element(doc, s3, gone), { type: 'doc', content: [p([t('Deleted slide')])] })
     S.deleteSlide(doc, s3)
@@ -229,6 +238,14 @@ const FORMATTED = {
   execFileSync('soffice', ['--headless', '-env:UserInstallation=file://' + path.join(out, 'lo-profile'), '--convert-to', 'pptx', '--outdir', again, file], { stdio: 'pipe', timeout: 120000 })
   const loZip = await (await import('jszip')).default.loadAsync(fs.readFileSync(path.join(again, 'Export check.pptx')))
   const lo3 = loZip.file('ppt/slides/slide3.xml') ? await loZip.file('ppt/slides/slide3.xml').async('string') : ''
+  // The chart parts, ours and LibreOffice's, by their order in the file.
+  const chartParts = async (z) => Promise.all(Object.keys(z.files).filter((n) => /^ppt\/charts\/chart\d+\.xml$/.test(n)).sort((a, b) => Number(/(\d+)\.xml$/.exec(a)[1]) - Number(/(\d+)\.xml$/.exec(b)[1])).map((n) => z.file(n).async('string')))
+  const ourCharts = await chartParts(zip)
+  const loCharts = await chartParts(loZip)
+  const vals = (x) => [...x.matchAll(/<c:val>([\s\S]*?)<\/c:val>|<c:yVal>([\s\S]*?)<\/c:yVal>/g)].map((m) => [...(m[1] || m[2]).matchAll(/<c:v>([^<]*)<\/c:v>/g)].map((v) => Number(v[1])).join(',')).join('|')
+  const names = (x) => [...x.matchAll(/<c:tx>[\s\S]*?<c:v>([^<]*)<\/c:v>[\s\S]*?<\/c:tx>/g)].map((m) => m[1]).join(',')
+  const chartLike = (x, kind) => x.includes('<c:' + kind + '>') || x.includes('<c:' + kind + ' ')
+  const loChart = (kind, name) => loCharts.find((x) => chartLike(x, kind) && names(x).includes(name)) || ''
   const spOf = (x, name) => { const i = x.indexOf(name); if (i < 0) return ''; const a = x.lastIndexOf('<p:sp>', i); const b = x.indexOf('</p:sp>', i); return a < 0 || b < 0 ? '' : x.slice(a, b) }
   // LibreOffice names shapes its own way: find them by their text or kind.
   const loHas = (re) => re.test(lo3)
@@ -241,7 +258,7 @@ const FORMATTED = {
   const twoPPr = [...allSlides.matchAll(/<a:p>([\s\S]*?)<\/a:p>/g)].some((x) => (x[1].match(/<a:pPr\b/g) || []).length > 1)
 
   const checks = {
-    'three pages (deleted slide left out)': pages.length === 3 && !bbox.includes('Deleted'),
+    'four pages (deleted slide left out)': pages.length === 4 && !bbox.includes('Deleted'),
     'pages are 13.333 x 7.5 in': pages.every((pg) => Math.round(pg.w) === 960 && Math.round(pg.h) === 540),
     'title centred on page 1': at(0, 'Quarterly review', { cx: 960, cy: 440 }),
     'subtitle centred under it': at(0, 'Prepared by Ana', { cx: 960, top: 629 }),
@@ -273,7 +290,17 @@ const FORMATTED = {
     'crop written and read back': /<a:srcRect l="25000" r="25000"\/>/.test(slide3) && (() => { const m = /<a:srcRect l="(\d+)"[^>]*r="(\d+)"/.exec(lo3); return !!m && Math.abs(m[1] - 25000) < 100 && Math.abs(m[2] - 25000) < 100 })(),
     'line ends written and read back': /<a:headEnd type="arrow"\/><a:tailEnd type="triangle"\/>/.test(slide3) && /<a:tailEnd type="oval"\/>/.test(slide3) && loHas(/<a:headEnd[^>]* type="arrow"/) && loHas(/<a:tailEnd[^>]* type="triangle"/) && loHas(/<a:tailEnd[^>]* type="oval"/),
     'custom shapes written and read back': (slide3.match(/<a:custGeom>/g) || []).length === 2 && /<a:cubicBezTo>/.test(slide3) && (lo3.match(/<a:custGeom>/g) || []).length >= 2 && /<a:cubicBezTo>/.test(lo3),
-    'text in a custom shape': !!find(2, 'Curved')
+    'text in a custom shape': !!find(2, 'Curved'),
+    'four charts written as PowerPoint charts': ourCharts.length === 4 && (await xml('ppt/slides/slide4.xml')).split('<p:graphicFrame>').length === 5,
+    'stacked column chart written': /<c:barDir val="col"\/><c:grouping val="stacked"\/>/.test(ourCharts[0] || '') && vals(ourCharts[0] || '') === '42,17,23|11,29' && names(ourCharts[0] || '') === 'Apples,Pears' && (ourCharts[0] || '').includes('<a:srgbClr val="D32F2F"') && /<c:legendPos val="r"\/>/.test(ourCharts[0] || ''),
+    'stacked line chart written': /<c:lineChart><c:grouping val="stacked"\/>/.test(ourCharts[1] || ''),
+    'pie with values written': chartLike(ourCharts[2] || '', 'pieChart') && /<c:showVal val="1"\/>/.test(ourCharts[2] || ''),
+    'scatter chart written': chartLike(ourCharts[3] || '', 'scatterChart') && vals(ourCharts[3] || '') === '50,58,66,79',
+    'chart titles drawn by LibreOffice': ['Sales by region', 'Stacked visits', 'Share of time', 'Height and weight'].every((x) => !!find(3, x)),
+    'column chart read back by LibreOffice': (() => { const x = loChart('barChart', 'Apples'); return /<c:grouping val="stacked"\/>/.test(x) && vals(x).startsWith('42,17,23|11,29') && /d32f2f/i.test(x) })(),
+    'line chart read back by LibreOffice': /<c:grouping val="stacked"\/>/.test(loChart('lineChart', 'Web')),
+    'pie chart read back by LibreOffice': vals(loChart('pieChart', 'Hours')) === '8,6,10',
+    'scatter chart read back by LibreOffice': vals(loChart('scatterChart', 'People')) === '50,58,66,79'
   }
   for (const [name, ok] of Object.entries(checks)) console.log((ok ? 'ok   ' : 'FAIL ') + name)
   const failed = Object.values(checks).filter((x) => !x).length
