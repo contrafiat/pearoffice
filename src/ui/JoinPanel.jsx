@@ -21,12 +21,12 @@ export function JoinPanel ({ initialLink = '', onStarted, onClose, onError }) {
 
   return (
     <div className='panel-backdrop' onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
-      <form className='panel' role='dialog' aria-label='Join a sheet' onSubmit={join}>
+      <form className='panel' role='dialog' aria-label='Join a file' onSubmit={join}>
         <header>
-          <h2>Join a sheet</h2>
+          <h2>Join a file</h2>
           <button type='button' className='close' aria-label='Close' onClick={onClose}><X size={18} /></button>
         </header>
-        <p>Paste the invite link someone sent you. It connects straight to their device, so one of the people already in the sheet needs to be online.</p>
+        <p>Paste the invite link someone sent you. It connects straight to their device, so one of the people already in the file needs to be online.</p>
         <input
           autoFocus
           aria-label='Invite link'
@@ -59,8 +59,8 @@ export function JoinProgress ({ entry, onBackground, onClose, onError }) {
   // Two steps the app can tell apart: someone let us in, then the content.
   const letIn = !entry.waiting
   const steps = [
-    ['Reaching someone in the sheet', letIn ? 'done' : 'now'],
-    ['Getting the sheet', letIn ? 'now' : 'next']
+    ['Reaching someone in the file', letIn ? 'done' : 'now'],
+    ['Getting the file', letIn ? 'now' : 'next']
   ]
   return (
     <div className='panel-backdrop' onMouseDown={(e) => { if (e.target === e.currentTarget) onBackground() }}>
@@ -80,7 +80,7 @@ export function JoinProgress ({ entry, onBackground, onClose, onError }) {
         </ul>
         {!letIn && waited > BACKGROUND_AFTER_MS && (
           <p className='small'>
-            The invite connects straight to the people already in the sheet, so one of them needs to be online with PearOffice open.
+            The invite connects straight to the people already in the file, so one of them needs to be online with PearOffice open.
             {days ? ' Waiting for ' + days + (days === 1 ? ' day.' : ' days.') : ''} PearOffice stops waiting by itself after 7 days.
           </p>
         )}
