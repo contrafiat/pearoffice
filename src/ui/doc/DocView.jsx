@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { clipboardPictureFile, looksLikePicture, pastedPictures } from '../clipboardPicture.js'
 import * as Y from 'yjs'
 import { useEditor, useEditorState, EditorContent } from '@tiptap/react'
 import Collaboration from '@tiptap/extension-collaboration'
@@ -345,8 +346,15 @@ function DocEditor ({ sheetId, pictures, ydoc, canEdit, phone, finding, setFindi
           if (found.length) setTimeout(() => adoptRef.current(found).catch(() => {}), 0)
           return false
         }
-        const files = [...((event.clipboardData && event.clipboardData.files) || [])].filter((f) => /^image\//.test(f.type))
-        if (!files.length || /data-pm-slice/.test(event.clipboardData.getData('text/html'))) return false
+        const files = pastedPictures(event.clipboardData)
+        if (!files.length) {
+          // No picture file in the paste: ask the desktop app for the one on
+          // the clipboard (a picture copied in a browser, say).
+          if (!canEditRef.current || !looksLikePicture(event.clipboardData)) return false
+          event.preventDefault()
+          clipboardPictureFile().then((file) => { if (file) addRef.current([file]) }).catch(() => {})
+          return true
+        }
         if (!canEditRef.current) return true
         event.preventDefault()
         addRef.current(files)
