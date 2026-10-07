@@ -67,7 +67,9 @@ function cleanState (s) {
   }
 }
 
-function createPresence ({ engine, emit, log = () => {}, now = () => Date.now() }) {
+// onSeen(identity, device): called when a checked peer is heard from, at most
+// once a minute per device (the Devices panel's "last seen").
+function createPresence ({ engine, emit, onSeen = () => {}, log = () => {}, now = () => Date.now() }) {
   const muxes = new Set()
   const mine = new Map() // sheetId -> state, for the sheets open here
   const channels = new Map() // sheetId -> Set of channels
@@ -107,6 +109,22 @@ function createPresence ({ engine, emit, log = () => {}, now = () => Date.now() 
   }
   const changed = (sheetId) => emit('sheet:presence', { sheetId, people: list(sheetId) })
 
+  // Devices with any file open on screen, seen from here.
+  function online () {
+    const out = new Set()
+    for (const set of channels.values()) for (const ch of set) if (ch.peer && ch.state && ch.state.open) out.add(ch.peer.device)
+    return out
+  }
+
+  const seenAt = new Map() // device -> when onSeen last ran
+  function heard (ch) {
+    ch.heard = now()
+    const last = seenAt.get(ch.peer.device) || 0
+    if (ch.heard - last < 60000) return
+    seenAt.set(ch.peer.device, ch.heard)
+    try { onSeen(ch.peer.identity, ch.peer.device) } catch {}
+  }
+
   function send (ch, msg) {
     try { ch.msg.send(msg) } catch {}
   }
@@ -127,7 +145,11 @@ function createPresence ({ engine, emit, log = () => {}, now = () => Date.now() 
       onopen: () => send(ch, helloFor(sheetId)),
       onclose: () => {
         const set = channels.get(sheetId)
-        if (set && set.delete(ch) && ch.peer) changed(sheetId)
+        if (set && set.delete(ch) && ch.peer) {
+          seenAt.delete(ch.peer.device)
+          try { onSeen(ch.peer.identity, ch.peer.device) } catch {}
+          changed(sheetId)
+        }
       }
     })
     if (!ch) return
@@ -155,13 +177,13 @@ function createPresence ({ engine, emit, log = () => {}, now = () => Date.now() 
       if (ch.peer) return
       if (!(await checkHello(ch, sheetId, msg))) { log('presence: refused a hello for ' + sheetId.slice(0, 6)); ch.close(); return }
       ch.peer = { identity: msg.identity, device: msg.device }
-      ch.heard = now()
+      heard(ch)
       const s = mine.get(sheetId)
       if (s) send(ch, { t: 'state', ...s })
       return
     }
     if (!ch.peer) return
-    ch.heard = now()
+    heard(ch)
     if (msg.t === 'state') {
       ch.state = cleanState(msg)
       changed(sheetId)
@@ -243,7 +265,7 @@ function createPresence ({ engine, emit, log = () => {}, now = () => Date.now() 
     for (const sheetId of [...mine.keys()]) set(sheetId, { open: false })
   }
 
-  return { onConnection, set, list, recheck, close, _checkHello: checkHello }
+  return { onConnection, set, list, online, recheck, close, _checkHello: checkHello }
 }
 
 module.exports = { createPresence, cleanState, PROTOCOL }
