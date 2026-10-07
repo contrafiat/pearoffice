@@ -26,8 +26,10 @@ async function takeThenRestart (method, args, before) {
 }
 
 // Waits up to 2 minutes for the other device (src/worklet/linking.js).
-export function linkDevice (link, { before } = {}) {
-  return takeThenRestart('link:join', { link: String(link || '').trim() }, before)
+// replace: remove this device's own files first (only once the other device
+// has answered).
+export function linkDevice (link, { before, replace = false } = {}) {
+  return takeThenRestart('link:join', { link: String(link || '').trim(), replace }, before)
 }
 
 // Stops a linkDevice that is still looking for the other device; it then
@@ -37,8 +39,14 @@ export function cancelLink () {
   return call('link:cancel').catch(() => {})
 }
 
-export function restorePhrase (text, { before } = {}) {
-  return takeThenRestart('app:restorePhrase', { phrase: cleanPhrase(text) }, before)
+export function restorePhrase (text, { before, replace = false } = {}) {
+  return takeThenRestart('app:restorePhrase', { phrase: cleanPhrase(text), replace }, before)
+}
+
+// The device already has files: the caller can show what would be removed
+// (link:filesHere) and try again with replace.
+export function hasFilesError (err) {
+  return /already has files/.test(plainError(err))
 }
 
 // An error's message without the desktop bridge's "Error invoking remote

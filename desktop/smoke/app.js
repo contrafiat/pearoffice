@@ -56,6 +56,20 @@ module.exports = async function app (t) {
   await js("[...document.querySelectorAll('.panel button')].find((b) => b.textContent.trim() === 'Show phrase').click()")
   await waitFor('recovery phrase', "document.querySelectorAll('.phrase li').length === 24")
   await js("document.querySelector('.panel .close').click()")
+  // Linking on a device that has files: it says what would be removed and
+  // which files only it has, and Back goes back (nothing is removed).
+  await openSettings()
+  await js("document.querySelector('.panel .settings-devices').click()")
+  await js("[...document.querySelectorAll('.panel button')].find((b) => b.textContent.trim() === 'This is the new device').click()")
+  await waitFor('link field', "!!document.querySelector('.panel input[aria-label=\"Device link\"]')")
+  await js("(() => { const i = document.querySelector('.panel input[aria-label=\"Device link\"]'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(i, 'pearoffice://link?rv=' + 'A'.repeat(43) + '&k=' + 'B'.repeat(43) + '&a=' + 'c'.repeat(64) + '&v=1'); i.dispatchEvent(new Event('input', { bubbles: true })) })()")
+  await js("document.querySelector('.panel form button[type=submit]').click()")
+  await waitFor('replace screen', "!!document.querySelector('.replace-files')")
+  await t.shot('PEAROFFICE_SMOKE_REPLACE_SHOT')
+  result.replaceScreen = await js("(() => { const r = document.querySelector('.replace-files'); return r.textContent.includes('already has files') && r.querySelectorAll('.warn li').length === 2 && !!r.querySelector('button.danger') })()")
+  await js("[...document.querySelectorAll('.replace-files button')].find((b) => b.textContent.trim() === 'Back').click()")
+  await waitFor('back at the link field', "!!document.querySelector('.panel input[aria-label=\"Device link\"]')")
+  await js("document.querySelector('.panel .close').click()")
   step('seeder and devices panels')
 
   // Run a seeder on this computer, pair this device with it, show its QR.
@@ -176,5 +190,5 @@ module.exports = async function app (t) {
   await waitFor('opened from the list', "!!document.querySelector('.grid .body')")
   step('file list')
 
-  return result.startButtonsEqual && result.about && result.donation && result.kinds === 'Spreadsheet, Document, Slides' && result.fileIcons === result.sheetsAfter && result.keepOnline && result.avatar && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.inviteLink.startsWith('pearoffice://join?s=')
+  return result.startButtonsEqual && result.replaceScreen && result.about && result.donation && result.kinds === 'Spreadsheet, Document, Slides' && result.fileIcons === result.sheetsAfter && result.keepOnline && result.avatar && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.inviteLink.startsWith('pearoffice://join?s=')
 }
