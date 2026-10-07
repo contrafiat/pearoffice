@@ -134,7 +134,7 @@ function createLinking ({ engine, log = () => {}, now = () => Date.now() }) {
 
   // --- B: take on the identity ---------------------------------------------
 
-  function join (link, { timeoutMs = 60000 } = {}) {
+  function join (link, { timeoutMs = 120000 } = {}) {
     const { rv, secret, deviceA } = parseLink(link)
     return (async () => {
       if (await hasSheets()) throw new Error('This device already has sheets. Linking replaces its identity, so it only works on a device with no sheets yet.')
@@ -171,7 +171,7 @@ function createLinking ({ engine, log = () => {}, now = () => Date.now() }) {
           })
           ch.open()
         }
-        const timer = setTimeout(() => finish(new Error('Could not reach your other device. Keep PearOffice open on it and try again.')), timeoutMs)
+        const timer = setTimeout(() => finish(new Error('Could not reach your other device. Open PearOffice on it, stay on the screen with the link and try again.')), timeoutMs)
         swarm.on('connection', onConnection)
         for (const conn of swarm.connections) onConnection(conn)
         const discovery = swarm.join(topic, { server: false, client: true })
