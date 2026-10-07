@@ -186,7 +186,7 @@ module.exports = async function onboarding (t) {
 
   // About, How it works, Take the tour; Escape closes.
   await openSettings()
-  await click('.panel .about-link')
+  await click('.sidebar .about-button')
   await js("[...document.querySelectorAll('.about-toggle')].find((b) => b.textContent.trim() === 'How it works').click()")
   await waitFor('about tour button', "!!document.querySelector('.about-tour')", 3000)
   await click('.about-tour')

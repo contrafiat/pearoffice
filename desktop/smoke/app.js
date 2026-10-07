@@ -9,6 +9,8 @@ const path = require('node:path')
 module.exports = async function app (t) {
   const { js, step, waitFor, openSettings, win, getTray, dataDir, result, sleep } = t
 
+  // The About button sits level with the Settings gear.
+  result.aboutLevel = await js("(() => { const c = (el) => { const r = el.getBoundingClientRect(); return r.top + r.height / 2 }; return Math.round((c(document.querySelector('.me-bar .about-button svg')) - c(document.querySelector('.me-row .gear'))) * 10) / 10 })()")
   // The empty screen's start buttons (PEAROFFICE_SMOKE_EMPTY_SHOT=<file>).
   await t.shot('PEAROFFICE_SMOKE_EMPTY_SHOT')
   result.startButtonSizes = await js("[...document.querySelectorAll('.empty-actions > *')].map((b) => { const r = b.getBoundingClientRect(); return b.tagName + ' ' + Math.round(r.width) + 'x' + Math.round(r.height) }).join(', ')")
@@ -133,7 +135,7 @@ module.exports = async function app (t) {
   await waitFor('own picture shown', "!!document.querySelector('.panel .me-picture img.avatar') && !!document.querySelector('.me-row img.avatar')")
   result.avatar = await js("document.querySelector('.me-row img.avatar').src.startsWith('data:image/jpeg;base64,')")
   // About: version and the open-source list.
-  await js("document.querySelector('.panel .about-link').click()")
+  await js("document.querySelector('.sidebar .about-button').click()")
   await waitFor('about', "document.querySelector('.panel').textContent.includes('Open-source software') && /Version \\d/.test(document.querySelector('.panel').textContent)")
   // Support development opens the Bitcoin sheet; back returns to About.
   await js("[...document.querySelectorAll('.about-toggle')].find((b) => b.textContent.trim() === 'Support development').click()")
@@ -190,5 +192,5 @@ module.exports = async function app (t) {
   await waitFor('opened from the list', "!!document.querySelector('.grid .body')")
   step('file list')
 
-  return result.startButtonsEqual && result.replaceScreen && result.about && result.donation && result.kinds === 'Spreadsheet, Document, Slides' && result.fileIcons === result.sheetsAfter && result.keepOnline && result.avatar && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.inviteLink.startsWith('pearoffice://join?s=')
+  return Math.abs(result.aboutLevel) <= 0.5 && result.startButtonsEqual && result.replaceScreen && result.about && result.donation && result.kinds === 'Spreadsheet, Document, Slides' && result.fileIcons === result.sheetsAfter && result.keepOnline && result.avatar && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.inviteLink.startsWith('pearoffice://join?s=')
 }

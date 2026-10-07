@@ -20,7 +20,10 @@ async function takeThenRestart (method, args, before) {
   const r = await call(method, args)
   if (r && r.restart) {
     if (before) await before()
-    await call('app:restart')
+    // Calls in flight fail while the worklet restarts: keep their errors
+    // out of the banner (App.jsx). The page reloads after the restart.
+    window.__pearRestarting = true
+    try { await call('app:restart') } catch (err) { window.__pearRestarting = false; throw err }
   }
   return r
 }

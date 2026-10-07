@@ -5,7 +5,7 @@ import { Avatar, shrinkPicture } from './Avatar.jsx'
 import { readPref, writePref } from './prefs.js'
 import { themePref, setThemePref } from './theme.js'
 
-import { AboutContent, BitcoinContent, VERSION } from './About.jsx'
+import { AboutContent, BitcoinContent } from './About.jsx'
 
 const TITLES = { settings: 'Settings', about: 'About PearOffice', bitcoin: 'Bitcoin Lightning' }
 
@@ -148,9 +148,7 @@ export function SettingsPanel ({ me, onMe, desktop, keepOnline, startAtLogin, on
             <p className='small'>A short tour of how PearOffice works and what is different from cloud apps.</p>
             <div className='row'><button className='settings-tour' onClick={onTour}><Compass size={16} /> Take the tour</button></div>
 
-            <div className='row about-row'>
-              <button className='link-button about-link' onClick={() => setMode('about')}>About PearOffice{VERSION ? ' ' + VERSION : ''}</button>
-            </div>
+
           </>
         )}
 

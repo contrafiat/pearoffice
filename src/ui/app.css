@@ -74,8 +74,13 @@ button, input, select { font: inherit; color: inherit; }
   gap: 12px;
   min-width: 0;
 }
-.brand { display: flex; align-items: center; gap: 8px; font-weight: 650; font-size: 16px; padding: 0 4px; }
-.brand-mark { width: 14px; height: 18px; background: var(--pear); border-radius: 50% 50% 46% 46% / 40% 40% 60% 60%; }
+.brand { display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 650; font-size: 16px; padding: 0 4px; }
+/* The pear (PearMark.jsx): the app icon's two-tone body, stem and leaf. */
+.pear-mark { flex: none; display: block; }
+.pear-mark .pear-body { fill: var(--pear); }
+.pear-mark .pear-shade { fill: var(--pear-dark); opacity: 0.45; }
+.pear-mark .pear-stem { stroke: var(--pear-dark); }
+.pear-mark .pear-leaf { fill: var(--pear-dark); }
 .new-sheet {
   background: var(--pear);
   color: #fff;
@@ -288,7 +293,10 @@ button, input, select { font: inherit; color: inherit; }
 .badge.view-only { color: var(--pear-dark); background: var(--pear-soft); }
 .keep-online { margin-top: auto; display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); padding: 6px 8px; cursor: pointer; }
 /* The person at the bottom of the sidebar: opens Settings. */
-.me-row { margin-top: auto; display: flex; align-items: center; gap: 10px; background: none; border: 0; border-top: 1px solid var(--line); padding: 10px 6px 4px; cursor: pointer; color: var(--ink); text-align: left; font: inherit; }
+.me-bar { margin-top: auto; display: flex; align-items: center; gap: 2px; border-top: 1px solid var(--line); padding-top: 6px; }
+.me-row { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; background: none; border: 0; padding: 4px 6px; cursor: pointer; color: var(--ink); text-align: left; font: inherit; }
+.me-bar .about-button { flex: none; display: flex; align-items: center; justify-content: center; align-self: stretch; line-height: 0; color: var(--muted); background: none; border: 0; padding: 0 6px; }
+.me-bar .about-button:hover { color: var(--pear-dark); }
 .me-row:hover .me-name, .me-row:hover .gear { color: var(--pear-dark); }
 .me-row .me-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
 .me-row .gear { color: var(--muted); flex: none; }
@@ -1124,9 +1132,7 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 .ob-body p { margin: 0; max-width: 36ch; color: var(--muted); font-size: 15px; line-height: 1.55; }
 .ob-title { margin: 4px 0 0; font-size: 23px; font-weight: 500; line-height: 1.25; color: var(--ink); }
 .ob-icon { width: 84px; height: 84px; border-radius: 50%; display: grid; place-items: center; background: var(--pear-soft); color: var(--pear-dark); margin-bottom: 4px; }
-.ob-pear { position: relative; width: 46px; height: 58px; margin: 4px 0 6px; background: var(--pear); border-radius: 50% 50% 46% 46% / 40% 40% 60% 60%; box-shadow: inset -6px -8px 0 rgb(0 0 0 / 0.08); }
-.ob-pear::before { content: ''; position: absolute; top: -9px; left: 21px; width: 4px; height: 12px; border-radius: 2px; background: var(--pear-dark); transform: rotate(12deg); }
-.ob-pear::after { content: ''; position: absolute; top: -10px; left: 25px; width: 15px; height: 9px; border-radius: 0 100% 0 100%; background: var(--pear); transform: rotate(-12deg); }
+.ob-pear-mark { margin: 4px 0 6px; }
 .ob-kinds { display: flex; justify-content: center; gap: 12px; list-style: none; margin: 10px 0 0; padding: 0; width: 100%; }
 .ob-kinds li { flex: 1 1 0; max-width: 112px; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 6px 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); font-size: 13px; color: var(--ink); }
 .ob-roles { list-style: none; margin: 4px 0 0; padding: 0; width: 100%; max-width: 320px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); text-align: left; }
@@ -1180,3 +1186,10 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
   .ob-title { font-size: 22px; }
   .ob-foot { margin-top: 14px; }
 }
+
+/* Taking on an identity on a device with files (DevicesPanel.jsx). */
+.replace-files { display: flex; flex-direction: column; gap: 12px; }
+.replace-files h3, .replace-files p { margin: 0; }
+.replace-files .warn { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent); border-radius: 8px; }
+.replace-files .warn ul { margin: 0; padding-left: 20px; }
+.replace-files .row.end { margin-top: 6px; }
