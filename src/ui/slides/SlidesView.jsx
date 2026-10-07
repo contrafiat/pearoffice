@@ -488,7 +488,7 @@ export function SlidesView ({ sheetId, onTitleChange, onError, onGone }) {
               : selChart
                 ? <ChartTools value={selChart.chart} theme={deck.theme} btn={btn} phone={phone} setChart={(patch) => change((doc) => slidesModel.setChart(doc, chartSlide, selChart.id, { chart: patch }))} onEditData={() => setDataPanel(selChart.id)} />
                 : canEdit && <TextTools editor={toolEditor} defaultSize={defaultSize(deck.theme, editingBox ? editingBox.role : 'body')} phone={phone} btn={btn} afterAlign={anchorTools} />}
-          <button className='present-button' title={phone ? 'Present' : 'Present (F5, or Shift+F5 from this slide)'} onMouseDown={(e) => e.preventDefault()} onClick={() => startShow(true)} disabled={!deck.slides.length}><Play size={ICON} weight='fill' /> Present</button>
+          {!phone && <button className='present-button' title='Present (F5, or Shift+F5 from this slide)' onMouseDown={(e) => e.preventDefault()} onClick={() => startShow(true)} disabled={!deck.slides.length}><Play size={ICON} weight='fill' /> Present</button>}
         </div>
         <div className='slides-row'>
           {!phone && <SlideList slides={deck.slides} current={current} onPick={setCurrent} size={deck.size} theme={deck.theme} canEdit={canEdit} phone={phone} people={bySlide} sheetId={sheetId} onAdd={addSlide} onDuplicate={duplicate} onDelete={remove} onMove={move} />}
@@ -514,6 +514,11 @@ export function SlidesView ({ sheetId, onTitleChange, onError, onGone }) {
           <ChartDataPanel key={selChart.id} value={selChart.chart} onData={(data) => change((doc) => slidesModel.setChart(doc, chartSlide, selChart.id, { data }))} onClose={() => { setDataPanel(null); setTimeout(focusStage, 0) }} />
         )}
         {toast && <div className='toast' role='status'>{toast}</div>}
+        {/* Phones: Present floats at the bottom centre, out of the toolbar's
+            way, and steps aside while you type. */}
+        {phone && !presenting && !editing && !notesEditor && deck.slides.length > 0 && (
+          <button className='present-button present-fab' onClick={() => startShow(true)}><Play size={20} weight='fill' /> Present</button>
+        )}
       </div>
     </PicturesContext.Provider>
   )
