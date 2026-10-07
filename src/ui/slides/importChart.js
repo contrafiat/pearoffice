@@ -7,7 +7,10 @@
 // Bar, column, line, area, pie, doughnut, scatter and radar charts are read,
 // their 3-D forms as the flat ones. A chart that combines types keeps its
 // first; the others are counted. Other kinds (bubble, stock, surface and
-// the newer chartex kinds) are not read.
+// the newer chartex kinds) are not read. The text colour is the one most
+// of the chart's text uses (its own and its title's, legend's, axes' and
+// labels' text properties); smooth comes from any line series with
+// c:smooth on.
 
 import { kid, kids, dig, attr, fillOf } from './importOoxml.js'
 
@@ -108,6 +111,37 @@ function seriesColour (ser, ctx, lineFirst, count) {
   return colourOfSp(kid(ser, 'spPr'), ctx, lineFirst)
 }
 
+// Does the text under el show? Not when it is in data labels that show
+// nothing or in a deleted axis.
+function shown (el) {
+  for (let p = el.parentNode; p && p.localName !== 'chartSpace'; p = p.parentNode) {
+    if (p.localName === 'dLbls' || p.localName === 'dLbl') return ['showVal', 'showPercent', 'showCatName', 'showSerName'].some((k) => on(kid(p, k)))
+    if (/^(cat|val|date|ser)Ax$/.test(p.localName)) return !on(kid(p, 'delete'))
+  }
+  return true
+}
+
+// The colour most of a chart's text is set in: every text run property
+// (a:defRPr, a:rPr) with a solid fill, under the chart's text properties
+// (c:txPr) and its title's text, where that text shows. Null when none
+// sets one.
+function textColour (root, ctx) {
+  const counts = new Map()
+  const holders = [...root.getElementsByTagName('*')].filter((e) => e.localName === 'txPr' || (e.localName === 'rich' && e.parentNode && e.parentNode.localName === 'tx'))
+  for (const h of holders) {
+    if (!shown(h)) continue
+    for (const r of h.getElementsByTagName('*')) {
+      if (r.localName !== 'defRPr' && r.localName !== 'rPr') continue
+      const f = fillOf(r, ctx)
+      if (!f || !f.colour || f.colour === 'none') continue
+      counts.set(f.colour, (counts.get(f.colour) || 0) + 1)
+    }
+  }
+  let best = null
+  for (const [c, n] of counts) if (!best || n > counts.get(best)) best = c
+  return best
+}
+
 // The chart part's root (c:chartSpace) as { chart, data, extra }, where
 // extra counts the plot types left out of a combined chart; null when the
 // chart has nothing PearOffice can draw. ctx is the slide's colour context
@@ -159,5 +193,8 @@ export function readChart (root, ctx) {
   const labels = [kid(plot, 'dLbls'), ...sers.map((s) => kid(s, 'dLbls'))].filter(Boolean)
   if (labels.some((d) => on(kid(d, 'showVal')) || ((type === 'pie' || type === 'doughnut') && on(kid(d, 'showPercent'))))) chart.dataLabels = true
   if (['column', 'bar', 'line', 'area'].includes(type) && (grouping === 'stacked' || grouping === 'percentStacked')) chart.stacked = true
+  if (type === 'line' && sers.some((s) => on(kid(s, 'smooth')))) chart.smooth = true
+  const ink = textColour(root, ctx)
+  if (ink) chart.textColor = ink
   return { chart, data: { categories, series }, extra: plots.length - 1 }
 }

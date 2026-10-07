@@ -5,11 +5,13 @@
 // picture, rotation, notes and the slide size. Slide 3 has the follow-ups
 // (proposals/2026-10-06-slides-followups.md): see-through fill and outline,
 // bottom-anchored and unwrapped text, a cropped picture, arrowheads and
-// custom shapes; LibreOffice saves the deck again as .pptx and its XML must
-// still have each of them. Slide 4 has four charts (a stacked column, a
+// custom shapes, unwrapped centred and right-aligned text that keeps its
+// box's middle or right edge and rounded corners (adj); LibreOffice saves
+// the deck again as .pptx and its XML must still have each of them. Slide 4 has four charts (a stacked column, a
 // stacked line, a pie and a scatter chart): written as PowerPoint charts,
-// LibreOffice must draw their titles and keep their series and values when
-// it saves the deck again. Needs `soffice` and `pdftotext` (poppler).
+// LibreOffice must draw their titles and keep their series, values, the
+// column chart's text colour and the line's smoothing when it saves the
+// deck again. Needs `soffice` and `pdftotext` (poppler).
 // Usage: node scripts/check-slides-export.js [out-dir]
 // With an out-dir it also keeps the .pptx, LibreOffice's PDF and a PNG of
 // each page for a look.
@@ -167,10 +169,19 @@ const FORMATTED = {
     ids.custom = S.addShape(doc, s4, 'custom', { x: 1150, y: 560, w: 300, h: 300, rot: 0 }, { path: 'M500 0L1000 1000L0 1000Z' })
     ids.curve = S.addShape(doc, s4, 'custom', { x: 1500, y: 560, w: 300, h: 300, rot: 0 }, { path: 'M0 1000C0 0 1000 0 1000 1000Z' })
     fill(S.element(doc, s4, ids.curve), { type: 'doc', content: [p([t('Curved')])] })
+    // Narrow boxes whose text does not wrap: centred and right-aligned.
+    ids.centred = S.addText(doc, s4, { x: 700, y: 750, w: 160, h: 70, rot: 0 })
+    fill(S.element(doc, s4, ids.centred), { type: 'doc', content: [p([t('Centred line that never wraps')], { textAlign: 'center' })] })
+    S.setWrap(doc, s4, ids.centred, false)
+    ids.righted = S.addText(doc, s4, { x: 900, y: 840, w: 160, h: 70, rot: 0 })
+    fill(S.element(doc, s4, ids.righted), { type: 'doc', content: [p([t('Right line that never wraps')], { textAlign: 'right' })] })
+    S.setWrap(doc, s4, ids.righted, false)
+    ids.rounder = S.addShape(doc, s4, 'roundRect', { x: 450, y: 940, w: 200, h: 110, rot: 0 })
+    S.setStyle(doc, s4, ids.rounder, { fill: '#388e3c', radius: 0.25 })
 
     s5 = S.addSlide(doc, { after: s4, layout: 'blank' })
-    S.addChart(doc, s5, { chart: { type: 'column', title: 'Sales by region', stacked: true, legend: 'right' }, data: { categories: ['North', 'South', 'East'], series: [{ name: 'Apples', values: [42, 17, 23], color: '#d32f2f' }, { name: 'Pears', values: [11, 29, null] }] } }, { x: 60, y: 60, w: 880, h: 460, rot: 0 })
-    S.addChart(doc, s5, { chart: { type: 'line', title: 'Stacked visits', stacked: true }, data: { categories: ['Mon', 'Tue', 'Wed', 'Thu'], series: [{ name: 'Web', values: [5, 6, 7, 8] }, { name: 'App', values: [2, 3, 4, 5] }] } }, { x: 980, y: 60, w: 880, h: 460, rot: 0 })
+    S.addChart(doc, s5, { chart: { type: 'column', title: 'Sales by region', stacked: true, legend: 'right', textColor: '#7b1fa2' }, data: { categories: ['North', 'South', 'East'], series: [{ name: 'Apples', values: [42, 17, 23], color: '#d32f2f' }, { name: 'Pears', values: [11, 29, null] }] } }, { x: 60, y: 60, w: 880, h: 460, rot: 0 })
+    S.addChart(doc, s5, { chart: { type: 'line', title: 'Stacked visits', stacked: true, smooth: true }, data: { categories: ['Mon', 'Tue', 'Wed', 'Thu'], series: [{ name: 'Web', values: [5, 6, 7, 8] }, { name: 'App', values: [2, 3, 4, 5] }] } }, { x: 980, y: 60, w: 880, h: 460, rot: 0 })
     S.addChart(doc, s5, { chart: { type: 'pie', title: 'Share of time', dataLabels: true }, data: { categories: ['Work', 'Play', 'Sleep'], series: [{ name: 'Hours', values: [8, 6, 10] }] } }, { x: 60, y: 560, w: 880, h: 460, rot: 0 })
     S.addChart(doc, s5, { chart: { type: 'scatter', title: 'Height and weight', legend: 'none' }, data: { categories: [150, 160, 170, 180], series: [{ name: 'People', values: [50, 58, 66, 79], color: '#1976d2' }] } }, { x: 980, y: 560, w: 880, h: 460, rot: 0 })
 
@@ -291,6 +302,13 @@ const FORMATTED = {
     'line ends written and read back': /<a:headEnd type="arrow"\/><a:tailEnd type="triangle"\/>/.test(slide3) && /<a:tailEnd type="oval"\/>/.test(slide3) && loHas(/<a:headEnd[^>]* type="arrow"/) && loHas(/<a:tailEnd[^>]* type="triangle"/) && loHas(/<a:tailEnd[^>]* type="oval"/),
     'custom shapes written and read back': (slide3.match(/<a:custGeom>/g) || []).length === 2 && /<a:cubicBezTo>/.test(slide3) && (lo3.match(/<a:custGeom>/g) || []).length >= 2 && /<a:cubicBezTo>/.test(lo3),
     'text in a custom shape': !!find(2, 'Curved'),
+    'unwrapped centred text centred on its box': at(2, 'Centred line that never wraps', { cx: 780 }),
+    'unwrapped right-aligned text ends at its box': at(2, 'Right line that never wraps', { right: 1045 }),
+    'corners written (adj)': /prst="roundRect"><a:avLst><a:gd name="adj" fmla="val 16667"\/>/.test(slide2) && /prst="roundRect"><a:avLst><a:gd name="adj" fmla="val 25000"\/>/.test(slide3),
+    'corners read back by LibreOffice': (() => { const m = /prst="roundRect">\s*<a:avLst>\s*<a:gd name="adj" fmla="val (\d+)"/.exec(lo3); return !!m && Math.abs(Number(m[1]) - 25000) < 100 })(),
+    'chart text colour written': ['catAx', 'valAx', 'legend', 'title'].every((k) => new RegExp('<c:' + k + '>[\\s\\S]*?7B1FA2[\\s\\S]*?</c:' + k + '>').test(ourCharts[0] || '')),
+    'chart text colour read back by LibreOffice': /7b1fa2/i.test(loChart('barChart', 'Apples').replace(/<c:ser>[\s\S]*?<\/c:ser>/g, '')),
+    'smooth line written and read back': /<c:smooth val="1"\/>/.test(ourCharts[1] || '') && /<c:smooth val="1"\/>/.test(loChart('lineChart', 'Web')),
     'four charts written as PowerPoint charts': ourCharts.length === 4 && (await xml('ppt/slides/slide4.xml')).split('<p:graphicFrame>').length === 5,
     'stacked column chart written': /<c:barDir val="col"\/><c:grouping val="stacked"\/>/.test(ourCharts[0] || '') && vals(ourCharts[0] || '') === '42,17,23|11,29' && names(ourCharts[0] || '') === 'Apples,Pears' && (ourCharts[0] || '').includes('<a:srgbClr val="D32F2F"') && /<c:legendPos val="r"\/>/.test(ourCharts[0] || ''),
     'stacked line chart written': /<c:lineChart><c:grouping val="stacked"\/>/.test(ourCharts[1] || ''),

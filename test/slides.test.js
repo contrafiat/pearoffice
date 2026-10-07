@@ -166,8 +166,10 @@ test('shapes and pictures: added, styled, duplicated and listed', () => {
   const st = (id, on = sl) => { const x = s.style(s.element(a, on, id)); return [x.shape, x.fill, x.line, x.lineW].join() }
   assert.equal(st(rect), 'roundRect,accent1,none,0')
   assert.equal(st(line), 'line,none,text,6')
-  change(a, (d) => s.setStyle(d, sl, rect, { fill: '#ff0000', line: 'javascript:x', lineW: 500 }))
+  assert.equal(s.style(s.element(a, sl, rect)).radius, 0.16667)
+  change(a, (d) => s.setStyle(d, sl, rect, { fill: '#ff0000', line: 'javascript:x', lineW: 500, radius: 0.9 }))
   assert.equal(st(rect), 'roundRect,#ff0000,none,100')
+  assert.equal(s.style(s.element(a, sl, rect)).radius, 0.5)
   const f = s.frame(s.element(a, sl, pic))
   assert.equal([f.x, f.y, f.w, f.h].join(), '480,420,960,240')
   assert.equal(s.elements(a, sl).map((e) => e.map.get('type')).join(), 'text,text,shape,shape,picture')
@@ -235,6 +237,10 @@ test('charts: added, cleaned, changed and duplicated', () => {
   assert.equal(JSON.stringify(got().data.series.slice(0, 2)), '[{"name":"A","values":[1,null,3,null],"color":"#ff0000"},{"name":"Series 2","values":[2]}]')
   change(a, (d) => s.setChart(d, sl, c, { chart: { type: 'line', stacked: true } }))
   assert.equal(JSON.stringify(got().chart), '{"type":"line","title":"Sales","stacked":true}')
+  change(a, (d) => s.setChart(d, sl, c, { chart: { smooth: true, textColor: '#ffffff' } }))
+  assert.equal(JSON.stringify(got().chart), '{"type":"line","title":"Sales","stacked":true,"smooth":true,"textColor":"#ffffff"}')
+  change(a, (d) => s.setChart(d, sl, c, { chart: { type: 'pie', textColor: 'javascript:' } }))
+  assert.equal(JSON.stringify(got().chart), '{"type":"pie","title":"Sales","stacked":true}', 'smooth only on line and area; a bad colour clears it')
   change(a, (d) => s.setChart(d, sl, c, { chart: { type: 'gantt' } }))
   assert.equal(got().chart.type, 'column', 'unknown types draw as columns')
   let dup

@@ -3,7 +3,8 @@
 // theme's accents; the type changes to pie and line and back; Edit data
 // changes a value and a series name and the drawing follows; title,
 // stacked and values on the chart; the slide duplicated with its chart; the
-// show draws it; the deck reopened keeps it.
+// show draws it; the deck reopened keeps it; then as a line chart with smooth
+// lines and white text, kept after reopening again.
 //
 // PEAROFFICE_SMOKE_CHART_SHOTS=<folder> saves a screenshot of the slide
 // with each chart type in the Plain and Midnight themes, one of the chart
@@ -181,5 +182,39 @@ async function run (t) {
   if (!result.chartsPersisted) throw new Error('not kept after reopening: ' + JSON.stringify(back))
   step('deck reopened')
 
-  return result.chartsInsert && result.chartsTypes && result.chartsData && result.chartsSettings && result.chartsDuplicate && result.chartsShow && result.chartsPersisted
+  // White text and smooth lines on a line chart, kept after reopening.
+  click(await centre('.slide-stage .slide-el[data-type=chart]'))
+  await waitFor('chart selected again', "!!document.querySelector('.slides-tools .chart-type')")
+  result.chartsNoSmoothOnColumn = await js("!document.querySelector('.slides-tools .chart-smooth')")
+  await setType('line')
+  const straight = await markup()
+  await waitFor('smooth button', "!!document.querySelector('.slides-tools .chart-smooth')")
+  await js("document.querySelector('.slides-tools .chart-smooth').click()")
+  // ECharts draws a smooth line with curves (C in the path).
+  const curved = `[...${svg()}.querySelectorAll('path')].some((p) => /C/.test(p.getAttribute('d') || '') && p.getAttribute('fill') === 'none')`
+  await waitFor('smooth lines', `document.querySelector('.slides-tools .chart-smooth').classList.contains('on') && ${svg()}.outerHTML !== ${JSON.stringify(straight)} && ${curved}`)
+  await js("document.querySelector('.slides-tools .chart-text').click()")
+  await waitFor('text colour menu', "!!document.querySelector('.chart-text-palette .swatch[title=\"#ffffff\"]')")
+  await js("document.querySelector('.chart-text-palette .swatch[title=\"#ffffff\"]').click()")
+  // Every label is white: the title, the axes and the legend.
+  const white = `(() => { const t = [...${svg()}.querySelectorAll('text')]; return t.length > 4 && t.every((x) => /^(#fff|#ffffff|rgb\\(255, ?255, ?255\\))$/i.test(x.getAttribute('fill') || '')) })()`
+  await waitFor('white text', white)
+  if (shots) {
+    await pick('.slides-tools .theme-select', 'midnight')
+    await js("document.querySelector('.slide-stage').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))")
+    await shot('smooth-white', '.slide-stage .slide')
+    await pick('.slides-tools .theme-select', 'plain')
+  }
+  await sleep(700)
+  await js("document.querySelector('.sheet-link.all-files').click()")
+  await waitFor('deck in all files again', "[...document.querySelectorAll('.file-card')].some((c) => !!c.querySelector('.kind-icon.kind-slides'))")
+  await js("[...document.querySelectorAll('.file-card')].find((c) => !!c.querySelector('.kind-icon.kind-slides')).click()")
+  await waitFor('deck reopened again', `!!document.querySelector('.slides .slide-stage .slide') && ${count} === 2`)
+  await js(`document.querySelector('.slide-thumb[data-id="${firstSlide}"]').click()`)
+  await waitFor('line chart again', `(document.querySelector('.slide-stage .slide-chart') || {}).dataset?.chartType === 'line' && !!${svg()}`)
+  result.chartsSmoothText = await js(`${curved} && ${white}`)
+  if (!result.chartsSmoothText) throw new Error('smooth lines or white text not kept: ' + (await markup()).slice(0, 600))
+  step('smooth lines and text colour')
+
+  return result.chartsNoSmoothOnColumn && result.chartsSmoothText && result.chartsInsert && result.chartsTypes && result.chartsData && result.chartsSettings && result.chartsDuplicate && result.chartsShow && result.chartsPersisted
 }

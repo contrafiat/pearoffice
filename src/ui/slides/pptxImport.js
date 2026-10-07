@@ -5,7 +5,7 @@
 // placeholders, which take their position and style from the slide's layout
 // and master; shapes drawn on the layout and master; backgrounds and
 // speaker notes; see-through fills and outlines, where text sits and
-// whether it wraps, picture crops, arrowheads, custom shapes (their paths
+// whether it wraps, rounded corners, picture crops, arrowheads, custom shapes (their paths
 // scaled into a 1000 x 1000 box, customGeom.js) and SmartArt (from the
 // drawing PowerPoint saves with it) and charts (with the values PowerPoint
 // keeps with them, importChart.js). What has no place in a PearOffice deck
@@ -352,25 +352,15 @@ function lineFrame (st, r, lineW) {
   return { x: Math.round(cx - len / 2), y: Math.round(cy - h / 2), w: Math.round(len), h, rot: normRot(Math.atan2(uy, ux) * 180 / Math.PI) }
 }
 
-// A box whose text does not wrap in PowerPoint (wrap="none") is widened
-// to about its longest line, from the side its text is aligned to: text
-// that does not wrap runs out of the right of its box here whatever its
-// alignment.
-function unwrapped (st, frame, paras) {
-  let widest = 0
-  for (const p of paras) {
-    let w = 0
-    for (const r of p.runs) {
-      if (r.br) { widest = Math.max(widest, w); w = 0; continue }
-      w += r.text.length * (r.size || 18) * st.ptScale * 2 * 0.56
-    }
-    widest = Math.max(widest, w)
-  }
-  const need = Math.round(widest + 30) // the box's padding
-  if (need <= frame.w) return frame
-  const align = (paras[0] && paras[0].align) || 'left'
-  const x = align === 'center' ? frame.x - (need - frame.w) / 2 : align === 'right' ? frame.x - (need - frame.w) : frame.x
-  return { ...frame, x: Math.round(x), w: need }
+const POWERPOINT_RADIUS = 0.16667
+
+// A rounded rectangle's corner as a fraction of the shorter side: its adj
+// guide ("val N", N in 1/100000), else PowerPoint's default of a sixth.
+function cornerOf (geom) {
+  const gd = kids(kid(geom, 'avLst'), 'gd').find((g) => attr(g, 'name') === 'adj')
+  const m = gd && /^val\s+(-?\d+)$/.exec(String(attr(gd, 'fmla') || '').trim())
+  if (!m) return POWERPOINT_RADIUS
+  return Math.min(0.5, Math.max(0, Number(m[1]) / 100000))
 }
 
 // A preset arrow pointing another way, as our right arrow turned.
@@ -529,7 +519,7 @@ function shapeEl (sc, part, el, xf, source, key) {
     // A box with no fill or outline is a text box. Empty title and body
     // placeholders stay, as empty layout boxes do.
     if (!blank || cls === 'title' || cls === 'body') {
-      sc.els.push({ kind: 'text', frame: text.wrap ? frame : unwrapped(st, frame, paras), ph: cls, phType: ph ? ph.type : null, paras, ...text })
+      sc.els.push({ kind: 'text', frame, ph: cls, phType: ph ? ph.type : null, paras, ...text })
     }
     return
   }
@@ -541,7 +531,9 @@ function shapeEl (sc, part, el, xf, source, key) {
     preset = PRESETS.rect
   }
   if (fill && fill.lost) lose(st, fill.lost, key)
-  sc.els.push({ kind: 'shape', shape: preset.shape, path, frame: turnedFrame(shapeFrame || frame, preset), ...look, paras, ...text })
+  const out = { kind: 'shape', shape: preset.shape, path, frame: turnedFrame(shapeFrame || frame, preset), ...look, paras, ...text }
+  if (preset.shape === 'roundRect') out.radius = cornerOf(prst === 'roundRect' ? geom : null)
+  sc.els.push(out)
 }
 
 // A custom outline's corners in the shape's box (EMU, flips applied), when
@@ -819,7 +811,7 @@ export function buildDeck (parsed, { Y: Yx = Y, title = 'Imported slides', pictu
           } else if (el.kind === 'shape') {
             made = slidesModel.addShape(doc, id, el.shape, el.frame, { path: el.path })
             if (made) {
-              slidesModel.setStyle(doc, id, made, { fill: el.fill, line: el.line, lineW: el.lineW })
+              slidesModel.setStyle(doc, id, made, { fill: el.fill, line: el.line, lineW: el.lineW, radius: el.radius })
               if (el.fillOpacity < 1 || el.lineOpacity < 1) slidesModel.setOpacity(doc, id, made, { fill: el.fillOpacity, line: el.lineOpacity })
               if (el.shape === 'line' && (el.head !== 'none' || el.tail !== 'none')) slidesModel.setArrows(doc, id, made, { head: el.head, tail: el.tail })
             }
@@ -829,7 +821,11 @@ export function buildDeck (parsed, { Y: Yx = Y, title = 'Imported slides', pictu
             made = slidesModel.addPicture(doc, id, { ref: refFor(el.media), hash: '', mime: p.mime, w: p.w, h: p.h, alt: el.alt }, el.frame)
             if (made && el.crop) slidesModel.setCrop(doc, id, made, el.crop)
           } else if (el.kind === 'chart') {
-            made = slidesModel.addChart(doc, id, { chart: el.chart, data: el.data }, el.frame)
+            // A text colour close to the theme's is left to follow it, as for
+            // text (importText.js, near).
+            const chart = { ...el.chart }
+            if (chart.textColor && distance(chart.textColor, theme.text) < 64) delete chart.textColor
+            made = slidesModel.addChart(doc, id, { chart, data: el.data }, el.frame)
           }
           add(made)
           if (!made || el.kind === 'picture' || el.kind === 'chart') continue
@@ -839,7 +835,8 @@ export function buildDeck (parsed, { Y: Yx = Y, title = 'Imported slides', pictu
           const role = el.role || null
           fill(map, el.paras, {
             defaultSize: role === 'title' ? defaultSize(theme, 'title') : defaultSize(theme, 'body'),
-            ink: el.kind === 'shape' ? inkOn(el.fill, theme, el.fillOpacity) : theme.text
+            ink: el.kind === 'shape' ? inkOn(el.fill, theme, el.fillOpacity) : theme.text,
+            align: el.kind === 'shape' ? 'left' : undefined
           })
         }
         // Layout boxes were made first: put everything back in file order.

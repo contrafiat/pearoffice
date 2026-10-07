@@ -1,7 +1,9 @@
 // Smoke test part "slides-style" (proposals/2026-10-06-slides-followups.md):
 // a rectangle's fill and outline made see-through from their menus, text
 // put at the bottom of the rectangle and of a text box, the text box set
-// not to wrap from the right-click menu, arrowheads on two lines, a picture
+// not to wrap from the right-click menu, a centred box that does not wrap
+// (its line grows both ways), a rounded rectangle's corners, arrowheads on
+// two lines, a picture
 // cropped with its handles (then undone and redone) and all of it kept
 // after the deck is reopened.
 //
@@ -129,6 +131,42 @@ async function run (t) {
   result.styleOneLine = await js(`(() => { const p = document.querySelector('${elSel(box)} .slide-static p'); const r = document.createRange(); r.selectNodeContents(p); return r.getClientRects().length === 1 })()`)
   step('text box at the bottom, not wrapping')
 
+  // A second box, centred and not wrapping: its line runs out of both
+  // sides of the box evenly.
+  const before2 = await ids()
+  await js("document.querySelector('.slides-tools .add-box').click()")
+  await waitFor('second box editor', "document.activeElement && document.activeElement.matches('.slide-el[data-type=text] .ProseMirror')")
+  const cbox = await newId(before2)
+  await type('Centred words that run out past both sides of this box and keep going', 5)
+  await js("document.querySelector('.slides-tools .align-button').click()")
+  await waitFor('align menu', "!!document.querySelector('.menu .align-center')")
+  await js("document.querySelector('.menu .align-center').click()")
+  await waitFor('centred', `(document.querySelector('${elSel(cbox)} .ProseMirror p') || {}).style?.textAlign === 'center'`)
+  await key('Escape')
+  await waitFor('second box done', `!document.querySelector('${elSel(cbox)} .ProseMirror') && !!document.querySelector('${elSel(cbox)} .slide-static p')`)
+  await js("document.querySelector('.slide-stage').focus()")
+  await moveTo(cbox, 560, 760)
+  click(await centre(elSel(cbox)), 1, 'right')
+  await waitFor('second box menu', "!!document.querySelector('.box-menu .wrap-text')")
+  await js("document.querySelector('.box-menu .wrap-text').click()")
+  await waitFor('second box no wrap', `document.querySelector('${elSel(cbox)} .slide-text').dataset.wrap === 'false'`)
+  // The line's middle is the box's middle, and it is wider than the box.
+  const centredLine = () => js(`(() => { const b = document.querySelector('${elSel(cbox)}').getBoundingClientRect(); const p = document.querySelector('${elSel(cbox)} .slide-static p').getBoundingClientRect(); return p.left < b.left && p.right > b.right && Math.abs((p.left + p.right) / 2 - (b.left + b.right) / 2) < b.width * 0.02 })()`)
+  result.styleCentredUnwrapped = await centredLine()
+  if (!result.styleCentredUnwrapped) throw new Error('centred unwrapped text is not centred on its box')
+  step('centred text grows both ways')
+
+  // A rounded rectangle: medium corners at first, then large.
+  const rr = await insertShape('roundRect')
+  await moveTo(rr, 100, 560)
+  await waitFor('corner select', "!!document.querySelector('.slides-tools .corner-radius')")
+  result.styleCornerDefault = await js("document.querySelector('.slides-tools .corner-radius').value === '0.16667'")
+  await select('.slides-tools .corner-radius', '0.25')
+  const corner = (k) => `(() => { const r = document.querySelector('${elSel(rr)} svg rect'); const w = parseFloat(r.getAttribute('width')); const h = parseFloat(r.getAttribute('height')); return Math.abs(parseFloat(r.getAttribute('rx')) - Math.min(w, h) * ${k}) < 0.5 })()`
+  await waitFor('large corners', corner(0.25))
+  result.styleCorners = true
+  step('corners')
+
   // Two lines: an arrow and a triangle, then a circle.
   const line1 = await insertShape('line')
   await moveTo(line1, 1000, 120)
@@ -209,10 +247,11 @@ async function run (t) {
       document.querySelector('${elSel(box)} .slide-text').dataset.anchor === 'bottom' &&
       document.querySelector('${elSel(box)} .slide-text').dataset.wrap === 'false' &&
       l1.dataset.head === 'arrow' && l1.dataset.tail === 'triangle' && l2.dataset.tail === 'oval' &&
-      !!p.querySelector('img.slide-picture.cropped') && Math.abs(parseFloat(p.style.width) - ${c1.w}) < 2
-  })()`)
+      !!p.querySelector('img.slide-picture.cropped') && Math.abs(parseFloat(p.style.width) - ${c1.w}) < 2 &&
+      document.querySelector('${elSel(cbox)} .slide-text').dataset.wrap === 'false' && ${corner(0.25)}
+  })()`) && await centredLine()
   if (!result.stylePersisted) throw new Error('not kept after reopening')
   step('deck reopened')
 
-  return result.styleNoCustomInMenu && result.styleOpacity && result.styleShapeAnchorDefault && result.styleLiveAnchor && result.styleWrapOnFirst && result.styleOneLine && result.styleArrows && result.styleCrop && result.styleCropUndo && result.stylePersisted
+  return result.styleNoCustomInMenu && result.styleOpacity && result.styleShapeAnchorDefault && result.styleLiveAnchor && result.styleWrapOnFirst && result.styleOneLine && result.styleCentredUnwrapped && result.styleCornerDefault && result.styleCorners && result.styleArrows && result.styleCrop && result.styleCropUndo && result.stylePersisted
 }

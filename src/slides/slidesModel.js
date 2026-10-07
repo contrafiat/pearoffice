@@ -39,6 +39,9 @@ const HEX = /^#[0-9a-fA-F]{6}$/
 const SHAPES = ['rect', 'roundRect', 'ellipse', 'triangle', 'arrow', 'line', 'custom']
 const ENDS = ['none', 'arrow', 'triangle', 'oval']
 const ANCHORS = ['top', 'middle', 'bottom']
+// A rounded rectangle's corner, as a fraction of its shorter side: PowerPoint's
+// default, and what the editor drew before corners could change.
+const DEFAULT_RADIUS = 0.16667
 const PATH_MAX = 20000
 // SVG path data in a 1000 x 1000 box: only these commands and numbers.
 const PATH = /^\s*[Mm][\sMmLlHhVvCcQqAaZz0-9.,+eE-]*$/
@@ -397,7 +400,8 @@ const num = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null)
 
 // A chart's settings and data, as stored, made safe: { chart, data } in the
 // shapes src/ui/sheet/chartOption.js takes. Settings: type, title, legend
-// ('bottom', 'right' or 'none'), dataLabels, stacked. Data: categories and
+// ('bottom', 'right' or 'none'), dataLabels, stacked, smooth (line and
+// area), textColor (a theme slot or hex). Data: categories and
 // up to 10 series of up to 1000 values, each with a name and an optional
 // colour.
 function cleanChart (value) {
@@ -409,6 +413,8 @@ function cleanChart (value) {
   if (['bottom', 'right', 'none'].includes(c.legend)) chart.legend = c.legend
   if (c.dataLabels === true) chart.dataLabels = true
   if (c.stacked === true) chart.stacked = true
+  if (c.smooth === true && ['line', 'area'].includes(chart.type)) chart.smooth = true
+  if (typeof c.textColor === 'string' && COLOR.test(c.textColor) && c.textColor !== 'none') chart.textColor = c.textColor
   const cats = Array.isArray(d.categories) ? d.categories.slice(0, CHART_POINTS) : []
   const categories = cats.map((x) => (chart.type === 'scatter' ? num(x) : typeof x === 'number' && Number.isFinite(x) ? String(x) : str(x, 200)))
   const series = (Array.isArray(d.series) ? d.series : []).slice(0, CHART_SERIES).map((s, i) => {
@@ -467,6 +473,7 @@ function style (map) {
     fill: col(map.get('fill'), 'accent1'),
     line: col(map.get('line'), 'none'),
     lineW: clampNum(map.get('lineW'), 0, 100, 0),
+    radius: clampNum(map.get('radius'), 0, 0.5, DEFAULT_RADIUS),
     fillOpacity: opacity(map.get('fillOpacity')),
     lineOpacity: opacity(map.get('lineOpacity')),
     head: ENDS.includes(map.get('head')) ? map.get('head') : 'none',
@@ -503,6 +510,7 @@ function setStyle (doc, slideId, elId, changes = {}) {
   if (!map || map.get('type') !== 'shape') return false
   for (const k of ['fill', 'line']) if (typeof changes[k] === 'string' && COLOR.test(changes[k])) map.set(k, changes[k])
   if (Number.isFinite(changes.lineW)) map.set('lineW', clampNum(changes.lineW, 0, 100, 0))
+  if (Number.isFinite(changes.radius) && map.get('shape') === 'roundRect') map.set('radius', clampNum(changes.radius, 0, 0.5, DEFAULT_RADIUS))
   return true
 }
 
