@@ -1,5 +1,5 @@
 // Run the desktop smoke test against a packaged app instead of the checkout:
-//   node scripts/smoke-packaged.js <path to the app executable> [--part sheets|sheet-files|docs|slides|app] [screenshot.png]
+//   node scripts/smoke-packaged.js <path to the app executable> [--part sheets|sheet-files|docs|slides|slides-present|app] [screenshot.png]
 // e.g. the AppImage, PearOffice.app/Contents/MacOS/PearOffice or PearOffice.exe.
 // Each part runs in its own launch of the app (see desktop/smoke/launch.js).
 const { parseArgs, runParts } = require('../desktop/smoke/launch')

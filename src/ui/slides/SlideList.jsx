@@ -2,8 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { DotsThree, Plus, CaretDown } from '@phosphor-icons/react'
 import { LAYOUTS, LAYOUT_IDS } from '../../slides/layouts.js'
 import { Avatar, MemberAvatar } from '../Avatar.jsx'
-import { themeStyle } from './themes.js'
-import { StaticText, TextFrame, boxStyle } from './TextBox.jsx'
+import { StaticSlide } from './StaticSlide.jsx'
 
 // The slide list: a column of thumbnails on desktop, a row under the slide
 // on phones. Thumbnails are the slide's own DOM scaled down, with no live
@@ -161,15 +160,7 @@ function Thumb ({ slide, size, theme, scale, root }) {
   }, [seen])
   return (
     <div className='thumb' ref={ref}>
-      {seen && (
-        <div className='slide' data-layout={slide.layout} style={{ width: size[0], height: size[1], transform: 'scale(' + scale + ')', ...themeStyle(theme) }}>
-          {slide.els.map((el) => (
-            <div key={el.id} className='slide-el' data-role={el.role || undefined} style={boxStyle(el.frame)}>
-              <TextFrame frame={el.frame} role={el.role}><StaticText fragment={el.text} /></TextFrame>
-            </div>
-          ))}
-        </div>
-      )}
+      {seen && <StaticSlide slide={slide} size={size} theme={theme} scale={scale} />}
     </div>
   )
 }

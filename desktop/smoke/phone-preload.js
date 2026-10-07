@@ -1,0 +1,14 @@
+// The desktop bridge (../preload.js) with platform 'mobile', so a smoke
+// test window draws the phone layout. Used for screenshots only.
+
+const { contextBridge, ipcRenderer } = require('electron')
+
+contextBridge.exposeInMainWorld('pearoffice', {
+  call: (method, args) => ipcRenderer.invoke('worklet:call', method, args),
+  on: (event, fn) => {
+    const listener = (_e, msg) => { if (msg.name === event) fn(msg.data) }
+    ipcRenderer.on('worklet:event', listener)
+    return () => ipcRenderer.removeListener('worklet:event', listener)
+  },
+  platform: 'mobile'
+})

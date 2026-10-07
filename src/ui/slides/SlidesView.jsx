@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as Y from 'yjs'
-import { ArrowCounterClockwise, ArrowClockwise, Textbox, SelectionForeground, SelectionBackground, Trash, ArrowUUpLeft } from '@phosphor-icons/react'
+import { ArrowCounterClockwise, ArrowClockwise, Textbox, SelectionForeground, SelectionBackground, Trash, ArrowUUpLeft, Play } from '@phosphor-icons/react'
 import { call, on } from '../bridge.js'
 import { FileBar, useMembers } from '../FileBar.jsx'
 import { colourFor } from '../Avatar.jsx'
@@ -8,13 +8,15 @@ import { readPref } from '../prefs.js'
 import { isMobile } from '../save.js'
 import { toB64, fromB64 } from '../doc/pictures.js'
 import slidesModel from '../../slides/slidesModel.js'
-import { LAYOUTS, LAYOUT_IDS, ROLES } from '../../slides/layouts.js'
-import { themeFor, defaultSize } from './themes.js'
+import { LAYOUTS, LAYOUT_IDS } from '../../slides/layouts.js'
+import { defaultSize } from './themes.js'
+import { useDeck, boxesOf } from './deck.js'
 import { LOCAL, deckUndo } from './text.js'
 import { Stage, restackSelected } from './Stage.jsx'
 import { SlideList } from './SlideList.jsx'
 import { TextTools } from './TextTools.jsx'
 import { Notes } from './Notes.jsx'
+import { Show, Presenter } from './Present.jsx'
 
 // The slide deck editor (proposals/2026-10-06-slides.md). As with documents
 // it keeps its own copy of the deck's Yjs doc: loaded whole with
@@ -29,30 +31,6 @@ import { Notes } from './Notes.jsx'
 
 const SEND_MS = 300
 const CURSOR_MS = 150
-
-// Redrawn when slides, boxes or deck settings change. Typing changes only
-// text inside a fragment, which each box draws for itself.
-function useDeckVersion (ydoc) {
-  const [version, setVersion] = useState(0)
-  useEffect(() => {
-    const slides = ydoc.getMap('slides')
-    const deck = ydoc.getMap('deck')
-    const isText = (ev) => ev.target instanceof Y.XmlFragment || ev.target instanceof Y.XmlElement || ev.target instanceof Y.XmlText
-    const deep = (events) => { if (!events.every(isText)) setVersion((v) => v + 1) }
-    const bump = () => setVersion((v) => v + 1)
-    slides.observeDeep(deep)
-    deck.observe(bump)
-    return () => { slides.unobserveDeep(deep); deck.unobserve(bump) }
-  }, [ydoc])
-  return version
-}
-
-function boxesOf (ydoc, slideId) {
-  return slidesModel.elements(ydoc, slideId).map((e) => {
-    const role = e.map.get('role')
-    return { id: e.id, role: ROLES.includes(role) ? role : null, frame: slidesModel.frame(e.map), text: e.map.get('text') }
-  })
-}
 
 export function SlidesView ({ sheetId, onTitleChange, onError, onGone }) {
   const ydoc = useMemo(() => new Y.Doc(), [sheetId])
@@ -179,12 +157,7 @@ export function SlidesView ({ sheetId, onTitleChange, onError, onGone }) {
 
   // --- the deck as drawn ---------------------------------------------------
 
-  const version = useDeckVersion(ydoc)
-  const deck = useMemo(() => ({
-    size: slidesModel.size(ydoc),
-    theme: themeFor(slidesModel.theme(ydoc)),
-    slides: slidesModel.slides(ydoc).map((s) => ({ id: s.id, layout: s.map.get('layout'), els: boxesOf(ydoc, s.id) }))
-  }), [ydoc, version])
+  const { deck, version } = useDeck(ydoc)
 
   // The slide on screen. One deleted by someone else stays, with Restore;
   // one that is gone for good gives way to its neighbour.
@@ -305,6 +278,52 @@ export function SlidesView ({ sheetId, onTitleChange, onError, onGone }) {
     if (id) startEditing(id, {})
   }
 
+  // --- presenting (Present.jsx) ---------------------------------------------
+
+  // Open to everyone who can see the deck, viewers too. On desktop the main
+  // process says whether there is a second display for the audience
+  // ('presenter') or the window just goes full screen ('single'); a phone's
+  // shell hides the status bar.
+  const [presenting, setPresenting] = useState(null) // { start, mode }
+  const presentingRef = useRef(null)
+  presentingRef.current = presenting
+  const startShow = async (fromCurrent) => {
+    if (presentingRef.current || !deck.slides.length) return
+    const start = fromCurrent && slide ? slide.id : deck.slides[0].id
+    setEditing(null)
+    setNotesEditor(null)
+    presentingRef.current = { start, mode: 'single' }
+    let mode = 'single'
+    try {
+      const r = await call('app:presentStart', { sheetId, slideId: start })
+      if (r && r.mode === 'presenter') mode = 'presenter'
+    } catch {}
+    setPresenting({ start, mode })
+  }
+  const endShow = (id) => {
+    if (!presentingRef.current) return
+    presentingRef.current = null
+    setPresenting(null)
+    if (id) setCurrent(id)
+    call('app:presentEnd').catch(() => {})
+    setTimeout(focusStage, 0)
+  }
+  // F5 starts from the first slide and Shift+F5 from this one, as in
+  // PowerPoint.
+  const startRef = useRef(startShow)
+  startRef.current = startShow
+  useEffect(() => {
+    const down = (e) => {
+      if (e.key !== 'F5' || e.ctrlKey || e.metaKey || e.altKey) return
+      e.preventDefault()
+      startRef.current(e.shiftKey)
+    }
+    window.addEventListener('keydown', down)
+    return () => window.removeEventListener('keydown', down)
+  }, [])
+  // Leaving the deck mid-show ends it (closes the audience window).
+  useEffect(() => () => { if (presentingRef.current) call('app:presentEnd').catch(() => {}) }, [])
+
   function onKeyDown (e) {
     if (e.defaultPrevented) return
     const mod = e.ctrlKey || e.metaKey
@@ -353,10 +372,10 @@ export function SlidesView ({ sheetId, onTitleChange, onError, onGone }) {
         onGone={onGone}
       />
       {note && <div className='banner info'>{note}</div>}
-      <div className={'doc-tools slides-tools' + (phone ? ' phone' : '')} role='toolbar' aria-label='Slide tools' hidden={!canEdit}>
-        {btn('Undo (Ctrl+Z)', ArrowCounterClockwise, undefined, () => undo.undo(), { disabled: !undo.undoStack.length, className: 'undo-button' })}
-        {btn('Redo (Ctrl+Y)', ArrowClockwise, undefined, () => undo.redo(), { disabled: !undo.redoStack.length, className: 'redo-button' })}
-        <span className='sep' />
+      <div className={'doc-tools slides-tools' + (phone ? ' phone' : '')} role='toolbar' aria-label='Slide tools'>
+        {canEdit && btn('Undo (Ctrl+Z)', ArrowCounterClockwise, undefined, () => undo.undo(), { disabled: !undo.undoStack.length, className: 'undo-button' })}
+        {canEdit && btn('Redo (Ctrl+Y)', ArrowClockwise, undefined, () => undo.redo(), { disabled: !undo.redoStack.length, className: 'redo-button' })}
+        {canEdit && <span className='sep' />}
         {layoutEdit && (
           <>
             <select aria-label='Layout' title='Layout' className='layout-select' disabled={!slide} value={(slide && slide.layout) || 'blank'} onChange={(e) => change((doc) => slidesModel.setLayout(doc, current, e.target.value))}>
@@ -369,7 +388,8 @@ export function SlidesView ({ sheetId, onTitleChange, onError, onGone }) {
             <span className='sep' />
           </>
         )}
-        <TextTools editor={toolEditor} defaultSize={defaultSize(deck.theme, editingBox ? editingBox.role : 'body')} phone={phone} btn={btn} />
+        {canEdit && <TextTools editor={toolEditor} defaultSize={defaultSize(deck.theme, editingBox ? editingBox.role : 'body')} phone={phone} btn={btn} />}
+        <button className='present-button' title={phone ? 'Present' : 'Present (F5, or Shift+F5 from this slide)'} onMouseDown={(e) => e.preventDefault()} onClick={() => startShow(true)} disabled={!deck.slides.length}><Play size={ICON} weight='fill' /> Present</button>
       </div>
       <div className='slides-row'>
         {!phone && <SlideList slides={deck.slides} current={current} onPick={setCurrent} size={deck.size} theme={deck.theme} canEdit={canEdit} phone={phone} people={bySlide} sheetId={sheetId} onAdd={addSlide} onDuplicate={duplicate} onDelete={remove} onMove={move} />}
@@ -388,6 +408,9 @@ export function SlidesView ({ sheetId, onTitleChange, onError, onGone }) {
           {notes instanceof Y.XmlFragment && <Notes key={current} fragment={notes} undo={undo} canEdit={canEdit} phone={phone} onFocus={setNotesEditor} />}
         </div>
       </div>
+      {presenting && (presenting.mode === 'presenter'
+        ? <Presenter deck={deck} ydoc={ydoc} startId={presenting.start} onEnd={endShow} />
+        : <Show deck={deck} ydoc={ydoc} startId={presenting.start} phone={phone} onEnd={endShow} />)}
     </div>
   )
 }
