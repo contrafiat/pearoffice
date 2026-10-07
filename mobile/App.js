@@ -42,9 +42,14 @@ async function shellMethod (method, args) {
     return { ok: true }
   }
   if (method === 'app:savePdf') {
-    // The UI sends a printable page, as on desktop. A4, then the share sheet.
+    // The UI sends a printable page, as on desktop. A4 (or pageSize, in
+    // inches, with no margins: a deck's slides), then the share sheet.
     const safe = String(args.name || 'PearOffice.pdf').replace(/[\\/:*?"<>|]/g, ' ')
-    const { uri: tmp } = await Print.printToFileAsync({ html: String(args.html || ''), width: 595, height: 842 })
+    const ps = args.pageSize
+    const size = ps && [ps.width, ps.height].every((n) => Number.isFinite(n) && n >= 1 && n <= 100)
+      ? { width: Math.round(ps.width * 72), height: Math.round(ps.height * 72), margins: { left: 0, top: 0, right: 0, bottom: 0 } }
+      : { width: 595, height: 842 }
+    const { uri: tmp } = await Print.printToFileAsync({ html: String(args.html || ''), ...size })
     const uri = FileSystem.cacheDirectory + safe
     await FileSystem.deleteAsync(uri, { idempotent: true })
     await FileSystem.moveAsync({ from: tmp, to: uri })
@@ -69,7 +74,7 @@ async function shellMethod (method, args) {
   if (method === 'app:pickFile') {
     // A picture file for a document (args.images) or a file to import.
     const res = await DocumentPicker.getDocumentAsync({
-      type: args && args.images ? ['image/*'] : ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'text/csv', 'text/comma-separated-values', 'text/tab-separated-values', 'application/json', 'text/json', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/markdown', 'text/x-markdown', 'text/plain', 'text/html', 'application/octet-stream'],
+      type: args && args.images ? ['image/*'] : ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'text/csv', 'text/comma-separated-values', 'text/tab-separated-values', 'application/json', 'text/json', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.openxmlformats-officedocument.presentationml.presentation', 'text/markdown', 'text/x-markdown', 'text/plain', 'text/html', 'application/octet-stream'],
       copyToCacheDirectory: true
     })
     if (res.canceled || !res.assets || !res.assets[0]) return { canceled: true }

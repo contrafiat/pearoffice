@@ -85,6 +85,8 @@ test('a new deck has one title slide with a title and a subtitle box', () => {
   assert.equal(s.version(base), 1)
   assert.equal(s.size(base).join('x'), '1920x1080')
   assert.equal(s.theme(base), 'plain')
+  change(base, (d) => { s.setSize(d, [1440, 1080]); s.setSize(d, [5, 1080]) })
+  assert.equal(s.size(base).join('x'), '1440x1080')
   const [first] = s.slideIds(base)
   assert.equal(s.slide(base, first).get('layout'), 'title')
   assert.equal(s.elements(base, first).map((e) => e.map.get('role')).join(), 'title,body')
@@ -436,6 +438,23 @@ test('slide decks between devices', async (t) => {
     await call(viewer, 'file:join', { link })
     await waitFor('viewer joined', async () => (await call(viewer, 'slides:state', { sheetId })).myRole === 'viewer')
     await assert.rejects(edit(viewer, sheetId, (d) => s.addSlide(d)), /view this file but not edit/)
+  })
+
+  await t.test('a deck made from a file', async () => {
+    const scratch = new Y.Doc()
+    const update = change(scratch, (d) => {
+      const first = s.initDeck(d, { title: 'From pptx' })
+      type(d, first, box(d, first, 'title'), 'Imported title')
+      s.addShape(d, first, 'ellipse')
+    })
+    scratch.destroy()
+    const { sheetId: id } = await call(owner, 'slides:import', { title: 'From pptx', update: b4a.toString(update, 'base64') })
+    assert.equal((await call(owner, 'file:list')).find((x) => x.sheetId === id)?.kind, 'slides')
+    assert.equal(await read(owner, id, (d) => s.plainText(d) + '|' + s.elements(d, s.slideIds(d)[0]).length), 'Imported title\n\n|3')
+    const sheetDoc = new Y.Doc()
+    sheetDoc.getMap('meta').set('kind', 'sheet')
+    await assert.rejects(call(owner, 'slides:import', { update: b4a.toString(Y.encodeStateAsUpdate(sheetDoc), 'base64') }), /could not be read/)
+    await assert.rejects(call(owner, 'slides:import', { update: 'not base64 yjs' }), /could not be read/)
   })
 
   await t.test('tidying up a deck keeps its slides', async () => {

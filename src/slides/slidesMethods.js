@@ -7,6 +7,7 @@
 // file:* ones.
 
 const b4a = require('b4a')
+const Y = require('yjs')
 const m = require('../worklet/membership')
 const { createFileHelpers } = require('../worklet/fileMethods')
 const docModel = require('../doc/docModel')
@@ -40,6 +41,34 @@ function createSlidesMethods (sheets, { getJoin, getPictures }) {
       replicaState(ctx, sheetId, { withState, newer: (doc) => slidesModel.version(doc) > slidesModel.VERSION }),
 
     'slides:update': ({ sheetId, update }, ctx) => replicaUpdate(ctx, sheetId, update, 'slides', 'a slide deck'),
+
+    // A new deck made from a file (.pptx), as doc:import: the UI turns the
+    // file into the deck's content as one Yjs update made on an empty doc
+    // (slidesModel.initDeck and the rest). It goes in the guarded way like
+    // any edit. Pictures are added afterwards with slides:addPicture and an
+    // ordinary update that points the picture elements at them.
+    'slides:import': async ({ title = 'Imported slides', update } = {}, ctx) => {
+      if (typeof update !== 'string' || !update) throw new Error('Nothing to import')
+      const bytes = b4a.from(update, 'base64')
+      // Checked before the deck is made, so a bad file leaves nothing.
+      const scratch = new Y.Doc()
+      try {
+        Y.applyUpdate(scratch, bytes)
+        if (model.kind(scratch) !== 'slides') throw new Error('not a deck')
+      } catch { throw new Error('This file could not be read') } finally { scratch.destroy() }
+      const { groupId } = await ctx.createGroup({ name: String(title) })
+      const base = ctx.bases.get(groupId)
+      const e = sheets.entryFor(groupId)
+      e.loading = Promise.resolve()
+      for (const op of m.foundingOps({ sheetId: groupId, identity: ctx.identity, writerKey: hex(base.local.key), name: await profileName(ctx) })) {
+        await ctx.append(groupId, op)
+      }
+      if (getJoin()) getJoin().addSheet(groupId)
+      if (!e.guarded.apply(bytes, 'ui')) throw new Error('This file could not be read')
+      await commit(ctx, groupId, bytes)
+      await sheets.attach(groupId)
+      return { sheetId: groupId }
+    },
 
     // A picture for the deck, as for documents (doc:addPicture): stored in
     // this device's picture core for the file. Returns the reference; the
