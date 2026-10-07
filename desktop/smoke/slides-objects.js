@@ -57,11 +57,15 @@ async function run (t) {
   // Resize from the bottom right corner, then move, to a frame in slide units.
   async function place (id, target, { resize = true } = {}) {
     const s = await stage()
+    // Drags land to the nearest screen pixel: allow 3 of them, in slide units
+    // (a small window, as on the Windows build VM, has bigger ones).
+    const tol = Math.max(8, Math.ceil(3 / s.k))
     if (resize) {
       const f = await frameOf(id)
       const se = await centre((await js("!!document.querySelector('.sel-frame .handle.h-se')")) ? '.sel-frame .handle.h-se' : '.sel-frame .handle.h-e')
       await drag(se, { x: Math.round(se.x + (target.w - f.w) * s.k), y: Math.round(se.y + (target.h - f.h) * s.k) }, { modifiers: ['alt'] })
-      await waitFor('resized ' + id, `(() => { const el = document.querySelector('${elSel(id)}'); return Math.abs(parseFloat(el.style.width) - ${target.w}) < 8 })()`)
+      await waitFor('resized ' + id, `(() => { const el = document.querySelector('${elSel(id)}'); return Math.abs(parseFloat(el.style.width) - ${target.w}) < ${tol} })()`, 5000)
+        .catch(async (err) => { throw new Error(err.message + ' ' + JSON.stringify({ f, se, target, now: await frameOf(id), s })) })
     }
     const f = await frameOf(id)
     // A quarter of the way across: a thin line's middle is under its handles.
@@ -69,7 +73,7 @@ async function run (t) {
     const dx = (target.x - f.x) * s.k
     const dy = (target.y - f.y) * s.k
     await drag(from, { x: Math.round(from.x + dx), y: Math.round(from.y + dy) }, { modifiers: ['alt'] })
-    await waitFor('moved ' + id, `(() => { const el = document.querySelector('${elSel(id)}'); return Math.abs(parseFloat(el.style.left) - ${target.x}) < 8 && Math.abs(parseFloat(el.style.top) - ${target.y}) < 8 })()`, 3000)
+    await waitFor('moved ' + id, `(() => { const el = document.querySelector('${elSel(id)}'); return Math.abs(parseFloat(el.style.left) - ${target.x}) < ${tol} && Math.abs(parseFloat(el.style.top) - ${target.y}) < ${tol} })()`, 3000)
       .catch(async (err) => { throw new Error(err.message + ' ' + JSON.stringify({ f, from, dx, dy, now: await frameOf(id), s })) })
   }
 
@@ -185,7 +189,8 @@ async function run (t) {
   result.objectsPictureAspect = Math.abs(f1.w / f1.h - 2) < 0.05
   await place(pic, { x: 1040, y: 320, w: f1.w, h: f1.h }, { resize: false })
   const f2 = await frameOf(pic)
-  result.objectsPictureMoved = f2.x === 1040 && f2.y === 320
+  const tol = Math.max(8, Math.ceil(3 / (await stage()).k)) // as in place()
+  result.objectsPictureMoved = Math.abs(f2.x - 1040) < tol && Math.abs(f2.y - 320) < tol
   if (!result.objectsPictureAspect || !result.objectsPictureMoved) throw new Error('picture frames: ' + JSON.stringify({ f0, f1, f2 }))
   // Alt text from the right-click menu.
   const pc = await centre(elSel(pic))
@@ -247,7 +252,7 @@ async function run (t) {
     const p = document.querySelector('${elSel(pic)}')
     return g.getAttribute('fill') === 'var(--accent2)' && g.getAttribute('stroke') === '#d32f2f' && g.getAttribute('stroke-width') === '8' &&
       document.querySelector('${elSel(rect)} .slide-static').textContent === 'Hi' &&
-      p.style.left === '1040px' && p.style.top === '320px' &&
+      p.style.left === '${f2.x}px' && p.style.top === '${f2.y}px' &&
       document.querySelector('.slides-tools .theme-select').value === 'vivid'
   })()`)
   if (!result.objectsPersisted) throw new Error('not kept after reopening')
