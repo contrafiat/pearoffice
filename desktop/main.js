@@ -259,16 +259,22 @@ ipcMain.handle('worklet:call', async (_e, method, args) => {
   // This Electron's clipboard calls return promises.
   if (method === 'app:setClipboard') { await clipboard.writeText(String((args && args.text) || '')); return { ok: true } }
   if (method === 'app:getClipboard') return { text: String((await clipboard.readText()) || '') }
-  // A tab as PDF or on paper: the UI sends a printable page.
+  // A tab as PDF or on paper: the UI sends a printable page. A4 unless it
+  // sends pageSize ({ width, height } in inches, no margins: a deck's slides).
   if (method === 'app:savePdf' || method === 'app:print') {
     const page = new BrowserWindow({ show: false, webPreferences: { javascript: false } })
+    const ps = args && args.pageSize
+    const size = ps && [ps.width, ps.height].every((n) => Number.isFinite(n) && n >= 1 && n <= 100) ? { width: ps.width, height: ps.height } : null
     try {
       await page.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(String((args && args.html) || '')))
       if (method === 'app:print') {
-        await new Promise((resolve) => page.webContents.print({ printBackground: true }, () => resolve()))
+        const opts = size ? { pageSize: { width: Math.round(size.width * 25400), height: Math.round(size.height * 25400) }, margins: { marginType: 'none' } } : {}
+        await new Promise((resolve) => page.webContents.print({ printBackground: true, ...opts }, () => resolve()))
         return { ok: true }
       }
-      const pdf = await page.webContents.printToPDF({ printBackground: true, pageSize: 'A4' })
+      const pdf = await page.webContents.printToPDF(size
+        ? { printBackground: true, pageSize: size, margins: { top: 0, bottom: 0, left: 0, right: 0 } }
+        : { printBackground: true, pageSize: 'A4' })
       const name = String((args && args.name) || 'PearOffice.pdf').replace(/[\\/:*?"<>|]/g, ' ')
       // The smoke test saves without asking.
       const file = SMOKE

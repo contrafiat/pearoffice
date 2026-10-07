@@ -13,6 +13,7 @@ import { call } from '../bridge.js'
 import { writePref } from '../prefs.js'
 import { isMobile, fileName, saveFile } from '../save.js'
 import { isDocFile, importDocument } from '../doc/docFiles.js'
+import { isPptxFile, importPresentation } from '../slides/pptxImport.js'
 import { borderCss, fontPx, FONTS } from './cellStyle.js'
 
 const MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -57,9 +58,11 @@ function importText (bytes, name) {
 }
 
 // Desktop: a File from an <input type=file>. Word, Markdown, text and HTML
-// files become documents (src/ui/doc/docFiles.js), the rest sheets.
+// files become documents (src/ui/doc/docFiles.js), PowerPoint files slide
+// decks (src/ui/slides/pptxImport.js), the rest sheets.
 export async function importFile (file) {
   const data = new Uint8Array(await file.arrayBuffer())
+  if (isPptxFile(file.name)) return importPresentation(data, file.name)
   if (isDocFile(file.name)) return importDocument(data, file.name)
   if (isJson(file.name) || isCsv(file.name)) return importText(data, file.name)
   return importWorkbook(XLSX.read(data, { type: 'array', ...READ_OPTIONS }), file.name, data)
@@ -70,6 +73,7 @@ export async function pickAndImport () {
   const picked = await call('app:pickFile')
   if (!picked || picked.canceled) return null
   const bytes = Uint8Array.from(atob(picked.base64), (ch) => ch.charCodeAt(0))
+  if (isPptxFile(picked.name)) return importPresentation(bytes, picked.name)
   if (isDocFile(picked.name)) return importDocument(bytes, picked.name)
   if (isJson(picked.name) || isCsv(picked.name)) return importText(bytes, picked.name)
   return importWorkbook(XLSX.read(bytes, { type: 'array', ...READ_OPTIONS }), picked.name, bytes)

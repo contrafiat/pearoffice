@@ -443,6 +443,14 @@ function restack (doc, slideId, elId, step) {
   return true
 }
 
+// The deck's size in slide space: 1920 x 1080 for 16:9, 1440 x 1080 for an
+// imported 4:3 deck. Call before adding slides, so layouts fit.
+function setSize (doc, [w, h]) {
+  if (![w, h].every((n) => Number.isFinite(n) && n >= 100 && n <= 10000)) return false
+  deckMap(doc).set('size', [Math.round(w), Math.round(h)])
+  return true
+}
+
 function setTheme (doc, id) {
   deckMap(doc).set('theme', String(id).slice(0, 64))
 }
@@ -505,6 +513,7 @@ module.exports = {
   removeElement,
   restack,
   setTheme,
+  setSize,
   plainOf,
   plainText
 }

@@ -19,6 +19,7 @@ import { Notes } from './Notes.jsx'
 import { Show, Presenter } from './Present.jsx'
 import { PicturesContext, usePictureCache } from './objects.jsx'
 import { InsertShape, ShapeTools } from './ShapeTools.jsx'
+import { exportDeck } from './pdfExport.jsx'
 
 // The slide deck editor (proposals/2026-10-06-slides.md). As with documents
 // it keeps its own copy of the deck's Yjs doc: loaded whole with
@@ -413,6 +414,16 @@ export function SlidesView ({ sheetId, onTitleChange, onError, onGone }) {
           onTitleChange={onTitleChange}
           onError={onError}
           onGone={onGone}
+          menuItems={() => {
+            const save = (format) => exportDeck(ydoc, title, format, sheetId).catch((err) => onError(err.message))
+            return (
+              <>
+                <li role='menuitem' onClick={() => save('pptx')}>Save as a PowerPoint file</li>
+                <li role='menuitem' onClick={() => save('pdf')}>Save as PDF</li>
+                {!phone && <li role='menuitem' onClick={() => save('print')}>Print...</li>}
+              </>
+            )
+          }}
         />
         {note && <div className='banner info'>{note}</div>}
         <div className={'doc-tools slides-tools' + (phone ? ' phone' : '')} role='toolbar' aria-label='Slide tools'>
