@@ -26,6 +26,7 @@ const P = {
   role: 'pearoffice/role/v1',
   name: 'pearoffice/name/v1',
   avatar: 'pearoffice/avatar/v1',
+  deviceName: 'pearoffice/device-name/v1',
   seeder: 'pearoffice/seeder/v1',
   seederOff: 'pearoffice/seeder-off/v1',
   move: 'pearoffice/move/v1',
@@ -105,6 +106,28 @@ function nameOp ({ sheetId, identity, name, n, at }) {
 // it. Signed by the member, so any writer may append it for them.
 function avatarOp ({ sheetId, identity, data, mime, hash, n, at }) {
   return { type: 'avatar', avatar: signValue({ purpose: P.avatar, sheetId, identity: hex(identity.publicKey), data: data || '', mime: data ? mime : '', hash: data ? hash : '', n, at }, identity.secretKey) }
+}
+
+// A name for one of the person's devices (proposals/2026-10-07-device-names.md).
+// `deviceKey` is the device's swarm key (the same in every file), `writerKey`
+// its writer in this file. Signed by the person, so any writer may append it
+// for a viewer. `at` is when the name was chosen, 0 for the name a device
+// gives itself; a newer `at` wins. `kind` is 'phone' or 'computer', for the
+// icon.
+function deviceNameOp ({ sheetId, identity, deviceKey, writerKey, name, at, kind }) {
+  return { type: 'deviceName', deviceName: signValue({ purpose: P.deviceName, sheetId, identity: hex(identity.publicKey), deviceKey, writerKey, name: String(name || '').trim(), at, kind: DEVICE_KINDS.includes(kind) ? kind : '' }, identity.secretKey) }
+}
+
+const DEVICE_NAME_MAX = 40
+const DEVICE_KINDS = ['phone', 'computer']
+
+// The trimmed name if it is 1 to 40 characters with no control characters,
+// else null.
+function checkDeviceName (name) {
+  if (typeof name !== 'string' || /[\u0000-\u001f\u007f-\u009f]/.test(name)) return null
+  const t = name.trim()
+  const len = [...t].length
+  return len >= 1 && len <= DEVICE_NAME_MAX ? t : null
 }
 
 const AVATAR_MAX_BYTES = 16 * 1024
@@ -401,6 +424,23 @@ async function applyMembershipOp (op, { view, base, groupId, node, log }) {
     return true
   }
 
+  // A device name: signed by the person, for a writer key of theirs in this
+  // sheet, newer than the name it replaces.
+  if (op.type === 'deviceName') {
+    const r = op.deviceName
+    if (!signedBy(r, 'identity', P.deviceName, sheetId)) return skip('bad signature')
+    if (!HEX64.test(r.deviceKey || '') || !HEX64.test(r.writerKey || '') || typeof r.at !== 'number' || !(r.at >= 0)) return skip('bad device name')
+    const name = checkDeviceName(r.name)
+    if (!name) return skip('bad device name')
+    const actor = await actorOf(view, node)
+    if (!actor || (actor.identity !== r.identity && actor.role !== 'owner' && actor.role !== 'editor')) return skip('not appended by a writer')
+    const dev = await get(view, 'device/' + r.writerKey)
+    if (!dev || dev.identity !== r.identity) return skip('not a device of that person')
+    if (typeof dev.nameAt === 'number' && r.at <= dev.nameAt) return skip('stale device name')
+    await view.put('device/' + r.writerKey, { ...dev, deviceKey: r.deviceKey, name, nameAt: r.at, kind: DEVICE_KINDS.includes(r.kind) ? r.kind : '' })
+    return true
+  }
+
   if (op.type === 'seeder') {
     const r = op.seeder
     if (!signedBy(r, 'identity', P.seeder, sheetId) || !HEX64.test(r.seederKey || '')) return skip('bad seeder record')
@@ -464,6 +504,9 @@ module.exports = {
   roleOp,
   nameOp,
   avatarOp,
+  deviceNameOp,
+  checkDeviceName,
+  DEVICE_NAME_MAX,
   avatarHash,
   checkAvatar,
   AVATAR_MAX_BYTES,

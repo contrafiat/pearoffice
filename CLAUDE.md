@@ -48,6 +48,9 @@ a device can stop using one and a seeder can forget a device
 (proposals/2026-10-04-stop-backing-up.md). Members see who else has a sheet open and which cell they are on
 (proposals/2026-10-05-presence.md). People have profile pictures,
 stored inside each sheet (proposals/2026-10-04-profiles-with-avatars.md).
+Settings > Devices lists your linked devices; each has a name you can
+change on any of them, kept in every file like your name
+(proposals/2026-10-07-device-names.md).
 On desktop, PearOffice can start hidden in the tray at login
 (`desktop/login.js`; XDG autostart on Linux, a LaunchAgent on macOS, login
 items on Windows). `PEAROFFICE_DEBUG=1` turns on logging in an installed copy.
@@ -86,7 +89,11 @@ Code that works for any kind of file sits apart from each editor's own
   `moves.js` (removal by moving to fresh keys), `seeding.js` (seeder client),
   `linking.js` (linking a person's devices, recovery phrase),
   `presence.js` (who has a sheet open, and their cell),
-  `profiles.js` (your name and picture in every sheet), `fileMethods.js` (`file:*` IPC for any kind of file; `sheet:*` names kept as aliases),
+  `profiles.js` (your name and picture in every sheet),
+  `devices.js` (your linked devices and their names: localDb
+  `devices:<deviceKey>`, the signed `deviceName` op on each file's
+  `device/<writerKey>` record, a first name from the platform; `app:devices`,
+  `app:renameDevice`, event `devices:changed`), `fileMethods.js` (`file:*` IPC for any kind of file; `sheet:*` names kept as aliases),
   `pictures.js` (pictures in documents: a Hyperblobs picture core per
   writer device per file, `pictures/<fileId>`, encrypted with a keyed
   BLAKE2b of `pearoffice/pictures/1` under the file key; the document holds
@@ -252,7 +259,9 @@ builds are signed and notarized; Linux and Windows builds are unsigned
   golden file, the same corpus in four timezones, formula reference
   translation, Yjs merging, bad-update handling, a two-engine sync test and
   the invite and role rules (single use, expiry, viewers cannot write, forged
-  and replayed ops skipped), the seeder (pairing, sync from the seeder
+  and replayed ops skipped), device names (`test/device-names.test.js`:
+  the `deviceName` op's checks, renames reaching linked devices and every
+  file, a viewer's rename appended by a writer), the seeder (pairing, sync from the seeder
   alone, no readable data on it, strangers refused) and removal (others
   follow, including one who was offline; the removed person cannot open the
   new sheet; the old one freezes), all over a local DHT testnet.
@@ -306,7 +315,10 @@ builds are signed and notarized; Linux and Windows builds are unsigned
   and reopening, then smooth lines and white text kept after reopening
   (about 5 s); with `PEAROFFICE_SMOKE_CHART_SHOTS=<folder>` it
   saves each type in Plain and Midnight, the tools and the data panel.
-  `app` is the shell: the New picker, theme, Seeder and Devices panels, the
+  `app` is the shell: the New picker, theme, Seeder and Devices panels
+  (Linked devices: this device's default name, renaming, kept after
+  reopening and a reload; `PEAROFFICE_SMOKE_DEVICES_SHOT=<png>` saves the
+  list with a made-up second device, light and `-dark`), the
   local seeder, keep online, start at login, profile picture, About, sharing,
   backups, removing a file and the file list (about 16 s). `onboarding` is
   the first-run welcome, name and tour, Show my phrase, finishing with New

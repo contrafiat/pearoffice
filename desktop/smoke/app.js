@@ -72,6 +72,42 @@ module.exports = async function app (t) {
   await js("[...document.querySelectorAll('.replace-files button')].find((b) => b.textContent.trim() === 'Back').click()")
   await waitFor('back at the link field', "!!document.querySelector('.panel input[aria-label=\"Device link\"]')")
   await js("document.querySelector('.panel .close').click()")
+  // Linked devices (proposals/2026-10-07-device-names.md): this device, named
+  // from its platform, renamed in place; Esc cancels, Enter saves.
+  await openSettings()
+  await js("document.querySelector('.panel .settings-devices').click()")
+  const defaultName = { linux: 'Linux computer', win32: 'Windows computer', darwin: 'Mac' }[process.platform] || 'Computer'
+  const rowText = "[...document.querySelectorAll('.linked-devices .device-row')].map((r) => r.querySelector('.device-name')?.textContent + '|' + (r.querySelector('.device-status')?.textContent || '')).join(',')"
+  await waitFor('this device listed', rowText + " === '" + defaultName + "|This device' && document.querySelector('.linked-devices').textContent.includes('Link another device to see it here.')")
+  await js("document.querySelector('.device-row .icon-button').click()")
+  await waitFor('rename field', "document.activeElement === document.querySelector('.device-row input')")
+  await t.type('Nope', 10)
+  await t.key('Escape')
+  await waitFor('Esc cancels', rowText + " === '" + defaultName + "|This device'")
+  await js("document.querySelector('.device-row .icon-button').click()")
+  await waitFor('rename field again', "document.activeElement === document.querySelector('.device-row input') && document.querySelector('.device-row input').placeholder === 'e.g. Work laptop'")
+  await t.type('Work laptop', 10)
+  await t.shot('PEAROFFICE_SMOKE_DEVICE_RENAME_SHOT')
+  await t.key('Enter')
+  await waitFor('renamed', rowText + " === 'Work laptop|This device'")
+  await js("document.querySelector('.panel .close').click()")
+  await openSettings()
+  await js("document.querySelector('.panel .settings-devices').click()")
+  await waitFor('name kept after reopening', rowText + " === 'Work laptop|This device'")
+  await js("document.querySelector('.panel .close').click()")
+  // And after the window reloads (the name comes from the worklet).
+  win.webContents.reload()
+  await waitFor('reloaded', "!!document.querySelector('.me-row .gear')", 20000)
+  await openSettings()
+  await js("document.querySelector('.panel .settings-devices').click()")
+  await waitFor('name kept after a reload', rowText + " === 'Work laptop|This device'")
+  result.linkedDevices = await js(rowText)
+  await devicesShot(t)
+  // The reload closed the open sheet: open one again for the steps below.
+  await js("document.querySelector('.panel .close').click()")
+  await waitFor('file list back', "!!document.querySelector('.sheet-link:not(.all-files)')")
+  await js("document.querySelector('.sheet-link:not(.all-files)').click()")
+  await waitFor('sheet open again', "!!document.querySelector('.grid .body') && !!document.querySelector('.toolbar .share')")
   step('seeder and devices panels')
 
   // Run a seeder on this computer, pair this device with it, show its QR.
@@ -193,4 +229,35 @@ module.exports = async function app (t) {
   step('file list')
 
   return Math.abs(result.aboutLevel) <= 0.5 && result.startButtonsEqual && result.replaceScreen && result.about && result.donation && result.kinds === 'Spreadsheet, Document, Slides' && result.fileIcons === result.sheetsAfter && result.keepOnline && result.avatar && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.inviteLink.startsWith('pearoffice://join?s=')
+}
+
+// Screenshots of the Linked devices list with a second device, light and dark
+// (PEAROFFICE_SMOKE_DEVICES_SHOT=<file>, -dark added for the second). Only
+// for pictures: a made-up phone is added to what app:devices returns.
+async function devicesShot (t) {
+  const file = process.env.PEAROFFICE_SMOKE_DEVICES_SHOT
+  if (!file) return
+  const { ipcMain } = require('electron')
+  const handlers = ipcMain._invokeHandlers
+  const real = handlers && handlers.get('worklet:call')
+  if (!real) return
+  handlers.set('worklet:call', async (e, method, args) => {
+    const out = await real(e, method, args)
+    if (method !== 'app:devices') return out
+    return [...out, { deviceKey: 'f'.repeat(64), name: 'Pixel 9', kind: 'phone', thisDevice: false, online: false, lastSeen: Date.now() - 3 * 3600 * 1000, files: 2 }]
+  })
+  try {
+    await t.js("document.querySelector('.panel .close').click()")
+    await t.openSettings()
+    await t.js("document.querySelector('.panel .settings-devices').click()")
+    await t.waitFor('two devices', "document.querySelectorAll('.linked-devices .device-row').length === 2")
+    await t.js("document.documentElement.dataset.theme = 'light'")
+    await t.shot('PEAROFFICE_SMOKE_DEVICES_SHOT', 300)
+    await t.js("document.documentElement.dataset.theme = 'dark'")
+    process.env.PEAROFFICE_SMOKE_DEVICES_SHOT_DARK = file.replace(/(\.png)?$/, '-dark.png')
+    await t.shot('PEAROFFICE_SMOKE_DEVICES_SHOT_DARK', 300)
+    await t.js("delete document.documentElement.dataset.theme")
+  } finally {
+    handlers.set('worklet:call', real)
+  }
 }

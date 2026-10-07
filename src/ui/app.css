@@ -1193,3 +1193,16 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 .replace-files .warn { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent); border-radius: 8px; }
 .replace-files .warn ul { margin: 0; padding-left: 20px; }
 .replace-files .row.end { margin-top: 6px; }
+
+/* Linked devices (DevicesPanel.jsx, proposals/2026-10-07-device-names.md). */
+.linked-devices { display: flex; flex-direction: column; gap: 6px; }
+.linked-devices h3 { margin-top: 0; }
+.devices-list .device-row { justify-content: flex-start; gap: 12px; }
+.device-icon { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: 50%; background: var(--head); color: var(--ink); }
+.device-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.device-name { color: var(--ink); font-size: 15px; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.device-status { color: var(--muted); font-size: 12px; }
+.device-status.online { color: #3c9a5f; }
+.panel .device-text input { padding: 5px 8px; font-size: 15px; }
+.panel .device-row .icon-button { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; padding: 0; border: 0; background: none; color: var(--muted); border-radius: 8px; cursor: pointer; }
+.panel .device-row .icon-button:hover { background: var(--head); color: var(--ink); }
