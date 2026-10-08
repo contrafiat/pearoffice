@@ -14,7 +14,9 @@ TAG="$IMAGE:$VERSION"
 PUSH="${PUSH:-1}"
 
 node scripts/stage-umbrel.js
-podman manifest rm "$TAG" 2>/dev/null || true
+# A plain image with this tag (a StartOS package build leaves one) blocks
+# --manifest as much as an old list does.
+podman manifest rm "$TAG" 2>/dev/null || podman rmi "$TAG" 2>/dev/null || true
 podman build --platform=linux/amd64,linux/arm64 --manifest "$TAG" -f seeder-dist/umbrel/Dockerfile dist/umbrel
 if [ "$PUSH" = 1 ]; then
   podman manifest push --all "$TAG" "docker://$TAG"
