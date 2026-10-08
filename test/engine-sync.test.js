@@ -57,7 +57,11 @@ test('two devices converge after concurrent offline edits, and survive a restart
   await waitFor('converged', async () => {
     ga = await grid(A, sheetId)
     gb = await grid(B, sheetId)
-    return JSON.stringify(ga) === JSON.stringify(gb) && Object.values(ga).includes('note from B')
+    // Equal is not enough: both can match for a moment before every edit
+    // has arrived. Wait for all four: B's note, the insert (the SUM moved to
+    // row 4) and one of the two values for B2 (now B3).
+    return JSON.stringify(ga) === JSON.stringify(gb) && Object.values(ga).includes('note from B') &&
+      /^=SUM\(B2:B3\) -> (1700|1710)$/.test(ga['4,2'] || '')
   })
   // The SUM moved down a row with the insert and still points at the same cells.
   assert.match(ga['4,2'], /^=SUM\(B2:B3\) -> (1700|1710)$/)

@@ -17,6 +17,7 @@ const Hypercore = require('hypercore')
 const b4a = require('b4a')
 const { applyEncryptionReloadFix } = require('../worklet/hypercoreEncryptionPatch')
 applyEncryptionReloadFix(Hypercore, b4a)
+require('../worklet/hypercoreSnapshotPatch').applySnapshotFlushFix(require('hypercore/lib/session-state'))
 
 const { createSeeder } = require('./seeder')
 const { toTerminal } = require('../shared/qr')
