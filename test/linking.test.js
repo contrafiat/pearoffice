@@ -63,9 +63,20 @@ test('linking a new device and the recovery phrase', async (t) => {
   })
 
   await t.test('the linked device has the same rights: owner, editor, viewer', async () => {
-    const { link } = await call(B, 'sheet:invite', { sheetId: own, role: 'viewer' })
+    // Just after admission a file can briefly say "Still getting edit access"
+    // again while it settles (seen once under load); the app asks to try
+    // again in a moment, so does this.
+    const settled = async (fn) => {
+      for (let i = 0; ; i++) {
+        try { return await fn() } catch (e) {
+          if (i >= 50 || !/Still getting edit access/.test(e.message)) throw e
+          await new Promise((resolve) => setTimeout(resolve, 200))
+        }
+      }
+    }
+    const { link } = await settled(() => call(B, 'sheet:invite', { sheetId: own, role: 'viewer' }))
     assert.match(link, /^pearoffice:\/\/join\?/)
-    await call(B, 'sheet:setCell', { sheetId: edits, row: 2, col: 1, input: 'from the second device' })
+    await settled(() => call(B, 'sheet:setCell', { sheetId: edits, row: 2, col: 1, input: 'from the second device' }))
     await waitFor('Cam sees it', async () => (await grid(C, edits))['2,1'] === 'from the second device')
     await assert.rejects(call(B, 'sheet:setCell', { sheetId: views, row: 1, col: 1, input: 'x' }), /not edit/)
     // Still one member per person: Alex appears once in Cam's sheet.
