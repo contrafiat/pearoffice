@@ -27,6 +27,23 @@ module.exports = async function app (t) {
   await t.newSheet()
   step('two sheets created')
 
+  // With a file worth recovering, a dot on Settings (and on Devices inside
+  // it) asks for the phrase to be written down, until it is shown below.
+  // PEAROFFICE_SMOKE_NUDGE_SHOT=<file> saves the side menu and Settings.
+  await waitFor('reminder dot', "!!document.querySelector('.me-row .nudge-dot')")
+  await js("document.documentElement.dataset.theme = 'light'")
+  await t.shot('PEAROFFICE_SMOKE_NUDGE_SHOT', 300)
+  await openSettings()
+  await waitFor('reminder in settings', "!!document.querySelector('.panel .settings-devices .nudge-dot')")
+  if (process.env.PEAROFFICE_SMOKE_NUDGE_SHOT) {
+    process.env.PEAROFFICE_SMOKE_NUDGE_SETTINGS_SHOT = process.env.PEAROFFICE_SMOKE_NUDGE_SHOT.replace(/(\.png)?$/, '-settings.png')
+    await t.shot('PEAROFFICE_SMOKE_NUDGE_SETTINGS_SHOT', 300)
+  }
+  await js("delete document.documentElement.dataset.theme")
+  await js("document.querySelector('.panel .close').click()")
+  result.nudgeShown = true
+  step('phrase reminder dot')
+
   // The theme setting.
   await openSettings()
   await js("[...document.querySelectorAll('.theme-choice button')].find((b) => b.textContent.trim() === 'Dark').click()")
@@ -58,6 +75,8 @@ module.exports = async function app (t) {
   await js("[...document.querySelectorAll('.panel button')].find((b) => b.textContent.trim() === 'Show phrase').click()")
   await waitFor('recovery phrase', "document.querySelectorAll('.phrase li').length === 12")
   await js("document.querySelector('.panel .close').click()")
+  await waitFor('reminder dot gone', "!document.querySelector('.me-row .nudge-dot')")
+  result.nudgeGone = true
   // Linking on a device that has files: it says what would be removed and
   // which files only it has, and Back goes back (nothing is removed).
   await openSettings()
@@ -229,7 +248,7 @@ module.exports = async function app (t) {
   await waitFor('opened from the list', "!!document.querySelector('.grid .body')")
   step('file list')
 
-  return Math.abs(result.aboutLevel) <= 0.5 && result.startButtonsEqual && result.replaceScreen && result.about && result.donation && result.kinds === 'Spreadsheet, Document, Slides' && result.fileIcons === result.sheetsAfter && result.keepOnline && result.avatar && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.inviteLink.startsWith('pearoffice://join?s=')
+  return Math.abs(result.aboutLevel) <= 0.5 && result.startButtonsEqual && result.nudgeShown && result.nudgeGone && result.replaceScreen && result.about && result.donation && result.kinds === 'Spreadsheet, Document, Slides' && result.fileIcons === result.sheetsAfter && result.keepOnline && result.avatar && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.inviteLink.startsWith('pearoffice://join?s=')
 }
 
 // Screenshots of the Linked devices list with a second device, light and dark
