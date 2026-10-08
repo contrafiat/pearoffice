@@ -3,6 +3,9 @@ const os = require('node:os')
 const path = require('node:path')
 const Corestore = require('corestore')
 
+// As the worklet and seeder do at start-up (src/worklet/hypercoreSnapshotPatch.js).
+require('../src/worklet/hypercoreSnapshotPatch').applySnapshotFlushFix(require('hypercore/lib/session-state'))
+
 const dirs = []
 
 function tmpDir (prefix = 'pearoffice-') {
