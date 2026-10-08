@@ -150,6 +150,13 @@ function tabMap (doc, tabId) {
   return t
 }
 
+// The format version the sheet was written in. A sheet with a higher one
+// was made by a newer build: it opens read-only, so this build never drops
+// what it does not know.
+function version (doc) {
+  return doc.getMap('meta').get('version') || VERSION
+}
+
 function title (doc) {
   return doc.getMap('meta').get('title') || ''
 }
@@ -1283,6 +1290,7 @@ function setTitle (doc, value) {
 
 module.exports = {
   VERSION,
+  version,
   KINDS,
   kind,
   FORMAT_ATTRS,

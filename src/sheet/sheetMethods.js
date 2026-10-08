@@ -104,7 +104,14 @@ function formulaMatches (tabId, rules, all) {
 function createSheetMethods (sheets, { getJoin }) {
   // The method table refers to itself (sheet:import builds on sheet:create).
   let methods = null
-  const { profileName, myRole, frozenInfo, isFrozen, requireEdit, commit, docFor } = createFileHelpers(sheets)
+  const { profileName, myRole, frozenInfo, isFrozen, requireEdit: requireFileEdit, commit, docFor } = createFileHelpers(sheets)
+
+  // A sheet made by a newer build is read-only here (sheetModel.version).
+  async function requireEdit (ctx, sheetId) {
+    await requireFileEdit(ctx, sheetId)
+    const { doc } = await docFor(sheetId)
+    if (model.version(doc) > model.VERSION) throw new Error('This sheet was made with a newer version of PearOffice. Update PearOffice to edit it.')
+  }
 
   function firstTab (doc, tabId) {
     const ids = model.tabIds(doc)
@@ -286,6 +293,7 @@ function createSheetMethods (sheets, { getJoin }) {
         widths,
         myRole: (await isFrozen(ctx, sheetId)) ? 'viewer' : await myRole(ctx, sheetId),
         frozen: await frozenInfo(ctx, sheetId),
+        newer: model.version(doc) > model.VERSION,
         // An editor's device can lag behind its role for a few seconds after
         // joining or a move, until a writer has added it.
         writable: !!(ctx.bases.get(sheetId) && ctx.bases.get(sheetId).writable),
