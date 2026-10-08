@@ -90,8 +90,14 @@ export function DevicesPanel ({ initialLink = '', startWith = null, onBack = nul
   const [busy, setBusy] = useState(false)
   const [copied, setCopied] = useState(false)
   const [replacing, setReplacing] = useState(null) // { how: 'link' | 'restore', back, files }
+  const [backedUp, setBackedUp] = useState(0) // seeders holding your file list
 
   useEffect(() => on('link:done', () => setLinked(true)), [])
+  useEffect(() => {
+    const load = () => call('app:keyring').then((r) => setBackedUp(r.seeders || 0)).catch(() => {})
+    load()
+    return on('keyring:changed', load)
+  }, [])
   // Opened straight at the phrase (the first-run tour's Show my phrase).
   useEffect(() => {
     if (startWith !== 'phrase') return
@@ -135,6 +141,7 @@ export function DevicesPanel ({ initialLink = '', startWith = null, onBack = nul
             </div>
             <h3>Recovery phrase</h3>
             <p>24 words that bring back your identity if you lose every device. Anyone with them can act as you.</p>
+            {backedUp > 0 && <p className='muted'>Your file list is backed up to {backedUp === 1 ? '1 seeder' : backedUp + ' seeders'}.</p>}
             <p className='muted'>They do not hold your files. After a restore, the owner of each file invites you back. Files only you own need another linked device to survive.</p>
             <div className='row'>
               <button onClick={async () => { try { setPhrase((await call('link:phrase')).phrase); setMode('phrase'); call('app:phraseNudged').catch(() => {}) } catch (err) { onError(err.message) } }}><Key size={16} /> Show phrase</button>
@@ -199,7 +206,7 @@ export function DevicesPanel ({ initialLink = '', startWith = null, onBack = nul
 
         {mode === 'phrase' && phrase && (
           <>
-            <p className='warn'>Write these down and keep them somewhere safe. Anyone who has them can act as you in every file.</p>
+            <p className='warn'>Write these down and keep them somewhere safe. Anyone who has them can act as you in every file{backedUp > 0 ? ' and read every file your seeders back up' : ''}.</p>
             <ol className='phrase'>{phrase.split(' ').map((w, i) => <li key={i}>{w}</li>)}</ol>
             <div className='row end'><button onClick={() => { setPhrase(null); if (startWith === 'phrase') onClose(); else setMode('menu') }}>Done</button></div>
           </>
