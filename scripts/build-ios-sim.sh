@@ -32,7 +32,8 @@ ssh -o BatchMode=yes "$MAC" "zsh -lc 'set -e
   cd ~/$REMOTE/pearoffice && npm install --no-audit --no-fund --silent
   npm run build:bare:ios >/dev/null
   npm run build:ui:mobile >/dev/null
-  [ -d ios ] || npx expo prebuild --platform ios --no-install >/dev/null
+  # Every time, so app.json changes (Info.plist strings, plugins) reach the build.
+  npx expo prebuild --platform ios --no-install >/dev/null
   (cd ios && pod install >/dev/null)
   xcodebuild -workspace ios/PearOffice.xcworkspace -scheme PearOffice -configuration Release \\
     -destination \"generic/platform=iOS Simulator\" -sdk iphonesimulator -derivedDataPath build/ios-sim \\

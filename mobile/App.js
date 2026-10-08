@@ -4,7 +4,7 @@
 // src/ui/mobile-entry.js on top of the WebView bridge.
 
 import React, { useEffect, useRef, useState } from 'react'
-import { ActivityIndicator, BackHandler, Keyboard, Linking, Modal, Platform, Share, StatusBar, StyleSheet, Text, TouchableOpacity, View, useColorScheme } from 'react-native'
+import { ActivityIndicator, AppState, BackHandler, Keyboard, Linking, Modal, NativeModules, Platform, Share, StatusBar, StyleSheet, Text, TouchableOpacity, View, useColorScheme } from 'react-native'
 import { CameraView, useCameraPermissions } from 'expo-camera'
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context'
 import { WebView } from 'react-native-webview'
@@ -32,6 +32,12 @@ const CSP = "default-src 'self'; script-src 'unsafe-inline'; style-src 'self' 'u
 // iOS file types for the share sheet, by MIME type.
 const UTIS = {
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'org.openxmlformats.spreadsheetml.sheet',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'org.openxmlformats.wordprocessingml.document',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'org.openxmlformats.presentationml.presentation',
+  'text/markdown': 'net.daringfireball.markdown',
+  'text/plain': 'public.plain-text',
+  'text/html': 'public.html',
+  'image/jpeg': 'public.jpeg',
   'text/csv': 'public.comma-separated-values-text',
   'application/json': 'public.json',
   'image/png': 'public.png',
@@ -235,6 +241,23 @@ export default function App () {
     Linking.getInitialURL().then(sendLink).catch(() => {})
     const sub = Linking.addEventListener('url', ({ url }) => sendLink(url))
     return () => { alive = false; listeners.delete(onEvent); sub.remove() }
+  }, [])
+
+  // GrapheneOS: Vanadium's renderer, frozen while the app is in the
+  // background, does not paint again after a resume (PearPetal, 2026-07-19).
+  // After 20 s away, end it and let onRenderProcessGone load a fresh one
+  // (plugins/with-android-webview-recovery.js; it does nothing on other
+  // WebViews). Short trips to the share sheet or a picker stay under 20 s.
+  useEffect(() => {
+    if (Platform.OS !== 'android' || !NativeModules.WebViewRecovery) return
+    let leftAt = 0
+    const sub = AppState.addEventListener('change', (s) => {
+      if (s !== 'active') { if (!leftAt) leftAt = Date.now(); return }
+      const away = leftAt ? Date.now() - leftAt : 0
+      leftAt = 0
+      if (away >= 20000) NativeModules.WebViewRecovery.terminateRenderer().catch(() => {})
+    })
+    return () => sub.remove()
   }, [])
 
   // Back goes to the UI, which closes what is on top or leaves the file,
