@@ -248,7 +248,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
   }, [view, load])
 
   const hasEditRole = !!view && (view.myRole === 'owner' || view.myRole === 'editor')
-  const canEdit = hasEditRole && view.writable
+  const canEdit = hasEditRole && view.writable && !view.newer
 
   const cells = useMemo(() => {
     const m = new Map()
@@ -886,6 +886,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
     : view.frozen.tidied
       ? 'Updating this sheet...'
       : 'This sheet moved to new keys. Opening the new copy...')
+  const note = frozenNote || (view.newer ? 'This sheet was made with a newer version of PearOffice. Update PearOffice to edit it.' : null)
 
   const fmt = (selected && selected.fmt) || {}
   const barValue = editing && editing.row === sel.row && editing.col === sel.col ? editing.value : spilled ? (anchor ? anchor.input : '') : (selected ? selected.input : '')
@@ -899,7 +900,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
         myRole={view.myRole}
         frozen={view.frozen}
         canEdit={canEdit}
-        badge={!canEdit && <span className='badge view-only'>{hasEditRole ? 'Getting edit access...' : 'View only'}</span>}
+        badge={!canEdit && <span className='badge view-only'>{hasEditRole && !view.newer ? 'Getting edit access...' : 'View only'}</span>}
         phone={phone}
         members={members}
         present={presentWhere}
@@ -1061,7 +1062,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
         {!phone && <button className='find-button icon-button' title='Find and replace (Ctrl+F)' aria-label='Find' onClick={() => setFinding({ replace: false })}><MagnifyingGlass size={ICON} /></button>}
       </FileBar>
 
-      {frozenNote && <div className='banner info'>{frozenNote}</div>}
+      {note && <div className='banner info'>{note}</div>}
       <div className='formula-bar'>
         {goingTo === null
           ? <span className='address' role='button' tabIndex={-1} title='Go to a cell or named range' onClick={() => setGoingTo('')}>{colName(sel.col) + sel.row}</span>
