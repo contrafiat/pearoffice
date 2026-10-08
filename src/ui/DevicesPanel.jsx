@@ -119,8 +119,9 @@ export function DevicesPanel ({ initialLink = '', startWith = null, onBack = nul
     }
   }
 
-  const link1 = (l) => (replace) => linkDevice(l, { replace })
-  const restore1 = (replace) => restorePhrase(input, { replace, before: () => call('app:setWelcomeBack', { show: true }) })
+  const link1 = (l) => (replace) => linkDevice(l, { replace, before: () => call('app:onboarded') })
+  // Restoring from here means they already use PearOffice: no first-run welcome after the restart.
+  const restore1 = (replace) => restorePhrase(input, { replace, before: async () => { await call('app:onboarded'); await call('app:setWelcomeBack', { show: true }) } })
 
   return (
     <div className='panel-backdrop' onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
