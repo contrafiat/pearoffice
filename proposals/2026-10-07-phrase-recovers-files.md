@@ -143,15 +143,23 @@ have until a paired device forgets them; nothing else depends on it.
 3. Devices write keyrings; Settings shows "Your file list is backed up to N
    seeders".
 4. Restore flow, admission waits, "make a copy you own", UI.
+   The phrase entry (onboarding and Settings > Devices) is rebuilt too,
+   as Tim asked on 2026-10-07: on phones one word at a time ("Word 3 of
+   24", Back and Next), and suggestions from the BIP39 list as you type
+   (every word is unique by its first 4 letters, so 4 letters pick it).
+   A pasted phrase still fills every word at once. Desktop may keep a
+   grid of 24 boxes with the same suggestions.
 
 ## Decided 2026-10-07
 
 1. The keyring is on by default once you have a seeder. The phrase screens
    (onboarding, Settings, Devices) get a stronger warning: anyone with the
    words can read every file your seeders hold.
-2. A seeder treats a device as paired when it signs a fresh challenge with
-   `S` for a keyring the seeder holds (`keyring-claim { L, nonce, sig }`).
-   The seeder already trusts that keyring's owner. A claim counts against
+2. A seeder treats a device as paired when it signs, with `S`, the locator,
+   the seeder's key and its own swarm key, for a keyring the seeder holds
+   (`keyring-claim { L, sig }`, src/seeder/keyringRecord.js). The
+   connection has already proved the swarm key, so a claim is no use to
+   any other device. The seeder already trusts that keyring's owner. A claim counts against
    the same limits as a paired device.
 3. A copy made on restore keeps the original title.
 
