@@ -115,12 +115,16 @@ function createRestoring ({ engine, getSeeding, getOwnDevices, emit = () => {}, 
     }
     const list = files(found.keyring)
     for (const e of list) {
-      if (!(await engine.localDb.get('groups:joined:' + e.sheetId))) await engine.localDb.put('recovered:' + e.sheetId, { at: now() })
+      if (!(await engine.localDb.get('groups:joined:' + e.sheetId))) await engine.localDb.put('recovered:' + e.sheetId, { at: now(), kind: e.kind || null })
     }
+    const fromSeeders = [...new Set([...found.holders, ...seeders(found.keyring)])]
     // Start the keyring here from what came back, so this device's next
     // write carries it on.
     await engine.localDb.put('keyring:local', { seq: found.seq, keyring: found.keyring, fingerprint: '', held: [], at: now() })
     await own.take(list)
+    // The files' views, which name their seeders, come only from a seeder:
+    // ask these until they do.
+    for (const e of list) seeding.hint(e.sheetId, fromSeeders)
     await engine.localDb.del('restore:pending')
     await setStatus({ state: 'done', files: list.length, seeders: claimed })
     log('restore: ' + list.length + ' files from ' + found.holders.length + ' seeder(s)')
@@ -137,19 +141,26 @@ function createRestoring ({ engine, getSeeding, getOwnDevices, emit = () => {}, 
   // Whether this device is in a file brought back by the phrase yet, and
   // whether it can only come back as a copy. Null for any other file.
   async function fileState (sheetId) {
-    if (!(await engine.localDb.get('recovered:' + sheetId))) return null
+    const rec = (await engine.localDb.get('recovered:' + sheetId))?.value
+    if (!rec) return null
+    const hintKind = rec.kind ? { kindHint: rec.kind } : {}
     const base = engine.bases.get(sheetId)
-    if (!base) return { recovery: 'waiting' }
+    if (!base) return { recovery: 'waiting', ...hintKind }
     await base.ready()
     if ((await base.view.get('device/' + hex(base.local.key)))) {
       await engine.localDb.del('recovered:' + sheetId)
       return null
     }
+    // Until this device has the member list, it cannot tell who could let
+    // it in: wait.
     const me = hex(engine.identity.publicKey)
+    let mine = false
     for await (const { value } of base.view.createReadStream({ gt: 'member/', lt: 'member/~' })) {
-      if (value && value.identity !== me && (value.role === 'owner' || value.role === 'editor')) return { recovery: 'waiting' }
+      if (!value) continue
+      if (value.identity === me) mine = true
+      else if (value.role === 'owner' || value.role === 'editor') return { recovery: 'waiting', ...hintKind }
     }
-    return { recovery: 'copy' }
+    return { recovery: mine ? 'copy' : 'waiting', ...hintKind }
   }
 
   function close () { closed = true }

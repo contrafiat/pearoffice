@@ -148,7 +148,10 @@ function createFileMethods (sheets, { getJoin, getMoves, getProfiles, getRestori
         // Not loaded yet: load it in the background, so its title (and any
         // later change) reaches the list live through sheet:changed.
         if (!e && !(moved && moved.removed)) sheets.load(value.groupId).then(() => sheets.changed(value.groupId)).catch(() => {})
-        out.push({ sheetId: value.groupId, title: (e && model.title(e.guarded.doc)) || value.name || '', kind: (e && e.guarded.doc.getMap('meta').get('kind')) || joinKinds.get(value.groupId) || 'sheet', joining: joining.has(value.groupId) || undefined, removed: (moved && moved.removed) || undefined, ...(await peopleOf(ctx, value.groupId)), ...((getRestoring() && await getRestoring().fileState(value.groupId).catch(() => null)) || {}) })
+        // A file back from the phrase (restoring.js): whether this device is
+        // let in yet, and its kind from the keyring until its content arrives.
+        const { kindHint, ...recovery } = (getRestoring() && await getRestoring().fileState(value.groupId).catch(() => null)) || {}
+        out.push({ sheetId: value.groupId, title: (e && model.title(e.guarded.doc)) || value.name || '', kind: (e && e.guarded.doc.getMap('meta').get('kind')) || joinKinds.get(value.groupId) || kindHint || 'sheet', joining: joining.has(value.groupId) || undefined, removed: (moved && moved.removed) || undefined, ...(await peopleOf(ctx, value.groupId)), ...recovery })
         joining.delete(value.groupId)
       }
       // Joins that have not been welcomed yet have no base.
