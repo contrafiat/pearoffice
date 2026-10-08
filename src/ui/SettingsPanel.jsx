@@ -10,7 +10,7 @@ import { AboutContent, BitcoinContent } from './About.jsx'
 const TITLES = { settings: 'Settings', about: 'About PearOffice', bitcoin: 'Bitcoin Lightning' }
 
 // One place for your profile and this device's settings, plus About.
-export function SettingsPanel ({ me, onMe, desktop, keepOnline, startAtLogin, onSetting, onDevices, onSeeder, onTour, onClose, onError, startIn = null }) {
+export function SettingsPanel ({ me, onMe, phraseNudge = false, desktop, keepOnline, startAtLogin, onSetting, onDevices, onSeeder, onTour, onClose, onError, startIn = null }) {
   const [mode, setMode] = useState(startIn ? startIn.mode : 'settings') // settings | about | bitcoin
   const [wallet, setWallet] = useState(false) // a Lightning wallet is installed
   const [numPad, setNumPad] = useState(() => readPref('pearoffice:numpad') === '1')
@@ -138,7 +138,8 @@ export function SettingsPanel ({ me, onMe, desktop, keepOnline, startAtLogin, on
 
             <h3>Devices</h3>
             <p className='small'>Use PearOffice on another device as the same person, and keep your recovery phrase.</p>
-            <div className='row'><button className='settings-devices' onClick={onDevices}><Devices size={16} /> Devices and recovery phrase</button></div>
+            <div className='row'><button className='settings-devices' onClick={onDevices}><Devices size={16} /> Devices and recovery phrase{phraseNudge && <span className='nudge-dot' aria-hidden='true' />}</button></div>
+            {phraseNudge && <p className='small muted'>Write down your recovery phrase, so you can get your identity and files back if you lose this device.</p>}
 
             <h3>Seeder</h3>
             <p className='small'>An always-on computer that keeps an encrypted copy of your files online. It cannot read them.</p>

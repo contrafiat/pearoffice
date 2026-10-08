@@ -718,7 +718,7 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 .join-progress .small { text-align: center; }
 .join-pill { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(46px + env(safe-area-inset-bottom)); z-index: 15; display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: 999px; border: 1px solid var(--line-strong); background: var(--panel); color: var(--ink); box-shadow: 0 4px 16px rgb(0 0 0 / 0.18); cursor: pointer; font: inherit; white-space: nowrap; }
 .join-pill svg { color: var(--pear); }
-.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(46px + env(safe-area-inset-bottom)); z-index: 16; padding: 8px 16px; border-radius: 999px; background: var(--ink); color: var(--panel); box-shadow: 0 4px 16px rgb(0 0 0 / 0.18); white-space: nowrap; }
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(46px + env(safe-area-inset-bottom)); z-index: 16; padding: 8px 16px; border-radius: 999px; background: var(--ink); color: var(--panel); box-shadow: 0 4px 16px rgb(0 0 0 / 0.18); max-width: calc(100vw - 32px); box-sizing: border-box; text-align: center; }
 
 /* Settings: change or remove your picture, as icons */
 .pic-actions { display: flex; gap: 8px; }
@@ -1240,3 +1240,8 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 .restore-card h2 { margin: 0; font-size: 18px; font-weight: 650; color: var(--ink); }
 .restore-card p { margin: 0 0 6px; color: var(--muted); line-height: 1.45; }
 .restore-card button.primary { min-width: 120px; justify-content: center; }
+
+/* The recovery phrase not written down yet (App.jsx, SettingsPanel.jsx). */
+.nudge-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--pear); margin-left: 4px; }
+.me-row { position: relative; }
+.me-row .nudge-dot { position: absolute; top: 6px; right: 4px; margin: 0; }
