@@ -217,6 +217,13 @@ module.exports = async function app (t) {
   await t.shot('PEAROFFICE_SMOKE_BTC_SHOT')
   await js("document.querySelector('.panel .back').click()")
   await waitFor('back to about', "document.querySelector('.panel h2').textContent === 'About PearOffice'")
+  // Every licence text: this app's MIT licence and the bundled packages'.
+  await js("[...document.querySelectorAll('.about-toggle')].find((b) => b.textContent.trim() === 'Open-source software').click()")
+  await waitFor('licences button', "!!document.querySelector('.about-licences')")
+  await js("document.querySelector('.about-licences').click()")
+  // A checkout has the bundled list only after scripts/stage-desktop.js.
+  await waitFor('licences', "!!document.querySelector('.licence-text') && document.querySelector('.licence-text').textContent.includes('PeerLoom LLC')", 10000)
+  result.licenceList = await js("document.querySelector('.licence-text').textContent.includes('=== yjs@')")
   result.about = true
   // The donation reminder's check reaches the worklet (it once did not).
   result.donation = await js("window.pearoffice.call('donation:status').then((r) => r && r.due === false)")

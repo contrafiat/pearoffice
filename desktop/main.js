@@ -329,6 +329,12 @@ ipcMain.handle('worklet:call', async (_e, method, args) => {
     if (!seeder || !seeder.running) throw new Error('The seeder on this computer is not running')
     return seeder.call('forget', { deviceKey: String((args && args.deviceKey) || '') })
   }
+  // About > Open-source software: this app's licence and the bundled ones.
+  if (method === 'app:licenses') {
+    const read = (f) => fs.promises.readFile(f, 'utf8').then((s) => s.trim(), () => '')
+    const [own, others] = await Promise.all([read(paths.licence), read(paths.notices)])
+    return { text: [own, others].filter(Boolean).join('\n\n') || null }
+  }
   if (method === 'app:restart') {
     await worklet.stop()
     await startWorklet()

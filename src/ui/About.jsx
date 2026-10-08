@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { ArrowSquareOut, CaretDown, CheckCircle, Compass, EnvelopeSimple, Lightning, ShareNetwork } from '@phosphor-icons/react'
+import { ArrowSquareOut, CaretDown, CheckCircle, Compass, EnvelopeSimple, Lightning, ShareNetwork, Scroll } from '@phosphor-icons/react'
 import { call } from './bridge.js'
 
 /* global __APP_VERSION__ */
@@ -78,6 +78,9 @@ export function AboutContent ({ startSection = null, onBitcoin, onTour }) {
   const [open, setOpen] = useState(startSection)
   const toggle = (id) => setOpen((s) => (s === id ? null : id))
   const donate = donationsShown()
+  // Every licence text, from the app's own copy (app:licenses).
+  const [licences, setLicences] = useState(null)
+  const showLicences = () => call('app:licenses').then((r) => setLicences((r && r.text) || 'The full licence list comes with the installed app.'), (err) => setLicences(err.message))
 
   async function bitcoin () {
     let detected = false
@@ -134,6 +137,9 @@ export function AboutContent ({ startSection = null, onBitcoin, onTour }) {
             <li key={what}><span>{what}</span><span className='muted'>{licence} · {use}</span></li>
           ))}
         </ul>
+        {licences === null
+          ? <div className='row center'><button className='about-licences' onClick={showLicences}><Scroll size={16} /> All licence texts</button></div>
+          : <pre className='licence-text'>{licences}</pre>}
       </Section>
       <p className='small muted about-foot'>© PeerLoom LLC</p>
     </>

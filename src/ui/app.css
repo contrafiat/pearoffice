@@ -313,6 +313,7 @@ button, input, select { font: inherit; color: inherit; }
 .credits { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; font-size: 13px; }
 .credits li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px solid var(--line); }
 .credits li .muted { margin: 0; text-align: right; }
+.licence-text { max-height: 50vh; overflow: auto; margin: 10px 0 0; padding: 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; font-size: 11px; white-space: pre-wrap; word-break: break-word; }
 /* About, as in the other PeerLoom apps: one section open at a time. */
 .panel .about-head { text-align: center; }
 .panel .about-head p { margin: 0; }

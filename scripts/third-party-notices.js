@@ -32,6 +32,29 @@ function filesOf (input) {
   return [...Bundle.from(data).keys()]
 }
 
+// A package folder and every package it depends on (its "dependencies"),
+// found the way Node finds them. For the phone app's shell, whose bundle
+// (Metro) lists no inputs.
+function withDependencies (dirs) {
+  const out = new Set()
+  const find = (from, name) => {
+    for (let d = from; ; d = path.dirname(d)) {
+      const p = path.join(d, 'node_modules', name)
+      if (fs.existsSync(path.join(p, 'package.json'))) return p
+      if (d === path.dirname(d) || d === root) return null
+    }
+  }
+  const visit = (dir) => {
+    if (!dir || out.has(dir)) return
+    out.add(dir)
+    let pkg
+    try { pkg = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8')) } catch { return }
+    for (const name of Object.keys(pkg.dependencies || {})) visit(find(dir, name) || find(root, name))
+  }
+  for (const d of dirs) visit(d)
+  return [...out]
+}
+
 function licenceText (dir) {
   const names = fs.readdirSync(dir, { withFileTypes: true }).filter((d) => d.isFile() && /^(licen[cs]e|copying|notice)/i.test(d.name)).map((d) => d.name).sort()
   return names.map((n) => fs.readFileSync(path.join(dir, n), 'utf8').trim()).join('\n\n')
@@ -74,7 +97,7 @@ function notices (inputs, { extraDirs = [], font = true } = {}) {
   return { text: out.join('\n') + '\n', count: entries.length, missing: entries.filter((e) => !e.text).map((e) => e.id) }
 }
 
-module.exports = { notices }
+module.exports = { notices, withDependencies }
 
 if (require.main === module) {
   const [outFile, ...inputs] = process.argv.slice(2)
