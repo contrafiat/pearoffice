@@ -237,7 +237,7 @@ export function App () {
       // A sheet moved to fresh keys: follow it if it is the one on screen.
       on('sheet:moved', async ({ from, to }) => { await refresh(); setCurrent((c) => (c === from ? to : c)) }),
       on('sheet:removed', refresh),
-      on('sheet:tidied', () => setNotice('PearOffice tidied up a long file: devices now keep it as it is, not every change ever made.')),
+      on('sheet:tidied', () => setToast('Tidied up a long file')),
       // Any edit or membership change anywhere: titles, roles and people in
       // the sidebar stay live. Batched, since edits arrive in bursts.
       on('sheet:changed', refreshSoon),
@@ -340,6 +340,8 @@ export function App () {
             <Avatar name={name} src={avatar ? 'data:' + avatar.mime + ';base64,' + avatar.data : null} seed={myId} size={32} />
             <span className='me-name'>{name || 'Set your name'}</span>
             <GearSix className='gear' size={20} aria-hidden='true' />
+            {/* The recovery phrase not written down yet: a dot until it is shown (Settings > Devices). */}
+            {nudge && <span className='nudge-dot' title='Write down your recovery phrase' aria-label='Write down your recovery phrase' />}
           </button>
           <button className='icon-button about-button' aria-label='About PearOffice' title='About PearOffice' onClick={() => setSettings({ mode: 'about' })}><Info size={20} /></button>
         </div>
@@ -374,6 +376,7 @@ export function App () {
           key={typeof settings === 'object' ? 'start-' + settings.mode + '-' + (settings.section || '') : 'settings'}
           me={{ name, avatar, identity: myId }}
           onMe={loadMe}
+          phraseNudge={nudge}
           desktop={desktop}
           keepOnline={keepOnline}
           startAtLogin={startAtLogin}
@@ -400,7 +403,7 @@ export function App () {
       )}
       {!waitingJoin && joining === null && sheets && <JoinPill entries={sheets.filter((x) => x.joining)} onOpen={setWaitingJoin} />}
       {toast && <div className='toast' role='status'>{toast}</div>}
-      {devices && <DevicesPanel initialLink={devices.link || ''} startWith={devices.startWith || null} onBack={devices.fromSettings ? () => { setDevices(null); setSettings(true) } : null} onClose={() => setDevices(null)} onError={setError} />}
+      {devices && <DevicesPanel initialLink={devices.link || ''} startWith={devices.startWith || null} onBack={devices.fromSettings ? () => { setDevices(null); setSettings(true) } : null} onClose={() => { setDevices(null); loadMe() }} onError={setError} />}
       {seeder && <SeederPanel initialLink={typeof seeder === 'string' && seeder !== 'fromSettings' ? seeder : ''} onBack={seeder === 'fromSettings' ? () => { setSeeder(false); setSettings(true) } : null} onClose={() => setSeeder(false)} onError={setError} />}
       {onboarding && (
         <Onboarding
@@ -426,13 +429,6 @@ export function App () {
             onHide={() => setRestoreHidden(true)}
             onDone={() => { setWelcomeBack(false); call('app:setWelcomeBack', { show: false }).catch(() => {}) }}
           />
-        )}
-        {nudge && !onboarding && (
-          <div className='banner info'>
-            Write down your recovery phrase so you can get your identity back if you lose this device.{' '}
-            <button className='link-button' onClick={() => { setNudge(false); setDevices({ startWith: 'menu' }) }}>Show it</button>
-            <button className='link-button' onClick={() => { setNudge(false); call('app:phraseNudged').catch(() => {}) }}>Later</button>
-          </div>
         )}
         {error && <div className='banner' role='alert'>{error} <button className='link-button' onClick={() => setError(null)}>Dismiss</button></div>}
         {current && !opensHere(sheets, current)
