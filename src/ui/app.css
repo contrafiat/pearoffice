@@ -946,7 +946,9 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 .slide-add button:hover { background: var(--head); }
 .slide-thumbs { list-style: none; margin: 0; padding: 6px 8px 24px; overflow-y: auto; flex: 1; min-height: 0; outline: none; }
 .slide-thumb { position: relative; display: flex; align-items: flex-start; gap: 6px; padding: 6px 4px; border-radius: 8px; cursor: pointer; user-select: none; }
-.slide-thumb:hover { background: var(--head); }
+/* Hover only where there is a pointer that hovers: on iOS a tap that shows
+   something through :hover only hovers, and a second tap picks the slide. */
+@media (hover: hover) { .slide-thumb:hover { background: var(--head); } }
 .slide-number { width: 18px; flex: none; text-align: right; font-size: 12px; color: var(--muted); padding-top: 2px; font-variant-numeric: tabular-nums; }
 .thumb-frame { position: relative; flex: none; border: 2px solid var(--line); border-radius: 6px; overflow: hidden; background: #fff; box-sizing: content-box; }
 .slide-thumb.current .thumb-frame { border-color: var(--pear); }
@@ -960,7 +962,8 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 .thumb-people { position: absolute; right: 4px; bottom: 4px; display: flex; gap: 2px; }
 .thumb-person { display: inline-flex; border-radius: 50%; box-shadow: 0 0 0 2px var(--who); }
 .thumb-more { position: absolute; right: 8px; top: 8px; width: 26px; height: 26px; display: none; align-items: center; justify-content: center; padding: 0; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--ink); cursor: pointer; }
-.slide-thumb:hover .thumb-more, .slide-thumb.current .thumb-more { display: inline-flex; }
+.slide-thumb.current .thumb-more { display: inline-flex; }
+@media (hover: hover) { .slide-thumb:hover .thumb-more { display: inline-flex; } }
 .slide-list.phone { width: auto; flex-direction: row; border-right: 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
 .slide-list.phone .slide-thumbs { display: flex; gap: 4px; overflow-x: auto; overflow-y: hidden; padding: 6px 8px; scrollbar-width: none; }
 .slide-list.phone .slide-thumbs::-webkit-scrollbar { display: none; }
