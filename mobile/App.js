@@ -173,6 +173,11 @@ async function loadHtml (dark) {
 export default function App () {
   const dark = useColorScheme() === 'dark'
   const [html, setHtml] = useState(null)
+  // Bumped to load the page again. A WebView reload() would fetch the base
+  // URL, https://localhost/, which iOS cannot reach (NSURLErrorDomain -1004,
+  // a white error page after a restore); a new WebView loads the html.
+  const [page, setPage] = useState(0)
+  const reloadPage = () => { loaded.current = false; setPage((n) => n + 1) }
   const [error, setError] = useState(null)
   const web = useRef(null)
   const [scanning, setScanning] = useState(false)
@@ -262,7 +267,7 @@ export default function App () {
     if (method === 'app:restart') {
       try { await restartWorklet() } catch (err) { return reply({ error: String(err && err.message ? err.message : err) }) }
       reply({ result: { ok: true } })
-      if (web.current) { loaded.current = false; web.current.reload() }
+      reloadPage()
       return
     }
     try {
@@ -298,6 +303,7 @@ export default function App () {
       <StatusBar hidden={presenting} barStyle={dark ? 'light-content' : 'dark-content'} backgroundColor={bg} />
       <SafeAreaView style={{ flex: 1, backgroundColor: presenting ? '#000' : bg }} edges={presenting ? [] : ['top', 'bottom']}>
         <WebView
+          key={page}
           ref={web}
           source={{ html, baseUrl: 'https://localhost/' }}
           originWhitelist={['*']}
@@ -307,7 +313,8 @@ export default function App () {
             loaded.current = true
             for (const code of queued.current.splice(0)) web.current.injectJavaScript(code + ';true;')
           }}
-          onRenderProcessGone={() => { loaded.current = false; web.current && web.current.reload() }}
+          onRenderProcessGone={reloadPage}
+          onContentProcessDidTerminate={reloadPage}
           keyboardDisplayRequiresUserAction={false}
           style={{ flex: 1, backgroundColor: bg }}
         />
