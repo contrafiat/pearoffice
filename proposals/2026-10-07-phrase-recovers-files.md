@@ -1,7 +1,7 @@
 # The recovery phrase brings your files back
 
-**Status:** draft, 2026-10-07. Asked for by Tim after reviewing what the
-phrase does (PR #138, `test/recovery.test.js`).
+**Status:** approved by Tim 2026-10-07. Asked for by Tim after reviewing
+what the phrase does (PR #138, `test/recovery.test.js`).
 
 **Goal:** someone who loses every device gets their files back with their
 24 words, not only their identity.
@@ -76,8 +76,9 @@ After `app:restorePhrase` and the restart, before anything else:
 1. Derive `L`, `T`, `S` and `B`; join `T`; ask every seeder found for
    `keyring-get`. Take the highest `seq` whose signature checks against
    `S` and that decrypts with `B`.
-2. Store the seeder keys as paired (the device can then back up there too,
-   once re-paired by the seeder's own rules; see open question 2).
+2. Store the seeder keys as paired. Each seeder treats the device as
+   paired once it proves it holds `S` for a keyring the seeder keeps
+   (decision 2), so the device backs up there again with no new pairing.
 3. For each file: open it with its keys. Then, as a linked device does
    today (linking.js `resume`, moves.js admission), it asks to be admitted
    as a new device of an existing member.
@@ -143,14 +144,17 @@ have until a paired device forgets them; nothing else depends on it.
    seeders".
 4. Restore flow, admission waits, "make a copy you own", UI.
 
+## Decided 2026-10-07
+
+1. The keyring is on by default once you have a seeder. The phrase screens
+   (onboarding, Settings, Devices) get a stronger warning: anyone with the
+   words can read every file your seeders hold.
+2. A seeder treats a device as paired when it signs a fresh challenge with
+   `S` for a keyring the seeder holds (`keyring-claim { L, nonce, sig }`).
+   The seeder already trusts that keyring's owner. A claim counts against
+   the same limits as a paired device.
+3. A copy made on restore keeps the original title.
+
 ## Open questions
 
-1. Keyring on by default, or a switch ("Back up my file list so my phrase
-   can bring files back")? Recommended: on by default when you have a
-   seeder, with the phrase warning made stronger.
-2. A restored device finds your seeders through topic `T`, but the seeders
-   accept new cores only from paired devices. Recommended: a seeder treats
-   a device that proves it holds `S` for a keyring it keeps as paired (the
-   seeder already trusts that keyring's owner).
-3. Should a viewer-only or solo file's copy keep the old title with
-   "(recovered)", or the same title?
+None.
