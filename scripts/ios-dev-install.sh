@@ -22,7 +22,7 @@ if [ "${SKIP_BUILD:-0}" != "1" ]; then
   ssh -o BatchMode=yes -o ConnectTimeout=6 "$MAC" exit || { echo "cannot reach $MAC (locked?)" >&2; exit 1; }
   echo "==> sync"
   ssh -o BatchMode=yes "$MAC" "mkdir -p ~/$REMOTE/pearoffice ~/$REMOTE/peerloom-core"
-  rsync -a --delete --rsync-path="$RSYNC_PATH" --exclude node_modules --exclude dist --exclude 'desktop/dist' --exclude 'desktop/build/resources' --exclude .git --exclude 'spikes/*/tmp' --exclude 'spikes/*/pack' --exclude '/ios' --exclude '/android' --exclude '/build' "$ROOT/" "$MAC:$REMOTE/pearoffice/"
+  rsync -a --delete --rsync-path="$RSYNC_PATH" --exclude node_modules --exclude dist --exclude 'desktop/dist' --exclude 'desktop/build/resources' --exclude .git --exclude 'spikes/*/tmp' --exclude 'spikes/*/pack' --exclude '/ios' --exclude '/android' --exclude '/build' --exclude '/*.apk' --exclude '/*.aab' --exclude '/*.AppImage' --exclude '/*.deb' --exclude '/*.exe' --exclude '/*.dmg' --exclude '/*.ipa' --exclude '/*.sha256' --exclude '/*.blockmap' --exclude '/latest*.yml' "$ROOT/" "$MAC:$REMOTE/pearoffice/"
   rsync -a --delete --rsync-path="$RSYNC_PATH" --exclude node_modules --exclude .git "$ROOT/../peerloom-core/" "$MAC:$REMOTE/peerloom-core/"
 
   echo "==> install, bundle, prebuild, pods"
