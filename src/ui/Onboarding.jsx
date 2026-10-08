@@ -62,7 +62,7 @@ export const CARDS = [
     id: 'phrase',
     Icon: Key,
     title: 'Keep your recovery phrase',
-    text: 'Your recovery phrase is 24 words that bring back your identity if you lose every device. It does not hold your files: the owners of your files invite you back. Files only you own survive if you link a second device.'
+    text: 'Your recovery phrase is 12 words that bring back your identity if you lose every device. It does not hold your files: the owners of your files invite you back. Files only you own survive if you link a second device.'
   }
 ]
 
@@ -116,7 +116,7 @@ export function Onboarding ({ tourOnly = false, hidden = false, me, onMe, onPhra
     e.preventDefault()
     if (waiting) return
     const words = phraseWordCount(phraseText)
-    if (words !== 24) { setProblem('A recovery phrase has 24 words. This has ' + words + '.'); return }
+    if (words !== 12) { setProblem('A recovery phrase has 12 words. This has ' + words + '.'); return }
     setProblem(null)
     setWaiting(true)
     try {
@@ -261,7 +261,7 @@ export function Onboarding ({ tourOnly = false, hidden = false, me, onMe, onPhra
             <div className='ob-body'>
               <span className='ob-icon' aria-hidden='true'><Key size={40} weight='duotone' /></span>
               <h2 className='ob-title'>Restore from my recovery phrase</h2>
-              <p>Type your 24 words in order. This brings back your identity. Your files come back when their owners invite you again.</p>
+              <p>Type your 12 words in order. This brings back your identity. Your files come back when their owners invite you again.</p>
               <textarea
                 ref={focusRef}
                 className='ob-phrase'
@@ -273,7 +273,7 @@ export function Onboarding ({ tourOnly = false, hidden = false, me, onMe, onPhra
                 value={phraseText}
                 onChange={(e) => setPhraseText(e.target.value)}
               />
-              <p className='ob-count'>{words === 1 ? '1 word' : words + ' words'} of 24</p>
+              <p className='ob-count'>{words === 1 ? '1 word' : words + ' words'} of 12</p>
               {problem && <p className='ob-error' role='alert'>{problem}</p>}
             </div>
             <div className='ob-foot'>

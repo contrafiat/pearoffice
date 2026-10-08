@@ -3,18 +3,19 @@
 //   A (has the identity)            B (new, no sheets)
 //   start(): link + topic           join(link): topic, talk only to key `a`
 //               <- hello { deviceKey, proof signed with the link secret }
-//   welcome { seed, name, sheets, seeders } ->
+//   welcome { root, name, sheets, seeders } ->
 //                                   store identity, ask the shell to restart
 //   after the restart B opens each sheet and asks to be admitted (moves.js).
 //
-// The recovery phrase is the identity seed as 24 words (src/shared/phrase.js).
+// The recovery phrase is the identity's root as 12 words (src/shared/phrase.js);
+// the root is `phrase:root` in localDb and the identity is derived from it.
 
 const Protomux = require('protomux')
 const c = require('compact-encoding')
 const b4a = require('b4a')
 const sodium = require('sodium-universal')
 const { signValue, verifyValueWithSigner } = require('@peerloom/core/records')
-const { identityFromSeed, seedToPhrase, phraseToSeed } = require('../shared/phrase')
+const { identityFromRoot, rootToPhrase, phraseToRoot } = require('../shared/phrase')
 const { defaultEncodeInvite } = require('@peerloom/core/engine')
 const { inviteKeyPair, cleanName, checkAvatar } = require('./membership')
 
@@ -117,12 +118,13 @@ function createLinking ({ engine, removeFiles = async () => {}, log = () => {}, 
           return no('This link does not check out.')
         }
         active.used = true
-        const seed = engine.identity.secretKey.subarray(0, 32)
+        const root = await rootHere()
+        if (!root) return no('This device has no recovery phrase to pass on. It was set up by an older test version of PearOffice.')
         const profile = (await engine.localDb.get('profile'))?.value
         const seeders = []
         for await (const { value } of engine.localDb.createReadStream({ gt: 'seeders:', lt: 'seeders:~' })) seeders.push(value.seederKey)
         log('linking a device ' + hex(conn.remotePublicKey).slice(0, 8))
-        msg.send({ t: 'welcome', seed: hex(seed), name: profile ? profile.name : '', profile: profile || null, sheets: await memberships(), seeders })
+        msg.send({ t: 'welcome', root: hex(root), name: profile ? profile.name : '', profile: profile || null, sheets: await memberships(), seeders })
         engine.emit('link:done', { deviceKey: hex(conn.remotePublicKey) })
         const used = active
         setTimeout(() => close(used), 2000)
@@ -204,9 +206,10 @@ function createLinking ({ engine, removeFiles = async () => {}, log = () => {}, 
   // Store the identity and what comes with it; the sheets open after the
   // worklet restarts with the new identity.
   async function adopt (welcome) {
-    const seed = b4a.from(String(welcome.seed), 'hex')
-    if (seed.length !== 32) throw new Error('The other device sent a damaged identity')
-    await replaceIdentity(seed)
+    if (typeof welcome.root !== 'string') throw new Error('The other device needs an update to link')
+    const root = b4a.from(welcome.root, 'hex')
+    if (root.length !== 16) throw new Error('The other device sent a damaged identity')
+    await replaceIdentity(root)
     const profile = { name: cleanName(welcome.name), nameAt: 0, avatar: null, avatarAt: 0 }
     const p = welcome.profile
     if (p && typeof p === 'object') {
@@ -223,9 +226,20 @@ function createLinking ({ engine, removeFiles = async () => {}, log = () => {}, 
     await engine.localDb.put('link:pending', { sheets: welcome.sheets || [] })
   }
 
-  async function replaceIdentity (seed) {
-    const id = identityFromSeed(seed)
+  async function replaceIdentity (root) {
+    const id = identityFromRoot(root)
+    await engine.localDb.put('phrase:root', { root: hex(root) })
     await engine.localDb.put('identity', { publicKey: hex(id.publicKey), secretKey: hex(id.secretKey), createdAt: Date.now() })
+  }
+
+  // The root, if it is this identity's (an identity from before 12-word
+  // phrases has none).
+  async function rootHere () {
+    const v = (await engine.localDb.get('phrase:root'))?.value
+    if (!v || typeof v.root !== 'string') return null
+    const root = b4a.from(v.root, 'hex')
+    if (root.length !== 16 || !b4a.equals(identityFromRoot(root).publicKey, engine.identity.publicKey)) return null
+    return root
   }
 
   // After a restart: open the sheets that came with a link. Admission into
@@ -246,17 +260,19 @@ function createLinking ({ engine, removeFiles = async () => {}, log = () => {}, 
 
   // --- recovery phrase -------------------------------------------------------
 
-  function phrase () {
-    return seedToPhrase(engine.identity.secretKey.subarray(0, 32))
+  async function phrase () {
+    const root = await rootHere()
+    if (!root) throw new Error('This identity has no recovery phrase. It was set up by an older test version of PearOffice; start fresh to get one.')
+    return rootToPhrase(root)
   }
 
   async function restore (words, { replace = false } = {}) {
-    const seed = phraseToSeed(words) // a bad phrase throws before anything is removed
+    const root = phraseToRoot(words) // a bad phrase throws before anything is removed
     if (await hasSheets()) {
       if (!replace) throw new Error(HAS_FILES + ' Restoring replaces its identity, so its files must be removed from it first.')
       await removeFiles()
     }
-    await replaceIdentity(seed)
+    await replaceIdentity(root)
     return { restart: true }
   }
 

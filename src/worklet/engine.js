@@ -23,6 +23,7 @@ const { createWake } = require('./wake')
 const { createPictures } = require('./pictures')
 const { createOwnDevices } = require('./ownDevices')
 const { createKeyringSync } = require('./keyringSync')
+const { newRoot, identityFromRoot } = require('../shared/phrase')
 const model = require('../sheet/sheetModel')
 
 function createSheetEngine (opts = {}) {
@@ -116,7 +117,7 @@ function createSheetEngine (opts = {}) {
       return { total: files.length, onlyHere: only }
     },
     'link:cancel': async () => linking.cancel(),
-    'link:phrase': async () => ({ phrase: linking.phrase() }),
+    'link:phrase': async () => ({ phrase: await linking.phrase() }),
     'app:restorePhrase': async ({ phrase, replace }) => linking.restore(phrase, { replace: replace === true }),
     // Close stores cleanly, then exit. The desktop shell calls this on quit.
     'app:close': async () => {
@@ -170,6 +171,12 @@ function createSheetEngine (opts = {}) {
     // Writers are admitted only by PearOffice's own inviteUse and role ops,
     // never by core's pair channel: never mint core addWriter ops, and refuse
     // any that arrive.
+    // A new device's identity comes from a fresh 12-word root (phrase.js).
+    newIdentity: async (localDb) => {
+      const root = newRoot()
+      await localDb.put('phrase:root', { root: b4a.toString(root, 'hex') })
+      return identityFromRoot(root)
+    },
     mintAddWriter: () => null,
     authorizeWriter: () => false,
     // Same swarm core would build, plus the join handshake on every

@@ -101,7 +101,7 @@ test('linking a new device and the recovery phrase', async (t) => {
 
   await t.test('the recovery phrase restores the identity on a fresh install', async () => {
     const { phrase } = await call(A, 'link:phrase')
-    assert.equal(phrase.split(' ').length, 24)
+    assert.equal(phrase.split(' ').length, 12)
     const dirF = tmpDir()
     let F = await device(null, dirF)
     assert.deepEqual(await call(F, 'app:restorePhrase', { phrase }), { restart: true })

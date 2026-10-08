@@ -4,7 +4,7 @@
 what the phrase does (PR #138, `test/recovery.test.js`).
 
 **Goal:** someone who loses every device gets their files back with their
-24 words, not only their identity.
+12 words, not only their identity.
 
 **Tier:** T3. Key handling (file keys leave the device, encrypted), a new
 seeder feature and a new restore flow. A leaked phrase becomes more
@@ -145,10 +145,10 @@ have until a paired device forgets them; nothing else depends on it.
 4. Restore flow, admission waits, "make a copy you own", UI.
    The phrase entry (onboarding and Settings > Devices) is rebuilt too,
    as Tim asked on 2026-10-07: on phones one word at a time ("Word 3 of
-   24", Back and Next), and suggestions from the BIP39 list as you type
+   12", Back and Next), and suggestions from the BIP39 list as you type
    (every word is unique by its first 4 letters, so 4 letters pick it).
    A pasted phrase still fills every word at once. Desktop may keep a
-   grid of 24 boxes with the same suggestions.
+   grid of 12 boxes with the same suggestions.
 
 ## Decided 2026-10-07
 

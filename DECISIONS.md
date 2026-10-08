@@ -24,6 +24,20 @@ made after it was lost. A file removed on a device stays away, and so does
 its copy after a tidy-up while the sender still has the old copy's record.
 Older builds never join the topic, so a mixed pair behaves as before.
 
+## 2026-10-07 - The recovery phrase is 12 words
+Tier: T3
+Context: 24 words was the 32-byte identity seed written out; Tim asked for
+12 ("This isn't a bitcoin wallet").
+Choice: a 16-byte random root as 12 BIP39 words (128 bits, 4-bit
+checksum); the identity seed is BLAKE2b keyed with `pearoffice/identity/1`
+over the root. The root is `phrase:root` in localDb, made on first start
+through @peerloom/core's new `newIdentity` hook (peerloom-core PR #21), and
+sent to a linked device in place of the seed. 24-word phrases are refused.
+Alternatives: keep 24; 12 for new identities while 24 still restores.
+Consequences: identities from before have no phrase and cannot link a new
+device; test devices start fresh. Nothing was released, so no user is
+affected. 128 bits cannot be guessed.
+
 ## 2026-10-07 - The recovery phrase brings files back
 Tier: T3
 Context: the phrase restored the identity only, so files you own were lost

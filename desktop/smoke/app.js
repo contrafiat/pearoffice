@@ -56,7 +56,7 @@ module.exports = async function app (t) {
   await openSettings()
   await js("document.querySelector('.panel .settings-devices').click()")
   await js("[...document.querySelectorAll('.panel button')].find((b) => b.textContent.trim() === 'Show phrase').click()")
-  await waitFor('recovery phrase', "document.querySelectorAll('.phrase li').length === 24")
+  await waitFor('recovery phrase', "document.querySelectorAll('.phrase li').length === 12")
   await js("document.querySelector('.panel .close').click()")
   // Linking on a device that has files: it says what would be removed and
   // which files only it has, and Back goes back (nothing is removed).
