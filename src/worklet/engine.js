@@ -24,6 +24,7 @@ const { createPictures } = require('./pictures')
 const { createOwnDevices } = require('./ownDevices')
 const { createKeyringSync } = require('./keyringSync')
 const { createRestoring } = require('./restoring')
+const { createRelay } = require('./relay')
 const { newRoot, identityFromRoot } = require('../shared/phrase')
 const model = require('../sheet/sheetModel')
 
@@ -44,6 +45,13 @@ function createSheetEngine (opts = {}) {
   let ownDevices = null
   let keyring = null
   let restoring = null
+  // The PeerLoom blind relay, direct first (proposals/2026-10-08-blind-relay.md).
+  const relay = createRelay()
+  const relayingDhts = new WeakMap() // swarm.dht -> its direct-first wrapper
+  const dhtOf = (dht) => {
+    if (!relayingDhts.has(dht)) relayingDhts.set(dht, relay.relayingDht(dht))
+    return relayingDhts.get(dht)
+  }
   const emit = (event, data) => engine && engine.emit(event, data)
 
   const sheets = createSheets({
@@ -92,6 +100,9 @@ function createSheetEngine (opts = {}) {
     'app:devices': async () => (devices ? devices.list() : []),
     'app:restoreStatus': async () => (restoring ? restoring.status() : null),
     'file:recoverCopy': async ({ sheetId }) => moves.recoverCopy(sheetId),
+    // "Connect anywhere" in Settings: this device only, never synced.
+    'app:relay': async () => ({ useRelay: relay.useRelay, configured: relay.configured, stats: engine.swarm ? dhtOf(engine.swarm.dht).relayStats : null }),
+    'app:setRelay': async ({ on }) => ({ useRelay: await relay.save(engine.localDb, on !== false) }),
     'app:keyring': async () => (keyring ? keyring.status() : { seeders: 0, paired: 0, at: null }),
     'app:renameDevice': async ({ deviceKey, name }) => { await devices.rename(deviceKey, name); return { ok: true } },
     'seeder:pair': async ({ link }) => seeding.pair(link),
@@ -186,7 +197,9 @@ function createSheetEngine (opts = {}) {
     // Same swarm core would build, plus the join handshake on every
     // connection. Core calls this during init, after localDb is ready.
     createSwarm: (args) => {
-      const swarm = makeSwarm ? makeSwarm(args) : new (require('hyperswarm'))(args)
+      // Read the switch before any dial; until then nothing relays.
+      relay.hydrate(engine.localDb).catch(() => {})
+      const swarm = makeSwarm ? makeSwarm(args) : new (require('hyperswarm'))({ ...args, relayThrough: relay.swarmRelayThrough })
       profiles = createProfiles({ engine, getJoin: () => join, emit, log })
       devices = createDevices({ engine, getJoin: () => join, getPresence: () => presence, emit, log, platform })
       join = createJoinService({ engine, emit, onProfile: (sheetId, op) => (op && op.type === 'deviceName' ? devices.take(sheetId, op) : profiles.take(sheetId, op)), kindOf: async (sheetId) => model.kind((await sheets.load(sheetId)).guarded.doc), onAdded: (sheetId) => { if (ownDevices) ownDevices.notify(sheetId); if (keyring) keyring.poke() }, log })
@@ -196,7 +209,7 @@ function createSheetEngine (opts = {}) {
       swarm.on('connection', (conn) => { Promise.resolve().then(() => { join.onConnection(conn); presence.onConnection(conn); if (ownDevices) ownDevices.onConnection(conn); if (linking) linking.listen(conn) }) })
       setTimeout(() => join.resume().catch((e) => log('resume joins failed: ' + e.message)), 0)
       pictures = createPictures({ engine, sheets, getSeeding: () => seeding, log })
-      seeding = createSeeding({ engine, getPictures: () => pictures, log })
+      seeding = createSeeding({ engine, dhtOf, getPictures: () => pictures, log })
       setTimeout(() => seeding.start(), 0)
       moves = createMoves({ engine, sheets, getJoin: () => join, getDeleting: () => deleting, getPictures: () => pictures, emit, log })
       linking = createLinking({
@@ -306,6 +319,7 @@ function createSheetEngine (opts = {}) {
   Object.defineProperty(engine, 'pictures', { get: () => pictures })
   Object.defineProperty(engine, 'ownDevices', { get: () => ownDevices })
   Object.defineProperty(engine, 'keyring', { get: () => keyring })
+  engine.relay = relay // for tests
   Object.defineProperty(engine, 'restoring', { get: () => restoring })
   return engine
 }

@@ -24,7 +24,7 @@ const m = require('./membership')
 const hex = (buf) => b4a.toString(buf, 'hex')
 const SWEEP_MS = 5000
 
-function createSeeding ({ engine, getPictures = () => null, log = () => {} }) {
+function createSeeding ({ engine, dhtOf = (dht) => dht, getPictures = () => null, log = () => {} }) {
   let peering = null
   const registered = new Map() // sheetId -> seeder keys registered with `peering`
   const registeredCores = new Map() // picture core key -> seeder keys and length registered
@@ -35,7 +35,7 @@ function createSeeding ({ engine, getPictures = () => null, log = () => {} }) {
   let rebuildNeeded = false
 
   function makePeering () {
-    peering = new BlindPeering(engine.swarm.dht, engine.store, { wakeup: new Wakeup() })
+    peering = new BlindPeering(dhtOf(engine.swarm.dht), engine.store, { wakeup: new Wakeup() })
     // blind-peering dials with `peering.keyPair`, which it never sets, so the
     // DHT falls back to a random key per process. The seeder recognises paired
     // devices by key, so dial with this device's swarm key (the one sent at
@@ -287,7 +287,7 @@ function createSeeding ({ engine, getPictures = () => null, log = () => {} }) {
   function askOver (socket, seederKey, request, timeoutMs) {
     const own = !socket
     return new Promise((resolve, reject) => {
-      if (own) socket = engine.swarm.dht.connect(b4a.from(seederKey, 'hex'), { keyPair: engine.swarm.keyPair })
+      if (own) socket = dhtOf(engine.swarm.dht).connect(b4a.from(seederKey, 'hex'), { keyPair: engine.swarm.keyPair })
       let ch = null
       let finished = false
       const done = (err, value) => {

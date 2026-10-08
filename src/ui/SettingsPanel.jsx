@@ -16,6 +16,10 @@ export function SettingsPanel ({ me, onMe, phraseNudge = false, desktop, keepOnl
   const [numPad, setNumPad] = useState(() => readPref('pearoffice:numpad') === '1')
   const [theme, setTheme] = useState(themePref)
   const [showMe, setShowMe] = useState(() => readPref('pearoffice:presence') !== '0')
+  // "Connect anywhere": the PeerLoom relay fallback (worklet relay.js). On
+  // until the worklet says otherwise, so an unanswered read does not flicker.
+  const [relayOn, setRelayOn] = useState(true)
+  useEffect(() => { call('app:relay').then((r) => setRelayOn(r.useRelay !== false)).catch(() => {}) }, [])
   const picRef = useRef(null)
   const { name, avatar, identity } = me
   const [nameDraft, setNameDraft] = useState(name || '')
@@ -127,6 +131,10 @@ export function SettingsPanel ({ me, onMe, phraseNudge = false, desktop, keepOnl
             <label className='check show-me'>
               <input type='checkbox' checked={showMe} onChange={(e) => { setShowMe(e.target.checked); writePref('pearoffice:presence', e.target.checked ? '1' : '0') }} />
               <span>Show others when I have a file open<br /><span className='small muted'>They see which cell, line or slide you are on. When this is off, you do not see them either.</span></span>
+            </label>
+            <label className='check connect-anywhere'>
+              <input type='checkbox' checked={relayOn} onChange={async (e) => { const on = e.target.checked; setRelayOn(on); try { setRelayOn((await call('app:setRelay', { on })).useRelay) } catch (err) { onError(err.message) } }} />
+              <span>Connect anywhere<br /><span className='small muted'>Your devices normally talk straight to each other and to your seeders. Some networks block that direct link. With this on, PearOffice falls back to a PeerLoom relay that passes the scrambled data along. The relay cannot read your files. It only sees that two devices are talking and how much data went by, and it keeps nothing. Turn it off to stay strictly device to device, accepting that on those networks nothing syncs until a direct link works.</span></span>
             </label>
 
             <h3>Appearance</h3>
