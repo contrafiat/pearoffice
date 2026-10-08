@@ -22,6 +22,7 @@ const { createRediscover } = require('./rediscover')
 const { createWake } = require('./wake')
 const { createPictures } = require('./pictures')
 const { createOwnDevices } = require('./ownDevices')
+const { createKeyringSync } = require('./keyringSync')
 const model = require('../sheet/sheetModel')
 
 function createSheetEngine (opts = {}) {
@@ -39,6 +40,7 @@ function createSheetEngine (opts = {}) {
   let rediscover = null
   let pictures = null
   let ownDevices = null
+  let keyring = null
   const emit = (event, data) => engine && engine.emit(event, data)
 
   const sheets = createSheets({
@@ -85,6 +87,7 @@ function createSheetEngine (opts = {}) {
     'sheet:visible': async ({ sheetId, visible }) => { if (rediscover) rediscover.visible(sheetId, !!visible); return {} },
     // Your linked devices and their names (proposals/2026-10-07-device-names.md).
     'app:devices': async () => (devices ? devices.list() : []),
+    'app:keyring': async () => (keyring ? keyring.status() : { seeders: 0, paired: 0, at: null }),
     'app:renameDevice': async ({ deviceKey, name }) => { await devices.rename(deviceKey, name); return { ok: true } },
     'seeder:pair': async ({ link }) => seeding.pair(link),
     'seeder:list': async () => seeding.list(),
@@ -175,7 +178,7 @@ function createSheetEngine (opts = {}) {
       const swarm = makeSwarm ? makeSwarm(args) : new (require('hyperswarm'))(args)
       profiles = createProfiles({ engine, getJoin: () => join, emit, log })
       devices = createDevices({ engine, getJoin: () => join, getPresence: () => presence, emit, log, platform })
-      join = createJoinService({ engine, emit, onProfile: (sheetId, op) => (op && op.type === 'deviceName' ? devices.take(sheetId, op) : profiles.take(sheetId, op)), kindOf: async (sheetId) => model.kind((await sheets.load(sheetId)).guarded.doc), onAdded: (sheetId) => { if (ownDevices) ownDevices.notify(sheetId) }, log })
+      join = createJoinService({ engine, emit, onProfile: (sheetId, op) => (op && op.type === 'deviceName' ? devices.take(sheetId, op) : profiles.take(sheetId, op)), kindOf: async (sheetId) => model.kind((await sheets.load(sheetId)).guarded.doc), onAdded: (sheetId) => { if (ownDevices) ownDevices.notify(sheetId); if (keyring) keyring.poke() }, log })
       presence = createPresence({ engine, emit, onSeen: (identity, device) => devices.seen(identity, device), log })
       rediscover = createRediscover({ engine, log })
       // Let core attach replication first, then add our channels.
@@ -215,6 +218,16 @@ function createSheetEngine (opts = {}) {
         log
       })
       setTimeout(() => ownDevices.start(), 0)
+      // The keyring on your seeders (proposals/2026-10-07-phrase-recovers-files.md).
+      keyring = createKeyringSync({
+        engine,
+        getSeeding: () => seeding,
+        getOwnDevices: () => ownDevices,
+        emit,
+        log,
+        ...(opts.keyringGapMs ? { gapMs: opts.keyringGapMs, checkMs: opts.keyringGapMs, settleMs: Math.min(3000, opts.keyringGapMs) } : {})
+      })
+      setTimeout(() => keyring.start(), 5000).unref?.()
       // Core has no hook for "init finished", so catch up a little after
       // start, and once more later: open sheets that came with a device link,
       // follow sheets that moved, ask to be admitted where needed.
@@ -242,6 +255,7 @@ function createSheetEngine (opts = {}) {
     if (deleting) deleting.close()
     if (linking) linking.close()
     if (ownDevices) ownDevices.close()
+    if (keyring) keyring.close()
     if (profiles) profiles.close()
     if (devices) devices.close()
     if (presence) presence.close()
@@ -269,6 +283,7 @@ function createSheetEngine (opts = {}) {
   Object.defineProperty(engine, 'rediscover', { get: () => rediscover })
   Object.defineProperty(engine, 'pictures', { get: () => pictures })
   Object.defineProperty(engine, 'ownDevices', { get: () => ownDevices })
+  Object.defineProperty(engine, 'keyring', { get: () => keyring })
   return engine
 }
 
