@@ -149,12 +149,19 @@ export function App () {
   // The restore card is up: the empty start screen waits under it.
   const restoreWorking = welcomeBack && (!restore || restore.state === 'looking' || restore.state === 'opening')
   // The restore finished with files: say so briefly, then the card goes.
+  // Files can also come from another of this person's devices (ownDevices.js)
+  // when no seeder had a file list: then no "nothing found" card either.
   useEffect(() => {
+    if (welcomeBack && restore && restore.state === 'none' && sheets && sheets.length > 0) {
+      setWelcomeBack(false)
+      call('app:setWelcomeBack', { show: false }).catch(() => {})
+      return
+    }
     if (!welcomeBack || !restore || restore.state !== 'done' || !(restore.files > 0)) return
     setToast(restore.files === 1 ? '1 file came back' : restore.files + ' files came back')
     setWelcomeBack(false)
     call('app:setWelcomeBack', { show: false }).catch(() => {})
-  }, [welcomeBack, restore])
+  }, [welcomeBack, restore, sheets])
   const [recovering, setRecovering] = useState(null) // a file to offer a copy of
   const [restoreHidden, setRestoreHidden] = useState(false)
 
@@ -422,7 +429,7 @@ export function App () {
       <main className='main'>
         {desktop && <UpdateBar />}
         {notice && <div className='banner info'>{notice} <button className='link-button' onClick={() => setNotice(null)}>OK</button></div>}
-        {welcomeBack && !onboarding && !(restore && restore.state === 'done' && restore.files > 0) && (
+        {welcomeBack && !onboarding && !(restore && restore.state === 'done' && restore.files > 0) && !(restore && restore.state === 'none' && sheets && sheets.length > 0) && (
           <RestoreCard
             restore={restore}
             hidden={restoreHidden}
