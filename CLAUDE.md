@@ -269,6 +269,18 @@ electron-builder copies into the app (`desktop/paths.js` finds them). Mac
 builds are signed and notarized; Linux and Windows builds are unsigned
 (no Windows code-signing certificate).
 
+## Store screenshots
+
+`scripts/store-shots/all.sh` takes every store and website screenshot into
+`metadata/store/` (desktop 1440x900, Android 1080x2160 without alpha, iPhone
+17 Pro Max 1320x2868, iPad Pro 13-inch 2064x2752; light, clean status bars).
+`demo.js` runs Nick, Satoshi and Hal as real engines here with the community
+garden files; each device links to Nick through `GET http://127.0.0.1:8799/link`
+(so it is the owner), then `desktop.sh` (the `store-shots` smoke part, not in
+the default parts), `android.sh` (adb, the emulator) and `ios.sh` (sim-drive on
+the `PearOfficeShotsPhone` and `PearOfficeShotsPad` Simulators, erased each run)
+take five scenes: files, sheet, document, slides, sharing.
+
 ## Verify
 
 `npm run verify` is the merge gate (Constitution §5). It runs:

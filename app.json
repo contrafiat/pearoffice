@@ -26,6 +26,10 @@
             {
               "scheme": "pearoffice",
               "host": "seeder"
+            },
+            {
+              "scheme": "pearoffice",
+              "host": "link"
             }
           ],
           "category": [

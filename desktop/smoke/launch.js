@@ -6,7 +6,7 @@ const fs = require('node:fs')
 const os = require('node:os')
 const path = require('node:path')
 const { spawn } = require('node:child_process')
-const { PARTS } = require('../smoke-run')
+const { PARTS, EXTRA_PARTS } = require('../smoke-run')
 
 // Splits [--part name] and one optional screenshot path out of argv.
 function parseArgs (argv) {
@@ -16,7 +16,7 @@ function parseArgs (argv) {
     else if (argv[i].startsWith('--part=')) out.parts = argv[i].slice(7).split(',')
     else out.shot = path.resolve(argv[i])
   }
-  const bad = out.parts.filter((p) => !PARTS.includes(p))
+  const bad = out.parts.filter((p) => !PARTS.includes(p) && !EXTRA_PARTS.includes(p))
   if (bad.length) { console.error('unknown part ' + bad.join(', ') + ' (parts: ' + PARTS.join(', ') + ')'); process.exit(2) }
   return out
 }

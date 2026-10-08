@@ -21,5 +21,5 @@ const args = [__dirname]
 // GPU sandbox, as in PearGuard's desktop smoke scripts.
 if (process.platform === 'linux') args.unshift('--no-sandbox', '--disable-gpu')
 
-runParts({ command: electron, args, label: 'desktop smoke', parts: opts.parts, shot: opts.shot, timeout: 60000, echo: true })
+runParts({ command: electron, args, label: 'desktop smoke', parts: opts.parts, shot: opts.shot, timeout: Number(process.env.PEAROFFICE_SMOKE_TIMEOUT) || 60000, echo: true })
   .then((ok) => process.exit(ok ? 0 : 1))
