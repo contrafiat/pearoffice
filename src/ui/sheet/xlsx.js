@@ -14,6 +14,7 @@ import { writePref } from '../prefs.js'
 import { isMobile, fileName, saveFile } from '../save.js'
 import { isDocFile, importDocument } from '../doc/docFiles.js'
 import { isPptxFile, importPresentation } from '../slides/pptxImport.js'
+import { checkZip } from '../slides/importOoxml.js'
 import { borderCss, fontPx, FONTS } from './cellStyle.js'
 
 const MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
@@ -65,7 +66,7 @@ export async function importFile (file) {
   if (isPptxFile(file.name)) return importPresentation(data, file.name)
   if (isDocFile(file.name)) return importDocument(data, file.name)
   if (isJson(file.name) || isCsv(file.name)) return importText(data, file.name)
-  return importWorkbook(XLSX.read(data, { type: 'array', ...READ_OPTIONS }), file.name, data)
+  return readWorkbook(data, file.name)
 }
 
 // Phones: the shell's file picker. Resolves to null if cancelled.
@@ -76,7 +77,14 @@ export async function pickAndImport () {
   if (isPptxFile(picked.name)) return importPresentation(bytes, picked.name)
   if (isDocFile(picked.name)) return importDocument(bytes, picked.name)
   if (isJson(picked.name) || isCsv(picked.name)) return importText(bytes, picked.name)
-  return importWorkbook(XLSX.read(bytes, { type: 'array', ...READ_OPTIONS }), picked.name, bytes)
+  return readWorkbook(bytes, picked.name)
+}
+
+// A spreadsheet file. A zip (.xlsx, .ods) is checked for size first; an
+// older .xls is not a zip.
+async function readWorkbook (bytes, name) {
+  if (bytes[0] === 0x50 && bytes[1] === 0x4b) await checkZip(bytes, 'This is not a spreadsheet PearOffice can read.')
+  return importWorkbook(XLSX.read(bytes, { type: 'array', ...READ_OPTIONS }), name, bytes)
 }
 
 export async function exportSheet (sheetId) {

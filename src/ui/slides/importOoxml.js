@@ -27,6 +27,45 @@ export async function openPackage (bytes) {
   return zip
 }
 
+// Any zip-based file a library reads whole (.docx through mammoth, .xlsx
+// through SheetJS), checked first with the same limits: every part is
+// unpacked and counted, without keeping it, so a size that lies is caught.
+export async function checkZip (bytes, notReadable) {
+  if (!bytes || bytes.length > MAX_FILE) throw new Error('This file is too big to import. The limit is 100 MB.')
+  let zip
+  try { zip = await JSZip.loadAsync(bytes) } catch { throw new Error(notReadable) }
+  const files = Object.values(zip.files).filter((f) => !f.dir)
+  if (files.length > MAX_ENTRIES) throw new Error('This file has too many parts to import.')
+  const tooMuch = new Error('This file unpacks to more than PearOffice can import.')
+  let total = 0
+  for (const f of files) total += declaredSize(f)
+  if (total > MAX_TOTAL) throw tooMuch
+  total = 0
+  for (const f of files) {
+    const size = await unpackedSize(f, Math.min(MAX_MEDIA, MAX_TOTAL - total))
+    if (size === null) throw tooMuch
+    total += size
+  }
+}
+
+// How many bytes a part unpacks to, or null past `limit` or when it is broken.
+function unpackedSize (f, limit) {
+  if (declaredSize(f) > limit) return Promise.resolve(null)
+  return new Promise((resolve) => {
+    let size = 0
+    let done = false
+    const stream = f.internalStream('uint8array')
+    stream.on('data', (chunk) => {
+      if (done) return
+      size += chunk.length
+      if (size > limit) { done = true; stream.pause(); resolve(null) }
+    })
+    stream.on('error', () => { if (!done) { done = true; resolve(null) } })
+    stream.on('end', () => { if (!done) { done = true; resolve(size) } })
+    stream.resume()
+  })
+}
+
 const declaredSize = (f) => (f && f._data && Number.isFinite(f._data.uncompressedSize) ? f._data.uncompressedSize : 0)
 
 // A part's bytes, or null when it is missing or bigger than `limit`.
