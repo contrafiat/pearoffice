@@ -1,5 +1,8 @@
 # PearSheet seeder for StartOS 0.4: on hold
 
+**2026-10-08:** fixed by the blind relay (proposals/2026-10-08-blind-relay.md):
+home-network devices now reach the seeder through it.
+
 **Status:** on hold (Tim, 2026-10-05). Tested, not shipped.
 
 **Goal:** the PearSheet seeder as a native StartOS 0.4 package (not the

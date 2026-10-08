@@ -111,13 +111,6 @@ function createRestoring ({ engine, getSeeding, getOwnDevices, emit = () => {}, 
     }
     const locator = hex(keys.locator)
     const deviceKey = hex(engine.swarm.keyPair.publicKey)
-    let claimed = 0
-    for (const sk of new Set([...found.holders, ...seeders(found.keyring)])) {
-      try {
-        await seeding.keyringClaim(sk, locator, signClaim(keys.signKeyPair, locator, sk, deviceKey))
-        claimed++
-      } catch (e) { log('restore: seeder ' + sk.slice(0, 8) + ' did not take this device: ' + e.message) }
-    }
     const list = files(found.keyring)
     for (const e of list) {
       if (!(await engine.localDb.get('groups:joined:' + e.sheetId))) await engine.localDb.put('recovered:' + e.sheetId, { at: now(), kind: e.kind || null })
@@ -127,10 +120,18 @@ function createRestoring ({ engine, getSeeding, getOwnDevices, emit = () => {}, 
     // write carries it on.
     await engine.localDb.put('keyring:local', { seq: found.seq, keyring: found.keyring, fingerprint: '', held: [], at: now() })
     await setStatus({ state: 'opening', files: list.length })
-    await own.take(list)
     // The files' views, which name their seeders, come only from a seeder:
-    // ask these until they do.
+    // name these first, so each file asks them as soon as it is open (the
+    // next seeding sweep registers it), even if opening waits on its data.
     for (const e of list) seeding.hint(e.sheetId, fromSeeders)
+    await own.take(list)
+    for (const e of list) seeding.hint(e.sheetId, fromSeeders)
+    // Then every seeder at once: one that is gone does not hold up the rest.
+    const claims = await Promise.all(fromSeeders.map((sk) => seeding.keyringClaim(sk, locator, signClaim(keys.signKeyPair, locator, sk, deviceKey)).then(() => true, (e) => {
+      log('restore: seeder ' + sk.slice(0, 8) + ' did not take this device: ' + e.message)
+      return false
+    })))
+    const claimed = claims.filter(Boolean).length
     await engine.localDb.del('restore:pending')
     await setStatus({ state: 'done', files: list.length, seeders: claimed })
     log('restore: ' + list.length + ' files from ' + found.holders.length + ' seeder(s)')
