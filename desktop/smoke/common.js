@@ -41,7 +41,14 @@ function helpers ({ win, dataDir, result, log }) {
     await sleep(80)
   }
 
-  const sendMod = async (keyCode, modifiers = []) => { wc.sendInputEvent({ type: 'keyDown', keyCode, modifiers }); wc.sendInputEvent({ type: 'keyUp', keyCode, modifiers }); await sleep(60) }
+  // Ctrl shortcuts are Cmd on a Mac, where the editors (TipTap's Mod-) want
+  // Cmd; the grid takes either.
+  const sendMod = async (keyCode, modifiers = []) => {
+    if (process.platform === 'darwin') modifiers = modifiers.map((m) => (m === 'control' ? 'meta' : m))
+    wc.sendInputEvent({ type: 'keyDown', keyCode, modifiers })
+    wc.sendInputEvent({ type: 'keyUp', keyCode, modifiers })
+    await sleep(60)
+  }
 
   const more = async (label) => {
     await js("document.querySelector('.toolbar .more-button').click()")
