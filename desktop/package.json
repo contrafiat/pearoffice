@@ -24,6 +24,9 @@
     "productName": "PearOffice",
     "copyright": "Copyright 2026 PeerLoom LLC",
     "afterPack": "build/afterPack.js",
+    "toolsets": {
+      "appimage": "1.0.3"
+    },
     "directories": {
       "output": "dist",
       "buildResources": "build"
@@ -94,7 +97,21 @@
     },
     "deb": {
       "packageName": "pearoffice",
-      "afterInstall": "build/deb-postinst.sh"
+      "afterInstall": "build/deb-postinst.sh",
+      "depends": [
+        "libgtk-3-0",
+        "libnotify4",
+        "libnss3",
+        "libxss1",
+        "libxtst6",
+        "xdg-utils",
+        "libatspi2.0-0",
+        "libuuid1",
+        "libsecret-1-0",
+        "libasound2",
+        "libgbm1",
+        "libatomic1"
+      ]
     },
     "win": {
       "target": "nsis",
