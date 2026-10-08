@@ -223,6 +223,18 @@ export default function App () {
     return () => { alive = false; listeners.delete(onEvent); sub.remove() }
   }, [])
 
+  // Back goes to the UI, which closes what is on top or leaves the file,
+  // and asks for app:exit on the file list (src/ui/App.jsx). The show's
+  // handler below is added later, so it runs first while presenting.
+  useEffect(() => {
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (!loaded.current) return false
+      inject("window.__psEvent && window.__psEvent('app:back', null)")
+      return true
+    })
+    return () => sub.remove()
+  }, [])
+
   useEffect(() => {
     if (!presenting) return
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
@@ -246,6 +258,7 @@ export default function App () {
     }
     if (method === 'app:presentStart') { setPresenting(true); return reply({ result: { mode: 'single' } }) }
     if (method === 'app:presentEnd') { setPresenting(false); return reply({ result: { ok: true } }) }
+    if (method === 'app:exit') { BackHandler.exitApp(); return reply({ result: { ok: true } }) }
     if (method === 'app:restart') {
       try { await restartWorklet() } catch (err) { return reply({ error: String(err && err.message ? err.message : err) }) }
       reply({ result: { ok: true } })
