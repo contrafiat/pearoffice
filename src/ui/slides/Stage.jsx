@@ -43,7 +43,7 @@ const HANDLES = [
 const CURSORS = ['ns-resize', 'nesw-resize', 'ew-resize', 'nwse-resize']
 const cursorFor = (angle, rot) => CURSORS[Math.round((angle + rot) / 45) % 4]
 
-export function Stage ({ size, theme, slideId, layout, els, sel, setSel, editing, startEditing, stopEditing, editStart, canEdit, layoutEdit, phone, undo, change, others, onCursor, onEditor, onPastePictures, cropping, setCropping, onEditChart }) {
+export function Stage ({ size, theme, slideId, layout, els, sel, setSel, editing, startEditing, stopEditing, editStart, canEdit, layoutEdit, phone, touch, undo, change, others, onCursor, onEditor, onPastePictures, cropping, setCropping, onEditChart }) {
   const viewRef = useRef(null)
   const slideRef = useRef(null)
   const [scale, setScale] = useState(0)
@@ -127,7 +127,8 @@ export function Stage ({ size, theme, slideId, layout, els, sel, setSel, editing
 
   // A move, resize or rotate with the pointer. The frames are written once,
   // when the pointer comes up.
-  function startDrag (e, kind, ids, dir = null) {
+  // onTap: called instead when the pointer comes up without moving.
+  function startDrag (e, kind, ids, dir = null, onTap = null) {
     if (e.button !== 0) return
     e.preventDefault()
     e.stopPropagation()
@@ -167,6 +168,7 @@ export function Stage ({ size, theme, slideId, layout, els, sel, setSel, editing
     }
     const onUp = () => {
       drag.end()
+      if (!out && onTap) onTap()
       if (out) {
         const done = out
         change((doc) => { for (const id of Object.keys(done)) slidesModel.setFrame(doc, slideId, id, done[id]) })
@@ -206,9 +208,12 @@ export function Stage ({ size, theme, slideId, layout, els, sel, setSel, editing
       return
     }
     const ids = sel.includes(el.id) ? sel : [el.id]
+    // On a tablet, a tap on the one selected box edits its text, as a
+    // double-click does with a mouse.
+    const tapEdits = touch && canEdit && hasText(el) && sel.length === 1 && sel[0] === el.id
     setSel(ids)
     if (editing) stopEditing()
-    startDrag(e, 'move', ids)
+    startDrag(e, 'move', ids, null, tapEdits ? () => startEditing(el.id, { point: { x: e.clientX, y: e.clientY } }) : null)
   }
 
   function onKeyDown (e) {
@@ -318,8 +323,8 @@ export function Stage ({ size, theme, slideId, layout, els, sel, setSel, editing
                     text={
                       <TextFrame frame={f} role={el.role} layout={el.layout}>
                         {live
-                          ? <LiveText fragment={el.text} undo={undo} placeholder={placeholderFor(el.role, phone)} canEdit={canEdit} cursors={others.filter((p) => p.box === el.id && p.cursor)} onCursor={onCursor} onEditor={onEditor} start={editStart} label={el.role === 'title' ? 'Slide title' : el.type === 'shape' ? 'Text in the shape' : 'Text box'} />
-                          : <StaticText fragment={el.text} placeholder={canEdit ? placeholderFor(el.role, phone) : ''} markEmpty={canEdit && el.type === 'text' && !el.role} />}
+                          ? <LiveText fragment={el.text} undo={undo} placeholder={placeholderFor(el.role, touch || phone)} canEdit={canEdit} cursors={others.filter((p) => p.box === el.id && p.cursor)} onCursor={onCursor} onEditor={onEditor} start={editStart} label={el.role === 'title' ? 'Slide title' : el.type === 'shape' ? 'Text in the shape' : 'Text box'} />
+                          : <StaticText fragment={el.text} placeholder={canEdit ? placeholderFor(el.role, touch || phone) : ''} markEmpty={canEdit && el.type === 'text' && !el.role} />}
                       </TextFrame>
                     }
                   />
