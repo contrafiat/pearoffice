@@ -79,9 +79,9 @@ module.exports = async function onboarding (t) {
   await click('.ob-restore-form button[type=submit]')
   await waitFor('word count error', "!!document.querySelector('.ob-error')", 3000)
   result.countError = await js("document.querySelector('.ob-error').textContent")
-  // 24 words that are not recovery words: the worklet's error, inline.
+  // 12 words that are not recovery words: the worklet's error, inline.
   await js("document.querySelector('.ob-phrase').select(); true")
-  await wc.insertText(Array(24).fill('zzz').join(' '))
+  await wc.insertText(Array(12).fill('zzz').join(' '))
   await click('.ob-restore-form button[type=submit]')
   await waitFor('bad phrase error', "(document.querySelector('.ob-error') || {}).textContent?.includes('not a recovery phrase word')", 5000)
   result.badPhrase = await js("document.querySelector('.ob-error').textContent")
@@ -116,8 +116,8 @@ module.exports = async function onboarding (t) {
   await waitTitle('Welcome back')
   await click('.ob-back')
   await waitTitle('Welcome to PearOffice')
-  result.haveDone = result.choices === 'Link to my other device | Restore from my recovery phrase' && result.wordCount === '3 words of 24' &&
-    result.countError === 'A recovery phrase has 24 words. This has 3.' && result.stillHere && result.linkOff === true &&
+  result.haveDone = result.choices === 'Link to my other device | Restore from my recovery phrase' && result.wordCount === '3 words of 12' &&
+    result.countError === 'A recovery phrase has 12 words. This has 3.' && result.stillHere && result.linkOff === true &&
     result.waitingTitle === 'Looking for your other device...' && result.cancelMs < 5000 && result.cancelQuiet && result.linkKept
   step('i already use it: choice, restore errors, link wait and cancel')
 
@@ -148,9 +148,9 @@ module.exports = async function onboarding (t) {
     if (i < TITLES.length - 2) await click('.ob-next')
     else if (i === TITLES.length - 2) {
       result.laterLabel = await js("document.querySelector('.ob-next').textContent.trim()")
-      // Show my phrase opens the 24 words over the tour.
+      // Show my phrase opens the 12 words over the tour.
       await click('.ob-show-phrase')
-      await waitFor('recovery phrase', "document.querySelectorAll('.phrase li').length === 24 && !!document.querySelector('.ob-backdrop.hidden')")
+      await waitFor('recovery phrase', "document.querySelectorAll('.phrase li').length === 12 && !!document.querySelector('.ob-backdrop.hidden')")
       result.phrase = true
       await js("[...document.querySelectorAll('.panel button')].find((b) => b.textContent.trim() === 'Done').click()")
       await waitFor('phrase closed', "!document.querySelector('.phrase') && !!document.querySelector('.ob-backdrop:not(.hidden)')")

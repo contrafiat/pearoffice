@@ -140,7 +140,7 @@ export function DevicesPanel ({ initialLink = '', startWith = null, onBack = nul
               <button onClick={() => setMode('use')}>This is the new device</button>
             </div>
             <h3>Recovery phrase</h3>
-            <p>24 words that bring back your identity if you lose every device. Anyone with them can act as you.</p>
+            <p>12 words that bring back your identity if you lose every device. Anyone with them can act as you.</p>
             {backedUp > 0 && <p className='muted'>Your file list is backed up to {backedUp === 1 ? '1 seeder' : backedUp + ' seeders'}.</p>}
             <p className='muted'>They do not hold your files. After a restore, the owner of each file invites you back. Files only you own need another linked device to survive.</p>
             <div className='row'>
@@ -214,11 +214,11 @@ export function DevicesPanel ({ initialLink = '', startWith = null, onBack = nul
 
         {mode === 'restore' && (
           <form className='stack' onSubmit={(e) => { e.preventDefault(); restartAfter(restore1, 'restore', 'restore') }}>
-            <p>Type your 24 words. This brings back your identity. Your files come back when you link from another device or their owners invite you again.</p>
+            <p>Type your 12 words. This brings back your identity. Your files come back when you link from another device or their owners invite you again.</p>
             <textarea aria-label='Recovery phrase' rows='4' value={input} onChange={(e) => setInput(e.target.value)} autoFocus />
             <div className='row end'>
               <button type='button' onClick={() => setMode('menu')}>Back</button>
-              <button className='primary' type='submit' disabled={busy || phraseWordCount(input) !== 24}>{busy ? 'Restoring...' : 'Restore'}</button>
+              <button className='primary' type='submit' disabled={busy || phraseWordCount(input) !== 12}>{busy ? 'Restoring...' : 'Restore'}</button>
             </div>
           </form>
         )}

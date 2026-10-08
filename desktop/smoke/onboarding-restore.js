@@ -28,7 +28,7 @@ module.exports = async function onboardingRestore (t) {
   await waitFor('phrase focused', "document.activeElement === document.querySelector('.ob-phrase')", 3000)
   // As someone might type it: capitals, new lines and extra spaces.
   const words = phrase.split(' ')
-  await wc.insertText('  ' + words.slice(0, 12).join(' ').toUpperCase() + '\n' + words.slice(12).join('  ') + '\n')
+  await wc.insertText('  ' + words.slice(0, 6).join(' ').toUpperCase() + '\n' + words.slice(6).join('  ') + '\n')
   result.wordCount = await js("document.querySelector('.ob-count').textContent")
   // The restart reloads the page; the note shows once it is back.
   await js("document.querySelector('.ob-restore-form button[type=submit]').click(); window.__beforeRestart = true; true")
@@ -55,6 +55,6 @@ module.exports = async function onboardingRestore (t) {
   }
   step('note dismissed')
 
-  return result.noNoteYet && result.wordCount === '24 words of 24' && result.onboarded && result.sameIdentity && result.noteFlag && result.noteCleared &&
+  return result.noNoteYet && result.wordCount === '12 words of 12' && result.onboarded && result.sameIdentity && result.noteFlag && result.noteCleared &&
     result.note === 'Welcome back. Ask the owners of your files to invite you again; you will be back as yourself.'
 }

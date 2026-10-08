@@ -36,7 +36,7 @@ invites, owner, editor and viewer roles, renames. The blind seeder works:
 pair by link, every member backs up to it, a member can catch up from it
 alone. Removing someone moves the sheet to fresh keys. Desktop installers build for
 Linux, macOS and Windows. The Android app runs on the emulator and the TCL.
-A person can link their devices (one-time link) and keep a 24-word recovery
+A person can link their devices (one-time link) and keep a 12-word recovery
 phrase (proposals/2026-10-03-device-linking.md). The seeder ships inside the
 desktop app and as a Linux server download. iOS runs on the Simulator and
 the iPhone SE. Mac builds are signed and notarized. Anyone can remove a sheet
