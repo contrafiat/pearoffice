@@ -36,6 +36,8 @@ const port = Number(env.SEEDER_PORT || 8761)
 const barePath = env.SEEDER_BARE || path.join(root, 'bare')
 const bundlePath = env.SEEDER_BUNDLE || path.join(root, 'seeder.bundle')
 const page = fs.readFileSync(path.join(__dirname, 'index.html'))
+// The app's icon at 64 px (assets/images/icon.png), for the browser tab.
+const icon = fs.readFileSync(path.join(__dirname, 'icon.png'))
 const startedAt = Date.now()
 
 // The staged copy has version.json (scripts/stage-umbrel.js); a checkout has
@@ -89,6 +91,7 @@ async function main () {
       res.end(body)
     }
     if (req.method === 'GET' && url === '/fonts.css') return send(200, 'text/css', FONT_CSS)
+    if (req.method === 'GET' && url === '/icon.png') return send(200, 'image/png', icon)
     // Answers /api/login and /api/logout, and 401 for anything else without a
     // session. The page itself always loads and shows the login form on a 401.
     if (auth.handle(req, res, parsed)) return

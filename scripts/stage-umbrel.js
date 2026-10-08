@@ -19,6 +19,7 @@ fs.rmSync(outDir, { recursive: true, force: true })
 const files = [
   'seeder-dist/umbrel/server.js',
   'seeder-dist/umbrel/index.html',
+  'seeder-dist/umbrel/icon.png',
   'desktop/seeder-process.js',
   'src/shared/qr.js',
   'src/ui/fonts.js',
