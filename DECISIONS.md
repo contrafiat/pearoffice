@@ -2,6 +2,19 @@
 
 Append-only, newest on top. Per Constitution §4.
 
+## 2026-10-08 - The phrase brings files back from seeders only
+Tier: T3
+Context: after phrase recovery shipped, the option of a restore with no
+seeder, from the devices of people you share files with.
+Choice: no. Tim: "We only want files retrievable from seeders." A restore
+gets files from your seeders, or from another of your own devices that is
+on; co-members' devices never hand out file keys on proof of the phrase.
+Alternatives: co-members keep your sealed keyring; co-members let a device
+that proves your identity back into shared files and send it the keys.
+Consequences: without a seeder or another device, the owner of each shared
+file invites you again and files only you were in are lost. A leaked
+phrase reaches only what your seeders hold.
+
 ## 2026-10-07 - Your devices tell each other about their files
 Tier: T3
 Context: linking sent the file list once, so a file made later on one
