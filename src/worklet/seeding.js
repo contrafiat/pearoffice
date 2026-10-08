@@ -314,6 +314,29 @@ function createSeeding ({ engine, getPictures = () => null, log = () => {} }) {
     })
   }
 
+  // --- keyrings (proposals/2026-10-07-phrase-recovers-files.md) -------------
+
+  // rec: a sealed keyring (keyring.js seal). Resolves { seq }.
+  function keyringPut (seederKey, rec) {
+    return ask(seederKey, { t: 'keyring-put', rec }).then((r) => ({ seq: r.seq }))
+  }
+
+  // The sealed keyring the seeder holds at `locator` (hex), or null.
+  function keyringGet (seederKey, locator) {
+    return ask(seederKey, { t: 'keyring-get', locator }).then((r) => r.rec || null)
+  }
+
+  // Asks the seeder to treat this device as paired, proving the keyring's
+  // sign key (keyringRecord.js), and remembers it as paired here.
+  async function keyringClaim (seederKey, locator, sig) {
+    await ask(seederKey, { t: 'keyring-claim', locator, sig })
+    if (!(await engine.localDb.get('seeders:' + seederKey))) {
+      await engine.localDb.put('seeders:' + seederKey, { seederKey, pairedAt: Date.now() })
+      sweep().catch(() => {})
+    }
+    return { paired: true }
+  }
+
   // --- choosing seeders per sheet (proposals/2026-10-04-stop-backing-up.md) --
 
   async function canStop (base, listing) {
@@ -403,7 +426,7 @@ function createSeeding ({ engine, getPictures = () => null, log = () => {} }) {
     if (peering) await peering.close().catch(() => {})
   }
 
-  return { start, pair, list, register, sweep, close, requestDrop, requestKeep, sheetSeeders, removeFromSheet, addToSheet, stopUsing, stopPreview, get peering () { return peering } }
+  return { start, pair, list, keyringPut, keyringGet, keyringClaim, register, sweep, close, requestDrop, requestKeep, sheetSeeders, removeFromSheet, addToSheet, stopUsing, stopPreview, get peering () { return peering } }
 }
 
 module.exports = { createSeeding }

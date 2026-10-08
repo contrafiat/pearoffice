@@ -13,6 +13,13 @@
 // Strangers would need a registered sheet's bootstrap key, which only members
 // and the seeder hold.
 //
+// It also keeps keyrings (proposals/2026-10-07-phrase-recovers-files.md):
+// a person's encrypted file list, put by their paired devices, handed to
+// anyone who knows its locator, and announced on its topic so a device
+// restored from the phrase can find it. A device that proves the keyring's
+// sign key counts as paired (keyringRecord.js, claims). The seeder cannot
+// open a keyring.
+//
 // blind-peer is pinned to an exact version in package.json because this file
 // wraps two of its internal methods (_onaddcore, _onaddcores).
 
@@ -25,8 +32,10 @@ const b4a = require('b4a')
 const sodium = require('sodium-universal')
 const IdEnc = require('hypercore-id-encoding')
 const { PAIR_PROTOCOL, PAIR_WINDOW_MS, SEEDER_PROTOCOL, DROP_MAX_MS, DROP_GRACE_MS, pairTopic, seederLink } = require('./protocol')
+const { checkSealed, checkClaim, topicOf } = require('./keyringRecord')
 
 const DROP_SWEEP_MS = 60 * 60 * 1000
+const KEYRINGS_PER_DEVICE = 4
 
 const hex = (buf) => b4a.toString(buf, 'hex')
 
@@ -66,6 +75,12 @@ async function createSeeder ({ dataDir, bootstrap = null, log = () => {} }) {
     allowed.add(sheet)
     const by = value && value.by
     registrants.set(sheet, new Set(Array.isArray(by) ? by : by ? [by] : []))
+  }
+
+  // locator -> { signKey, seq, by: Set of device keys that put or claimed it }
+  const keyrings = new Map()
+  for await (const { key, value } of state.createReadStream({ gt: 'keyring/', lt: 'keyring/~' })) {
+    if (value && value.rec) keyrings.set(key.slice(8), { signKey: value.rec.signKey, seq: value.rec.seq, by: new Set(value.by || []) })
   }
 
   async function addRegistrant (sheet, device) {
@@ -168,6 +183,15 @@ async function createSeeder ({ dataDir, bootstrap = null, log = () => {} }) {
       await state.put('sheet/' + sheet, { by: [...set], at: Date.now() })
       if (![...set].some((d) => paired.has(d))) { await scheduleDrop(sheet, DROP_GRACE_MS); dropping++ }
     }
+    for (const [locator, k] of keyrings) {
+      if (!k.by.delete(deviceKey)) continue
+      if ([...k.by].some((d) => paired.has(d))) {
+        const rec = (await state.get('keyring/' + locator))?.value?.rec
+        await state.put('keyring/' + locator, { rec, by: [...k.by] })
+      } else {
+        await dropKeyring(locator)
+      }
+    }
     log('forgot device ' + deviceKey.slice(0, 8) + ', dropping ' + dropping + ' sheet(s)')
     return { forgotten: true, dropping }
   }
@@ -189,6 +213,81 @@ async function createSeeder ({ dataDir, bootstrap = null, log = () => {} }) {
   const peer = new SheetSeeder(dataDir, { bootstrap, pearoffice: rules, trustedPubKeys: [...paired].map((k) => b4a.from(k, 'hex')) })
   await peer.listen()
   const seederKey = peer.publicKey
+
+  // --- keyrings ------------------------------------------------------------
+
+  for (const locator of keyrings.keys()) announce(locator)
+
+  function announce (locator) {
+    peer.swarm.join(topicOf(b4a.from(locator, 'hex')), { server: true, client: false })
+  }
+
+  async function dropKeyring (locator) {
+    keyrings.delete(locator)
+    await state.del('keyring/' + locator)
+    peer.swarm.leave(topicOf(b4a.from(locator, 'hex'))).catch(() => {})
+    log('dropped keyring ' + locator.slice(0, 8))
+  }
+
+  function keyringsOf (device) {
+    let n = 0
+    for (const k of keyrings.values()) if (k.by.has(device)) n++
+    return n
+  }
+
+  // Puts and claims run one at a time, so two devices writing at once
+  // cannot both pass the seq check.
+  let keyringLock = Promise.resolve()
+  function locked (fn) {
+    const run = keyringLock.then(fn)
+    keyringLock = run.catch(() => {})
+    return run
+  }
+
+  function putKeyring (rec, device) {
+    return locked(async () => {
+      if (!paired.has(device)) return { reason: 'Only paired devices can back up a file list' }
+      if (!checkSealed(rec)) return { reason: 'This file list does not check out' }
+      const have = keyrings.get(rec.locator)
+      if (have && have.signKey !== rec.signKey) return { reason: 'This file list belongs to someone else' }
+      if (have && rec.seq <= have.seq) return { reason: 'A newer file list is already here', seq: have.seq }
+      if (!(have && have.by.has(device)) && keyringsOf(device) >= KEYRINGS_PER_DEVICE) return { reason: 'This device has backed up too many file lists here' }
+      const by = new Set(have ? have.by : [])
+      by.add(device)
+      const clean = { locator: rec.locator, seq: rec.seq, nonce: rec.nonce, ciphertext: rec.ciphertext, signKey: rec.signKey, sig: rec.sig }
+      await state.put('keyring/' + rec.locator, { rec: clean, by: [...by] })
+      keyrings.set(rec.locator, { signKey: rec.signKey, seq: rec.seq, by })
+      if (!have) { announce(rec.locator); log('keeping keyring ' + rec.locator.slice(0, 8)) }
+      return { seq: rec.seq }
+    })
+  }
+
+  async function getKeyring (locator) {
+    if (typeof locator !== 'string' || !keyrings.has(locator)) return null
+    return (await state.get('keyring/' + locator))?.value?.rec || null
+  }
+
+  // A restored device proves the keyring's sign key: pair it.
+  function claimKeyring (m, conn) {
+    return locked(async () => {
+      const device = hex(conn.remotePublicKey)
+      const k = typeof m.locator === 'string' && keyrings.get(m.locator)
+      if (!k || !checkClaim(m, k.signKey, hex(seederKey), device)) return { reason: 'This claim does not check out' }
+      if (!k.by.has(device)) {
+        if (keyringsOf(device) >= KEYRINGS_PER_DEVICE) return { reason: 'This device has backed up too many file lists here' }
+        k.by.add(device)
+        const rec = (await state.get('keyring/' + m.locator))?.value?.rec
+        await state.put('keyring/' + m.locator, { rec, by: [...k.by] })
+      }
+      if (!paired.has(device)) {
+        paired.add(device)
+        await state.put('device/' + device, { at: Date.now(), via: 'keyring' })
+        peer.addTrustedPubKey(conn.remotePublicKey)
+        log('paired device ' + device.slice(0, 8) + ' (it proved keyring ' + m.locator.slice(0, 8) + ')')
+      }
+      return { paired: true }
+    })
+  }
 
   // --- pairing -----------------------------------------------------------
 
@@ -257,8 +356,13 @@ async function createSeeder ({ dataDir, bootstrap = null, log = () => {} }) {
     const msg = ch.addMessage({
       encoding: c.json,
       onmessage: async (m) => {
-        if (!m || (m.t !== 'drop' && m.t !== 'keep')) return
+        if (!m) return
         const remote = hex(conn.remotePublicKey)
+        const reply = (r) => msg.send(r.reason ? { t: 'no', reason: r.reason } : { t: 'ok', ...r })
+        if (m.t === 'keyring-put') return reply(await putKeyring(m.rec, remote))
+        if (m.t === 'keyring-get') return reply({ rec: await getKeyring(m.locator) })
+        if (m.t === 'keyring-claim') return reply(await claimKeyring(m, conn))
+        if (m.t !== 'drop' && m.t !== 'keep') return
         if (!paired.has(remote)) return msg.send({ t: 'no', reason: 'Only paired devices can ask for that' })
         if (typeof m.bootstrap !== 'string' || !allowed.has(m.bootstrap)) return msg.send({ t: 'no', reason: 'This seeder does not hold that file' })
         if (m.t === 'keep') return msg.send({ t: 'ok', cancelled: await keep(m.bootstrap, remote) })
@@ -276,6 +380,7 @@ async function createSeeder ({ dataDir, bootstrap = null, log = () => {} }) {
       seederKey: hex(seederKey),
       pairedDevices: paired.size,
       sheets: allowed.size,
+      keyrings: keyrings.size,
       coresAdded: peer.stats.coresAdded,
       pairing: windowState ? { link: windowState.link, expiresAt: windowState.expiresAt } : null
     }

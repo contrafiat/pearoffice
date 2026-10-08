@@ -20,6 +20,11 @@ const PAIR_NAMESPACE = 'pearoffice/seeder-pair/v1'
 const PAIR_WINDOW_MS = 5 * 60 * 1000
 // Requests from paired devices after pairing (proposals/2026-10-04-deleting-sheets.md):
 //   { t: 'drop', bootstrap, afterMs }  ->  { t: 'ok', due } | { t: 'no', reason }
+//   { t: 'keep', bootstrap }           ->  { t: 'ok', cancelled }
+// Keyrings (proposals/2026-10-07-phrase-recovers-files.md, keyringRecord.js):
+//   { t: 'keyring-put', rec }            paired devices  ->  { t: 'ok', seq }
+//   { t: 'keyring-get', locator }        anyone          ->  { t: 'ok', rec | null }
+//   { t: 'keyring-claim', locator, sig } anyone          ->  { t: 'ok', paired: true }
 const SEEDER_PROTOCOL = 'pearoffice/seeder/1'
 const DROP_MAX_MS = 30 * 24 * 3600 * 1000
 const DROP_GRACE_MS = 7 * 24 * 3600 * 1000
