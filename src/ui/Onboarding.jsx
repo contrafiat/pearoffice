@@ -72,7 +72,7 @@ export const CARDS = [
 // the name comes with the identity.
 const HAVE = [
   { id: 'link', Icon: Devices, title: 'Link to my other device', text: 'Use the same identity and files as your other device.' },
-  { id: 'restore', Icon: ArrowCounterClockwise, title: 'Restore from my recovery phrase', text: 'Lost every device? Get your identity back. The owners of your files can then invite you back in.' }
+  { id: 'restore', Icon: ArrowCounterClockwise, title: 'Restore from my recovery phrase', text: 'Lost every device? Get your identity back, and your files if you had a seeder.' }
 ]
 
 const START = { id: 'start', Icon: RocketLaunch, title: 'You are all set', text: 'Make a new file, bring one in from your computer or join one with a link you were sent.' }

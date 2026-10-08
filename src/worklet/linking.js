@@ -275,6 +275,8 @@ function createLinking ({ engine, removeFiles = async () => {}, log = () => {}, 
     await replaceIdentity(root)
     // After the restart, restoring.js brings the files back from the seeders.
     await engine.localDb.put('restore:pending', { at: Date.now() })
+    // They have just typed the phrase: no reminder to write it down.
+    await engine.localDb.put('phraseNudged', { at: Date.now() })
     return { restart: true }
   }
 

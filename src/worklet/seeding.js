@@ -68,11 +68,21 @@ function createSeeding ({ engine, getPictures = () => null, log = () => {} }) {
     return out.sort()
   }
 
+  // Seeders to use for a file whose view names none yet: after a restore
+  // from the phrase, the view arrives only from a seeder (restoring.js).
+  const hints = new Map() // sheetId -> [seederKey]
+  function hint (sheetId, seederKeys) {
+    hints.set(sheetId, [...new Set(seederKeys)].sort())
+    register(sheetId).catch(() => {})
+  }
+
   async function register (sheetId) {
     const base = engine.bases.get(sheetId)
     if (!base || !peering || closed) return
     await base.ready()
-    const keys = await seedersOf(base)
+    let keys = await seedersOf(base)
+    if (keys.length) hints.delete(sheetId)
+    else if (hints.has(sheetId)) keys = hints.get(sheetId)
     const id = keys.join(',')
     const prev = seen.get(sheetId)
     seen.set(sheetId, id)
@@ -426,7 +436,7 @@ function createSeeding ({ engine, getPictures = () => null, log = () => {} }) {
     if (peering) await peering.close().catch(() => {})
   }
 
-  return { start, pair, list, keyringPut, keyringGet, keyringClaim, register, sweep, close, requestDrop, requestKeep, sheetSeeders, removeFromSheet, addToSheet, stopUsing, stopPreview, get peering () { return peering } }
+  return { start, pair, list, hint, keyringPut, keyringGet, keyringClaim, register, sweep, close, requestDrop, requestKeep, sheetSeeders, removeFromSheet, addToSheet, stopUsing, stopPreview, get peering () { return peering } }
 }
 
 module.exports = { createSeeding }

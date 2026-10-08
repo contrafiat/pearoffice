@@ -20,8 +20,15 @@ test('the phrase brings files back', async (t) => {
   const testnet = await createTestnet(3)
   const mkSwarm = ({ keyPair }) => new Hyperswarm({ keyPair, bootstrap: testnet.bootstrap })
   const engines = []
+  const logs = []
   const device = async (name, dir = tmpDir()) => {
-    const e = createSheetEngine({ corestore: new Corestore(dir), createSwarm: mkSwarm, keyringGapMs: 300, restoreLookMs: 60000, log: process.env.DEBUG_RESTORE ? (m) => console.log('[' + (name || 'r') + '] ' + m) : undefined })
+    const e = createSheetEngine({
+      corestore: new Corestore(dir),
+      createSwarm: mkSwarm,
+      keyringGapMs: 300,
+      restoreLookMs: 60000,
+      log: (m) => { if (!name) logs.push(m); if (process.env.DEBUG_RESTORE) console.log('[' + (name || 'r') + '] ' + m) }
+    })
     engines.push(e)
     await e.init({})
     if (name) await call(e, 'app:setName', { name })
@@ -73,6 +80,12 @@ test('the phrase brings files back', async (t) => {
   await t.test('the files come back from the seeder, and the seeder takes the new device', async () => {
     await waitFor('restore done', async () => (await call(r, 'app:restoreStatus'))?.state === 'done', { timeout: 60000 })
     assert.equal((await call(r, 'app:restoreStatus')).files, 3)
+    // Each file asks the seeder at once: its view, which names the seeder,
+    // comes only from the seeder (a phone on the real network found it no
+    // other way).
+    for (const id of [solo, olives, viewed]) {
+      await waitFor('asks the seeder for ' + id.slice(0, 6), async () => logs.some((m) => m.startsWith('registered ' + id.slice(0, 8))), { timeout: 5000 })
+    }
     assert.equal(seeder.isPaired(r.swarm.keyPair.publicKey), true)
     assert.deepEqual((await call(r, 'seeder:list')).map((s) => s.seederKey), [hex(seeder.seederKey)])
     await waitFor('content from the seeder', async () => (await grid(r, solo))['1,1'] === 'only ed has this', { timeout: 40000 })
