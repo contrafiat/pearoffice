@@ -6,7 +6,9 @@ const { withAndroidManifest } = require('expo/config-plugins')
 module.exports = function withAndroidQueries (config) {
   return withAndroidManifest(config, (cfg) => {
     const manifest = cfg.modResults.manifest
-    manifest.queries = manifest.queries || []
+    // A prebuild over an existing android/ runs this again on its own output,
+    // so drop the copies an earlier run added before adding one.
+    manifest.queries = (manifest.queries || []).filter((q) => !JSON.stringify(q).includes('"android:scheme":"lightning"'))
     manifest.queries.push({
       intent: [{
         action: [{ $: { 'android:name': 'android.intent.action.VIEW' } }],
