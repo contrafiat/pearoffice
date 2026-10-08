@@ -1,13 +1,14 @@
 // THIRD-PARTY-NOTICES.txt for a package: the licence of every npm package
 // whose code ships in it, read from the built bundles themselves (the
 // worklet and seeder Bare bundles, the UI's esbuild metafile), plus the Bare
-// runtime and the Manrope font. Electron adds its own LICENSE and
-// LICENSES.chromium.html.
+// runtime and the Manrope font (font: false leaves it out). Electron adds its
+// own LICENSE and LICENSES.chromium.html.
 //
 //   node scripts/third-party-notices.js <out file> <bundle or meta.json>...
 //
 // A .json argument is an esbuild metafile; anything else a Bare bundle.
-// Also run by stage-desktop.js.
+// Also run by stage-desktop.js and, for the seeder downloads, scripts/bare.js
+// and stage-umbrel.js.
 
 const fs = require('fs')
 const path = require('path')
@@ -36,7 +37,7 @@ function licenceText (dir) {
   return names.map((n) => fs.readFileSync(path.join(dir, n), 'utf8').trim()).join('\n\n')
 }
 
-function notices (inputs, { extraDirs = [] } = {}) {
+function notices (inputs, { extraDirs = [], font = true } = {}) {
   const dirs = new Set(extraDirs)
   for (const input of inputs) {
     for (const file of filesOf(input)) {
@@ -56,12 +57,9 @@ function notices (inputs, { extraDirs = [] } = {}) {
   const entries = [...seen.values()].sort((a, b) => a.id.localeCompare(b.id))
   const out = [
     'PearOffice includes the third-party software listed below. Each is',
-    'used under its own licence, given after its name.',
-    '',
-    '=== Manrope typeface (SIL Open Font License 1.1)',
-    '',
-    fs.readFileSync(path.join(root, 'assets', 'fonts', 'OFL.txt'), 'utf8').trim()
+    'used under its own licence, given after its name.'
   ]
+  if (font) out.push('', '=== Manrope typeface (SIL Open Font License 1.1)', '', fs.readFileSync(path.join(root, 'assets', 'fonts', 'OFL.txt'), 'utf8').trim())
   // Packages whose licence text is the same word for word share one copy.
   const byText = new Map()
   for (const e of entries) {
