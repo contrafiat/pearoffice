@@ -444,7 +444,10 @@ button, input, select { font: inherit; color: inherit; }
 @media (pointer: coarse) { .range-handle { display: block; } }
 /* Phones: the tools are icons in one row that scrolls sideways when it does
    not fit. */
-.tools.phone-row { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; margin-left: -44px; width: calc(100% + 44px); }
+.tools.phone-row { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+/* Under the menu button's column only on narrow screens; an iPad shows the
+   sidebar there instead. */
+@media (max-width: 720px) { .tools.phone-row { margin-left: -44px; width: calc(100% + 44px); } }
 .tools.phone-row::-webkit-scrollbar { display: none; }
 .tools.phone-row button { flex: none; min-width: 38px; height: 36px; padding: 0 8px; display: inline-flex; align-items: center; justify-content: center; color: var(--ink); }
 .tools.phone-row select { flex: none; height: 36px; }
@@ -773,6 +776,8 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 .doc-tools.phone > * { flex: none; }
 .doc-tools.phone button { min-width: 38px; height: 36px; }
 .doc-tools.phone select { height: 36px; }
+/* Tablets: room for every tool, so wrap rather than scroll. */
+@media (min-width: 721px) { .doc-tools.phone { flex-wrap: wrap; overflow-x: visible; row-gap: 6px; } }
 .doc-scrim { position: fixed; inset: 0; z-index: 9; }
 .doc-pop { z-index: 12; }
 .doc-pop.menu li { display: flex; align-items: center; gap: 8px; }
