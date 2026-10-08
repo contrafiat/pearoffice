@@ -2,6 +2,21 @@
 
 Append-only, newest on top. Per Constitution §4.
 
+## 2026-10-08 - PearOffice uses the PeerLoom blind relay
+Tier: T3
+Context: a StartOS seeder cannot be reached from the home network, while
+the other apps' seeders on the same Start9 can, because they fall back to
+the suite's blind relay (proposals/2026-10-08-blind-relay.md).
+Choice: the shared relay key, direct first: members' Hyperswarm through
+`relayThrough` as a function, and seeder dials through a wrapper that adds
+the relay for a seeder only after a holepunch failure to it. A "Connect
+anywhere" switch in Settings, on by default. The seeder sets no relay.
+Alternatives: no relay (StartOS seeders work only away from home); a port
+forward on StartOS (PearTune measured it does not fix the punch).
+Consequences: PeerLoom's relay sees which two keys talk and how many bytes
+for connections that cannot go direct; it never sees a file or a key. A
+StartOS seeder can ship with the first release.
+
 ## 2026-10-08 - The phrase brings files back from seeders only
 Tier: T3
 Context: after phrase recovery shipped, the option of a restore with no

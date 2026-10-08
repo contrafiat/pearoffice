@@ -1,6 +1,6 @@
 # The PeerLoom blind relay in PearOffice
 
-**Status:** draft, 2026-10-08. Asked for by Tim: the StartOS seeder should
+**Status:** approved by Tim 2026-10-08. Asked for by Tim: the StartOS seeder should
 work for devices on the home network, as the PearCircle and PearCal seeders
 do on the same Start9.
 
@@ -89,11 +89,14 @@ device just never relays. Rollback is removing the option.
 2. The seeder dial wrapper for backups and seeder requests.
 3. The StartOS package and the test on the Start9.
 
+## Decided 2026-10-08
+
+1. The switch is on by default.
+2. "Connect anywhere" in Settings, next to "Keep files online", with
+   PearList's words.
+3. The StartOS seeder is published with the first release, alongside the
+   Umbrel app; until then it is a sideload.
+
 ## Open questions
 
-1. The switch on by default, as in every other app? Recommended: yes.
-2. Its name and place: "Connect anywhere" in Settings, next to "Keep files
-   online"? Recommended: yes, same words as PearList.
-3. Ship the StartOS seeder to the StartOS registry once it works from the
-   home network, or keep it a sideload until the first release? Recommended:
-   with the first release, alongside the Umbrel app.
+None.
