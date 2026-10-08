@@ -24,6 +24,20 @@ made after it was lost. A file removed on a device stays away, and so does
 its copy after a tidy-up while the sender still has the old copy's record.
 Older builds never join the topic, so a mixed pair behaves as before.
 
+## 2026-10-07 - The recovery phrase brings files back
+Tier: T3
+Context: the phrase restored the identity only, so files you own were lost
+with every device (proposals/2026-10-07-phrase-recovers-files.md).
+Choice: an encrypted keyring of file keys, derived from the identity seed,
+kept by your seeders and found on a topic only the phrase can derive; on
+by default with a seeder; a device proving the keyring's sign key counts
+as paired; files nobody else can admit you to come back as a copy you own
+with the same title.
+Alternatives: no recovery of files; a switch, off by default; re-pairing
+every seeder by hand after a restore; titling copies "(recovered)".
+Consequences: a leaked phrase now reveals every file your seeders hold;
+seeders need an update to keep keyrings; the seeder stays blind.
+
 ## 2026-10-06 - Slides: optional element fields and a chart element
 Tier: T2
 Context: .pptx import lost see-through fills, custom shapes, text anchoring,
