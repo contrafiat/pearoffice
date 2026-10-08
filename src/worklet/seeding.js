@@ -46,6 +46,7 @@ function createSeeding ({ engine, dhtOf = (dht) => dht, getPictures = () => null
   // blind-peering cannot forget one base, so when a seeder is taken off a
   // sheet, start over with a fresh instance and register every sheet again.
   async function rebuild () {
+    if (closed) return
     const old = peering
     makePeering()
     registered.clear()
@@ -54,6 +55,8 @@ function createSeeding ({ engine, dhtOf = (dht) => dht, getPictures = () => null
   }
 
   function start () {
+    // Started on a timer after the swarm: an engine closed by then stays closed.
+    if (closed) return
     makePeering()
     // Sheets mount during init and arrive later through joins; sweep for new
     // ones and for changed seeder lists. Cheap: one short view read per sheet.
@@ -263,12 +266,19 @@ function createSeeding ({ engine, dhtOf = (dht) => dht, getPictures = () => null
   const queues = new Map() // seederKey -> the last request's promise
   function ask (seederKey, request, timeoutMs = 20000) {
     const prev = queues.get(seederKey) || Promise.resolve()
+    // A new connection that fails without an answer is tried once more: if
+    // the direct attempt could not holepunch, the second one goes through the
+    // relay (relay.js relayingDht).
+    const fresh = () => askOver(null, seederKey, request, timeoutMs).catch((e) => {
+      if (e.answered) throw e
+      return askOver(null, seederKey, request, timeoutMs)
+    })
     const run = prev.catch(() => {}).then(() => {
       const open = openBackupSocket(seederKey)
-      if (!open) return askOver(null, seederKey, request, timeoutMs)
+      if (!open) return fresh()
       return askOver(open, seederKey, request, timeoutMs).catch((e) => {
         if (e.answered) throw e
-        return askOver(null, seederKey, request, timeoutMs)
+        return fresh()
       })
     })
     queues.set(seederKey, run)

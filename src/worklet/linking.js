@@ -230,6 +230,10 @@ function createLinking ({ engine, removeFiles = async () => {}, log = () => {}, 
     const id = identityFromRoot(root)
     await engine.localDb.put('phrase:root', { root: hex(root) })
     await engine.localDb.put('identity', { publicKey: hex(id.publicKey), secretKey: hex(id.secretKey), createdAt: Date.now() })
+    // The last keyring this device wrote belongs to the old identity: never
+    // merge its files or seeders into the new one's (keyringSync.js).
+    await engine.localDb.del('keyring:local')
+    await engine.localDb.del('restore:status')
   }
 
   // The root, if it is this identity's (an identity from before 12-word
