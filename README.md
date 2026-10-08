@@ -1,8 +1,8 @@
 # PearOffice
 
-Private, peer-to-peer shared spreadsheets. No accounts, no servers, no cloud.
-Share a sheet with family or a small team and edit it together, device to
-device. Shared documents are planned as a later phase.
+Private, peer-to-peer spreadsheets, documents and slides. No accounts, no
+servers, no cloud. Share a file with family or a small team and edit it
+together, device to device.
 
 Part of the [PeerLoom](https://peerloomllc.com) suite of account-free P2P apps.
 

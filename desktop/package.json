@@ -18,11 +18,12 @@
     "name": "PeerLoom LLC",
     "email": "support@peerloomllc.com"
   },
-  "homepage": "https://github.com/peerloomllc/pearoffice",
+  "homepage": "https://github.com/peerloomllc/pearoffice-releases",
   "build": {
     "appId": "com.peerloomllc.pearoffice",
     "productName": "PearOffice",
     "copyright": "Copyright 2026 PeerLoom LLC",
+    "afterPack": "build/afterPack.js",
     "directories": {
       "output": "dist",
       "buildResources": "build"
@@ -40,7 +41,9 @@
       "smoke-run.js",
       "smoke/**",
       "package.json",
-      "build/icon.png"
+      "build/icon.png",
+      "build/trayTemplate.png",
+      "build/trayTemplate@2x.png"
     ],
     "extraResources": [
       {
@@ -86,11 +89,12 @@
       },
       "icon": "build/icon.png",
       "artifactName": "pearoffice-${version}-linux-${arch}.${ext}",
-      "synopsis": "Peer-to-peer shared spreadsheets",
-      "description": "Shared spreadsheets that sync device to device. No accounts, no servers."
+      "synopsis": "Peer-to-peer spreadsheets, documents and slides",
+      "description": "Spreadsheets, documents and slides you share and edit together, synced device to device. No accounts, no servers."
     },
     "deb": {
-      "packageName": "pearoffice"
+      "packageName": "pearoffice",
+      "afterInstall": "build/deb-postinst.sh"
     },
     "win": {
       "target": "nsis",

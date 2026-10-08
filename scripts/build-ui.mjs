@@ -12,7 +12,7 @@ const version = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).ver
 rmSync(out, { recursive: true, force: true })
 mkdirSync(out, { recursive: true })
 
-await build({
+const ui = await build({
   entryPoints: [join(root, 'src', 'ui', 'main.jsx')],
   outfile: join(out, 'app.js'),
   bundle: true,
@@ -22,8 +22,11 @@ await build({
   minify: process.argv.includes('--minify'),
   sourcemap: process.argv.includes('--minify') ? false : 'inline',
   define: { 'process.env.NODE_ENV': JSON.stringify(process.argv.includes('--minify') ? 'production' : 'development'), __APP_VERSION__: JSON.stringify(version) },
-  logLevel: 'warning'
+  logLevel: 'warning',
+  metafile: true
 })
+// What went into app.js, for scripts/third-party-notices.js.
+writeFileSync(join(root, 'dist', 'ui-meta.json'), JSON.stringify(ui.metafile))
 
 copyFileSync(join(root, 'src', 'ui', 'index.html'), join(out, 'index.html'))
 copyFileSync(join(root, 'src', 'ui', 'app.css'), join(out, 'app.css'))

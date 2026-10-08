@@ -2,6 +2,7 @@
 //   desktop/build/resources/bare/bare(.exe)       the Bare runtime
 //   desktop/build/resources/worklet/              worklet bundle + its addons
 //   desktop/build/resources/ui/                   the built web UI
+//   desktop/build/resources/LICENSE.txt, THIRD-PARTY-NOTICES.txt
 // electron-builder copies that folder into the app's resources (see
 // desktop/package.json "build.extraResources" and desktop/paths.js).
 //
@@ -66,5 +67,14 @@ for (const b of ['worklet/worklet.bundle', 'seeder/seeder.bundle']) assertAddons
 // 4. The UI, minified.
 execFileSync(process.execPath, [path.join(root, 'scripts', 'build-ui.mjs'), '--minify'], { cwd: root, stdio: 'inherit' })
 fs.cpSync(path.join(root, 'dist', 'ui'), path.join(out, 'ui'), { recursive: true })
+
+// 5. Licences: PearOffice's own and every bundled package's.
+const { notices } = require('./third-party-notices')
+const n = notices(['worklet/worklet.bundle', 'seeder/seeder.bundle'].map((b) => path.join(out, b)).concat(path.join(root, 'dist', 'ui-meta.json')), {
+  extraDirs: [runtimeDir, path.join(root, 'node_modules', 'bare-runtime')]
+})
+fs.writeFileSync(path.join(out, 'THIRD-PARTY-NOTICES.txt'), n.text)
+fs.copyFileSync(path.join(root, 'LICENSE'), path.join(out, 'LICENSE.txt'))
+console.log('third-party notices: ' + n.count + ' packages' + (n.missing.length ? ', no licence file in ' + n.missing.join(', ') : ''))
 
 console.log('staged desktop resources for ' + host)
