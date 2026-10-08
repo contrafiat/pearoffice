@@ -1,8 +1,8 @@
 # PearOffice Seeder
 
-The seeder keeps an encrypted copy of the PearOffice sheets your devices back
-up to it, so the people you share a sheet with can catch up when every
-device is off. It cannot read your sheets.
+The seeder keeps an encrypted copy of the PearOffice files your devices back
+up to it, so the people you share a file with can catch up when every
+device is off. It cannot read your files.
 
 ## Pair a device
 
@@ -11,6 +11,6 @@ device is off. It cannot read your sheets.
 3. Choose **Pair a device**. A QR code and a link appear for 5 minutes.
 4. In PearOffice, open **Seeder** and scan the code, or paste the link.
 
-The dashboard then shows the device and how many sheets it holds. **Forget**
-next to a device stops the seeder accepting it; sheets no other paired
+The dashboard then shows the device and how many files it holds. **Forget**
+next to a device stops the seeder accepting it; files no other paired
 device backs up are deleted after 7 days.

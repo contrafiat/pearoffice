@@ -9,6 +9,8 @@
 # daily, and says so in its output. PEAROFFICE_NO_UPDATE_CHECK=1 turns that
 # off; it is always off inside a container. See
 # proposals/2026-10-05-update-checker.md in the PearOffice repo.
+# Keys and data are for this user only.
+umask 077
 here="$(cd "$(dirname "$0")" && pwd)"
 current="$(cat "$here/VERSION" 2>/dev/null || echo 0.0.0)"
 latest_url="${PEAROFFICE_UPDATE_LATEST_URL:-https://api.github.com/repos/peerloomllc/pearoffice-releases/releases/latest}"
