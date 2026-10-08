@@ -39,6 +39,23 @@ import { sampleChart } from './SlideChart.jsx'
 const SEND_MS = 300
 const CURSOR_MS = 150
 
+// phone: a touch screen smaller than 700 px either way. listBelow: a phone,
+// or a touch screen narrower than 1000 px. Follows rotation and split view.
+function useTouchLayout (touch) {
+  const measure = () => {
+    const phone = touch && Math.min(window.innerWidth, window.innerHeight) < 700
+    return { phone, listBelow: phone || (touch && window.innerWidth < 1000) }
+  }
+  const [value, setValue] = useState(measure)
+  useEffect(() => {
+    if (!touch) return
+    const onResize = () => setValue((v) => { const n = measure(); return n.phone === v.phone && n.listBelow === v.listBelow ? v : n })
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [touch])
+  return value
+}
+
 export function SlidesView ({ sheetId, onTitleChange, onError, onGone }) {
   const ydoc = useMemo(() => new Y.Doc(), [sheetId])
   const undo = useMemo(() => deckUndo(ydoc), [ydoc])
@@ -48,7 +65,12 @@ export function SlidesView ({ sheetId, onTitleChange, onError, onGone }) {
   const [arrived, setArrived] = useState(false)
   const members = useMembers(sheetId)
   const pictures = usePictureCache(sheetId)
-  const phone = isMobile()
+  // A touch screen. On a phone the editor is the phone's (text, notes and
+  // order); a tablet, at least 700 px both ways, gets the full editor.
+  // listBelow: the slide list goes under the slide, as on a phone, which a
+  // tablet narrower than 1000 px (an iPad upright) does too.
+  const touch = isMobile()
+  const { phone, listBelow } = useTouchLayout(touch)
   const errorRef = useRef(onError)
   errorRef.current = onError
   const goneRef = useRef(onGone)
@@ -452,7 +474,7 @@ export function SlidesView ({ sheetId, onTitleChange, onError, onGone }) {
               <>
                 <li role='menuitem' onClick={() => save('pptx')}>Save as a PowerPoint file</li>
                 <li role='menuitem' onClick={() => save('pdf')}>Save as PDF</li>
-                {!phone && <li role='menuitem' onClick={() => save('print')}>Print...</li>}
+                {!touch && <li role='menuitem' onClick={() => save('print')}>Print...</li>}
               </>
             )
           }}
@@ -491,7 +513,7 @@ export function SlidesView ({ sheetId, onTitleChange, onError, onGone }) {
           {!phone && <button className='present-button' title='Present (F5, or Shift+F5 from this slide)' onMouseDown={(e) => e.preventDefault()} onClick={() => startShow(true)} disabled={!deck.slides.length}><Play size={ICON} weight='fill' /> Present</button>}
         </div>
         <div className='slides-row'>
-          {!phone && <SlideList slides={deck.slides} current={current} onPick={setCurrent} size={deck.size} theme={deck.theme} canEdit={canEdit} phone={phone} people={bySlide} sheetId={sheetId} onAdd={addSlide} onDuplicate={duplicate} onDelete={remove} onMove={move} />}
+          {!listBelow && <SlideList slides={deck.slides} current={current} onPick={setCurrent} size={deck.size} theme={deck.theme} canEdit={canEdit} phone={false} people={bySlide} sheetId={sheetId} onAdd={addSlide} onDuplicate={duplicate} onDelete={remove} onMove={move} />}
           <div className='slides-main' onPointerDownCapture={(e) => { if (!e.target.closest('.slide-notes')) setNotesEditor(null) }}>
             {deleted
               ? (
@@ -501,15 +523,15 @@ export function SlidesView ({ sheetId, onTitleChange, onError, onGone }) {
                 </div>
                 )
               : slide
-                ? <Stage size={deck.size} theme={deck.theme} slideId={current} layout={slide.layout} els={els} sel={shownSel} setSel={setSel} editing={editing} startEditing={startEditing} stopEditing={stopEditing} editStart={editStart} canEdit={canEdit} layoutEdit={layoutEdit} phone={phone} undo={undo} change={change} others={others} onCursor={onCursor} onEditor={setBoxEditor} onPastePictures={addPictures} cropping={cropping} setCropping={setCropping} onEditChart={(id) => { setSel([id]); setDataPanel(id) }} />
+                ? <Stage size={deck.size} theme={deck.theme} slideId={current} layout={slide.layout} els={els} sel={shownSel} setSel={setSel} editing={editing} startEditing={startEditing} stopEditing={stopEditing} editStart={editStart} canEdit={canEdit} layoutEdit={layoutEdit} phone={phone} touch={touch} undo={undo} change={change} others={others} onCursor={onCursor} onEditor={setBoxEditor} onPastePictures={addPictures} cropping={cropping} setCropping={setCropping} onEditChart={(id) => { setSel([id]); setDataPanel(id) }} />
                 : <div className='slide-stage' />}
-            {phone && <SlideList slides={deck.slides} current={current} onPick={setCurrent} size={deck.size} theme={deck.theme} canEdit={canEdit} phone={phone} people={bySlide} sheetId={sheetId} onAdd={addSlide} onDuplicate={duplicate} onDelete={remove} onMove={move} />}
-            {notes instanceof Y.XmlFragment && <Notes key={current} fragment={notes} undo={undo} canEdit={canEdit} phone={phone} onFocus={setNotesEditor} />}
+            {listBelow && <SlideList slides={deck.slides} current={current} onPick={setCurrent} size={deck.size} theme={deck.theme} canEdit={canEdit} phone people={bySlide} sheetId={sheetId} onAdd={addSlide} onDuplicate={duplicate} onDelete={remove} onMove={move} />}
+            {notes instanceof Y.XmlFragment && <Notes key={current} fragment={notes} undo={undo} canEdit={canEdit} phone={touch} onFocus={setNotesEditor} />}
           </div>
         </div>
         {presenting && (presenting.mode === 'presenter'
           ? <Presenter deck={deck} ydoc={ydoc} startId={presenting.start} onEnd={endShow} />
-          : <Show deck={deck} ydoc={ydoc} startId={presenting.start} phone={phone} onEnd={endShow} />)}
+          : <Show deck={deck} ydoc={ydoc} startId={presenting.start} phone={touch} onEnd={endShow} />)}
         {selChart && dataPanel === selChart.id && (
           <ChartDataPanel key={selChart.id} value={selChart.chart} onData={(data) => change((doc) => slidesModel.setChart(doc, chartSlide, selChart.id, { data }))} onClose={() => { setDataPanel(null); setTimeout(focusStage, 0) }} />
         )}

@@ -976,7 +976,12 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 .slide-holder { position: relative; flex: none; box-shadow: 0 2px 14px rgb(0 0 0 / 0.14); }
 .slide { position: absolute; left: 0; top: 0; transform-origin: 0 0; overflow: hidden; background: var(--slide-bg); color: var(--slide-ink); font-family: var(--slide-body); }
 .slide-el { position: absolute; transform-origin: 50% 50%; }
-.slide-stage.layout .slide-el { cursor: move; }
+.slide-stage.layout .slide-el { cursor: move; touch-action: none; }
+/* Fingers need bigger handles than a mouse. */
+@media (pointer: coarse) {
+  .handle { width: 20px; height: 20px; margin: -10px 0 0 -10px; }
+  .rotate-handle { width: 22px; height: 22px; margin-left: -11px; top: -38px; }
+}
 .slide-stage.phone .slide-el, .slide-stage .slide-el.editing { cursor: text; }
 .slide-stage:not(.layout):not(.phone) .slide-el { cursor: default; }
 .slide-stage .slide-el:has(.slide-empty-mark) { outline: 2px dashed color-mix(in srgb, var(--slide-ink) 22%, transparent); outline-offset: -2px; }
