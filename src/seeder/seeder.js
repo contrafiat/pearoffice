@@ -382,6 +382,7 @@ async function createSeeder ({ dataDir, bootstrap = null, log = () => {} }) {
       sheets: allowed.size,
       keyrings: keyrings.size,
       coresAdded: peer.stats.coresAdded,
+      peers: peer.swarm.connections.size,
       pairing: windowState ? { link: windowState.link, expiresAt: windowState.expiresAt } : null
     }
   }
