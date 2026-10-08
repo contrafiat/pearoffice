@@ -11,10 +11,10 @@ import { Avatar, MemberAvatar } from './Avatar.jsx'
 import { SettingsPanel } from './SettingsPanel.jsx'
 import { UpdateBar } from './UpdateBar.jsx'
 import { applyTheme } from './theme.js'
-import { FileHome, NewPanel, RecoverPanel, untitled } from './Files.jsx'
+import { FileHome, KindIcon, NewPanel, RecoverPanel, untitled } from './Files.jsx'
 import { DonationReminder, donationsShown } from './About.jsx'
 import { Onboarding } from './Onboarding.jsx'
-import { FileArrowUp, GearSix, House, Info, LinkSimple, List, Plus } from '@phosphor-icons/react'
+import { CircleNotch, FileArrowUp, GearSix, House, Info, LinkSimple, List, Plus } from '@phosphor-icons/react'
 import { PearMark } from './PearMark.jsx'
 
 applyTheme()
@@ -83,6 +83,29 @@ function StartActions ({ onNew, onJoin, onImported, onError }) {
   )
 }
 
+// After a restore from the recovery phrase: progress while the files come
+// back from the seeders (worklet restoring.js), or how to get them back
+// when there was no file list.
+function RestoreCard ({ restore, hidden, onHide, onDone }) {
+  const state = restore ? restore.state : 'looking'
+  const working = state === 'looking' || state === 'opening'
+  if (working && hidden) return null
+  return (
+    <div className='restore-card' role='status'>
+      {working && <CircleNotch className='join-spinner' size={36} aria-hidden='true' />}
+      <h2>{working ? 'Restoring your files' : 'Welcome back'}</h2>
+      <p>
+        {state === 'looking'
+          ? 'Looking for your files. This can take a minute.'
+          : state === 'opening'
+            ? 'Bringing back ' + (restore.files === 1 ? '1 file' : restore.files + ' files') + '...'
+            : 'No backed-up files were found. Ask the owners of your files to invite you again; you will be back as yourself.'}
+      </p>
+      <button className={working ? 'link-button' : 'primary'} onClick={working ? onHide : onDone}>{working ? 'Hide' : 'OK'}</button>
+    </div>
+  )
+}
+
 export function App () {
   const [sheets, setSheets] = useState(null)
   const [current, setCurrent] = useState(null)
@@ -123,7 +146,17 @@ export function App () {
   welcomeBackRef.current = welcomeBack
   // Files coming back from the seeders after that restore (worklet restoring.js).
   const [restore, setRestore] = useState(null)
+  // The restore card is up: the empty start screen waits under it.
+  const restoreWorking = welcomeBack && (!restore || restore.state === 'looking' || restore.state === 'opening')
+  // The restore finished with files: say so briefly, then the card goes.
+  useEffect(() => {
+    if (!welcomeBack || !restore || restore.state !== 'done' || !(restore.files > 0)) return
+    setToast(restore.files === 1 ? '1 file came back' : restore.files + ' files came back')
+    setWelcomeBack(false)
+    call('app:setWelcomeBack', { show: false }).catch(() => {})
+  }, [welcomeBack, restore])
   const [recovering, setRecovering] = useState(null) // a file to offer a copy of
+  const [restoreHidden, setRestoreHidden] = useState(false)
 
   const refresh = useCallback(async () => {
     try {
@@ -283,6 +316,7 @@ export function App () {
               title={s.waiting ? 'Waiting for someone in this file to come online' : s.removed ? 'You were removed from this file' : undefined}
               onClick={() => (s.waiting ? setWaitingJoin(s.sheetId) : setCurrent(s.sheetId))}
             >
+              <KindIcon kind={s.kind} size={18} />
               {s.owner
                 ? (
                   <span className='sheet-owner' title={s.owner.isMe ? 'Yours' : 'Owned by ' + (s.owner.name || 'someone')}>
@@ -385,15 +419,13 @@ export function App () {
       <main className='main'>
         {desktop && <UpdateBar />}
         {notice && <div className='banner info'>{notice} <button className='link-button' onClick={() => setNotice(null)}>OK</button></div>}
-        {welcomeBack && !onboarding && (
-          <div className='banner info welcome-back'>
-            {restore && restore.state === 'looking'
-              ? 'Welcome back. Looking for your files on your seeders...'
-              : restore && restore.state === 'done' && restore.files > 0
-                ? 'Welcome back. ' + (restore.files === 1 ? '1 file' : restore.files + ' files') + ' came back from your seeders. Each opens once someone in it lets this device in; files only you could change come back as your own copy.'
-                : 'Welcome back. Ask the owners of your files to invite you again; you will be back as yourself.'}{' '}
-            <button className='link-button' onClick={() => { setWelcomeBack(false); call('app:setWelcomeBack', { show: false }).catch(() => {}) }}>OK</button>
-          </div>
+        {welcomeBack && !onboarding && !(restore && restore.state === 'done' && restore.files > 0) && (
+          <RestoreCard
+            restore={restore}
+            hidden={restoreHidden}
+            onHide={() => setRestoreHidden(true)}
+            onDone={() => { setWelcomeBack(false); call('app:setWelcomeBack', { show: false }).catch(() => {}) }}
+          />
         )}
         {nudge && !onboarding && (
           <div className='banner info'>
@@ -427,7 +459,9 @@ export function App () {
                     actions={<StartActions onNew={() => setNewFile(true)} onJoin={() => setJoining('')} onImported={opened} onError={setError} />}
                   />
                   )
-                : (
+                : restoreWorking && !restoreHidden
+                  ? null
+                  : (
                   <div className='empty'>
                     <h1>Shared files, device to device.</h1>
                     <p>No accounts and no servers. Create a file, join one with a link or import one.</p>

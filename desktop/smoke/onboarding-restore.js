@@ -32,8 +32,8 @@ module.exports = async function onboardingRestore (t) {
   result.wordCount = await js("document.querySelector('.ob-count').textContent")
   // The restart reloads the page; the note shows once it is back.
   await js("document.querySelector('.ob-restore-form button[type=submit]').click(); window.__beforeRestart = true; true")
-  await waitFor('restarted with the note', "!window.__beforeRestart && !!document.querySelector('.banner.welcome-back') && !document.querySelector('.ob-backdrop')", 30000)
-  result.note = await js("document.querySelector('.banner.welcome-back').textContent.replace(/\\s*OK$/, '')")
+  await waitFor('restarted with the note', "!window.__beforeRestart && !!document.querySelector('.restore-card') && !document.querySelector('.ob-backdrop')", 30000)
+  result.note = await js("document.querySelector('.restore-card h2').textContent + ' | ' + document.querySelector('.restore-card p').textContent")
   result.onboarded = (await ask('app:onboarding')).done === true
   result.sameIdentity = (await ask('app:me')).identity === before.identity
   result.noteFlag = (await ask('app:welcomeBack')).show === true
@@ -46,16 +46,13 @@ module.exports = async function onboardingRestore (t) {
     fs.writeFileSync(path.join(shots, 'desktop-8-welcome-back-light.png'), (await wc.capturePage()).toPNG())
   }
 
-  await js("[...document.querySelectorAll('.banner.welcome-back button')].find((b) => b.textContent === 'OK').click(); true")
-  await waitFor('note gone', "!document.querySelector('.banner.welcome-back')", 3000)
-  // The flag is cleared in the background; give it a moment.
-  for (let i = 0; i < 30 && !result.noteCleared; i++) {
-    result.noteCleared = (await ask('app:welcomeBack')).show === false
-    if (!result.noteCleared) await sleep(100)
-  }
-  step('note dismissed')
+  // No seeder here, so it is still looking: Hide puts the card away while
+  // the restore carries on.
+  await js("document.querySelector('.restore-card button').click(); true")
+  await waitFor('card hidden', "!document.querySelector('.restore-card')", 3000)
+  result.cardHidden = true
+  step('progress shown and hidden')
 
-  return result.noNoteYet && result.wordCount === '12 words of 12' && result.onboarded && result.sameIdentity && result.noteFlag && result.noteCleared &&
-    // Before the device starts looking for a file list (restoring.js), or once it has.
-    ['Welcome back. Ask the owners of your files to invite you again; you will be back as yourself.', 'Welcome back. Looking for your files on your seeders...'].includes(result.note)
+  return result.noNoteYet && result.wordCount === '12 words of 12' && result.onboarded && result.sameIdentity && result.noteFlag && result.cardHidden &&
+    result.note === 'Restoring your files | Looking for your files. This can take a minute.'
 }

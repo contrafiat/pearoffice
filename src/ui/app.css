@@ -459,6 +459,8 @@ button, input, select { font: inherit; color: inherit; }
 .panel .small { font-size: 12px; }
 
 .keep-online.inline { margin-top: 0; padding: 0; }
+.setting-switch { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 12px 0 4px; font-weight: 500; cursor: pointer; }
+.setting-switch input { flex: none; width: 18px; height: 18px; margin: 0; accent-color: var(--pear); }
 .pairing { display: flex; flex-direction: column; align-items: center; gap: 8px; }
 .pairing .qr { background: #fff; padding: 8px; border-radius: 8px; line-height: 0; }
 
@@ -1231,3 +1233,10 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 .phrase-one-sofar li.here button { border-color: var(--pear); }
 .phrase-one-sofar li.bad button { border-color: var(--error); color: var(--error); }
 @media (max-width: 420px) { .phrase-grid { grid-template-columns: repeat(2, 1fr); } }
+
+/* After a restore from the phrase (App.jsx RestoreCard): a card above the
+   files while they come back, not a banner. */
+.restore-card { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; width: min(420px, calc(100% - 32px)); box-sizing: border-box; margin: 24px auto 0; padding: 20px 20px 16px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); box-shadow: 0 4px 18px rgb(0 0 0 / 0.06); }
+.restore-card h2 { margin: 0; font-size: 18px; font-weight: 650; color: var(--ink); }
+.restore-card p { margin: 0 0 6px; color: var(--muted); line-height: 1.45; }
+.restore-card button.primary { min-width: 120px; justify-content: center; }

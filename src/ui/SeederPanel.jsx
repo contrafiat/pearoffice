@@ -23,14 +23,13 @@ function LocalSeeder ({ onPaired, onError }) {
   if (!settings) return null
   return (
     <>
-      <h3>This computer as a seeder</h3>
-      <label className='keep-online inline'>
+      <label className='setting-switch'>
+        <span>Run this computer as a seeder?</span>
         <input
           type='checkbox'
           checked={settings.runSeeder}
           onChange={async (e) => { setPairing(null); await call('app:setSetting', { runSeeder: e.target.checked }); refresh() }}
         />
-        Run a seeder on this computer
       </label>
       {settings.runSeeder && host && !host.running && <p className='muted'>Starting the seeder...</p>}
       {host && host.running && (
@@ -189,8 +188,8 @@ export function SeederPanel ({ initialLink = '', onBack = null, onClose, onError
           onChange={(e) => setLink(e.target.value)}
         />
         <ScanButton prefix='pearoffice://seeder?' what='a PearOffice seeder code' onError={onError} onLink={(l) => { setLink(l); pair(null, l) }} />
+        {done && <p className='muted'>Paired. Your files are backing up.</p>}
         <div className='row end'>
-          {done && <span className='muted'>Paired. Your files are backing up.</span>}
           <button className='primary' type='submit' disabled={busy || !link.trim()}>{busy ? 'Pairing...' : 'Pair'}</button>
         </div>
         {window.pearoffice && window.pearoffice.platform === 'desktop' && <LocalSeeder onPaired={() => { setDone(true); load() }} onError={onError} />}

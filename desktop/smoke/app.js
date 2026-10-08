@@ -113,17 +113,18 @@ module.exports = async function app (t) {
   // Run a seeder on this computer, pair this device with it, show its QR.
   await openSettings()
   await js("document.querySelector('.panel .settings-seeder').click()")
-  await waitFor('local seeder switch', "[...document.querySelectorAll('.panel label')].some((l) => l.textContent.includes('Run a seeder'))")
+  await waitFor('local seeder switch', "[...document.querySelectorAll('.panel label')].some((l) => l.textContent.includes('Run this computer as a seeder'))")
   // How long each stage takes, in ms (first connections were slow on Windows).
   const seederMs = {}
   let t0 = Date.now()
-  await js("[...document.querySelectorAll('.panel label')].find((l) => l.textContent.includes('Run a seeder')).querySelector('input').click()")
+  await js("[...document.querySelectorAll('.panel label')].find((l) => l.textContent.includes('Run this computer as a seeder')).querySelector('input').click()")
   await waitFor('local seeder running', "document.querySelector('.panel').textContent.includes('Holding')", 60000)
   seederMs.start = Date.now() - t0
   t0 = Date.now()
   await js("[...document.querySelectorAll('.panel button')].find((b) => b.textContent.trim() === 'Pair this device with it').click()")
   await waitFor('paired with the local seeder', "document.querySelector('.panel').textContent.includes('Paired. Your files are backing up.')", 60000)
   seederMs.pair = Date.now() - t0
+  await t.shot('PEAROFFICE_SMOKE_SEEDER_SHOT', 300)
   t0 = Date.now()
   await js("[...document.querySelectorAll('.panel button')].find((b) => b.textContent.trim() === 'Show pairing code').click()")
   await waitFor('pairing QR', "!!document.querySelector('.pairing .qr svg')")
