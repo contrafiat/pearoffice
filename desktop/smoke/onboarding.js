@@ -80,13 +80,21 @@ module.exports = async function onboarding (t) {
   await waitFor('word count error', "!!document.querySelector('.ob-error')", 3000)
   result.countError = await js("document.querySelector('.ob-error').textContent")
   // 12 words that are not recovery words: the worklet's error, inline.
-  await js("document.querySelector('.ob-phrase').select(); true")
+  await js("{ const b = document.querySelector('.ob-phrase'); b.focus(); b.select() } true")
   await wc.insertText(Array(12).fill('zzz').join(' '))
   await click('.ob-restore-form button[type=submit]')
   await waitFor('bad phrase error', "(document.querySelector('.ob-error') || {}).textContent?.includes('not a recovery phrase word')", 5000)
   result.badPhrase = await js("document.querySelector('.ob-error').textContent")
   result.stillHere = (await ask('app:onboarding')).done === false
   await snap('5-restore-error')
+  // Suggestions: a started word offers the words it begins, and a click
+  // fills it and moves on (src/ui/PhraseInput.jsx).
+  await js("{ const b = document.querySelector('.ob-phrase'); b.focus(); b.select() } true")
+  await wc.insertText('legal winner th')
+  await waitFor('suggestions', "(document.querySelector('.phrase-suggest button') || {}).textContent === 'thank'", 3000)
+  await js("document.querySelector('.phrase-suggest button').click(); true")
+  await waitFor('word filled', "document.querySelectorAll('.phrase-grid input')[2].value === 'thank' && document.activeElement === document.querySelectorAll('.phrase-grid input')[3]", 3000)
+  result.suggested = true
   await click('.ob-back')
   await waitTitle('Welcome back')
   await click('.ob-choice-link')
@@ -118,8 +126,8 @@ module.exports = async function onboarding (t) {
   await waitTitle('Welcome to PearOffice')
   result.haveDone = result.choices === 'Link to my other device | Restore from my recovery phrase' && result.wordCount === '3 words of 12' &&
     result.countError === 'A recovery phrase has 12 words. This has 3.' && result.stillHere && result.linkOff === true &&
-    result.waitingTitle === 'Looking for your other device...' && result.cancelMs < 5000 && result.cancelQuiet && result.linkKept
-  step('i already use it: choice, restore errors, link wait and cancel')
+    result.waitingTitle === 'Looking for your other device...' && result.cancelMs < 5000 && result.cancelQuiet && result.linkKept && result.suggested
+  step('i already use it: choice, restore errors, suggestions, link wait and cancel')
 
   // Your name.
   await click('.ob-start')
@@ -231,6 +239,13 @@ async function phoneShots (t, shots) {
     await title('Restore from my recovery phrase')
     await pshot('5-restore')
     await pshot('5-restore', 'dark')
+    // Two words in, a third started: the suggestions.
+    await pjs("document.querySelector('.ob-phrase').focus(); true")
+    await phone.webContents.insertText('legal winner ')
+    await phone.webContents.insertText('th')
+    await new Promise((resolve) => setTimeout(resolve, 200))
+    await pshot('5-restore-typing')
+    await pshot('5-restore-typing', 'dark')
     await pjs("document.querySelector('.ob-back').click(); true")
     await title('Welcome back')
     await pjs("document.querySelector('.ob-back').click(); true")

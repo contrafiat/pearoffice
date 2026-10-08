@@ -303,7 +303,7 @@ function createOwnDevices ({ engine, getJoin = () => null, getMoves = () => null
     if (topic) engine.swarm.leave(topic).catch(() => {})
   }
 
-  return { start, onConnection, notify, close, entries, stats, get topic () { return topic } }
+  return { start, onConnection, notify, close, entries, take, stats, get topic () { return topic } }
 }
 
 module.exports = { createOwnDevices, ownTopic, channelId, makeHello, checkHello, cleanEntry, PROTOCOL, PURPOSE }

@@ -96,8 +96,25 @@ function createMoves ({ engine, sheets, getJoin, getDeleting = () => null, getPi
   }
 
   async function moveSheet (oldId, remaining, reason) {
-    const me = hex(engine.identity.publicKey)
     const old = await sheets.load(oldId)
+    const title = model.title(old.guarded.doc)
+    const { newId, created } = await foundCopy(oldId, old, remaining)
+
+    // 4. Freeze the old sheet and hand each remaining person the new keys.
+    const target = { sheetId: newId, groupKey: created.groupKey, encryptionKey: created.encryptionKey, bootstrap: created.bootstrap, name: title }
+    await engine.append(oldId, m.moveOp({ sheetId: oldId, owner: engine.identity, target, recipients: remaining.map((x) => x.identity), reason }))
+    // Everything this device had is in the new sheet already.
+    await engine.localDb.put('moves:' + oldId, { to: newId, removed: false, reason, carried: true, at: Date.now() })
+    emit('sheet:moved', { from: oldId, to: newId, reason })
+    log((reason === 'compact' ? 'tidied up ' : 'moved ') + oldId.slice(0, 8) + ' to ' + newId.slice(0, 8))
+    if (getDeleting()) getDeleting().afterMove(oldId).catch(() => {})
+    return { sheetId: newId }
+  }
+
+  // Steps 1 to 3 of a move: a new file founded by this device with the old
+  // one's content, pictures and seeders, and `remaining` as its members.
+  async function foundCopy (oldId, old, remaining) {
+    const me = hex(engine.identity.publicKey)
     const title = model.title(old.guarded.doc)
     const pictures = hasPictures(old.guarded.doc) ? getPictures() : null
     if (pictures) {
@@ -142,14 +159,27 @@ function createMoves ({ engine, sheets, getJoin, getDeleting = () => null, getPi
     }
     if (getJoin()) getJoin().addSheet(newId)
     await sheets.attach(newId)
+    return { newId, created }
+  }
 
-    // 4. Freeze the old sheet and hand each remaining person the new keys.
-    const target = { sheetId: newId, groupKey: created.groupKey, encryptionKey: created.encryptionKey, bootstrap: created.bootstrap, name: title }
-    await engine.append(oldId, m.moveOp({ sheetId: oldId, owner: engine.identity, target, recipients: remaining.map((x) => x.identity), reason }))
-    // Everything this device had is in the new sheet already.
-    await engine.localDb.put('moves:' + oldId, { to: newId, removed: false, reason, carried: true, at: Date.now() })
-    emit('sheet:moved', { from: oldId, to: newId, reason })
-    log((reason === 'compact' ? 'tidied up ' : 'moved ') + oldId.slice(0, 8) + ' to ' + newId.slice(0, 8))
+  // After a restore from the phrase (restoring.js): a file nobody else can
+  // let this device into comes back as a copy this person owns, with the
+  // same title. The old one cannot be written to, so it is not told; this
+  // device just treats it as moved. Others in it are invited again by hand.
+  async function recoverCopy (oldId) {
+    const me = hex(engine.identity.publicKey)
+    if (!(await engine.localDb.get('recovered:' + oldId))) throw new Error('Only a file brought back by your recovery phrase can be copied this way')
+    if ((await engine.localDb.get('moves:' + oldId))?.value) throw new Error('This file has already moved')
+    const members = await membersOf(oldId)
+    const mine = members.find((x) => x.identity === me)
+    if (!mine) throw new Error('You are not in this file')
+    if (members.some((x) => x.identity !== me && (x.role === 'owner' || x.role === 'editor'))) throw new Error('Someone else in this file can let this device in')
+    const old = await sheets.load(oldId)
+    const { newId } = await foundCopy(oldId, old, [{ ...mine, role: 'owner' }])
+    await engine.localDb.put('moves:' + oldId, { to: newId, removed: false, reason: 'recovered', carried: true, at: Date.now() })
+    await engine.localDb.del('recovered:' + oldId)
+    emit('sheet:moved', { from: oldId, to: newId, reason: 'recovered' })
+    log('copied ' + oldId.slice(0, 8) + ' to ' + newId.slice(0, 8) + ' after a restore')
     if (getDeleting()) getDeleting().afterMove(oldId).catch(() => {})
     return { sheetId: newId }
   }
@@ -288,7 +318,7 @@ function createMoves ({ engine, sheets, getJoin, getDeleting = () => null, getPi
     for (const f of following.values()) clearInterval(f.timer)
   }
 
-  return { removeMember, compact, openInvites, onMoved, resume, followDevice, status, close }
+  return { removeMember, compact, recoverCopy, membersOf, openInvites, onMoved, resume, followDevice, status, close }
 }
 
 module.exports = { createMoves }

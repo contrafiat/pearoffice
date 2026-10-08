@@ -4,6 +4,7 @@ import { ArrowCounterClockwise, ArrowLeft, ArrowRight, ArrowsClockwise, Camera, 
 import { call } from './bridge.js'
 import { Avatar, shrinkPicture } from './Avatar.jsx'
 import { KINDS } from './Files.jsx'
+import { PhraseInput } from './PhraseInput.jsx'
 import { ScanButton } from './Qr.jsx'
 import { CANCELLED, cancelLink, linkDevice, phraseWordCount, plainError, restorePhrase } from './takeIdentity.js'
 
@@ -62,7 +63,7 @@ export const CARDS = [
     id: 'phrase',
     Icon: Key,
     title: 'Keep your recovery phrase',
-    text: 'Your recovery phrase is 12 words that bring back your identity if you lose every device. It does not hold your files: the owners of your files invite you back. Files only you own survive if you link a second device.'
+    text: 'Your recovery phrase is 12 words that bring back your identity if you lose every device. With a seeder, it brings back your files too. Without one, the owners of your files invite you back, and files only you own survive if you link a second device.'
   }
 ]
 
@@ -261,17 +262,14 @@ export function Onboarding ({ tourOnly = false, hidden = false, me, onMe, onPhra
             <div className='ob-body'>
               <span className='ob-icon' aria-hidden='true'><Key size={40} weight='duotone' /></span>
               <h2 className='ob-title'>Restore from my recovery phrase</h2>
-              <p>Type your 12 words in order. This brings back your identity. Your files come back when their owners invite you again.</p>
-              <textarea
-                ref={focusRef}
+              <p>Type your 12 words in order. This brings back your identity, and your files if you had a seeder.</p>
+              <PhraseInput
+                inputRef={focusRef}
                 className='ob-phrase'
-                aria-label='Recovery phrase'
-                rows='4'
-                autoComplete='off'
-                autoCapitalize='none'
-                spellCheck={false}
+                oneAtATime={!!(window.pearoffice && window.pearoffice.platform === 'mobile')}
+                disabled={waiting}
                 value={phraseText}
-                onChange={(e) => setPhraseText(e.target.value)}
+                onChange={setPhraseText}
               />
               <p className='ob-count'>{words === 1 ? '1 word' : words + ' words'} of 12</p>
               {problem && <p className='ob-error' role='alert'>{problem}</p>}

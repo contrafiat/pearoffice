@@ -37,7 +37,8 @@ pair by link, every member backs up to it, a member can catch up from it
 alone. Removing someone moves the sheet to fresh keys. Desktop installers build for
 Linux, macOS and Windows. The Android app runs on the emulator and the TCL.
 A person can link their devices (one-time link) and keep a 12-word recovery
-phrase (proposals/2026-10-03-device-linking.md). The seeder ships inside the
+phrase (proposals/2026-10-03-device-linking.md). With a seeder, the phrase
+brings files back too (proposals/2026-10-07-phrase-recovers-files.md). The seeder ships inside the
 desktop app and as a Linux server download. iOS runs on the Simulator and
 the iPhone SE. Mac builds are signed and notarized. Anyone can remove a sheet
 from their device and the owner can delete it for everyone, seeder included
@@ -76,7 +77,8 @@ Code that works for any kind of file sits apart from each editor's own
 `src/ui/slides/`.
 
 - `src/shared/` - runs anywhere, for any file: `ids.js`, `phrase.js`
-  (recovery phrase), `qr.js`, Bare shims.
+  (12-word recovery phrase: a 16-byte root, `phrase:root` in localDb, the
+  identity seed a keyed hash of it), `qr.js`, Bare shims.
 - `src/doc/` and `src/ui/doc/` - documents (proposals/2026-10-06-documents.md): `docModel.js` (the Yjs doc: `meta`, `body`), `docMethods.js` (`doc:create`, `doc:state`, `doc:update`), `DocView.jsx` (TipTap 3 editor), `docFiles.js` (import .docx/.md/.txt/.html, export .docx/.md/.txt/PDF, pictures included; `node scripts/check-doc-export.js [dir]` has LibreOffice read an exported .docx), `pictures.js` (shrinking before upload, the per-document picture cache, the picture node view). Pictures are `image` nodes (`extensions.js`, `Picture`) and move a document to schema version 2 (`docModel.js`); `doc:addPicture` and `doc:picture` are in `docMethods.js`. The editor keeps a Yjs replica and sends batched updates; `doc:updated` brings others' edits.
 - `src/slides/` and `src/ui/slides/` - slide decks (proposals/2026-10-06-slides.md): `slidesModel.js` (the Yjs doc: `meta`, `deck`, `slides`; order by fractional index keys; every change goes through its functions), `layouts.js`, `slidesMethods.js` (`slides:create`, `slides:state`, `slides:update`). `SlidesView.jsx` (the replica, toolbar, notes, presence and one Y.UndoManager over `slides` and `deck`, shared with TipTap's undo plugin through `text.js`, so text and moves undo in one history), `SlideList.jsx` (thumbnails as static DOM, reorder by drag, Ctrl+Up/Down or the slide menu), `Stage.jsx` (the slide scaled with a CSS transform; selection, our own move, resize and rotate handles, snapping with guides in `geometry.js`; a drag writes the frame once, on release), `TextBox.jsx` (a live TipTap editor only in the box being edited, static DOM for the rest; text is drawn 1.5 times larger so sizes are PowerPoint points), `TextTools.jsx`, `Notes.jsx`, `themes.js` (four themes: `plain`, `midnight`, `paper`, `vivid`; colours and fonts as CSS variables on the slide), `objects.jsx` (shapes as inline SVG filling the frame, a line across the middle of its frame with SVG arrowheads, a custom shape's path from its 1000 x 1000 box (`svgPath.js`), fill and outline opacity; pictures cropped by drawing the whole picture larger inside a clipping box; pictures as `<img>` from a per-deck cache fetched with `slides:picture`, grey with the alt text until they arrive; `PicturesContext`, which the editor and the audience window each provide; a theme colour slot is drawn as the slide's CSS variable, so a new theme recolours shapes), `ShapeTools.jsx` (Insert shape menu; fill, outline colour, width, their opacity, a rounded rectangle's corners and arrowheads for the selected shapes; top, middle and bottom for text; desktop only; Crop and Wrap text are in `Stage.jsx`), `SlideChart.jsx` (chart elements drawn with the sheet's `chartOption.js` as ECharts SVG text, in the theme's accents, the chart's text colour (else the theme's) and font; horizontal bars run from the bottom up as in PowerPoint and small pies keep labels inside; kept per data, theme and size so thumbnails reuse it), `ChartTools.jsx` (the tools of a selected chart: type, title, legend, values, stacked, smooth lines and text colour; the Edit data panel writes `slidesModel.setChart` once typing pauses; desktop only), `deck.js` (the deck as drawn from a replica), `StaticSlide.jsx` (a slide as static DOM, for thumbnails and the show), `Present.jsx` (presenting: Present or F5 from the first slide, Shift+F5 from this one, for viewers too; PowerPoint's keys; one display goes full screen; with two, `desktop/main.js` opens an audience window on the other display, which loads the UI with `?audience=<id>` and keeps its own replica, and the main window becomes the presenter view with notes, next slide and a timer; `app:presentStart`, `app:presentGo`, `app:presentInput` and `app:presentEnd` are handled in main; on phones, tap halves or swipe in landscape, notes under the slide in portrait; `mobile/App.js` hides the status bar and ends the show on Back). Pictures are added with `slides:addPicture` after the same shrinking as documents (`src/ui/doc/pictures.js`), then `slidesModel.addPicture`; a corner handle keeps a picture's shape (Shift frees it). The schema is `slideExtensions()` in `src/ui/doc/extensions.js`. Phones edit text (in boxes and shapes), notes and slide order only; they and viewers draw shapes and pictures. Export: `pptxExport.js` (pptxgenjs, fixed up after writing; charts as PowerPoint charts) and `pdfExport.jsx` (one page per slide through `app:savePdf`/`app:print`, which take a `pageSize` in inches); `node scripts/check-slides-export.js [dir]` has LibreOffice read an exported .pptx (needs `soffice` and `pdftotext`). Import: `pptxImport.js` (our own reader: layout and master inheritance, theme colours and fonts, groups, notes, opacity, text anchor and wrap, crops, line ends, SmartArt from its saved drawing, charts from their cached values in `importChart.js`; a notice lists what was lost), `customGeom.js` (custGeom paths into the 1000 box), `importOoxml.js` (the zip with size limits, theme, colours) and `importText.js`; the deck goes in with `slides:import` and its pictures after.
 - `src/sheet/` - the spreadsheet, runs anywhere (Bare, Node, browser):
@@ -95,6 +97,12 @@ Code that works for any kind of file sits apart from each editor's own
   a topic from the identity seed, signed hellos on `pearoffice/own-devices/1`,
   then the file list and each new file; a file removed on a device is not
   added back to it),
+  `keyring.js` (your encrypted file list: keys from the identity seed,
+  sealing, merging), `keyringSync.js` (each device keeps it on your seeders,
+  once a minute at most; `app:keyring`), `restoring.js` (after a restore
+  from the phrase: find the keyring on its topic, claim the seeders, open
+  the files; `app:restoreStatus`; `moves.recoverCopy` and `file:recoverCopy`
+  for a file nobody else can let you into),
   `profiles.js` (your name and picture in every sheet),
   `devices.js` (your linked devices and their names: localDb
   `devices:<deviceKey>`, the signed `deviceName` op on each file's
@@ -119,7 +127,9 @@ Code that works for any kind of file sits apart from each editor's own
 - `src/sheet/jsonImport.js` turns a .json file into the same import payload
   as an .xlsx (a tab per list of records, the rest on a Summary tab).
 - `src/ui/` - the React UI: the app shell, file list, sharing, seeder,
-  devices and settings panels, About and donations (`About.jsx`), the first-run welcome and tour (`Onboarding.jsx`). `src/ui/sheet/` is the spreadsheet editor
+  devices and settings panels, About and donations (`About.jsx`), the phrase entry
+  (`PhraseInput.jsx`: one word at a time on phones, 12 boxes on desktop,
+  suggestions from the word list), the first-run welcome and tour (`Onboarding.jsx`). `src/ui/sheet/` is the spreadsheet editor
   (grid, toolbar, its panels, charts, `xlsx.js` file handling). Talks only to
   `window.pearoffice` (`call`, `on`), which the desktop preload and the mobile
   WebView provide. Built to `dist/ui` by `scripts/build-ui.mjs`.
@@ -128,7 +138,9 @@ Code that works for any kind of file sits apart from each editor's own
   `smoke.js`, `smoke-run.js` and `smoke/` are the offscreen smoke test. Has its own
   `package.json` (Electron): `npm install --prefix desktop`.
 - `src/seeder/` - the blind seeder: `seeder.js` (blind-peer plus the rule
-  that it stores only sheets a paired device registered), `protocol.js`
+  that it stores only sheets a paired device registered, and keyrings:
+  `keyring-put`, `-get`, `-claim`), `keyringRecord.js` (what it checks
+  without the seed), `protocol.js`
   (pairing link and topic, shared with the app), `bare.js` (CLI entry).
   The app side is `src/worklet/seeding.js`.
 - The repo root is also the Expo app (as in PearPetal): BareKit links the
