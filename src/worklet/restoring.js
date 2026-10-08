@@ -20,9 +20,10 @@ const { deriveKeys, open, merge, empty, files, seeders, signClaim } = require('.
 
 const hex = (buf) => b4a.toString(buf, 'hex')
 
-function createRestoring ({ engine, getSeeding, getOwnDevices, emit = () => {}, log = () => {}, now = () => Date.now(), lookMs = 3 * 60 * 1000, settleMs = 5000 }) {
+function createRestoring ({ engine, getSeeding, getOwnDevices, emit = () => {}, log = () => {}, now = () => Date.now(), lookMs = 90 * 1000, settleMs = 5000 }) {
   let closed = false
   let running = null
+  let stop = null // ends a search under way
 
   async function setStatus (status) {
     await engine.localDb.put('restore:status', { ...status, at: now() })
@@ -45,6 +46,7 @@ function createRestoring ({ engine, getSeeding, getOwnDevices, emit = () => {}, 
       let keyring = null
       let seq = 0
       let settle = null
+      let again = null
       let finished = false
       const finish = () => {
         if (finished) return
@@ -75,8 +77,10 @@ function createRestoring ({ engine, getSeeding, getOwnDevices, emit = () => {}, 
         if (info.topics.some((t) => b4a.equals(t, keys.topic))) tryKey(hex(conn.remotePublicKey))
       }
       const timer = setTimeout(finish, lookMs)
+      stop = finish
       swarm.on('connection', onConnection)
-      const discovery = swarm.join(keys.topic, { server: false, client: true })
+      let discovery
+      try { discovery = swarm.join(keys.topic, { server: false, client: true }) } catch { return finish() }
       // A seeder already connected for another reason brings no new
       // connection event: look through the connections too.
       const known = () => {
@@ -86,7 +90,7 @@ function createRestoring ({ engine, getSeeding, getOwnDevices, emit = () => {}, 
         }
       }
       discovery.flushed().then(known).catch(() => {})
-      const again = setInterval(() => { known(); discovery.refresh({ server: false, client: true }).catch(() => {}) }, 5000)
+      again = setInterval(() => { known(); discovery.refresh({ server: false, client: true }).catch(() => {}) }, 5000)
     })
   }
 
@@ -96,6 +100,7 @@ function createRestoring ({ engine, getSeeding, getOwnDevices, emit = () => {}, 
     if (closed || !seeding || !own) return null
     const keys = deriveKeys(b4a.from(engine.identity.secretKey.subarray(0, 32)))
     await setStatus({ state: 'looking' })
+    if (closed) return null
     const found = await find(keys)
     if (closed) return null
     if (!found) {
@@ -121,6 +126,7 @@ function createRestoring ({ engine, getSeeding, getOwnDevices, emit = () => {}, 
     // Start the keyring here from what came back, so this device's next
     // write carries it on.
     await engine.localDb.put('keyring:local', { seq: found.seq, keyring: found.keyring, fingerprint: '', held: [], at: now() })
+    await setStatus({ state: 'opening', files: list.length })
     await own.take(list)
     // The files' views, which name their seeders, come only from a seeder:
     // ask these until they do.
@@ -133,7 +139,7 @@ function createRestoring ({ engine, getSeeding, getOwnDevices, emit = () => {}, 
 
   // On start: carry on with a restore that has not finished.
   async function start () {
-    if (!(await engine.localDb.get('restore:pending'))) return null
+    if (closed || !(await engine.localDb.get('restore:pending'))) return null
     if (!running) running = run().catch((e) => { log('restore failed: ' + e.message); return null }).finally(() => { running = null })
     return running
   }
@@ -163,7 +169,10 @@ function createRestoring ({ engine, getSeeding, getOwnDevices, emit = () => {}, 
     return { recovery: mine ? 'copy' : 'waiting', ...hintKind }
   }
 
-  function close () { closed = true }
+  function close () {
+    closed = true
+    if (stop) stop()
+  }
 
   return { start, run, status, fileState, close }
 }
