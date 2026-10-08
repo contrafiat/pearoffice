@@ -15,6 +15,7 @@ import { prosemirrorJSONToYXmlFragment, yXmlFragmentToProseMirrorRootNode } from
 import mammoth from 'mammoth'
 import JSZip from 'jszip'
 import { marked } from 'marked'
+import { checkZip } from '../slides/importOoxml.js'
 import * as D from 'docx'
 import { documentExtensions, SIZES, LINE_HEIGHTS, MAX_INDENT } from './extensions.js'
 import { call } from '../bridge.js'
@@ -638,6 +639,7 @@ export async function fileToJson (name, bytes) {
   let html
   let styles = null
   if (ext === 'docx') {
+    await checkZip(bytes, 'This is not a Word file PearOffice can read.')
     const buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength)
     // Colours are a nicety: a file whose XML we cannot read still imports.
     const colours = await runColours(buf).catch(() => [])
