@@ -2,6 +2,28 @@
 
 Append-only, newest on top. Per Constitution §4.
 
+## 2026-10-07 - Your devices tell each other about their files
+Tier: T3
+Context: linking sent the file list once, so a file made later on one
+device never reached the person's other devices
+(proposals/2026-10-07-own-devices-files.md).
+Choice: every device joins a topic that is a keyed BLAKE2b of the identity
+seed and opens `pearoffice/own-devices/1` on each connection, its channel id
+a hash of the topic. Hellos are signed by the identity over both devices'
+swarm keys and the time, and only a hello from this device's own identity,
+for the connection's key and within 10 minutes, is accepted. Then each side
+sends its file list (keys included, frozen copies and pending joins left
+out) and a `file` message for each file it creates, joins or follows to new
+keys. A device opens what it does not have the way a linked device does
+after restarting, and is admitted as the same person.
+Alternatives: sending new files only through the linking welcome (today's
+gap); syncing through a private per-person file; pushing removals to every
+device too (left for later).
+Consequences: a lost device that still holds the identity also gets files
+made after it was lost. A file removed on a device stays away, and so does
+its copy after a tidy-up while the sender still has the old copy's record.
+Older builds never join the topic, so a mixed pair behaves as before.
+
 ## 2026-10-06 - Slides: optional element fields and a chart element
 Tier: T2
 Context: .pptx import lost see-through fills, custom shapes, text anchoring,

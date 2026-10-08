@@ -51,6 +51,8 @@ stored inside each sheet (proposals/2026-10-04-profiles-with-avatars.md).
 Settings > Devices lists your linked devices; each has a name you can
 change on any of them, kept in every file like your name
 (proposals/2026-10-07-device-names.md).
+A person's linked devices keep the same files: one made, joined or moved
+on one device appears on the others (proposals/2026-10-07-own-devices-files.md).
 On desktop, PearOffice can start hidden in the tray at login
 (`desktop/login.js`; XDG autostart on Linux, a LaunchAgent on macOS, login
 items on Windows). `PEAROFFICE_DEBUG=1` turns on logging in an installed copy.
@@ -89,6 +91,10 @@ Code that works for any kind of file sits apart from each editor's own
   `moves.js` (removal by moving to fresh keys), `seeding.js` (seeder client),
   `linking.js` (linking a person's devices, recovery phrase),
   `presence.js` (who has a sheet open, and their cell),
+  `ownDevices.js` (a person's devices tell each other about their files:
+  a topic from the identity seed, signed hellos on `pearoffice/own-devices/1`,
+  then the file list and each new file; a file removed on a device is not
+  added back to it),
   `profiles.js` (your name and picture in every sheet),
   `devices.js` (your linked devices and their names: localDb
   `devices:<deviceKey>`, the signed `deviceName` op on each file's

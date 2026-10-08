@@ -37,7 +37,9 @@ const LOOKUP_EVERY_MS = [3000, 5000, 10000, 15000]
 const GIVE_UP_MS = 7 * 24 * 3600 * 1000
 const hex = (buf) => b4a.toString(buf, 'hex')
 
-function createJoinService ({ engine, emit, onProfile = async () => {}, kindOf = async () => 'sheet', log = () => {}, now = () => Date.now() }) {
+// onAdded(sheetId): this device created, joined or followed a file (for
+// ownDevices.js, which tells the person's other devices).
+function createJoinService ({ engine, emit, onProfile = async () => {}, kindOf = async () => 'sheet', onAdded = () => {}, log = () => {}, now = () => Date.now() }) {
   const muxes = new Set()
   const joins = new Map() // sheetId -> { link, welcome, channels:Set, timer, done }
   const recentlyAppended = new Map() // inviteId -> time
@@ -73,6 +75,7 @@ function createJoinService ({ engine, emit, onProfile = async () => {}, kindOf =
 
   function addSheet (sheetId) {
     for (const mux of muxes) listen(mux, sheetId)
+    onAdded(sheetId)
   }
 
   function openChannel (mux, sheetId) {
@@ -297,6 +300,7 @@ function createJoinService ({ engine, emit, onProfile = async () => {}, kindOf =
     for (const ch of j.channels) { try { ch.close() } catch {} }
     joins.delete(sheetId)
     await engine.localDb.del('joins:pending:' + sheetId)
+    onAdded(sheetId)
     emit('sheet:joined', { sheetId })
   }
 

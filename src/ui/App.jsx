@@ -159,8 +159,14 @@ export function App () {
     const offs = [
       on('worklet:exit', () => setError('The sync engine stopped. Restart PearOffice.')),
       on('join:progress', refresh),
-      on('sheet:joined', async ({ sheetId }) => {
+      on('sheet:joined', async ({ sheetId, fromOtherDevice, title }) => {
         const list = await refresh()
+        // Made or joined on another of this person's devices
+        // (src/worklet/ownDevices.js): list it, stay where we are.
+        if (fromOtherDevice) {
+          setToast('A file from your other device: ' + (title || 'Untitled'))
+          return
+        }
         setCurrent(sheetId)
         setWaitingJoin((w) => (w === sheetId ? null : w))
         const s = list && list.find((x) => x.sheetId === sheetId)
