@@ -85,13 +85,15 @@ function createDeleting ({ engine, sheets, getSeeding, getPictures = () => null,
     const deleted = await viewGet(base, 'deleted')
     if (!deleted) return false
     const title = (await engine.localDb.get('groups:joined:' + sheetId))?.value?.name || ''
-    const seeding = getSeeding()
-    if (seeding) {
-      try { await seeding.requestDrop({ bootstrap: hex(base.key), seederKeys: await seedersOf(base), afterMs: DROP_GRACE_MS }) } catch (e) { log('drop request failed: ' + e.message) }
-    }
+    const bootstrap = hex(base.key)
+    const seederKeys = await seedersOf(base)
     await engine.localDb.put('deleted:' + sheetId, { by: deleted.by, title, at: now() })
     emit('sheet:deleted', { sheetId, title })
     await removeLocal(sheetId, { reason: 'deleted' })
+    // The seeders after, without waiting: each can take up to 20 s to answer
+    // (twice), which held the file in the list that long.
+    const seeding = getSeeding()
+    if (seeding && seederKeys.length) seeding.requestDrop({ bootstrap, seederKeys, afterMs: DROP_GRACE_MS }).catch((e) => log('drop request failed: ' + e.message))
     return true
   }
 

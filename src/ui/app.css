@@ -1080,7 +1080,8 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 .slides-tools .present-button { margin-left: auto; gap: 6px; padding: 0 12px; border-color: var(--pear); background: var(--pear); color: #fff; font-weight: 600; }
 .slides-tools .present-button:hover:not(:disabled) { border-color: var(--pear); filter: brightness(0.93); }
 /* Below the phone side menu (25 and 30) so it never covers Settings or About. */
-.present-fab { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 20; display: inline-flex; align-items: center; gap: 8px; padding: 12px 22px; border: 0; border-radius: 999px; background: var(--pear); color: #fff; font: inherit; font-weight: 600; font-size: 16px; box-shadow: 0 6px 18px rgb(0 0 0 / 0.25); }
+/* Under menus and sheets (the scrim is 9), above the slide. */
+.present-fab { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 8; display: inline-flex; align-items: center; gap: 8px; padding: 12px 22px; border: 0; border-radius: 999px; background: var(--pear); color: #fff; font: inherit; font-weight: 600; font-size: 16px; box-shadow: 0 6px 18px rgb(0 0 0 / 0.25); }
 .present-fab:active { filter: brightness(0.93); }
 .fit-slide { position: relative; display: flex; align-items: center; justify-content: center; overflow: hidden; min-width: 0; min-height: 0; }
 .fit-holder { position: relative; flex: none; overflow: hidden; }
