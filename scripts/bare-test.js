@@ -26,6 +26,14 @@ async function main () {
   assert.deepEqual(got.lifts, JSON.parse(fs.readFileSync(path.join(root, 'test', 'fixtures', 'lift-golden.json'), 'utf8')))
   console.log('ok - lift corpus under Bare matches the golden file')
 
+  // The keyring's sodium calls under Bare (src/worklet/keyring.js).
+  const ring = JSON.parse(execFileSync(bare, [pack(path.join(root, 'test', 'fixtures', 'keyring-bare-entry.js'), path.join(root, 'dist', 'test-corpus', 'keyring.bundle'))]).toString())
+  const underNode = JSON.parse(execFileSync(process.execPath, [path.join(root, 'test', 'fixtures', 'keyring-bare-entry.js')]).toString())
+  assert.deepEqual(ring, underNode)
+  assert.deepEqual(ring.opened, ['Budget'])
+  assert.equal(ring.checks && ring.claim, true)
+  console.log('ok - keyring under Bare: same keys as Node, seals, opens, claims')
+
   require('./build-worklet')
   const bundle = path.join(root, 'dist', 'worklet', 'worklet.bundle')
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pearoffice-bare-'))

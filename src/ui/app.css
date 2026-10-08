@@ -1172,8 +1172,6 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 .ob-choice-text span { color: var(--muted); font-size: 13.5px; line-height: 1.4; }
 .ob-choice-go { flex: none; color: var(--muted); }
 .ob-card input.ob-link { font-size: 14px; }
-.ob-card textarea.ob-phrase { width: min(340px, 100%); box-sizing: border-box; padding: 11px 14px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--paper); color: var(--ink); font: inherit; font-size: 15px; line-height: 1.5; resize: none; }
-.ob-card textarea.ob-phrase:focus { outline: none; border-color: var(--pear); box-shadow: 0 0 0 3px var(--pear-soft); }
 .ob-body p.ob-count { font-size: 13px; margin-top: -6px; }
 .ob-body p.ob-error { color: var(--error); font-size: 14px; }
 .ob-card button.scan-button { flex: none; width: min(300px, 100%); }
@@ -1208,3 +1206,28 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 .panel .device-text input { padding: 5px 8px; font-size: 15px; }
 .panel .device-row .icon-button { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; padding: 0; border: 0; background: none; color: var(--muted); border-radius: 8px; cursor: pointer; }
 .panel .device-row .icon-button:hover { background: var(--head); color: var(--ink); }
+
+/* Typing the recovery phrase (PhraseInput.jsx): a grid of 12 boxes on
+   desktop, one word at a time on phones, suggestions under both. */
+.phrase-grid-wrap, .phrase-one { width: min(420px, 100%); margin: 0 auto; }
+.phrase-grid { list-style: none; counter-reset: word; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 4px 0; padding: 0; }
+.phrase-grid li { counter-increment: word; display: flex; align-items: center; gap: 6px; }
+.phrase-grid li::before { content: counter(word); min-width: 1.4em; text-align: right; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.phrase-grid input, .phrase-one-input { min-width: 0; width: 100%; box-sizing: border-box; padding: 7px 9px; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--paper); color: var(--ink); font: inherit; font-size: 14px; }
+.phrase-grid input:focus, .phrase-one-input:focus { outline: none; border-color: var(--pear); box-shadow: 0 0 0 3px var(--pear-soft); }
+.phrase-grid li.bad input, .phrase-one-input.bad { border-color: var(--error); }
+.phrase-suggest { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin: 8px 0 2px; }
+.phrase-suggest button { padding: 5px 12px; border-radius: 999px; border: 1px solid var(--line-strong); background: var(--head); color: var(--ink); font: inherit; font-size: 14px; cursor: pointer; }
+.phrase-suggest button:first-child { border-color: var(--pear); background: var(--pear-soft); }
+.phrase-one { display: flex; flex-direction: column; align-items: stretch; gap: 8px; text-align: center; }
+.phrase-one-label { font-weight: 600; color: var(--muted); font-size: 13px; }
+.phrase-one-input { padding: 12px 14px; font-size: 18px; text-align: center; }
+.phrase-one-row { display: flex; gap: 8px; align-items: stretch; }
+.phrase-one .phrase-one-row .phrase-one-input { flex: 1 1 auto; width: auto; min-width: 0; }
+.phrase-one .phrase-one-row .phrase-one-step { flex: 0 0 48px; width: 48px; min-width: 0; padding: 0; display: flex; align-items: center; justify-content: center; border: 1px solid var(--line-strong); border-radius: 8px; background: var(--panel); color: var(--ink); cursor: pointer; }
+.phrase-one .phrase-one-row .phrase-one-step:disabled { opacity: 0.4; cursor: default; }
+.phrase-one-sofar { list-style: none; display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin: 4px 0 0; padding: 0; }
+.phrase-one-sofar button { width: 100%; min-height: 28px; padding: 3px 4px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--ink); font: inherit; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.phrase-one-sofar li.here button { border-color: var(--pear); }
+.phrase-one-sofar li.bad button { border-color: var(--error); color: var(--error); }
+@media (max-width: 420px) { .phrase-grid { grid-template-columns: repeat(2, 1fr); } }

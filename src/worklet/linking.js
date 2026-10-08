@@ -273,6 +273,8 @@ function createLinking ({ engine, removeFiles = async () => {}, log = () => {}, 
       await removeFiles()
     }
     await replaceIdentity(root)
+    // After the restart, restoring.js brings the files back from the seeders.
+    await engine.localDb.put('restore:pending', { at: Date.now() })
     return { restart: true }
   }
 

@@ -56,5 +56,6 @@ module.exports = async function onboardingRestore (t) {
   step('note dismissed')
 
   return result.noNoteYet && result.wordCount === '12 words of 12' && result.onboarded && result.sameIdentity && result.noteFlag && result.noteCleared &&
-    result.note === 'Welcome back. Ask the owners of your files to invite you again; you will be back as yourself.'
+    // Before the device starts looking for a file list (restoring.js), or once it has.
+    ['Welcome back. Ask the owners of your files to invite you again; you will be back as yourself.', 'Welcome back. Looking for your files on your seeders...'].includes(result.note)
 }

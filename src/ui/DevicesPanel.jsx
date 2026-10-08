@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { ArrowCounterClockwise, CaretLeft, Check, DeviceMobile, Key, Laptop, PencilSimple, X } from '@phosphor-icons/react'
 import { QrCode, ScanButton } from './Qr.jsx'
 import { call, on } from './bridge.js'
+import { PhraseInput } from './PhraseInput.jsx'
 import { hasFilesError, linkDevice, phraseWordCount, restorePhrase } from './takeIdentity.js'
 
 // "5 minutes ago", for last seen.
@@ -141,8 +142,9 @@ export function DevicesPanel ({ initialLink = '', startWith = null, onBack = nul
             </div>
             <h3>Recovery phrase</h3>
             <p>12 words that bring back your identity if you lose every device. Anyone with them can act as you.</p>
-            {backedUp > 0 && <p className='muted'>Your file list is backed up to {backedUp === 1 ? '1 seeder' : backedUp + ' seeders'}.</p>}
-            <p className='muted'>They do not hold your files. After a restore, the owner of each file invites you back. Files only you own need another linked device to survive.</p>
+            {backedUp > 0
+              ? <p className='muted'>They bring back your files too: your file list is backed up to {backedUp === 1 ? '1 seeder' : backedUp + ' seeders'}.</p>
+              : <p className='muted'>With a seeder, they bring back your files too. Without one, the owner of each file invites you back after a restore, and files only you own need another linked device to survive.</p>}
             <div className='row'>
               <button onClick={async () => { try { setPhrase((await call('link:phrase')).phrase); setMode('phrase'); call('app:phraseNudged').catch(() => {}) } catch (err) { onError(err.message) } }}><Key size={16} /> Show phrase</button>
               <button onClick={() => setMode('restore')}><ArrowCounterClockwise size={16} /> Restore</button>
@@ -214,8 +216,8 @@ export function DevicesPanel ({ initialLink = '', startWith = null, onBack = nul
 
         {mode === 'restore' && (
           <form className='stack' onSubmit={(e) => { e.preventDefault(); restartAfter(restore1, 'restore', 'restore') }}>
-            <p>Type your 12 words. This brings back your identity. Your files come back when you link from another device or their owners invite you again.</p>
-            <textarea aria-label='Recovery phrase' rows='4' value={input} onChange={(e) => setInput(e.target.value)} autoFocus />
+            <p>Type your 12 words. This brings back your identity, and your files if you had a seeder.</p>
+            <PhraseInput value={input} onChange={setInput} autoFocus oneAtATime={!!(window.pearoffice && window.pearoffice.platform === 'mobile')} disabled={busy} />
             <div className='row end'>
               <button type='button' onClick={() => setMode('menu')}>Back</button>
               <button className='primary' type='submit' disabled={busy || phraseWordCount(input) !== 12}>{busy ? 'Restoring...' : 'Restore'}</button>

@@ -1,6 +1,6 @@
 # The recovery phrase brings your files back
 
-**Status:** approved by Tim 2026-10-07. Asked for by Tim after reviewing
+**Status:** approved by Tim 2026-10-07; built in PRs #150, #151, #152 and #154. Asked for by Tim after reviewing
 what the phrase does (PR #138, `test/recovery.test.js`).
 
 **Goal:** someone who loses every device gets their files back with their

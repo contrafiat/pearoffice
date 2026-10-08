@@ -23,6 +23,7 @@ const { createWake } = require('./wake')
 const { createPictures } = require('./pictures')
 const { createOwnDevices } = require('./ownDevices')
 const { createKeyringSync } = require('./keyringSync')
+const { createRestoring } = require('./restoring')
 const { newRoot, identityFromRoot } = require('../shared/phrase')
 const model = require('../sheet/sheetModel')
 
@@ -42,6 +43,7 @@ function createSheetEngine (opts = {}) {
   let pictures = null
   let ownDevices = null
   let keyring = null
+  let restoring = null
   const emit = (event, data) => engine && engine.emit(event, data)
 
   const sheets = createSheets({
@@ -74,7 +76,7 @@ function createSheetEngine (opts = {}) {
     }
   }
 
-  const deps = { getJoin: () => join, getMoves: () => moves, getProfiles: () => profiles, getDevices: () => devices, getPictures: () => pictures }
+  const deps = { getJoin: () => join, getMoves: () => moves, getProfiles: () => profiles, getDevices: () => devices, getPictures: () => pictures, getRestoring: () => restoring }
   const methods = {
     ...createFileMethods(sheets, deps),
     ...createSheetMethods(sheets, deps),
@@ -88,6 +90,8 @@ function createSheetEngine (opts = {}) {
     'sheet:visible': async ({ sheetId, visible }) => { if (rediscover) rediscover.visible(sheetId, !!visible); return {} },
     // Your linked devices and their names (proposals/2026-10-07-device-names.md).
     'app:devices': async () => (devices ? devices.list() : []),
+    'app:restoreStatus': async () => (restoring ? restoring.status() : null),
+    'file:recoverCopy': async ({ sheetId }) => moves.recoverCopy(sheetId),
     'app:keyring': async () => (keyring ? keyring.status() : { seeders: 0, paired: 0, at: null }),
     'app:renameDevice': async ({ deviceKey, name }) => { await devices.rename(deviceKey, name); return { ok: true } },
     'seeder:pair': async ({ link }) => seeding.pair(link),
@@ -235,6 +239,16 @@ function createSheetEngine (opts = {}) {
         ...(opts.keyringGapMs ? { gapMs: opts.keyringGapMs, checkMs: opts.keyringGapMs, settleMs: Math.min(3000, opts.keyringGapMs) } : {})
       })
       setTimeout(() => keyring.start(), 5000).unref?.()
+      // After a restore from the phrase: bring the files back.
+      restoring = createRestoring({
+        engine,
+        getSeeding: () => seeding,
+        getOwnDevices: () => ownDevices,
+        emit,
+        log,
+        ...(opts.restoreLookMs ? { lookMs: opts.restoreLookMs, settleMs: Math.min(5000, opts.restoreLookMs) } : {})
+      })
+      setTimeout(() => restoring.start().catch(() => {}), 1000)
       // Core has no hook for "init finished", so catch up a little after
       // start, and once more later: open sheets that came with a device link,
       // follow sheets that moved, ask to be admitted where needed.
@@ -263,6 +277,7 @@ function createSheetEngine (opts = {}) {
     if (linking) linking.close()
     if (ownDevices) ownDevices.close()
     if (keyring) keyring.close()
+    if (restoring) restoring.close()
     if (profiles) profiles.close()
     if (devices) devices.close()
     if (presence) presence.close()
@@ -291,6 +306,7 @@ function createSheetEngine (opts = {}) {
   Object.defineProperty(engine, 'pictures', { get: () => pictures })
   Object.defineProperty(engine, 'ownDevices', { get: () => ownDevices })
   Object.defineProperty(engine, 'keyring', { get: () => keyring })
+  Object.defineProperty(engine, 'restoring', { get: () => restoring })
   return engine
 }
 

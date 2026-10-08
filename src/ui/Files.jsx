@@ -44,7 +44,35 @@ export function NewPanel ({ onPick, onClose }) {
 }
 
 // The start screen: every file on this device, newest first.
-export function FileHome ({ files, actions, onOpen, onWaiting }) {
+// After a restore from the recovery phrase: a file nobody else can let this
+// device into comes back as a copy you own (worklet moves.recoverCopy).
+export function RecoverPanel ({ file, onCopy, onOpen, onClose }) {
+  const [busy, setBusy] = React.useState(false)
+  const name = file.title || untitled(file.kind)
+  return (
+    <div className='panel-backdrop' onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
+      <section className='panel recover-file' role='dialog' aria-label='Make a copy you own'>
+        <header>
+          <h2>Make a copy you own</h2>
+          <button className='close' aria-label='Close' onClick={onClose}><X size={18} /></button>
+        </header>
+        <p>Nobody else in "{name}" can let this device back in, so you can read it but not change it.</p>
+        <p>A copy you own has everything in it and the same name. Anyone else who had it needs a new invite.</p>
+        <div className='row equal'>
+          <button onClick={onOpen} disabled={busy}>Just read it</button>
+          <button className='primary' disabled={busy} onClick={async () => { setBusy(true); try { await onCopy() } finally { setBusy(false) } }}>{busy ? 'Copying...' : 'Make my copy'}</button>
+        </div>
+      </section>
+    </div>
+  )
+}
+
+const RECOVERY_TITLES = {
+  waiting: 'Waiting for someone in this file to let this device in',
+  copy: 'Nobody else can let this device in. Open it to make a copy you own.'
+}
+
+export function FileHome ({ files, actions, onOpen, onWaiting, onRecover = onOpen }) {
   return (
     <div className='files-home'>
       <h1>Your files</h1>
@@ -54,8 +82,8 @@ export function FileHome ({ files, actions, onOpen, onWaiting }) {
           <li key={f.sheetId}>
             <button
               className={'file-card' + (f.waiting ? ' waiting' : '') + (f.removed ? ' removed' : '')}
-              title={f.waiting ? 'Waiting for someone in this file to come online' : f.removed ? 'You were removed from this file' : undefined}
-              onClick={() => (f.waiting ? onWaiting(f.sheetId) : onOpen(f.sheetId))}
+              title={f.waiting ? 'Waiting for someone in this file to come online' : f.removed ? 'You were removed from this file' : RECOVERY_TITLES[f.recovery]}
+              onClick={() => (f.waiting ? onWaiting(f.sheetId) : f.recovery === 'copy' ? onRecover(f) : onOpen(f.sheetId))}
             >
               <KindIcon kind={f.kind} size={28} />
               <span className='file-title'>{f.waiting ? 'Joining...' : (f.title || untitled(f.kind))}</span>
@@ -66,6 +94,8 @@ export function FileHome ({ files, actions, onOpen, onWaiting }) {
                   </span>
                 )}
                 {f.joining && !f.waiting && <span className='badge'>joining</span>}
+                {f.recovery === 'waiting' && <span className='badge'>waiting to be let in</span>}
+                {f.recovery === 'copy' && <span className='badge view-only'>make your copy</span>}
                 {!f.joining && f.people > 1 && <span className='people-count'>{f.people} people</span>}
               </span>
             </button>

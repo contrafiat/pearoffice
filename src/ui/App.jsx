@@ -11,7 +11,7 @@ import { Avatar, MemberAvatar } from './Avatar.jsx'
 import { SettingsPanel } from './SettingsPanel.jsx'
 import { UpdateBar } from './UpdateBar.jsx'
 import { applyTheme } from './theme.js'
-import { FileHome, NewPanel, untitled } from './Files.jsx'
+import { FileHome, NewPanel, RecoverPanel, untitled } from './Files.jsx'
 import { DonationReminder, donationsShown } from './About.jsx'
 import { Onboarding } from './Onboarding.jsx'
 import { FileArrowUp, GearSix, House, Info, LinkSimple, List, Plus } from '@phosphor-icons/react'
@@ -115,6 +115,11 @@ export function App () {
   // After a restore from the recovery phrase: the identity is back, the
   // files are not, so a note says how to get them (app:welcomeBack).
   const [welcomeBack, setWelcomeBack] = useState(false)
+  const welcomeBackRef = useRef(false)
+  welcomeBackRef.current = welcomeBack
+  // Files coming back from the seeders after that restore (worklet restoring.js).
+  const [restore, setRestore] = useState(null)
+  const [recovering, setRecovering] = useState(null) // a file to offer a copy of
 
   const refresh = useCallback(async () => {
     try {
@@ -155,8 +160,10 @@ export function App () {
     loadMe()
     call('app:onboarding').then((r) => { if (r && !r.done) setOnboarding({ tourOnly: false }) }).catch(() => {})
     call('app:welcomeBack').then((r) => setWelcomeBack(!!(r && r.show))).catch(() => {})
+    call('app:restoreStatus').then((r) => setRestore(r || null)).catch(() => {})
     if (desktop) call('app:settings').then((s) => { setKeepOnline(!!s.keepOnline); setStartAtLogin(!!s.startAtLogin) }).catch(() => {})
     const offs = [
+      on('restore:changed', (r) => { setRestore(r); refresh() }),
       on('worklet:exit', () => setError('The sync engine stopped. Restart PearOffice.')),
       on('join:progress', refresh),
       on('sheet:joined', async ({ sheetId, fromOtherDevice, title }) => {
@@ -164,7 +171,8 @@ export function App () {
         // Made or joined on another of this person's devices
         // (src/worklet/ownDevices.js): list it, stay where we are.
         if (fromOtherDevice) {
-          setToast('A file from your other device: ' + (title || 'Untitled'))
+          // During a restore the welcome back note counts them instead.
+          if (!welcomeBackRef.current) setToast('A file from your other device: ' + (title || 'Untitled'))
           return
         }
         setCurrent(sheetId)
@@ -282,6 +290,22 @@ export function App () {
         </div>
       </aside>
       {newFile && <NewPanel onPick={create} onClose={() => setNewFile(false)} />}
+      {recovering && (
+        <RecoverPanel
+          file={recovering}
+          onClose={() => setRecovering(null)}
+          onOpen={() => { setCurrent(recovering.sheetId); setRecovering(null) }}
+          onCopy={async () => {
+            try {
+              const { sheetId } = await call('file:recoverCopy', { sheetId: recovering.sheetId })
+              await refresh()
+              setRecovering(null)
+              setCurrent(sheetId)
+              setToast('"' + (recovering.title || untitled(recovering.kind)) + '" is yours again')
+            } catch (err) { setError(err.message); setRecovering(null) }
+          }}
+        />
+      )}
       {joining !== null && (
         <JoinPanel
           initialLink={joining}
@@ -342,7 +366,11 @@ export function App () {
         {notice && <div className='banner info'>{notice} <button className='link-button' onClick={() => setNotice(null)}>OK</button></div>}
         {welcomeBack && !onboarding && (
           <div className='banner info welcome-back'>
-            Welcome back. Ask the owners of your files to invite you again; you will be back as yourself.{' '}
+            {restore && restore.state === 'looking'
+              ? 'Welcome back. Looking for your files on your seeders...'
+              : restore && restore.state === 'done' && restore.files > 0
+                ? 'Welcome back. ' + (restore.files === 1 ? '1 file' : restore.files + ' files') + ' came back from your seeders. Each opens once someone in it lets this device in; files only you could change come back as your own copy.'
+                : 'Welcome back. Ask the owners of your files to invite you again; you will be back as yourself.'}{' '}
             <button className='link-button' onClick={() => { setWelcomeBack(false); call('app:setWelcomeBack', { show: false }).catch(() => {}) }}>OK</button>
           </div>
         )}
@@ -374,6 +402,7 @@ export function App () {
                     files={sheets}
                     onOpen={setCurrent}
                     onWaiting={setWaitingJoin}
+                    onRecover={setRecovering}
                     actions={<StartActions onNew={() => setNewFile(true)} onJoin={() => setJoining('')} onImported={opened} onError={setError} />}
                   />
                   )

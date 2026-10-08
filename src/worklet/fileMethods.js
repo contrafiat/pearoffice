@@ -127,7 +127,7 @@ function createFileHelpers (sheets) {
   return { profileName, viewGet, peopleOf, myRole, frozenInfo, isFrozen, requireOwner, requireEdit, commit, docFor, replicaState, replicaUpdate }
 }
 
-function createFileMethods (sheets, { getJoin, getMoves, getProfiles }) {
+function createFileMethods (sheets, { getJoin, getMoves, getProfiles, getRestoring = () => null }) {
   const { profileName, viewGet, peopleOf, requireOwner, requireEdit, commit, docFor } = createFileHelpers(sheets)
   // The kind each join's invite named, for a just-joined file whose content
   // has not arrived yet (it would otherwise show as a sheet).
@@ -148,7 +148,7 @@ function createFileMethods (sheets, { getJoin, getMoves, getProfiles }) {
         // Not loaded yet: load it in the background, so its title (and any
         // later change) reaches the list live through sheet:changed.
         if (!e && !(moved && moved.removed)) sheets.load(value.groupId).then(() => sheets.changed(value.groupId)).catch(() => {})
-        out.push({ sheetId: value.groupId, title: (e && model.title(e.guarded.doc)) || value.name || '', kind: (e && e.guarded.doc.getMap('meta').get('kind')) || joinKinds.get(value.groupId) || 'sheet', joining: joining.has(value.groupId) || undefined, removed: (moved && moved.removed) || undefined, ...(await peopleOf(ctx, value.groupId)) })
+        out.push({ sheetId: value.groupId, title: (e && model.title(e.guarded.doc)) || value.name || '', kind: (e && e.guarded.doc.getMap('meta').get('kind')) || joinKinds.get(value.groupId) || 'sheet', joining: joining.has(value.groupId) || undefined, removed: (moved && moved.removed) || undefined, ...(await peopleOf(ctx, value.groupId)), ...((getRestoring() && await getRestoring().fileState(value.groupId).catch(() => null)) || {}) })
         joining.delete(value.groupId)
       }
       // Joins that have not been welcomed yet have no base.
