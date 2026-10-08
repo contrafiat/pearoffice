@@ -8,9 +8,9 @@ Tested on 2026-10-08: a desktop on the home network paired and backed up,
 and an Android emulator restored a file from its phrase. To be published
 with the first release.
 
-The image is the Umbrel one. Until it is published, build it here first:
-`podman build --platform linux/amd64 -t ghcr.io/peerloomllc/pearoffice-seeder:0.1.0 -f seeder-dist/umbrel/Dockerfile dist/umbrel`
-(after `node scripts/stage-umbrel.js`), from the repo root.
+The image is the Umbrel one, `ghcr.io/peerloomllc/pearoffice-seeder`,
+built by `scripts/build-umbrel-image.sh` from the repo root (`PUSH=0` to
+build without pushing). The package build uses the local image of that tag.
 
 Build: `npm install && make` (needs `start-cli-1.1.0` and a signing
 workspace in `../.startos`). Install on a box the CLI is logged in to:

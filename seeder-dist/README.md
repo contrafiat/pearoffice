@@ -4,6 +4,9 @@ An always-on helper that keeps an encrypted copy of your PearOffice files, so
 the people in them can catch up when nobody else is online. It never gets a
 file's key and cannot read your files.
 
+For 64-bit Linux on x64 or arm64. The Bare runtime and the libraries it
+needs come in the download; `update` also uses `curl`.
+
 ## Run it
 
     tar xzf pearoffice-seeder-*-linux-*.tar.gz
@@ -45,4 +48,11 @@ published checksum, replaces the program and restarts the
 ## What it stores
 
 Only files that a device paired with this seeder has registered, plus the
-other members' copies of those files. Anything else is refused.
+other members' copies of those files, and each paired person's encrypted
+file list (which their recovery phrase uses to bring their files back).
+Anything else is refused. It is never given the keys to read any of it.
+
+## Licence
+
+MIT, see `LICENSE.txt`. `THIRD-PARTY-NOTICES.txt` and `licenses/` cover
+the libraries in the download.
