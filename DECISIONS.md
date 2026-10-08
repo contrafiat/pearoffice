@@ -2,6 +2,19 @@
 
 Append-only, newest on top. Per Constitution §4.
 
+## 2026-10-08 - The desktop data folder stays pearoffice-desktop
+Tier: T1
+Context: the release review asked whether to rename the folder before the
+first release. Electron names it after `desktop/package.json`'s `name`:
+`~/.config/pearoffice-desktop`, `~/Library/Application
+Support/pearoffice-desktop` and `%APPDATA%\pearoffice-desktop`, with the
+files in `data/` under it.
+Choice: keep it.
+Alternatives: `PearOffice`, which would leave copies installed so far
+looking empty unless the old folder were moved on first launch.
+Consequences: matches PearGuard, PearTune and PearCinema. Renaming the
+`name` later moves everyone's files, so it stays as it is.
+
 ## 2026-10-08 - PearOffice uses the PeerLoom blind relay
 Tier: T3
 Context: a StartOS seeder cannot be reached from the home network, while
