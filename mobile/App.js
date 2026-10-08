@@ -20,6 +20,15 @@ import b4a from 'b4a'
 import { requestLocalNetworkPermission } from '../modules/local-network'
 
 const ALLOWED = /^(sheet|file|doc|slides|app|seeder|link|donation):[A-Za-z]+$/
+// The UI's own page. The WebView must never show anything else: any page it
+// shows can talk to the worklet (the recovery phrase included), so a link
+// tapped in a document opens in the browser instead (onShouldStartLoad).
+const PAGE_URL = 'https://localhost/'
+// Android reports a message's sender as an origin, with no trailing slash.
+const isOwnPage = (url) => url === 'about:blank' || /^https:\/\/localhost(\/|$)/.test(String(url))
+// The same rules as the desktop page (src/ui/index.html), except that the
+// bundle is inline here.
+const CSP = "default-src 'self'; script-src 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' data: blob:"
 // iOS file types for the share sheet, by MIME type.
 const UTIS = {
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'org.openxmlformats.spreadsheetml.sheet',
@@ -165,7 +174,7 @@ async function loadHtml (dark) {
   await asset.downloadAsync()
   const js = await FileSystem.readAsStringAsync(asset.localUri, { encoding: FileSystem.EncodingType.UTF8 })
   const bg = dark ? '#171a17' : '#f7f7f4'
-  return '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">' +
+  return '<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="' + CSP + '"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">' +
     '<style>html,body,#root{height:100%;margin:0;background:' + bg + '}</style></head>' +
     '<body><div id="root"></div><script>' + js + '</script></body></html>'
 }
@@ -249,7 +258,17 @@ export default function App () {
     return () => sub.remove()
   }, [presenting])
 
+  // Only the UI's own page loads. A link opens in the browser (https and
+  // mailto only); anything else is dropped.
+  const onShouldStartLoad = (req) => {
+    if (isOwnPage(req.url)) return true
+    if (req.isTopFrame !== false && /^(https:|mailto:)/.test(req.url)) Linking.openURL(req.url).catch(() => {})
+    return false
+  }
+
   const onMessage = async (e) => {
+    // A message from any other page is ignored (see onShouldStartLoad).
+    if (!isOwnPage(e.nativeEvent.url)) return
     let msg
     try { msg = JSON.parse(e.nativeEvent.data) } catch { return }
     const { id, method, args } = msg
@@ -305,8 +324,10 @@ export default function App () {
         <WebView
           key={page}
           ref={web}
-          source={{ html, baseUrl: 'https://localhost/' }}
+          source={{ html, baseUrl: PAGE_URL }}
           originWhitelist={['*']}
+          onShouldStartLoadWithRequest={onShouldStartLoad}
+          setSupportMultipleWindows={false}
           injectedJavaScriptBeforeContentLoaded={'window.__pearPlatform = ' + JSON.stringify(Platform.OS) + ';true;'}
           onMessage={onMessage}
           onLoad={() => {
