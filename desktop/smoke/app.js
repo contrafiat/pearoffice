@@ -54,6 +54,21 @@ module.exports = async function app (t) {
   result.theme = true
   step('theme')
 
+  // Connect anywhere (the relay fallback): on by default, off kept after
+  // reopening Settings, then on again.
+  await openSettings()
+  await waitFor('relay switch on', "!!document.querySelector('.panel .connect-anywhere input:checked')")
+  await js("document.querySelector('.panel .connect-anywhere input').click()")
+  await waitFor('relay off saved', "(async () => (await window.pearoffice.call('app:relay')).useRelay === false)()")
+  await js("document.querySelector('.panel .close').click()")
+  await openSettings()
+  await waitFor('relay switch still off', "!!document.querySelector('.panel .connect-anywhere input:not(:checked)')")
+  await js("document.querySelector('.panel .connect-anywhere input').click()")
+  await waitFor('relay on again', "(async () => (await window.pearoffice.call('app:relay')).useRelay === true)()")
+  await js("document.querySelector('.panel .close').click()")
+  result.relaySwitch = true
+  step('connect anywhere')
+
   // The Seeder and Devices panels reach the engine (seeder: and link: calls).
   await openSettings()
   await js("document.querySelector('.panel .settings-seeder').click()")
@@ -248,7 +263,7 @@ module.exports = async function app (t) {
   await waitFor('opened from the list', "!!document.querySelector('.grid .body')")
   step('file list')
 
-  return Math.abs(result.aboutLevel) <= 0.5 && result.startButtonsEqual && result.nudgeShown && result.nudgeGone && result.replaceScreen && result.about && result.donation && result.kinds === 'Spreadsheet, Document, Slides' && result.fileIcons === result.sheetsAfter && result.keepOnline && result.avatar && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.inviteLink.startsWith('pearoffice://join?s=')
+  return Math.abs(result.aboutLevel) <= 0.5 && result.startButtonsEqual && result.nudgeShown && result.nudgeGone && result.relaySwitch && result.replaceScreen && result.about && result.donation && result.kinds === 'Spreadsheet, Document, Slides' && result.fileIcons === result.sheetsAfter && result.keepOnline && result.avatar && result.autostart && result.backups && result.sheetsAfter === result.sheetsBefore - 1 && result.inviteLink.startsWith('pearoffice://join?s=')
 }
 
 // Screenshots of the Linked devices list with a second device, light and dark
