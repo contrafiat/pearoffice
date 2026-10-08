@@ -36,6 +36,24 @@ const port = Number(env.SEEDER_PORT || 8761)
 const barePath = env.SEEDER_BARE || path.join(root, 'bare')
 const bundlePath = env.SEEDER_BUNDLE || path.join(root, 'seeder.bundle')
 const page = fs.readFileSync(path.join(__dirname, 'index.html'))
+const startedAt = Date.now()
+
+// The staged copy has version.json (scripts/stage-umbrel.js); a checkout has
+// the repo's package.json.
+function readVersion () {
+  for (const f of [path.join(__dirname, 'version.json'), path.join(root, 'package.json')]) {
+    try { return JSON.parse(fs.readFileSync(f, 'utf8')).version || null } catch {}
+  }
+  return null
+}
+const version = readVersion()
+
+// PeerLoom's tip jar, the same as the app's About panel (src/ui/About.jsx).
+const DONATE = {
+  ln: 'peerloomllc@strike.me',
+  onchain: 'bc1q0kksenz3j4u9ppe6f4krclvzwxk7sjy00cc9cf',
+  usd: 'https://buymeacoffee.com/peerloomllc'
+}
 
 const log = (line) => console.log('[pearoffice-seeder] ' + line)
 
@@ -53,12 +71,13 @@ async function main () {
   log('seeder key ' + seederKey)
 
   const routes = {
-    'GET /api/status': () => seeder.call('status'),
+    'GET /api/status': async () => ({ ...await seeder.call('status'), uptime: Date.now() - startedAt, version }),
     'GET /api/devices': () => seeder.call('devices'),
     'POST /api/pair': async () => {
       const p = await seeder.call('pair')
       return { ...p, svg: toSvg(p.link, 240), now: Date.now() }
     },
+    'GET /api/donate': () => Object.fromEntries(Object.entries(DONATE).map(([k, value]) => [k, { value, svg: toSvg(value, 200) }])),
     'POST /api/forget': (body) => seeder.call('forget', { deviceKey: String(body.deviceKey || '') })
   }
 

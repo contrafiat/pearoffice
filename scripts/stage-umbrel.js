@@ -40,6 +40,7 @@ for (const [arch, dockerArch] of [['x64', 'amd64'], ['arm64', 'arm64']]) {
     fs.mkdirSync(path.dirname(path.join(dir, f)), { recursive: true })
     fs.copyFileSync(path.join(root, f), path.join(dir, f))
   }
+  fs.writeFileSync(path.join(dir, 'seeder-dist', 'umbrel', 'version.json'), JSON.stringify({ version: require(path.join(root, 'package.json')).version }) + '\n')
   const hostDir = path.join(dir, 'node_modules', '@peerloom', 'host')
   for (const f of hostFiles) {
     fs.mkdirSync(path.join(hostDir, 'src'), { recursive: true })
