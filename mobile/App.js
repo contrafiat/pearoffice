@@ -97,6 +97,12 @@ async function shellMethod (method, args) {
     const base64 = await FileSystem.readAsStringAsync(file.uri, { encoding: FileSystem.EncodingType.Base64 })
     return { name: file.name, mime: file.mimeType || null, base64 }
   }
+  // The licences of everything in the app (scripts/build-ui.mjs --mobile).
+  if (method === 'app:licenses') {
+    const asset = Asset.fromModule(require('../assets/third-party-notices.txt'))
+    await asset.downloadAsync()
+    return { text: await FileSystem.readAsStringAsync(asset.localUri, { encoding: FileSystem.EncodingType.UTF8 }) }
+  }
   if (method === 'app:openUrl') {
     const url = String(args.url || '')
     if (/^(https:|mailto:|lightning:)/.test(url)) await Linking.openURL(url)
