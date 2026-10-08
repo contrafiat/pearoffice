@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { call, on } from './bridge.js'
+import { readPref, writePref } from './prefs.js'
 import { SheetView } from './sheet/SheetView.jsx'
 import { DocView } from './doc/DocView.jsx'
 import { SlidesView } from './slides/SlidesView.jsx'
@@ -199,8 +200,16 @@ export function App () {
     soon.current = setTimeout(() => { soon.current = null; refresh() }, 300)
   }, [refresh])
 
+  // The open file, so a reload of the page (mobile/App.js: a crashed or
+  // ended WebView, the GrapheneOS freeze fix) opens it again. Only then: a
+  // fresh start shows the file list.
+  // Read before the first write below empties it.
+  const reopen = useRef(window.__pearReloaded ? readPref('pearoffice:open') : null)
+  useEffect(() => { writePref('pearoffice:open', current || '') }, [current])
+
   useEffect(() => {
-    refresh()
+    const id = reopen.current
+    refresh().then((list) => { if (id && list && list.some((x) => x.sheetId === id)) setCurrent(id) })
     loadMe()
     call('app:onboarding').then((r) => { if (r && !r.done) setOnboarding({ tourOnly: false }) }).catch(() => {})
     call('app:welcomeBack').then((r) => setWelcomeBack(!!(r && r.show))).catch(() => {})
