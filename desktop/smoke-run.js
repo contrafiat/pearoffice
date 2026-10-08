@@ -6,6 +6,8 @@
 
 const { helpers } = require('./smoke/common')
 
+// Parts run only when named: store-shots takes screenshots for the stores.
+const EXTRA_PARTS = ['store-shots']
 const PARTS = ['sheets', 'sheet-files', 'docs', 'slides', 'slides-present', 'slides-objects', 'slides-style', 'slides-export', 'slides-import', 'slides-charts', 'app', 'onboarding', 'onboarding-restore']
 
 async function run ({ app, win, ready, log, dataDir, getTray }) {
@@ -15,7 +17,7 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
   const { js, step, waitFor, wc } = t
 
   try {
-    if (!PARTS.includes(part)) throw new Error('PEAROFFICE_SMOKE_PART must be one of ' + PARTS.join(', '))
+    if (!PARTS.includes(part) && !EXTRA_PARTS.includes(part)) throw new Error('PEAROFFICE_SMOKE_PART must be one of ' + PARTS.concat(EXTRA_PARTS).join(', '))
     await ready
     step('worklet ready')
     await new Promise((resolve) => wc.isLoading() ? wc.once('did-finish-load', resolve) : resolve())
@@ -33,4 +35,4 @@ async function run ({ app, win, ready, log, dataDir, getTray }) {
   app.quit()
 }
 
-module.exports = { run, PARTS }
+module.exports = { run, PARTS, EXTRA_PARTS }

@@ -21,3 +21,8 @@ ios/
 assets/bare-universal.bundle
 assets/app-ui.bundle
 assets/bare-ios.bundle
+# The store screenshots (scripts/store-shots), which the store/, android/
+# and ios/ rules above would catch.
+!metadata/store/
+!metadata/store/android/
+!metadata/store/ios/
