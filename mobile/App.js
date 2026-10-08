@@ -351,7 +351,7 @@ export default function App () {
           originWhitelist={['*']}
           onShouldStartLoadWithRequest={onShouldStartLoad}
           setSupportMultipleWindows={false}
-          injectedJavaScriptBeforeContentLoaded={'window.__pearPlatform = ' + JSON.stringify(Platform.OS) + ';true;'}
+          injectedJavaScriptBeforeContentLoaded={'window.__pearPlatform = ' + JSON.stringify(Platform.OS) + ';window.__pearReloaded = ' + (page > 0) + ';true;'}
           onMessage={onMessage}
           onLoad={() => {
             loaded.current = true
