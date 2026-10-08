@@ -86,6 +86,8 @@ function StartActions ({ onNew, onJoin, onImported, onError }) {
 export function App () {
   const [sheets, setSheets] = useState(null)
   const [current, setCurrent] = useState(null)
+  const currentRef = useRef(null)
+  currentRef.current = current
   const [error, setErrorNow] = useState(null)
   // While the worklet restarts with another identity (a link or a restore),
   // calls in flight fail; those errors would flash in a banner just before
@@ -104,6 +106,8 @@ export function App () {
   const [waitingJoin, setWaitingJoin] = useState(null) // sheetId of the join shown in a progress panel
   const [seeder, setSeeder] = useState(false)
   const [navOpen, setNavOpen] = useState(false) // phone layout: the sheet list slides in
+  const navRef = useRef(false)
+  navRef.current = navOpen
   const [devices, setDevices] = useState(null) // { link } | { startWith } | {} when open
   const [nudge, setNudge] = useState(false)
   const [notice, setNotice] = useState(null)
@@ -163,6 +167,23 @@ export function App () {
     call('app:restoreStatus').then((r) => setRestore(r || null)).catch(() => {})
     if (desktop) call('app:settings').then((s) => { setKeepOnline(!!s.keepOnline); setStartAtLogin(!!s.startAtLogin) }).catch(() => {})
     const offs = [
+      // Android Back (mobile/App.js): close what is on top, then leave the
+      // open file; on the file list, close the app.
+      on('app:back', () => {
+        const panels = document.querySelectorAll('.panel-backdrop')
+        const top = panels[panels.length - 1]
+        if (top) {
+          const close = top.querySelector('button.close')
+          if (close) close.click()
+          else top.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+          return
+        }
+        const tourBack = document.querySelector('.ob-backdrop:not(.hidden) .ob-back:not(:disabled)')
+        if (tourBack) return tourBack.click()
+        if (navRef.current) return setNavOpen(false)
+        if (currentRef.current) return setCurrent(null)
+        call('app:exit').catch(() => {})
+      }),
       on('restore:changed', (r) => { setRestore(r); refresh() }),
       on('worklet:exit', () => setError('The sync engine stopped. Restart PearOffice.')),
       on('join:progress', refresh),
