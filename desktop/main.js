@@ -2,7 +2,7 @@
 // (the same bundle the phones will run), opens the window and relays calls and
 // events between the UI and the worklet. See proposal section 9.
 
-const { app, BrowserWindow, Tray, Menu, ipcMain, shell, clipboard, dialog, nativeImage, screen } = require('electron')
+const { app, BrowserWindow, Tray, Menu, ipcMain, shell, clipboard, dialog, nativeImage, screen, session } = require('electron')
 const path = require('node:path')
 const fs = require('node:fs')
 const { Worklet } = require('./worklet')
@@ -26,6 +26,9 @@ if (!SMOKE && !app.requestSingleInstanceLock()) app.exit(0)
 // An AppImage first adds its own menu entry, which the link handler and the
 // taskbar icon both need.
 const ICON = path.join(__dirname, 'build', 'icon.png')
+// The macOS menu bar wants a one-colour template image, which it draws
+// black or white to match the bar; @2x is picked up beside it.
+const TRAY_MAC = path.join(__dirname, 'build', 'trayTemplate.png')
 if (!SMOKE && process.platform === 'linux' && process.env.APPIMAGE) {
   try { installMenuEntry({ appImage: process.env.APPIMAGE, image: nativeImage.createFromPath(ICON) }) } catch (err) { console.error('[pearoffice] menu entry', err.message) }
 }
@@ -113,7 +116,7 @@ function showWindow () {
 function createTray () {
   if (tray && !tray.isDestroyed()) return
   try {
-    tray = new Tray(ICON)
+    tray = new Tray(process.platform === 'darwin' ? TRAY_MAC : ICON)
   } catch (err) {
     log('tray failed:', err.message)
     return
@@ -182,7 +185,7 @@ let wasFullScreen = false
 
 function otherDisplay () {
   const here = screen.getDisplayMatching(win.getBounds())
-  const fake = Number(process.env.PEAROFFICE_FAKE_DISPLAYS)
+  const fake = SMOKE && Number(process.env.PEAROFFICE_FAKE_DISPLAYS)
   if (fake) return fake >= 2 ? { bounds: { ...here.bounds, x: here.bounds.x + here.bounds.width } } : null
   return screen.getAllDisplays().find((d) => d.id !== here.id) || null
 }
@@ -455,7 +458,12 @@ function createWindow () {
 }
 
 app.whenReady().then(async () => {
-  log('data', dataDir, 'argv', process.argv.slice(1).join(' '), 'stayRunning', stayRunning())
+  // An invite link in argv is a secret: log only that there is one.
+  log('data', dataDir, 'argv', process.argv.slice(1).map((a) => String(a).startsWith('pearoffice://') ? 'pearoffice://...' : a).join(' '), 'stayRunning', stayRunning())
+  // The UI needs no camera, microphone, location, notifications or the like.
+  // Only writing to the clipboard (the Copy buttons) is allowed.
+  session.defaultSession.setPermissionRequestHandler((_wc, permission, done) => done(permission === 'clipboard-sanitized-write'))
+  session.defaultSession.setPermissionCheckHandler((_wc, permission) => permission === 'clipboard-sanitized-write')
   const ready = startWorklet().catch((err) => {
     log('worklet failed to start:', err.message)
     throw err
