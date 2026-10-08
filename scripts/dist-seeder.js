@@ -3,6 +3,7 @@
 // for x64 and arm64, each with the Bare runtime, the seeder bundle and its
 // native addons, a launcher, a systemd unit and a README. Then runs the x64
 // one from a scratch folder to check it starts and prints a pairing link.
+const crypto = require('crypto')
 const fs = require('fs')
 const os = require('os')
 const path = require('path')
@@ -12,6 +13,36 @@ const { seederPayload } = require('./bare')
 const root = path.join(__dirname, '..')
 const version = require(path.join(root, 'package.json')).version
 const outDir = path.join(root, 'dist', 'seeder-pkg')
+
+// rocksdb-native links libatomic.so.1, which a server or minimal install
+// often lacks (a fresh Ubuntu 24.04 server does), and the seeder then stops
+// at start. The addon looks in $ORIGIN/rocksdb-native first, so Debian 12's
+// copy goes there, as in the Umbrel image (seeder-dist/umbrel/Dockerfile).
+const LIBATOMIC = {
+  x64: { deb: 'libatomic1_12.2.0-14+deb12u1_amd64.deb', sha256: 'fbd4e154a6b444229ea002cc209df099209c0adc09102e5fd21239a3d2b55e2d', lib: 'usr/lib/x86_64-linux-gnu/libatomic.so.1.2.0' },
+  arm64: { deb: 'libatomic1_12.2.0-14+deb12u1_arm64.deb', sha256: '1693aa13ce2b30d061a519fc28b77b9bab8c8e45804ced5969d99821e1bc2159', lib: 'usr/lib/aarch64-linux-gnu/libatomic.so.1.2.0' }
+}
+
+function addLibatomic (arch, dir) {
+  const { deb, sha256, lib } = LIBATOMIC[arch]
+  const cache = path.join(root, 'dist', 'cache')
+  const file = path.join(cache, deb)
+  fs.mkdirSync(cache, { recursive: true })
+  if (!fs.existsSync(file)) execFileSync('curl', ['-fsSL', '-o', file, 'https://deb.debian.org/debian/pool/main/g/gcc-12/' + deb])
+  const got = crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex')
+  if (got !== sha256) { fs.rmSync(file); throw new Error(deb + ': checksum ' + got + ', expected ' + sha256) }
+  const x = fs.mkdtempSync(path.join(os.tmpdir(), 'libatomic-'))
+  execFileSync('ar', ['x', file], { cwd: x })
+  const data = fs.readdirSync(x).find((n) => n.startsWith('data.tar'))
+  execFileSync('tar', ['xf', data, './' + lib], { cwd: x })
+  const addon = path.join(dir, 'seeder', 'node_modules', 'rocksdb-native', 'prebuilds', 'linux-' + arch)
+  if (!fs.existsSync(path.join(addon, 'rocksdb-native.bare'))) throw new Error('rocksdb-native.bare not at ' + addon)
+  fs.mkdirSync(path.join(addon, 'rocksdb-native'), { recursive: true })
+  fs.copyFileSync(path.join(x, lib), path.join(addon, 'rocksdb-native', 'libatomic.so.1'))
+  fs.rmSync(x, { recursive: true, force: true })
+  fs.cpSync(path.join(root, 'seeder-dist', 'licenses'), path.join(dir, 'licenses'), { recursive: true })
+}
+
 fs.rmSync(outDir, { recursive: true, force: true })
 fs.mkdirSync(outDir, { recursive: true })
 for (const arch of ['x64', 'arm64']) {
@@ -20,6 +51,7 @@ for (const arch of ['x64', 'arm64']) {
   const dir = path.join(outDir, name)
   fs.mkdirSync(dir, { recursive: true })
   seederPayload(arch, dir)
+  addLibatomic(arch, dir)
   for (const f of ['pearoffice-seeder', 'pearoffice-seeder.service', 'README.md']) fs.copyFileSync(path.join(root, 'seeder-dist', f), path.join(dir, f))
   fs.chmodSync(path.join(dir, 'pearoffice-seeder'), 0o755)
   // The launcher's update command compares this with the latest release.
@@ -35,7 +67,6 @@ for (const arch of ['x64', 'arm64']) {
 // install that release, and refuse one whose checksum does not match.
 if (process.arch === 'x64' && process.platform === 'linux') {
   const { serveRelease } = require('./serve-local-release')
-  const crypto = require('crypto')
   const name = 'pearoffice-seeder-' + version + '-linux-x64'
   const next = version.replace(/\d+$/, (n) => String(Number(n) + 1))
   const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'pearoffice-seeder-pkg-'))
