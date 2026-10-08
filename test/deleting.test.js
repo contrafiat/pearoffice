@@ -123,4 +123,18 @@ test('deleting sheets', async (t) => {
     assert.match(results[0].error, /Only paired devices/)
     assert.ok(seeder.allowedSheets().includes(bootstrap))
   })
+
+  await t.test('the seeder refuses drops from a paired device that does not back the file up', async () => {
+    const { sheetId } = await call(owner, 'sheet:create', { title: 'Theirs' })
+    await call(owner, 'sheet:setCell', { sheetId, row: 1, col: 1, input: 't' })
+    const bootstrap = hex(owner.bases.get(sheetId).key)
+    await waitFor('seeder holds it', async () => seeder.allowedSheets().includes(bootstrap))
+    // Someone else pairs with the same seeder and learns the file's key.
+    const other = await device('Other')
+    await call(other, 'seeder:pair', { link: seeder.openPairing().link })
+    const results = await other.seeding.requestDrop({ bootstrap, seederKeys: [hex(seeder.seederKey)], afterMs: 0 })
+    assert.match(results[0].error, /does not back up that file/)
+    assert.ok(seeder.allowedSheets().includes(bootstrap))
+    assert.equal((await seeder.drops()).some((d) => d.sheet === bootstrap), false)
+  })
 })

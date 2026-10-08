@@ -25,6 +25,11 @@ See the comments at the top of `pearoffice-seeder.service` for a systemd user
 service. Data lives in `~/.pearoffice-seeder` unless `PEAROFFICE_SEEDER_DATA`
 says otherwise.
 
+A service has no keyboard, so to pair a device, restart it and read the new
+link (it works for 5 minutes) from its log:
+
+    systemctl --user restart pearoffice-seeder && journalctl --user -u pearoffice-seeder -n 40
+
 ## Updates
 
 A minute after it starts, and then once a day, it checks for a newer

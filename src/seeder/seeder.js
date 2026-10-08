@@ -366,6 +366,8 @@ async function createSeeder ({ dataDir, bootstrap = null, log = () => {} }) {
         if (!paired.has(remote)) return msg.send({ t: 'no', reason: 'Only paired devices can ask for that' })
         if (typeof m.bootstrap !== 'string' || !allowed.has(m.bootstrap)) return msg.send({ t: 'no', reason: 'This seeder does not hold that file' })
         if (m.t === 'keep') return msg.send({ t: 'ok', cancelled: await keep(m.bootstrap, remote) })
+        // Only a device that backs the file up here may drop it.
+        if (!(registrants.get(m.bootstrap) || new Set()).has(remote)) return msg.send({ t: 'no', reason: 'This device does not back up that file here' })
         msg.send({ t: 'ok', due: await scheduleDrop(m.bootstrap, m.afterMs) })
       }
     })
