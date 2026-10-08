@@ -49,6 +49,18 @@ function seederPayload (arch, dir) {
     '-o', path.join(dir, 'seeder', 'seeder.bundle'),
     path.join(root, 'src', 'seeder', 'bare.js')
   ], { cwd: root, stdio: 'inherit' })
+  writeSeederNotices(dir, arch)
 }
 
-module.exports = { root, host, barePath, pack, seederPayload }
+// LICENSE.txt and THIRD-PARTY-NOTICES.txt for a seeder payload: the seeder
+// bundle's packages and the Bare runtime, plus `extraDirs` (stage-umbrel.js
+// adds the dashboard's).
+function writeSeederNotices (dir, arch, { extraDirs = [], font = false } = {}) {
+  const { notices } = require('./third-party-notices')
+  const runtime = [path.join(root, 'node_modules', 'bare-runtime-linux-' + arch), path.join(root, 'node_modules', 'bare-runtime')]
+  const n = notices([path.join(dir, 'seeder', 'seeder.bundle')], { extraDirs: runtime.concat(extraDirs), font })
+  fs.writeFileSync(path.join(dir, 'THIRD-PARTY-NOTICES.txt'), n.text)
+  fs.copyFileSync(path.join(root, 'LICENSE'), path.join(dir, 'LICENSE.txt'))
+}
+
+module.exports = { root, host, barePath, pack, seederPayload, writeSeederNotices }

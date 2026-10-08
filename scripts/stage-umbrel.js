@@ -12,7 +12,7 @@
 // Usage: node scripts/stage-umbrel.js [amd64|arm64]   (default both)
 const fs = require('fs')
 const path = require('path')
-const { root, seederPayload } = require('./bare')
+const { root, seederPayload, writeSeederNotices } = require('./bare')
 
 const outDir = path.join(root, 'dist', 'umbrel')
 fs.rmSync(outDir, { recursive: true, force: true })
@@ -48,5 +48,8 @@ for (const [arch, dockerArch] of [['x64', 'amd64'], ['arm64', 'arm64']]) {
     fs.copyFileSync(path.join(host, f), path.join(hostDir, f === 'LICENSE' ? f : path.join('src', f)))
   }
   fs.writeFileSync(path.join(hostDir, 'package.json'), JSON.stringify({ name: '@peerloom/host', exports: { './dashboard-auth': './src/dashboard-auth.js' } }, null, 2) + '\n')
+  // The dashboard's packages and font too, and libatomic (the Dockerfile adds it).
+  writeSeederNotices(dir, arch, { font: true, extraDirs: ['qrcode-generator', 'z32', 'b4a'].map((p) => path.join(root, 'node_modules', p)) })
+  fs.cpSync(path.join(root, 'seeder-dist', 'licenses'), path.join(dir, 'licenses'), { recursive: true })
   console.log('staged ' + path.relative(root, dir))
 }
