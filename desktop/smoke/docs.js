@@ -253,13 +253,15 @@ module.exports = async function docs (t) {
   const png = await wc.capturePage({ x: 0, y: 0, width: 64, height: 48 })
   await clipboard.write([new ClipboardItem({ 'image/png': new Blob([png.toPNG()], { type: 'image/png' }) })])
   await js("document.querySelector('.doc-body').editor.chain().insertContentAt(document.querySelector('.doc-body').editor.state.doc.content.size, { type: 'paragraph' }).focus('end').run()")
-  await sendMod('V', ['control'])
+  wc.paste() // the Edit menu's paste: on a Mac a sent Cmd+V reaches no menu
+  await sleep(60)
   await waitFor('pasted clipboard picture', `${pictureCount} === ${before + 1}`)
   const file = path.join(dataDir, 'copied picture.png')
   require('node:fs').writeFileSync(file, png.toPNG())
   await clipboard.write([new ClipboardItem({ 'text/uri-list': require('node:url').pathToFileURL(file).href + '\r\n' })])
   await js("document.querySelector('.doc-body').editor.chain().insertContentAt(document.querySelector('.doc-body').editor.state.doc.content.size, { type: 'paragraph' }).focus('end').run()")
-  await sendMod('V', ['control'])
+  wc.paste() // the Edit menu's paste: on a Mac a sent Cmd+V reaches no menu
+  await sleep(60)
   await waitFor('pasted picture file', `${pictureCount} === ${before + 2}`)
   // A picture copied in a browser can reach the page as HTML holding only an
   // <img> link: the app then reads the picture off the system clipboard.
