@@ -26,6 +26,9 @@ if (old === version) { console.error('already at ' + version); process.exit(1) }
 
 json('package.json', (o) => { o.version = version })
 json('desktop/package.json', (o) => { o.version = version })
+for (const lock of ['package-lock.json', 'desktop/package-lock.json']) {
+  json(lock, (o) => { o.version = version; if (o.packages && o.packages['']) o.packages[''].version = version })
+}
 json('app.json', (o) => {
   o.expo.version = version
   o.expo.android.versionCode = (Number(o.expo.android.versionCode) || 0) + 1

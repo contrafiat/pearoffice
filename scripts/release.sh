@@ -79,7 +79,7 @@ prepare () {
   git checkout -q main && git pull -q
   git checkout -q -b "release/$v"
   node scripts/release/bump.js "$v" "$notes"
-  git add -A package.json desktop/package.json app.json start9/seeder/startos "$notes"
+  git add -A package.json package-lock.json desktop/package.json desktop/package-lock.json app.json start9/seeder/startos "$notes"
   git commit -q -m "Release $v"
   if confirm "Push release/$v and open its PR?"; then
     git push -q -u origin "release/$v"
