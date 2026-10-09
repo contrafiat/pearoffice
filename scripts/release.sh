@@ -26,6 +26,8 @@
 #                 the official getumbrel/umbrel-apps store
 #       startos   PR to the website's StartOS registry
 #       play      prints the Google Play steps (by hand in the Console)
+#       nostr     a "PearOffice <version> is out" note from the Zapstore
+#                 key, edited in $EDITOR (vi) before it is posted
 #
 #   DRY_RUN=1 scripts/release.sh publish ...   builds but publishes nothing.
 #
@@ -41,6 +43,10 @@ RELEASES=peerloomllc/pearoffice-releases
 ASC_APP_ID=6820799007
 IMAGE=ghcr.io/peerloomllc/pearoffice-seeder
 DRY_RUN="${DRY_RUN:-0}"
+# Zapstore's Nostr account, tagged in the announcement.
+ZAPSTORE_HEX=78ce6faa72264387284e647ba6938995735ec8c7d5c5a65737e55130f026307d
+ZAPSTORE_NPUB=npub10r8xl2njyepcw2zwv3a6dyufj4e4ajx86hz6v4ehu4gnpupxxp7stjt2p8
+NOSTR_RELAYS=(wss://relay.damus.io wss://nos.lol wss://relay.primal.net wss://relay.nostr.net)
 
 say () { printf '\n==> %s\n' "$*"; }
 die () { echo "error: $*" >&2; exit 1; }
@@ -298,9 +304,34 @@ $PLAY_NOTES
 EOF
 }
 
+step_nostr () {
+  local v; v="$(version)"
+  say "nostr: the announcement"
+  command -v nak >/dev/null || die "nak not found (https://github.com/fiatjaf/nak/releases)"
+  set -a; . scripts/.env; set +a
+  : "${SIGN_WITH:?SIGN_WITH (Zapstore nsec) missing from scripts/.env}"
+  local draft; draft="$(mktemp --suffix=.txt)"
+  {
+    printf 'PearOffice %s is out!\n\n' "$v"
+    printf 'Spreadsheets, documents and slides you share with a link and edit together, straight between your devices. No account, no server, no cloud.\n\n'
+    node scripts/release/nostr-bullets.js "$ANDROID_NOTES" "${NOSTR_NOTE_BUDGET:-900}"
+    printf '\nhttps://peerloomllc.com/pearoffice/\nhttps://github.com/%s/releases/tag/v%s\n\n' "$RELEASES" "$v"
+    printf 'nostr:%s\n\n' "$ZAPSTORE_NPUB"
+    printf '#PearOffice #Nostr #P2P #privacy #spreadsheets #Android #iOS #Zapstore\n'
+  } > "$draft"
+  if [ "$DRY_RUN" = 1 ]; then sed 's/^/    /' "$draft"; rm -f "$draft"; echo "dry run: not posting"; return; fi
+  "${EDITOR:-vi}" "$draft" </dev/tty >/dev/tty
+  local note; note="$(cat "$draft")"; rm -f "$draft"
+  printf '%s\n' "$note" | sed 's/^/    /'
+  echo "    relays: ${NOSTR_RELAYS[*]}"
+  if confirm "Post this note to Nostr?"; then
+    nak event --sec "$SIGN_WITH" -k 1 -c "$note" -p "$ZAPSTORE_HEX" "${NOSTR_RELAYS[@]}"
+  fi
+}
+
 # --- main ---------------------------------------------------------------------
 
-STEPS=(desktop seeder android github zapstore appstore umbrel startos play)
+STEPS=(desktop seeder android github zapstore appstore umbrel startos play nostr)
 case "${1:-}" in
   prepare) shift; prepare "$@" ;;
   publish)

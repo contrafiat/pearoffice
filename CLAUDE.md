@@ -184,7 +184,9 @@ before each publishing step: the GitHub release on the public
 `peerloomllc/pearoffice-releases` (a `.sha256` for every file), Zapstore,
 the App Store (app 6820799007; `scripts/ios-appstore.sh`), the Umbrel image
 and both Umbrel stores, the StartOS registry on the website
-(`start9/registry/build-registry-04.js`), and prints the Google Play steps.
+(`start9/registry/build-registry-04.js`), prints the Google Play steps and
+last posts a Nostr note from the Zapstore key (`scripts/release/nostr-bullets.js`
+picks the bullets; the note opens in `$EDITOR` first).
 `DRY_RUN=1` builds but publishes nothing; steps can be named
 (`scripts/release.sh publish github zapstore`).
 
