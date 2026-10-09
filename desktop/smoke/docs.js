@@ -176,6 +176,11 @@ module.exports = async function docs (t) {
     docPdf.length > 1000 && docPdf.slice(0, 4).toString() === '%PDF'
   if (!result.docExport) throw new Error('document export: ' + JSON.stringify({ docx: docxOut.length, media: docMedia, md: mdOut.slice(0, 200), pdf: docPdf.length }))
   step('document export')
+  // Ctrl+P prints, as Print... in the More menu does.
+  await sendMod('P', ['control'])
+  result.docPrintKey = (await waitFile(path.join(dataDir, 'printed.html'))).toString('utf8').includes('Imported heading')
+  if (!result.docPrintKey) throw new Error('Ctrl+P did not print the document')
+  step('Ctrl+P prints')
 
   // Copy the picture from this document and paste it into "Smoke notes":
   // it is stored again there, so the new node points at that file's own
@@ -277,5 +282,5 @@ module.exports = async function docs (t) {
   result.docPastePicture = true
   step('pasted pictures')
 
-  return result.docPastePicture && result.docPicture && result.docPictureCopy && result.docPictureCut && result.docPaste && result.docOutline && result.docImport && result.docImportNotice && result.docExport && result.docCursors && result.docCard && result.docReopened && result.docWords === '10 words'
+  return result.docPrintKey && result.docPastePicture && result.docPicture && result.docPictureCopy && result.docPictureCut && result.docPaste && result.docOutline && result.docImport && result.docImportNotice && result.docExport && result.docCursors && result.docCard && result.docReopened && result.docWords === '10 words'
 }

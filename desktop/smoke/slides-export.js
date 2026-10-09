@@ -48,7 +48,7 @@ function pdfPages (file) {
 }
 
 async function run (t) {
-  const { wc, js, step, waitFor, type, key, more, downloads, dataDir, result, sleep } = t
+  const { wc, js, step, waitFor, type, key, sendMod, more, downloads, dataDir, result, sleep } = t
   const shots = process.env.PEAROFFICE_SMOKE_EXPORT_SHOTS
   const count = "document.querySelectorAll('.slide-thumbs .slide-thumb[data-id]').length"
   const centre = async (sel) => js(`(() => { const r = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) } })()`)
@@ -133,6 +133,14 @@ async function run (t) {
   result.exportPdf = pdfBytes.slice(0, 4).toString() === '%PDF' && info.pages === 2 && (info.size === '' || info.size === '960x540')
   if (!result.exportPdf) throw new Error('PDF: ' + JSON.stringify({ bytes: pdfBytes.length, ...info }))
   step('PDF saved: ' + info.pages + ' pages, ' + (info.size || 'size unknown') + ' pt, ' + pdfMs + ' ms')
+
+  // Ctrl+P prints, as Print... does.
+  const printed = path.join(dataDir, 'printed.html')
+  await sendMod('P', ['control'])
+  for (const t2 = Date.now(); !fs.existsSync(printed) && Date.now() - t2 < 15000;) await sleep(200)
+  result.printKey = fs.existsSync(printed) && fs.readFileSync(printed, 'utf8').includes('Second page')
+  if (!result.printKey) throw new Error('Ctrl+P did not print the deck')
+  step('Ctrl+P prints')
 
   // PowerPoint: a download.
   const pptBefore = fs.existsSync(downloads) ? fs.readdirSync(downloads) : []

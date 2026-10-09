@@ -272,6 +272,12 @@ module.exports = async function sheetFiles (t) {
   await sleep(300)
   const pdf = fs.existsSync(pdfFile) ? fs.readFileSync(pdfFile) : Buffer.alloc(0)
   result.csvPdf = csv.includes('Rent,1200') && csv.includes('Total,1650.5') && pdf.length > 1000 && pdf.slice(0, 4).toString() === '%PDF'
+  // Ctrl+P prints the tab, as Print this tab... does.
+  const printed = path.join(dataDir, 'printed.html')
+  await sendMod('P', ['control'])
+  for (const t0 = Date.now(); !fs.existsSync(printed) && Date.now() - t0 < 15000;) await sleep(200)
+  result.printKey = fs.existsSync(printed) && fs.readFileSync(printed, 'utf8').includes('1650.5')
+  if (!result.printKey) throw new Error('Ctrl+P did not print the tab')
   await js("document.querySelector('.tab.active').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 60, clientY: 700 }))")
   await waitFor('tab menu', "[...document.querySelectorAll('.menu li')].some((l) => l.textContent === 'Duplicate')")
   await js("[...document.querySelectorAll('.menu li')].find((l) => l.textContent === 'Duplicate').click()")
@@ -351,5 +357,5 @@ module.exports = async function sheetFiles (t) {
   result.importedFormats = true
   step('import')
 
-  return result.importedFormats && result.formats && result.csvPdf && result.tabs && result.tidied && result.jsonImport && result.csvImport && result.importedFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000
+  return result.importedFormats && result.formats && result.csvPdf && result.printKey && result.tabs && result.tidied && result.jsonImport && result.csvImport && result.importedFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000
 }

@@ -20,6 +20,7 @@ import { Show, Presenter } from './Present.jsx'
 import { PicturesContext, usePictureCache, hasText } from './objects.jsx'
 import { InsertShape, ShapeTools, AnchorButtons } from './ShapeTools.jsx'
 import { exportDeck } from './pdfExport.jsx'
+import { usePrintKey } from '../printKey.js'
 import { ChartTools, ChartDataPanel } from './ChartTools.jsx'
 import { sampleChart } from './SlideChart.jsx'
 
@@ -405,6 +406,7 @@ export function SlidesView ({ sheetId, onTitleChange, onError, onGone }) {
     window.addEventListener('keydown', down)
     return () => window.removeEventListener('keydown', down)
   }, [])
+  usePrintKey(() => { if (!presentingRef.current) exportDeck(ydoc, title, 'print', sheetId).catch((err) => onError(err.message)) })
   // Leaving the deck mid-show ends it (closes the audience window).
   useEffect(() => () => { if (presentingRef.current) call('app:presentEnd').catch(() => {}) }, [])
 
