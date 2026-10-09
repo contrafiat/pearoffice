@@ -24,6 +24,10 @@ if [ "${DRY_RUN:-0}" = 1 ]; then echo "dry run: would publish PearOffice $VERSIO
 
 keytool -importkeystore -srckeystore "$KEYSTORE_FILE" -srcalias "$KEY_ALIAS" -srcstorepass "$KEYSTORE_PASSWORD" -srckeypass "$KEY_PASSWORD" \
   -destkeystore "$P12" -deststoretype PKCS12 -deststorepass "$KEYSTORE_PASSWORD" -noprompt 2>/dev/null
-SIGN_WITH="$SIGN_WITH" KEYSTORE_PASSWORD="$KEYSTORE_PASSWORD" zsp identity --link-key "$P12" || echo "identity link returned non-zero (may already be linked)"
+# zsp identity asks for a confirmation on a terminal; signed offline and
+# sent with nak instead, so it runs anywhere.
+PROOF=$(SIGN_WITH="$SIGN_WITH" KEYSTORE_PASSWORD="$KEYSTORE_PASSWORD" zsp identity --link-key "$P12" --offline 2>/dev/null | grep -E '^\{' | tail -1)
+[ -n "$PROOF" ] || { echo "could not sign the identity proof" >&2; exit 1; }
+printf '%s' "$PROOF" | nak event wss://relay.zapstore.dev wss://relay.primal.net wss://relay.damus.io
 APP_VERSION="$VERSION" GITHUB_TOKEN="$(gh auth token)" SIGN_WITH="$SIGN_WITH" zsp publish -y zapstore.yaml
 echo "published PearOffice $VERSION to Zapstore"
