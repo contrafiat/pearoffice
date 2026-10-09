@@ -27,3 +27,6 @@ assets/third-party-notices.txt
 !metadata/store/
 !metadata/store/android/
 !metadata/store/ios/
+
+# Release signing passwords (scripts/build-android-release.sh)
+scripts/.env

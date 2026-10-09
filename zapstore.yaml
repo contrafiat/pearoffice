@@ -1,0 +1,40 @@
+repository: https://github.com/peerloomllc/pearoffice-releases
+
+name: PearOffice
+summary: Spreadsheets, documents and slides you share and edit together - no account, no server, no cloud
+description: |
+  PearOffice is a private, peer-to-peer office app. Spreadsheets, documents
+  and slides live only on your devices and the devices of the people you
+  share them with, and sync straight between them, encrypted. No accounts,
+  no servers and no company holding a copy of your files.
+
+  Features:
+  - Spreadsheets with around 400 formulas, charts, filters and comments
+  - Documents with headings, lists, tables and pictures
+  - Slides with layouts, shapes, charts, themes and a presenter view
+  - Edit together live and see who else is in a file
+  - Share with single-use links, as an editor or a viewer
+  - Open and save Excel, Word and PowerPoint files, CSV, Markdown and PDF
+  - Link your phone and computers; a 12-word recovery phrase restores you
+  - An optional seeder you run keeps files online and cannot read them
+
+tags:
+  - office
+  - spreadsheet
+  - documents
+  - slides
+  - privacy
+  - p2p
+
+license: MIT
+website: https://peerloomllc.com/pearoffice/
+
+images:
+  - ./metadata/store/android/01-files.png
+  - ./metadata/store/android/02-sheet.png
+  - ./metadata/store/android/03-document.png
+  - ./metadata/store/android/04-slides.png
+  - ./metadata/store/android/05-sharing.png
+
+metadata_sources:
+  - github
