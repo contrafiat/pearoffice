@@ -16,6 +16,7 @@ import * as Print from 'expo-print'
 import * as DocumentPicker from 'expo-document-picker'
 import * as ImagePicker from 'expo-image-picker'
 import * as Clipboard from 'expo-clipboard'
+import * as Haptics from 'expo-haptics'
 import b4a from 'b4a'
 import { requestLocalNetworkPermission } from '../modules/local-network'
 
@@ -119,6 +120,16 @@ async function shellMethod (method, args) {
   }
   if (method === 'app:setClipboard') { await Clipboard.setStringAsync(String(args.text || '')); return { ok: true } }
   if (method === 'app:getClipboard') return { text: await Clipboard.getStringAsync() }
+  if (method === 'app:haptic') {
+    const k = args.kind
+    try {
+      if (k === 'success') await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
+      else if (k === 'warn') await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning)
+      else if (k === 'select') await Haptics.selectionAsync()
+      else await Haptics.impactAsync(k === 'medium' ? Haptics.ImpactFeedbackStyle.Medium : Haptics.ImpactFeedbackStyle.Light)
+    } catch {}
+    return { ok: true }
+  }
   return null
 }
 

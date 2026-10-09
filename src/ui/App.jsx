@@ -12,6 +12,7 @@ import { Avatar, MemberAvatar } from './Avatar.jsx'
 import { SettingsPanel } from './SettingsPanel.jsx'
 import { UpdateBar } from './UpdateBar.jsx'
 import { applyTheme } from './theme.js'
+import { haptic, hapticTaps } from './haptic.js'
 import { FileHome, KindIcon, NewPanel, RecoverPanel, untitled } from './Files.jsx'
 import { DonationReminder, donationsShown } from './About.jsx'
 import { Onboarding } from './Onboarding.jsx'
@@ -126,6 +127,7 @@ export function App () {
   const [newFile, setNewFile] = useState(false) // the New panel, asking which kind
   // A short note at the bottom ("Joined ..."), gone after a few seconds.
   const [toast, setToast] = useState(null)
+  useEffect(() => hapticTaps(), [])
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(null), 4000); return () => clearTimeout(t) }, [toast])
   const [waitingJoin, setWaitingJoin] = useState(null) // sheetId of the join shown in a progress panel
   const [seeder, setSeeder] = useState(false)
@@ -159,6 +161,7 @@ export function App () {
       return
     }
     if (!welcomeBack || !restore || restore.state !== 'done' || !(restore.files > 0)) return
+    haptic('success')
     setToast(restore.files === 1 ? '1 file came back' : restore.files + ' files came back')
     setWelcomeBack(false)
     call('app:setWelcomeBack', { show: false }).catch(() => {})
@@ -248,6 +251,7 @@ export function App () {
         setCurrent(sheetId)
         setWaitingJoin((w) => (w === sheetId ? null : w))
         const s = list && list.find((x) => x.sheetId === sheetId)
+        haptic('success')
         setToast('Joined ' + (s && s.title ? '"' + s.title + '"' : 'the file'))
       }),
       // A sheet moved to fresh keys: follow it if it is the one on screen.
@@ -374,6 +378,7 @@ export function App () {
               await refresh()
               setRecovering(null)
               setCurrent(sheetId)
+              haptic('success')
               setToast('"' + (recovering.title || untitled(recovering.kind)) + '" is yours again')
             } catch (err) { setError(err.message); setRecovering(null) }
           }}

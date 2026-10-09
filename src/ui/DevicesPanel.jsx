@@ -161,7 +161,7 @@ export function DevicesPanel ({ initialLink = '', startWith = null, onBack = nul
             {link && (
               <div className='row'>
                 <input readOnly value={link.link} aria-label='Device link' onFocus={(e) => e.target.select()} />
-                <button className='primary' onClick={async () => { try { await navigator.clipboard.writeText(link.link); setCopied(true) } catch { if (window.pearoffice.platform === 'mobile') { await call('app:setClipboard', { text: link.link }); setCopied(true) } } }}>{copied ? 'Copied' : 'Copy'}</button>
+                <button className='primary' data-haptic='success' onClick={async () => { try { await navigator.clipboard.writeText(link.link); setCopied(true) } catch { if (window.pearoffice.platform === 'mobile') { await call('app:setClipboard', { text: link.link }); setCopied(true) } } }}>{copied ? 'Copied' : 'Copy'}</button>
               </div>
             )}
             {link && (
