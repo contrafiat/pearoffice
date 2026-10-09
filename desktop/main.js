@@ -272,6 +272,8 @@ ipcMain.handle('worklet:call', async (_e, method, args) => {
     try {
       await page.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(String((args && args.html) || '')))
       if (method === 'app:print') {
+        // The smoke test cannot answer a print dialog: it keeps the page.
+        if (SMOKE) { fs.writeFileSync(path.join(dataDir, 'printed.html'), String(args.html)); return { ok: true } }
         const opts = size ? { pageSize: { width: Math.round(size.width * 25400), height: Math.round(size.height * 25400) }, margins: { marginType: 'none' } } : {}
         await new Promise((resolve) => page.webContents.print({ printBackground: true, ...opts }, () => resolve()))
         return { ok: true }

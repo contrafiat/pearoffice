@@ -25,6 +25,7 @@ import { readPref, writePref } from '../prefs.js'
 import { Minus, ArrowCounterClockwise, ArrowClockwise, TextB, TextItalic, TextAUnderline, PaintBucket, Copy, Scissors, ClipboardText, Eraser, Numpad, FileXls, Plus, MagnifyingGlass, X, ChartBar, PencilSimple, DownloadSimple, Trash, TextUnderline, TextStrikethrough, TextAlignLeft, TextAlignCenter, TextAlignRight, ArrowUDownLeft, FrameCorners, AlignTop, AlignCenterVertical, AlignBottom, ArrowsOutLineHorizontal } from '@phosphor-icons/react'
 import { FormulaHelp, helpFor, insertFunction } from './FormulaHelp.jsx'
 import { exportSheet, exportCsv, exportJson, printTab, isMobile } from './xlsx.js'
+import { usePrintKey } from '../printKey.js'
 
 const COLOURS = ['#1f2420', '#b3261e', '#c2410c', '#a16207', '#15803d', '#0e7490', '#1d4ed8', '#7e22ce']
 const ZOOM_STEPS = [0.5, 0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5]
@@ -583,6 +584,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
   // The tab's charts as SVG for PDF and print, in light colours on white.
   const PAPER = { ink: '#1f2420', muted: '#6b716b', line: '#e2e3dd', lineStrong: '#c9cbc2', panel: '#ffffff' }
   const printCharts = () => (view.charts || []).map((c) => chartSvg(c, c.size.w, c.size.h, PAPER)).filter(Boolean)
+  usePrintKey(() => printTab(view, 'print', printCharts()).catch((err) => onError(err.message)))
 
   // Freeze panes (proposals/2026-10-04-freeze-filter.md), shared by everyone.
   const frozen = (view && view.freeze) || { rows: 0, cols: 0 }

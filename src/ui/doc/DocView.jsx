@@ -15,6 +15,7 @@ import { colourFor } from '../Avatar.jsx'
 import { readPref, writePref } from '../prefs.js'
 import { isMobile } from '../sheet/xlsx.js'
 import { exportDocument, tidyPaste } from './docFiles.js'
+import { usePrintKey } from '../printKey.js'
 import { Outline } from './Outline.jsx'
 import { documentExtensions, FindReplace, findKey, changeCaseCommand, LINE_HEIGHTS, SIZES } from './extensions.js'
 import { PictureView, pictureCache, preparePicture, isPicture, toB64, fromB64, noteCopied, pictureClipboard, foreignPictures, adoptPictures } from './pictures.js'
@@ -54,6 +55,7 @@ export function DocView ({ sheetId, onTitleChange, onError, onGone }) {
   const [finding, setFinding] = useState(false)
   const members = useMembers(sheetId)
   const phone = isMobile()
+  usePrintKey(() => exportDocument(ydoc, title, 'print', sheetId).catch((err) => onError(err.message)))
   // The outline is remembered on desktop; on a phone it is a sheet opened
   // when wanted.
   const [outline, setOutline] = useState(() => !phone && readPref(OUTLINE_PREF) === '1')
