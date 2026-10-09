@@ -172,11 +172,23 @@ and `index.html`. `node scripts/stage-umbrel.js` stages it per arch in
 `dist/umbrel/`; `scripts/build-umbrel-image.sh` builds amd64 and arm64 and
 pushes `ghcr.io/peerloomllc/pearoffice-seeder` (`PUSH=0` to only build). It
 must run with host networking: through Docker's bridge, devices cannot pair.
-The store entry is `peerloom-umbrel-app-store/peerloom-pearoffice-seeder/`.
+The store entry is `peerloom-umbrel-app-store/peerloom-pearoffice-seeder/`;
+the official one is `pearoffice-seeder` in getumbrel/umbrel-apps (first
+listing PR #6172, from PeerLoom's fork `../umbrel-apps`).
 
-Updates (proposals/2026-10-05-update-checker.md): releases go to the public
-`peerloomllc/pearoffice-releases` with `scripts/release.sh <notes> [version]`
-(after the dist scripts; writes a `.sha256` for every file). The desktop
+Releasing: write `notes/release-<v>.md` (rule 13, a `## Downloads` section
+last), run `scripts/release.sh prepare <v>` (sets the version everywhere with
+`scripts/release/bump.js`, opens the PR), merge it, then `scripts/release.sh
+publish` on main. It builds and tests every platform and publishes, asking
+before each publishing step: the GitHub release on the public
+`peerloomllc/pearoffice-releases` (a `.sha256` for every file), Zapstore,
+the App Store (app 6820799007; `scripts/ios-appstore.sh`), the Umbrel image
+and both Umbrel stores, the StartOS registry on the website
+(`start9/registry/build-registry-04.js`), and prints the Google Play steps.
+`DRY_RUN=1` builds but publishes nothing; steps can be named
+(`scripts/release.sh publish github zapstore`).
+
+Updates (proposals/2026-10-05-update-checker.md): the desktop
 app checks it through `desktop/updates.js` and shows `src/ui/UpdateBar.jsx`;
 the checking and installing code is `@peerloom/host`'s, copied into
 `desktop/vendor/peerloom-host/` by `node scripts/vendor-peerloom-host.js`.
