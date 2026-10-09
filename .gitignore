@@ -32,3 +32,4 @@ assets/third-party-notices.txt
 scripts/.env
 !metadata/ios/
 !metadata/android/
+start9/seeder/*.sha256
