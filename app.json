@@ -73,6 +73,7 @@
         }
       ],
       "./plugins/with-android-debug-standalone",
+      "./plugins/with-android-release-signing",
       "./plugins/with-android-abis",
       "./plugins/with-gradle-jvmargs",
       "./plugins/with-android-queries",
