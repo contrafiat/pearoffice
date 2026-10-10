@@ -59,6 +59,10 @@ test('the phrase brings files back', async (t) => {
   await call(val, 'sheet:join', { link: valInvite })
   await waitFor('Val reads it', async () => (await grid(val, viewed))['1,1'] === 'for val')
 
+  // A folder with one of the files in it (proposals/2026-10-10-folders.md).
+  const garden = await call(ed, 'file:newFolder', { name: 'Garden' })
+  await call(ed, 'file:place', { sheetId: solo, folder: garden.id })
+
   // Ed's files and the keyring reach the seeder.
   for (const id of [solo, olives, viewed]) {
     await waitFor('the seeder holds ' + id.slice(0, 6), async () => seeder.allowedSheets().includes(hex(ed.bases.get(id).key)), { timeout: 40000 })
@@ -89,6 +93,12 @@ test('the phrase brings files back', async (t) => {
     assert.equal(seeder.isPaired(r.swarm.keyPair.publicKey), true)
     assert.deepEqual((await call(r, 'seeder:list')).map((s) => s.seederKey), [hex(seeder.seederKey)])
     await waitFor('content from the seeder', async () => (await grid(r, solo))['1,1'] === 'only ed has this', { timeout: 40000 })
+  })
+
+  await t.test('and the folders they were in', async () => {
+    const f = await call(r, 'file:folders')
+    assert.deepEqual(f.folders, [{ id: garden.id, name: 'Garden' }])
+    assert.deepEqual(f.places, { [solo]: garden.id })
   })
 
   await t.test('Olive\'s device lets him back into her file', async () => {

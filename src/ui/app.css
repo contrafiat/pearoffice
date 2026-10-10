@@ -1260,3 +1260,36 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 .nudge-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--pear); margin-left: 4px; }
 .me-row { position: relative; }
 .me-row .nudge-dot { position: absolute; top: 6px; right: 4px; margin: 0; }
+
+/* Folders (proposals/2026-10-10-folders.md) */
+.kind-folder { color: #c98a12; }
+.file-cell { position: relative; }
+.card-more { position: absolute; top: 8px; right: 8px; display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; padding: 0; border: 0; border-radius: 6px; background: none; color: var(--muted); cursor: pointer; }
+.card-more:hover { background: var(--head); color: var(--ink); }
+.new-folder-card { border-style: dashed; color: var(--muted); }
+.new-folder-card .file-title { font-weight: 500; }
+.file-card.drop-here, .folder-back.drop-here { border-color: var(--pear); background: var(--pear-soft); }
+.folder-head { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; max-width: 960px; margin: 0 auto 16px; }
+.folder-head h1 { margin: 0; display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.folder-head h1 svg { color: #c98a12; flex: none; }
+.folder-back { justify-self: start; display: inline-flex; align-items: center; gap: 4px; padding: 6px 8px; border: 1px solid transparent; border-radius: 8px; text-decoration: none; }
+.folder-more { justify-self: end; display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; padding: 0; border: 0; border-radius: 8px; background: none; color: var(--muted); cursor: pointer; }
+.folder-more:hover { background: var(--head); color: var(--ink); }
+.folder-empty { text-align: center; margin: 0 auto 16px; max-width: 520px; }
+.card-menu { min-width: 170px; }
+.sidebar .folder-link { display: flex; align-items: center; gap: 6px; color: var(--ink); }
+.sidebar .folder-link svg:nth-child(2) { color: #c98a12; flex: none; }
+.sidebar .folder-count { color: var(--muted); font-size: 12px; }
+.side-folder-files { display: flex; flex-direction: column; gap: 2px; padding-left: 16px; }
+.panel .folder-choices { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; max-height: 50vh; overflow-y: auto; }
+.panel .folder-choice { width: 100%; display: flex; align-items: center; gap: 10px; padding: 10px 12px; text-align: left; }
+.panel .folder-choice.current { border-color: var(--pear); }
+.panel .folder-choice-icon { width: 20px; flex: none; color: #c98a12; }
+.panel .folder-choice-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.panel .move-what { margin: 0; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.panel .row.center > button { display: inline-flex; align-items: center; gap: 6px; }
+@media (max-width: 720px) {
+  .file-cell .file-card { padding-right: 46px; }
+  .card-more { top: 50%; transform: translateY(-50%); }
+  .folder-head h1 { font-size: 20px; }
+}

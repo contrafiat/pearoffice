@@ -9,6 +9,9 @@
 //   files  { t, files: [entry] }                     after both hellos, in parts
 //   file   { t, file: entry }                        when this device creates,
 //                                                    joins or follows a file
+//   folders { t, folders, places }                   after the files, in parts,
+//                                                    and on each change here
+//                                                    (folders.js records)
 //
 //   entry  { sheetId, groupKey, encryptionKey, bootstrap, name, kind, from }
 //
@@ -37,7 +40,7 @@ const TOPIC_NAMESPACE = 'pearoffice/own-devices/topic/1'
 const CHANNEL_NAMESPACE = 'pearoffice/own-devices/channel/1'
 const HELLO_MAX_AGE_MS = 10 * 60 * 1000
 const MAX_FILES = 5000
-const PART = 500 // entries per `files` message
+const PART = 500 // entries per `files` message, places per `folders` message
 const NOTIFY_AFTER_MS = 300
 const KINDS = ['sheet', 'doc', 'slides']
 const hex = (buf) => b4a.toString(buf, 'hex')
@@ -93,7 +96,8 @@ function cleanEntry (e) {
 
 // describe(sheetId): { title, kind } for a file whose content is loaded here,
 // else null. getMoves: moves.js, to get this device admitted.
-function createOwnDevices ({ engine, getJoin = () => null, getMoves = () => null, describe = () => null, emit, log = () => {}, now = () => Date.now() }) {
+// getFolders: folders.js, for this person's folders.
+function createOwnDevices ({ engine, getJoin = () => null, getMoves = () => null, getFolders = () => null, describe = () => null, emit, log = () => {}, now = () => Date.now() }) {
   const muxes = new Set()
   const channels = new Set()
   // For tests: hellos accepted and refused, entries looked at, files opened
@@ -172,11 +176,19 @@ function createOwnDevices ({ engine, getJoin = () => null, getMoves = () => null
       stats.accepted++
       const files = await entries()
       for (let i = 0; i < files.length; i += PART) send(ch, { t: 'files', files: files.slice(i, i + PART) })
+      const folders = getFolders()
+      if (folders) {
+        const { folders: f, places } = await folders.all()
+        const ids = Object.keys(places)
+        send(ch, { t: 'folders', folders: f, places: {} })
+        for (let i = 0; i < ids.length; i += PART) send(ch, { t: 'folders', folders: {}, places: Object.fromEntries(ids.slice(i, i + PART).map((id) => [id, places[id]])) })
+      }
       return
     }
     if (!ch.peer) return
     if (msg.t === 'files' && Array.isArray(msg.files) && msg.files.length <= MAX_FILES) take(msg.files)
     else if (msg.t === 'file') take([msg.file])
+    else if (msg.t === 'folders' && getFolders()) await getFolders().take(msg)
   }
 
   // --- what this device has -----------------------------------------------------
@@ -295,6 +307,13 @@ function createOwnDevices ({ engine, getJoin = () => null, getMoves = () => null
     }
   }
 
+  // Folders or placements changed here: tell the devices connected now.
+  // Ones that are not hear it in the next hello, or from the keyring.
+  function sendFolders ({ folders = {}, places = {} }) {
+    if (closed) return
+    for (const ch of channels) if (ch.peer) send(ch, { t: 'folders', folders, places })
+  }
+
   function close () {
     closed = true
     clearTimeout(notifyTimer)
@@ -303,7 +322,7 @@ function createOwnDevices ({ engine, getJoin = () => null, getMoves = () => null
     if (topic) engine.swarm.leave(topic).catch(() => {})
   }
 
-  return { start, onConnection, notify, close, entries, take, stats, get topic () { return topic } }
+  return { start, onConnection, notify, sendFolders, close, entries, take, stats, get topic () { return topic } }
 }
 
 module.exports = { createOwnDevices, ownTopic, channelId, makeHello, checkHello, cleanEntry, PROTOCOL, PURPOSE }

@@ -13,14 +13,17 @@
 //   - a file the keyring lists that this device removed, saw deleted or
 //     saw move away: marked removed, now. A file this device never had
 //     (another device's) stays as it is;
-//   - each paired seeder: listed.
+//   - each paired seeder: listed;
+//   - this device's folders and placements (folders.js), merged in. Ones
+//     that came from elsewhere are taken in here after the merge.
 
 const b4a = require('b4a')
 const { deriveKeys, empty, seal, open, clean, merge } = require('./keyring')
+const { mergeRecords } = require('./folders')
 
 const hex = (buf) => b4a.toString(buf, 'hex')
 
-function createKeyringSync ({ engine, getSeeding, getOwnDevices, emit = () => {}, log = () => {}, now = () => Date.now(), gapMs = 60 * 1000, checkMs = 60 * 1000, settleMs = 3000 }) {
+function createKeyringSync ({ engine, getSeeding, getOwnDevices, getFolders = () => null, emit = () => {}, log = () => {}, now = () => Date.now(), gapMs = 60 * 1000, checkMs = 60 * 1000, settleMs = 3000 }) {
   let keys = null
   let keysFor = null
   let timer = null
@@ -44,9 +47,9 @@ function createKeyringSync ({ engine, getSeeding, getOwnDevices, emit = () => {}
     return false
   }
 
-  const fingerprintOf = (files, seederKeys) => JSON.stringify([files.map((e) => JSON.stringify(e)).sort(), [...seederKeys].sort()])
+  const fingerprintOf = (files, seederKeys, folders) => JSON.stringify([files.map((e) => JSON.stringify(e)).sort(), [...seederKeys].sort(), folders])
 
-  async function withLocalChanges (keyring, files, seederKeys) {
+  async function withLocalChanges (keyring, files, seederKeys, folders) {
     const k = clean(keyring)
     const at = now()
     const here = new Set()
@@ -59,6 +62,8 @@ function createKeyringSync ({ engine, getSeeding, getOwnDevices, emit = () => {}
       if (!item.removed && !here.has(id) && await gone(id)) k.files[id] = { at, removed: true }
     }
     for (const s of seederKeys) if (!k.seeders[s] || k.seeders[s].removed) k.seeders[s] = { at }
+    k.folders = mergeRecords(k.folders, folders.folders, at)
+    k.places = mergeRecords(k.places, folders.places, at)
     return k
   }
 
@@ -69,13 +74,14 @@ function createKeyringSync ({ engine, getSeeding, getOwnDevices, emit = () => {}
     const seederKeys = (await seeding.list()).map((s) => s.seederKey)
     if (!seederKeys.length) return { written: false }
     const files = await own.entries()
+    const folders = getFolders() ? await getFolders().all() : { folders: {}, places: {} }
     const last = await local()
-    const fingerprint = fingerprintOf(files, seederKeys)
+    const fingerprint = fingerprintOf(files, seederKeys, folders)
     if (!force && fingerprint === last.fingerprint && seederKeys.every((s) => last.held.includes(s))) return { written: false }
 
     const ks = keysNow()
     const locator = hex(ks.locator)
-    let keyring = await withLocalChanges(last.keyring, files, seederKeys)
+    let keyring = await withLocalChanges(last.keyring, files, seederKeys, folders)
     let seq = last.seq
     const got = await Promise.all(seederKeys.map((s) => seeding.keyringGet(s, locator).catch(() => null)))
     for (const rec of got) {
@@ -86,6 +92,8 @@ function createKeyringSync ({ engine, getSeeding, getOwnDevices, emit = () => {}
       keyring = merge(keyring, theirs, now())
     }
     keyring = merge(keyring, empty(), now()) // drops removals older than 30 days
+    // Folders changed on a device this one has not met lately.
+    if (getFolders()) await getFolders().take({ folders: keyring.folders, places: keyring.places })
     seq = Math.max(seq + 1, 1)
     const rec = seal(keyring, ks, seq)
     const held = []

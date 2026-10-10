@@ -263,10 +263,10 @@ module.exports = async function app (t) {
   step('removed from this device')
 
   // With nothing open, the start screen lists every file with its kind.
-  await waitFor('file list', "!!document.querySelector('.files-home') && document.querySelectorAll('.file-card').length === " + result.sheetsAfter)
+  await waitFor('file list', "!!document.querySelector('.files-home') && document.querySelectorAll('.file-card:not(.folder-card):not(.new-folder-card)').length === " + result.sheetsAfter)
   await t.shot('PEAROFFICE_SMOKE_HOME_SHOT', 300)
   result.fileIcons = await js("document.querySelectorAll('.file-card .kind-icon.kind-sheet').length")
-  await js("document.querySelector('.file-card').click()")
+  await js("document.querySelector('.file-card:not(.folder-card):not(.new-folder-card)').click()")
   await waitFor('opened from the list', "!!document.querySelector('.grid .body')")
   step('file list')
 
