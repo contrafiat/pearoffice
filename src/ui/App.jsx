@@ -14,9 +14,10 @@ import { UpdateBar } from './UpdateBar.jsx'
 import { applyTheme } from './theme.js'
 import { haptic, hapticTaps } from './haptic.js'
 import { FileHome, KindIcon, NewPanel, RecoverPanel, untitled } from './Files.jsx'
+import { DeleteFolderPanel, FolderNamePanel, MoveToFolderPanel, filesIn, useFolders } from './Folders.jsx'
 import { DonationReminder, donationsShown } from './About.jsx'
 import { Onboarding } from './Onboarding.jsx'
-import { CircleNotch, FileArrowUp, GearSix, House, Info, LinkSimple, List, Plus } from '@phosphor-icons/react'
+import { CaretDown, CaretRight, CircleNotch, FileArrowUp, FolderSimple, GearSix, House, Info, LinkSimple, List, Plus } from '@phosphor-icons/react'
 import { PearMark } from './PearMark.jsx'
 
 applyTheme()
@@ -167,6 +168,28 @@ export function App () {
     call('app:setWelcomeBack', { show: false }).catch(() => {})
   }, [welcomeBack, restore, sheets])
   const [recovering, setRecovering] = useState(null) // a file to offer a copy of
+  // Folders (proposals/2026-10-10-folders.md): the one open on the start
+  // screen, the panels and the menu on a card.
+  const { folders, places } = useFolders()
+  const [folder, setFolder] = useState(null)
+  const folderRef = useRef(null)
+  folderRef.current = folder && folders.some((f) => f.id === folder) ? folder : null
+  const [naming, setNaming] = useState(null) // { folder } to rename, {} for a new one
+  const [droppingFolder, setDroppingFolder] = useState(null)
+  const [moving, setMoving] = useState(null) // a file to move to a folder
+  const [cardMenu, setCardMenu] = useState(null) // { x, y, file } or { x, y, folder }
+  // Folders open in the side list, per device.
+  const [sideOpen, setSideOpen] = useState(() => { try { return JSON.parse(readPref('pearoffice:openFolders') || '[]') } catch { return [] } })
+  const toggleSide = (id) => setSideOpen((list) => {
+    const next = list.includes(id) ? list.filter((x) => x !== id) : [...list, id]
+    writePref('pearoffice:openFolders', JSON.stringify(next))
+    return next
+  })
+  // A new or imported file goes into the folder open on the start screen.
+  const fileHere = useCallback(async (sheetId) => {
+    const f = folderRef.current
+    if (f && sheetId) await call('file:place', { sheetId, folder: f }).catch(() => {})
+  }, [])
   const [restoreHidden, setRestoreHidden] = useState(false)
 
   const refresh = useCallback(async () => {
@@ -190,12 +213,13 @@ export function App () {
   }, [])
 
   const opened = useCallback(async (sheetId, r) => {
+    await fileHere(sheetId)
     await refresh()
     setCurrent(sheetId)
     // A .pptx import says what it changed or left out (pptxImport.js, noticeFor).
     if (r && r.notice) setNotice(r.notice)
     else if (r && r.dropped) setNotice('Some parts of this file, such as pictures, were left out.')
-  }, [refresh])
+  }, [refresh, fileHere])
 
   const soon = useRef(null)
   const refreshSoon = useCallback(() => {
@@ -234,6 +258,7 @@ export function App () {
         if (tourBack) return tourBack.click()
         if (navRef.current) return setNavOpen(false)
         if (currentRef.current) return setCurrent(null)
+        if (folderRef.current) return setFolder(null)
         call('app:exit').catch(() => {})
       }),
       on('restore:changed', (r) => { setRestore(r); refresh() }),
@@ -302,6 +327,7 @@ export function App () {
         : kind === 'slides'
           ? await call('slides:create', { title: 'Untitled slides' })
           : await call('sheet:create', { title: 'Untitled sheet' })
+      await fileHere(sheetId)
       await refresh()
       setCurrent(sheetId)
     } catch (err) {
@@ -309,11 +335,38 @@ export function App () {
     }
   }
 
+  // A file in the side list.
+  const sideLink = (s) => (
+    <button
+      key={s.sheetId}
+      className={'sheet-link' + (s.sheetId === current ? ' active' : '') + (s.joining ? ' joining' : '') + (s.waiting ? ' waiting' : '') + (s.removed ? ' removed' : '')}
+      title={s.waiting ? 'Waiting for someone in this file to come online' : s.removed ? 'You were removed from this file' : undefined}
+      onClick={() => (s.waiting ? setWaitingJoin(s.sheetId) : setCurrent(s.sheetId))}
+    >
+      <KindIcon kind={s.kind} size={18} />
+      {s.owner
+        ? (
+          <span className='sheet-owner' title={s.owner.isMe ? 'Yours' : 'Owned by ' + (s.owner.name || 'someone')}>
+            <MemberAvatar sheetId={s.sheetId} member={s.owner} size={20} />
+          </span>
+          )
+        : <span className='sheet-owner placeholder' aria-hidden='true' />}
+      <span className='sheet-title'>{s.waiting ? 'Joining...' : (s.title || untitled(s.kind))}</span>
+      {s.joining && !s.waiting && <span className='badge'>joining</span>}
+      {!s.joining && s.people > 1 && (
+        <span className='people-count' title={s.people + ' people'} aria-label={s.people + ' people'}>
+          <svg viewBox='0 0 16 16' width='12' height='12' aria-hidden='true'><circle cx='8' cy='5' r='3' fill='currentColor' /><path d='M2 15c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5z' fill='currentColor' /></svg>
+          {s.people}
+        </span>
+      )}
+    </button>
+  )
+
   return (
     <div className={'app' + (navOpen ? ' nav-open' : '')}>
       <button className='nav-toggle' aria-label='Your files' aria-expanded={navOpen} onClick={() => setNavOpen(true)}><List size={20} aria-hidden='true' /></button>
       {navOpen && <div className='nav-scrim' onClick={() => setNavOpen(false)} />}
-      <aside className='sidebar' onClick={(e) => { if (e.target.closest('button')) setNavOpen(false) }}>
+      <aside className='sidebar' onClick={(e) => { if (e.target.closest('button') && !e.target.closest('.folder-link')) setNavOpen(false) }}>
         <div className='brand'>
           <PearMark size={20} />
           PearOffice
@@ -324,36 +377,27 @@ export function App () {
         <nav className='sheet-list' aria-label='Your files'>
           {sheets === null && <p className='muted'>Starting...</p>}
           {sheets && sheets.length > 0 && (
-            <button className={'sheet-link all-files' + (current ? '' : ' active')} onClick={() => setCurrent(null)}>
+            <button className={'sheet-link all-files' + (current ? '' : ' active')} onClick={() => { setCurrent(null); setFolder(null) }}>
               <House size={18} aria-hidden='true' /><span className='sheet-title'>All files</span>
             </button>
           )}
           {sheets && sheets.length === 0 && <p className='muted'>No files yet.</p>}
-          {sheets && [...sheets].reverse().map((s) => (
-            <button
-              key={s.sheetId}
-              className={'sheet-link' + (s.sheetId === current ? ' active' : '') + (s.joining ? ' joining' : '') + (s.waiting ? ' waiting' : '') + (s.removed ? ' removed' : '')}
-              title={s.waiting ? 'Waiting for someone in this file to come online' : s.removed ? 'You were removed from this file' : undefined}
-              onClick={() => (s.waiting ? setWaitingJoin(s.sheetId) : setCurrent(s.sheetId))}
-            >
-              <KindIcon kind={s.kind} size={18} />
-              {s.owner
-                ? (
-                  <span className='sheet-owner' title={s.owner.isMe ? 'Yours' : 'Owned by ' + (s.owner.name || 'someone')}>
-                    <MemberAvatar sheetId={s.sheetId} member={s.owner} size={20} />
-                  </span>
-                  )
-                : <span className='sheet-owner placeholder' aria-hidden='true' />}
-              <span className='sheet-title'>{s.waiting ? 'Joining...' : (s.title || untitled(s.kind))}</span>
-              {s.joining && !s.waiting && <span className='badge'>joining</span>}
-              {!s.joining && s.people > 1 && (
-                <span className='people-count' title={s.people + ' people'} aria-label={s.people + ' people'}>
-                  <svg viewBox='0 0 16 16' width='12' height='12' aria-hidden='true'><circle cx='8' cy='5' r='3' fill='currentColor' /><path d='M2 15c0-3.3 2.7-5.5 6-5.5s6 2.2 6 5.5z' fill='currentColor' /></svg>
-                  {s.people}
-                </span>
-              )}
-            </button>
-          ))}
+          {sheets && folders.map((fd) => {
+            const inside = filesIn([...sheets].reverse(), places, fd.id)
+            const shown = sideOpen.includes(fd.id)
+            return (
+              <div key={fd.id} className='side-folder'>
+                <button className='sheet-link folder-link' aria-expanded={shown} onClick={() => toggleSide(fd.id)}>
+                  {shown ? <CaretDown size={14} aria-hidden='true' /> : <CaretRight size={14} aria-hidden='true' />}
+                  <FolderSimple size={18} weight='duotone' aria-hidden='true' />
+                  <span className='sheet-title'>{fd.name}</span>
+                  <span className='folder-count'>{inside.length}</span>
+                </button>
+                {shown && <div className='side-folder-files'>{inside.map(sideLink)}</div>}
+              </div>
+            )
+          })}
+          {sheets && filesIn([...sheets].reverse(), places, null).map(sideLink)}
         </nav>
         <div className='me-bar'>
           <button className='me-row' onClick={() => setSettings(true)} aria-label='Settings'>
@@ -367,6 +411,46 @@ export function App () {
         </div>
       </aside>
       {newFile && <NewPanel onPick={create} onClose={() => setNewFile(false)} />}
+      {cardMenu && (
+        <>
+          <div className='doc-scrim' onPointerDown={() => setCardMenu(null)} />
+          <ul className='menu card-menu' role='menu' style={{ right: Math.max(8, window.innerWidth - cardMenu.x), top: Math.min(cardMenu.y + 4, window.innerHeight - 120) }} onClick={() => setCardMenu(null)}>
+            {cardMenu.file && <li role='menuitem' onClick={() => setMoving(cardMenu.file)}>Move to folder...</li>}
+            {cardMenu.folder && <li role='menuitem' onClick={() => setNaming({ folder: cardMenu.folder })}>Rename</li>}
+            {cardMenu.folder && <li role='menuitem' className='danger' onClick={() => setDroppingFolder(cardMenu.folder)}>Delete folder</li>}
+          </ul>
+        </>
+      )}
+      {naming && (
+        <FolderNamePanel
+          title={naming.folder ? 'Rename folder' : 'New folder'}
+          action={naming.folder ? 'Rename' : 'Create'}
+          initial={naming.folder ? naming.folder.name : ''}
+          onClose={() => setNaming(null)}
+          onSave={async (value) => {
+            try {
+              if (naming.folder) await call('file:renameFolder', { id: naming.folder.id, name: value })
+              else await call('file:newFolder', { name: value })
+              setNaming(null)
+            } catch (err) { setError(err.message) }
+          }}
+        />
+      )}
+      {droppingFolder && (
+        <DeleteFolderPanel
+          folder={droppingFolder}
+          count={sheets ? filesIn(sheets, places, droppingFolder.id).length : 0}
+          onClose={() => setDroppingFolder(null)}
+          onDelete={async () => {
+            try {
+              await call('file:deleteFolder', { id: droppingFolder.id })
+              setDroppingFolder(null)
+              setFolder((f) => (f === droppingFolder.id ? null : f))
+            } catch (err) { setError(err.message) }
+          }}
+        />
+      )}
+      {moving && <MoveToFolderPanel sheetId={moving.sheetId} title={moving.title || untitled(moving.kind)} onClose={() => setMoving(null)} onError={setError} />}
       {recovering && (
         <RecoverPanel
           file={recovering}
@@ -466,13 +550,22 @@ export function App () {
               ? <SlidesView key={current} sheetId={current} onTitleChange={refresh} onError={setError} onGone={async () => { forget(current); await refresh() }} />
               : current
               ? <SheetView key={current} sheetId={current} onTitleChange={refresh} onError={setError} onGone={async () => { forget(current); await refresh() }} />
-              : sheets && sheets.length
+              : sheets && (sheets.length || folders.length)
                 ? (
                   <FileHome
                     files={sheets}
                     onOpen={setCurrent}
                     onWaiting={setWaitingJoin}
                     onRecover={setRecovering}
+                    folders={folders}
+                    places={places}
+                    folder={folderRef.current}
+                    onFolder={setFolder}
+                    onNewFolder={() => setNaming({})}
+                    onFolderMenu={(e, fd) => { const r = e.currentTarget.getBoundingClientRect(); setCardMenu({ x: r.right, y: r.bottom, folder: fd }) }}
+                    onFileMenu={(e, f) => { const r = e.currentTarget.getBoundingClientRect(); setCardMenu({ x: r.right, y: r.bottom, file: f }) }}
+                    onDrop={(sheetId, fd) => call('file:place', { sheetId, folder: fd }).catch((err) => setError(err.message))}
+                    desktop={desktop}
                     actions={<StartActions onNew={() => setNewFile(true)} onJoin={() => setJoining('')} onImported={opened} onError={setError} />}
                   />
                   )

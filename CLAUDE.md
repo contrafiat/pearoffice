@@ -54,6 +54,8 @@ change on any of them, kept in every file like your name
 (proposals/2026-10-07-device-names.md).
 A person's linked devices keep the same files: one made, joined or moved
 on one device appears on the others (proposals/2026-10-07-own-devices-files.md).
+Files can go in folders, one level, yours alone, the same on all your devices
+and back with the phrase (proposals/2026-10-10-folders.md).
 On desktop, PearOffice can start hidden in the tray at login
 (`desktop/login.js`; XDG autostart on Linux, a LaunchAgent on macOS, login
 items on Windows). `PEAROFFICE_DEBUG=1` turns on logging in an installed copy.
@@ -104,6 +106,12 @@ Code that works for any kind of file sits apart from each editor's own
   the files; `app:restoreStatus`; `moves.recoverCopy` and `file:recoverCopy`
   for a file nobody else can let you into),
   `profiles.js` (your name and picture in every sheet),
+  `folders.js` (your folders, yours alone and one level: localDb
+  `folder:<id>` and `place:<sheetId>`, later wins; sent to your other
+  devices as `folders` on the own-devices channel, kept in the keyring's
+  `folders` and `places`, carried when a file moves; `file:folders`,
+  `file:newFolder`, `file:renameFolder`, `file:deleteFolder`, `file:place`,
+  event `folders:changed`; proposals/2026-10-10-folders.md),
   `devices.js` (your linked devices and their names: localDb
   `devices:<deviceKey>`, the signed `deviceName` op on each file's
   `device/<writerKey>` record, a first name from the platform; `app:devices`,
@@ -126,7 +134,9 @@ Code that works for any kind of file sits apart from each editor's own
   `src/sheet/xlsxStyles.js` (SheetJS CE writes none).
 - `src/sheet/jsonImport.js` turns a .json file into the same import payload
   as an .xlsx (a tab per list of records, the rest on a Summary tab).
-- `src/ui/` - the React UI: the app shell, file list, sharing, seeder,
+- `src/ui/` - the React UI: the app shell, file list with folders
+  (`Files.jsx`, `Folders.jsx`: folder cards, inside a folder, Move to
+  folder, drag onto a folder on desktop, folders in the side list), sharing, seeder,
   devices and settings panels, About and donations (`About.jsx`), the phrase entry
   (`PhraseInput.jsx`: one word at a time on phones, 12 boxes on desktop,
   suggestions from the word list), the first-run welcome and tour (`Onboarding.jsx`), Ctrl+P (Cmd+P on a Mac)
@@ -318,7 +328,7 @@ take five scenes: files, sheet, document, slides, sharing.
   bundle must create, edit and read a sheet over stdin/stdout, and the seeder
   bundle must start and print a pairing link.
 - `npm run smoke:desktop`: drives the real UI in Electron with an offscreen
-  window and real key and mouse events, in thirteen parts. Each part is its own
+  window and real key and mouse events, in fourteen parts. Each part is its own
   launch with a throwaway data folder and a 60 s limit, and prints one
   `ok`/`not ok` line, then a summary line. `sheets` is the grid editor
   (typing, formulas, spilling, fill, charts, copy and paste, undo, zoom; about
@@ -363,6 +373,11 @@ take five scenes: files, sheet, document, slides, sharing.
   and reopening, then smooth lines and white text kept after reopening
   (about 5 s); with `PEAROFFICE_SMOKE_CHART_SHOTS=<folder>` it
   saves each type in Plain and Midnight, the tools and the data panel.
+  `folders` is folders: New folder, Move to folder from a card and from
+  the file's menu, New inside a folder, dragging a file in and out, the
+  side list, renaming, reopening and deleting (the files stay) (about
+  5 s); with `PEAROFFICE_SMOKE_FOLDERS_SHOTS=<folder>` it saves the
+  screens.
   `app` is the shell: the New picker, theme, Seeder and Devices panels
   (Linked devices: this device's default name, renaming, kept after
   reopening and a reload; `PEAROFFICE_SMOKE_DEVICES_SHOT=<png>` saves the

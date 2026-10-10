@@ -4,6 +4,7 @@ import { SharePanel } from './SharePanel.jsx'
 import { PeopleStack } from './Avatar.jsx'
 import { DeletePanel } from './DeletePanel.jsx'
 import { TidyPanel } from './TidyPanel.jsx'
+import { MoveToFolderPanel } from './Folders.jsx'
 import { DotsThree, UserPlus } from '@phosphor-icons/react'
 
 // Everyone in a file, for the pictures next to Share.
@@ -26,6 +27,7 @@ export function FileBar ({ sheetId, noun, title, myRole, frozen, canEdit, badge,
   const [more, setMore] = useState(false) // the ⋯ menu
   const [deleting, setDeleting] = useState(null) // 'local' | 'everyone' | null
   const [tidying, setTidying] = useState(false)
+  const [moving, setMoving] = useState(false) // Move to folder
   const ICON = phone ? 20 : 18 // toolbar icon size
   const close = () => setMore(false)
 
@@ -56,6 +58,7 @@ export function FileBar ({ sheetId, noun, title, myRole, frozen, canEdit, badge,
           {more && (
             <ul className='menu more-menu' role='menu' onClick={close}>
               {menuItems && menuItems(close)}
+              <li role='menuitem' onClick={() => setMoving(true)}>Move to folder...</li>
               <li role='menuitem' onClick={() => setDeleting('local')}>Remove from this device</li>
               {myRole === 'owner' && !frozen && <li role='menuitem' onClick={() => setTidying(true)}>Tidy up this {noun}...</li>}
               {myRole === 'owner' && <li role='menuitem' className='danger' onClick={() => setDeleting('everyone')}>Delete for everyone</li>}
@@ -64,6 +67,7 @@ export function FileBar ({ sheetId, noun, title, myRole, frozen, canEdit, badge,
         </span>
       </header>
       {sharing && <SharePanel sheetId={sheetId} noun={noun} onClose={() => setSharing(false)} onError={onError} />}
+      {moving && <MoveToFolderPanel sheetId={sheetId} title={title} onClose={() => setMoving(false)} onError={onError} />}
       {tidying && <TidyPanel sheetId={sheetId} title={title} noun={noun} onClose={() => setTidying(false)} onError={onError} onDone={() => setTidying(false)} />}
       {deleting && <DeletePanel sheetId={sheetId} title={title} noun={noun} kind={deleting} onClose={() => setDeleting(null)} onError={onError} onDone={() => { setDeleting(null); onGone() }} />}
     </>
