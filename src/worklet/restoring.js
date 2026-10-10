@@ -20,7 +20,7 @@ const { deriveKeys, open, merge, empty, files, seeders, signClaim } = require('.
 
 const hex = (buf) => b4a.toString(buf, 'hex')
 
-function createRestoring ({ engine, getSeeding, getOwnDevices, emit = () => {}, log = () => {}, now = () => Date.now(), lookMs = 90 * 1000, settleMs = 5000 }) {
+function createRestoring ({ engine, getSeeding, getOwnDevices, getFolders = () => null, emit = () => {}, log = () => {}, now = () => Date.now(), lookMs = 90 * 1000, settleMs = 5000 }) {
   let closed = false
   let running = null
   let stop = null // ends a search under way
@@ -124,6 +124,9 @@ function createRestoring ({ engine, getSeeding, getOwnDevices, emit = () => {}, 
     // name these first, so each file asks them as soon as it is open (the
     // next seeding sweep registers it), even if opening waits on its data.
     for (const e of list) seeding.hint(e.sheetId, fromSeeders)
+    // The folders they were in (proposals/2026-10-10-folders.md), so each
+    // file shows in its folder as soon as it opens.
+    if (getFolders()) await getFolders().take({ folders: found.keyring.folders, places: found.keyring.places })
     await own.take(list)
     for (const e of list) seeding.hint(e.sheetId, fromSeeders)
     // Then every seeder at once: one that is gone does not hold up the rest.

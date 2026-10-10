@@ -11,8 +11,13 @@
 //
 // A keyring, before encryption:
 //
-//   { v: 1, files: { <sheetId>: item }, seeders: { <seederKey>: item } }
+//   { v: 1, files: { <sheetId>: item }, seeders: { <seederKey>: item },
+//     folders: { <folderId>: record }, places: { <sheetId>: record } }
 //   item  { at, entry } for a file, { at } for a seeder, { at, removed: true } when gone
+//
+// `folders` and `places` are folders.js records (proposals/2026-10-10-folders.md),
+// merged the same way. A place for a file the keyring no longer lists is
+// dropped. Older builds drop both sections when they write.
 //
 // A file entry is the own-devices entry (ownDevices.js cleanEntry) plus an
 // optional role. Merging keeps, per id, the item with the later `at`;
@@ -30,6 +35,7 @@
 const b4a = require('b4a')
 const sodium = require('sodium-universal')
 const { cleanEntry } = require('./ownDevices')
+const { cleanFolders, cleanPlaces, mergeRecords } = require('./folders')
 const { hash, signed, checkSealed, topicOf, signClaim, MAX_BYTES } = require('../seeder/keyringRecord')
 
 const NS = {
@@ -56,7 +62,7 @@ function deriveKeys (seed) {
 }
 
 function empty () {
-  return { v: 1, files: {}, seeders: {} }
+  return { v: 1, files: {}, seeders: {}, folders: {}, places: {} }
 }
 
 function seal (keyring, keys, seq) {
@@ -121,6 +127,8 @@ function clean (k) {
     const c = cleanItem(item, false)
     if (c) { out.seeders[key] = c; n++ }
   }
+  out.folders = cleanFolders(k.folders)
+  out.places = cleanPlaces(k.places)
   return out
 }
 
@@ -149,7 +157,11 @@ function mergeSection (a, b, now) {
 function merge (a, b, now = Date.now()) {
   a = clean(a)
   b = clean(b)
-  return { v: 1, files: mergeSection(a.files, b.files, now), seeders: mergeSection(a.seeders, b.seeders, now) }
+  const out = { v: 1, files: mergeSection(a.files, b.files, now), seeders: mergeSection(a.seeders, b.seeders, now) }
+  out.folders = mergeRecords(a.folders, b.folders, now)
+  out.places = mergeRecords(a.places, b.places, now)
+  for (const id of Object.keys(out.places)) if (!out.files[id]) delete out.places[id]
+  return out
 }
 
 // The files in a keyring that are still there.

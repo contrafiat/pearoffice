@@ -24,6 +24,7 @@ const { createPictures } = require('./pictures')
 const { createOwnDevices } = require('./ownDevices')
 const { createKeyringSync } = require('./keyringSync')
 const { createRestoring } = require('./restoring')
+const { createFolders } = require('./folders')
 const { createRelay } = require('./relay')
 const { newRoot, identityFromRoot } = require('../shared/phrase')
 const model = require('../sheet/sheetModel')
@@ -45,6 +46,7 @@ function createSheetEngine (opts = {}) {
   let ownDevices = null
   let keyring = null
   let restoring = null
+  let folders = null
   // The PeerLoom blind relay, direct first (proposals/2026-10-08-blind-relay.md).
   const relay = createRelay()
   const relayingDhts = new WeakMap() // swarm.dht -> its direct-first wrapper
@@ -105,6 +107,12 @@ function createSheetEngine (opts = {}) {
     'app:setRelay': async ({ on }) => ({ useRelay: await relay.save(engine.localDb, on !== false) }),
     'app:keyring': async () => (keyring ? keyring.status() : { seeders: 0, paired: 0, at: null }),
     'app:renameDevice': async ({ deviceKey, name }) => { await devices.rename(deviceKey, name); return { ok: true } },
+    // This person's folders (proposals/2026-10-10-folders.md).
+    'file:folders': async () => (folders ? folders.list() : { folders: [], places: {} }),
+    'file:newFolder': async ({ name }) => folders.create(name),
+    'file:renameFolder': async ({ id, name }) => folders.rename(id, name),
+    'file:deleteFolder': async ({ id }) => folders.remove(id),
+    'file:place': async ({ sheetId, folder }) => folders.place(sheetId, folder === undefined ? null : folder),
     'seeder:pair': async ({ link }) => seeding.pair(link),
     'seeder:list': async () => seeding.list(),
     'seeder:sheet': async ({ sheetId }) => seeding.sheetSeeders(sheetId),
@@ -211,7 +219,14 @@ function createSheetEngine (opts = {}) {
       pictures = createPictures({ engine, sheets, getSeeding: () => seeding, log })
       seeding = createSeeding({ engine, dhtOf, getPictures: () => pictures, log })
       setTimeout(() => seeding.start(), 0)
-      moves = createMoves({ engine, sheets, getJoin: () => join, getDeleting: () => deleting, getPictures: () => pictures, emit, log })
+      folders = createFolders({ engine, emit, getOwnDevices: () => ownDevices, getKeyring: () => keyring, log })
+      setTimeout(() => folders.prune().catch(() => {}), 0)
+      // A file that moves to fresh keys stays in its folder.
+      const movesEmit = (event, data) => {
+        if (event === 'sheet:moved' && data && data.to) folders.carry(data.from, data.to).catch((e) => log('folder not carried: ' + e.message))
+        emit(event, data)
+      }
+      moves = createMoves({ engine, sheets, getJoin: () => join, getDeleting: () => deleting, getPictures: () => pictures, emit: movesEmit, log })
       linking = createLinking({
         engine,
         log,
@@ -234,6 +249,7 @@ function createSheetEngine (opts = {}) {
         engine,
         getJoin: () => join,
         getMoves: () => moves,
+        getFolders: () => folders,
         describe: (sheetId) => {
           const e = sheets.peek(sheetId)
           return e ? { title: model.title(e.guarded.doc), kind: e.guarded.doc.getMap('meta').get('kind') } : null
@@ -247,6 +263,7 @@ function createSheetEngine (opts = {}) {
         engine,
         getSeeding: () => seeding,
         getOwnDevices: () => ownDevices,
+        getFolders: () => folders,
         emit,
         log,
         ...(opts.keyringGapMs ? { gapMs: opts.keyringGapMs, checkMs: opts.keyringGapMs, settleMs: Math.min(3000, opts.keyringGapMs) } : {})
@@ -257,6 +274,7 @@ function createSheetEngine (opts = {}) {
         engine,
         getSeeding: () => seeding,
         getOwnDevices: () => ownDevices,
+        getFolders: () => folders,
         emit,
         log,
         ...(opts.restoreLookMs ? { lookMs: opts.restoreLookMs, settleMs: Math.min(5000, opts.restoreLookMs) } : {})
@@ -319,6 +337,7 @@ function createSheetEngine (opts = {}) {
   Object.defineProperty(engine, 'pictures', { get: () => pictures })
   Object.defineProperty(engine, 'ownDevices', { get: () => ownDevices })
   Object.defineProperty(engine, 'keyring', { get: () => keyring })
+  Object.defineProperty(engine, 'folders', { get: () => folders })
   engine.relay = relay // for tests
   Object.defineProperty(engine, 'restoring', { get: () => restoring })
   return engine
