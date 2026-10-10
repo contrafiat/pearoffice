@@ -2,6 +2,7 @@ import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 're
 import * as Y from 'yjs'
 import { CaretLeft, CaretRight, X, Pause, Play, ArrowCounterClockwise, Square } from '@phosphor-icons/react'
 import { call, on } from '../bridge.js'
+import { haptic } from '../haptic.js'
 import { fromB64 } from '../doc/pictures.js'
 import slidesModel from '../../slides/slidesModel.js'
 import { StaticSlide } from './StaticSlide.jsx'
@@ -110,6 +111,7 @@ function useTaps (nav) {
       if (s.button !== 0) return
       const dx = e.clientX - s.x
       const dy = e.clientY - s.y
+      if (s.type === 'touch') haptic('select')
       if (Math.abs(dx) > SWIPE_PX && Math.abs(dx) > Math.abs(dy)) { if (dx < 0) n.next(); else n.prev(); return }
       if (s.type === 'touch') {
         const r = e.currentTarget.getBoundingClientRect()

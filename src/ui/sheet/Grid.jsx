@@ -4,6 +4,7 @@ import { colName } from './a1.js'
 import { textStyle, borderCss, hasBorder, neededHeight, inkOn } from './cellStyle.js'
 import { Funnel, CaretDown } from '@phosphor-icons/react'
 import { CfIcon } from './cfIcons.jsx'
+import { haptic } from '../haptic.js'
 
 const BASE_ROW_H = 24
 const HEAD_H = 26
@@ -160,7 +161,7 @@ export const Grid = forwardRef(function Grid (props, ref) {
       if (e.touches.length !== 1) return
       const t = e.touches[0]
       const p = { x: t.clientX, y: t.clientY, fired: false }
-      p.timer = setTimeout(() => { p.fired = true; open(p.x, p.y) }, 500)
+      p.timer = setTimeout(() => { p.fired = true; haptic('press'); open(p.x, p.y) }, 500)
       if (press.current) clearTimeout(press.current.timer)
       press.current = p
     },

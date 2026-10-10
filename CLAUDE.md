@@ -131,7 +131,9 @@ Code that works for any kind of file sits apart from each editor's own
   (`PhraseInput.jsx`: one word at a time on phones, 12 boxes on desktop,
   suggestions from the word list), the first-run welcome and tour (`Onboarding.jsx`), Ctrl+P (Cmd+P on a Mac)
   printing the open file on desktop (`printKey.js`; in a smoke run `app:print`
-  writes `printed.html` to the data folder). `src/ui/sheet/` is the spreadsheet editor
+  writes `printed.html` to the data folder). On phones a tap on any button or menu item buzzes
+  (`haptic.js`, the shell's `app:haptic` with expo-haptics; `danger` controls
+  buzz a warning, `data-haptic` picks another kind). `src/ui/sheet/` is the spreadsheet editor
   (grid, toolbar, its panels, charts, `xlsx.js` file handling). Talks only to
   `window.pearoffice` (`call`, `on`), which the desktop preload and the mobile
   WebView provide. Built to `dist/ui` by `scripts/build-ui.mjs`.
