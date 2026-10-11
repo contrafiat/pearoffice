@@ -48,6 +48,8 @@ module.exports = async function sheets (t) {
   const [b2x, b2y] = await middle(cellNode(2, 2))
   await type('=SUM(')
   await waitFor('editing', editorValue + " === '=SUM('")
+  // The editor is the cell's size while its text fits.
+  result.editorFits = await js("(() => { const e = document.querySelector('.grid .editor').getBoundingClientRect(); const c = (" + cellNode(4, 2) + ").getBoundingClientRect(); return Math.abs(e.width - c.width) <= 2 && Math.abs(e.height - c.height) <= 2 })()")
   wc.sendInputEvent({ type: 'mouseDown', x: b1x, y: b1y, button: 'left', clickCount: 1 })
   for (let i = 1; i <= 4; i++) { wc.sendInputEvent({ type: 'mouseMove', x: b1x, y: b1y + Math.round((b2y - b1y) * i / 4), button: 'left' }); await sleep(40) }
   wc.sendInputEvent({ type: 'mouseUp', x: b2x, y: b2y, button: 'left', clickCount: 1 })
@@ -314,5 +316,5 @@ module.exports = async function sheets (t) {
     step('screenshot', process.env.PEAROFFICE_SMOKE_SHOT)
   }
 
-  return result.pointed && result.moreChartTypes && result.spill && result.quickWins && result.findSort && result.fill && result.charts && result.suggested === 'SUBSTITUTE,SUBTOTAL,SUM' && result.argHelp === 'number1' && result.pastedFormula === '=SUM(C1:C2)' && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
+  return result.editorFits && result.pointed && result.moreChartTypes && result.spill && result.quickWins && result.findSort && result.fill && result.charts && result.suggested === 'SUBSTITUTE,SUBTOTAL,SUM' && result.argHelp === 'number1' && result.pastedFormula === '=SUM(C1:C2)' && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
 }
