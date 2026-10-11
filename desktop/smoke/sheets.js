@@ -22,6 +22,8 @@ module.exports = async function sheets (t) {
   await enter('Total', 'Tab')
   await enter('=SUM(B1:B2)', 'Enter', '1650.5')
   step('typed and computed')
+  // The font size list shows the default size, not a "Size" label.
+  result.sizeShown = await js("(() => { const s = document.querySelector('.size-select'); return s.options[s.selectedIndex].textContent + ',' + [...s.options].some((o) => o.textContent === 'Size') })()")
 
   // Formula suggestions: =su lists SUM; Down, Down, Tab inserts it; inside
   // the brackets the argument help shows; Escape leaves the cell as it was.
@@ -316,5 +318,5 @@ module.exports = async function sheets (t) {
     step('screenshot', process.env.PEAROFFICE_SMOKE_SHOT)
   }
 
-  return result.editorFits && result.pointed && result.moreChartTypes && result.spill && result.quickWins && result.findSort && result.fill && result.charts && result.suggested === 'SUBSTITUTE,SUBTOTAL,SUM' && result.argHelp === 'number1' && result.pastedFormula === '=SUM(C1:C2)' && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
+  return result.sizeShown === '10.5,false' && result.editorFits && result.pointed && result.moreChartTypes && result.spill && result.quickWins && result.findSort && result.fill && result.charts && result.suggested === 'SUBSTITUTE,SUBTOTAL,SUM' && result.argHelp === 'number1' && result.pastedFormula === '=SUM(C1:C2)' && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
 }
