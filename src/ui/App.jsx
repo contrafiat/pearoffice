@@ -17,7 +17,7 @@ import { FileHome, KindIcon, NewPanel, RecoverPanel, dragFile, dropTarget, untit
 import { DeleteFolderPanel, FolderNamePanel, MoveToFolderPanel, filesIn, useFolders } from './Folders.jsx'
 import { DonationReminder, donationsShown } from './About.jsx'
 import { Onboarding } from './Onboarding.jsx'
-import { CaretDown, CaretRight, CircleNotch, FileArrowUp, FolderSimple, GearSix, House, Info, LinkSimple, List, Plus } from '@phosphor-icons/react'
+import { CaretRight, CircleNotch, FileArrowUp, FolderSimple, GearSix, House, Info, LinkSimple, List, Plus } from '@phosphor-icons/react'
 import { PearMark } from './PearMark.jsx'
 
 applyTheme()
@@ -391,14 +391,17 @@ export function App () {
             const inside = filesIn([...sheets].reverse(), places, fd.id)
             const shown = sideOpen.includes(fd.id)
             return (
-              <div key={fd.id} className='side-folder'>
+              <div key={fd.id} className={'side-folder' + (shown ? ' open' : '')}>
                 <button className='sheet-link folder-link' aria-expanded={shown} {...(desktop ? dropTarget(placeFile, fd.id) : {})} onClick={() => toggleSide(fd.id)}>
-                  {shown ? <CaretDown size={14} aria-hidden='true' /> : <CaretRight size={14} aria-hidden='true' />}
+                  <CaretRight className='side-caret' size={14} aria-hidden='true' />
                   <FolderSimple size={18} weight='duotone' aria-hidden='true' />
                   <span className='sheet-title'>{fd.name}</span>
                   <span className='folder-count'>{inside.length}</span>
                 </button>
-                {shown && <div className='side-folder-files'>{inside.map(sideLink)}</div>}
+                {/* Always drawn, so opening and closing can slide. */}
+                <div className='side-folder-files' inert={!shown}>
+                  <div className='side-folder-inner'>{inside.map(sideLink)}</div>
+                </div>
               </div>
             )
           })}

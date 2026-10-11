@@ -104,7 +104,7 @@ module.exports = async function folders (t) {
 
   // The side list: Garden opens to show its files.
   await js("document.querySelector('.sidebar .folder-link').click()")
-  await waitFor('side folder open', "document.querySelectorAll('.side-folder-files .sheet-link').length === 3 && document.querySelector('.sidebar .folder-count').textContent === '3'")
+  await waitFor('side folder open', "!!document.querySelector('.side-folder.open') && document.querySelector('.side-folder-files').getBoundingClientRect().height > 60 && document.querySelectorAll('.side-folder-files .sheet-link').length === 3 && document.querySelector('.sidebar .folder-count').textContent === '3'")
   await snap('side-list')
   result.folderSide = true
 
