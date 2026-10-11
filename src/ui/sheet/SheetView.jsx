@@ -994,9 +994,9 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
               </span>
             )}
           </span>
-          <select title='Font size' aria-label='Font size' className='size-select' value={fmt.size || ''} onChange={(e) => formatRange({ size: e.target.value ? Number(e.target.value) : null })}>
+          <select title='Font size' aria-label='Font size' className='size-select' value={fmt.size && fmt.size !== DEFAULT_SIZE ? fmt.size : ''} onChange={(e) => formatRange({ size: e.target.value ? Number(e.target.value) : null })}>
             {/* The default size has no value: picking it clears the cell's size. */}
-            {[...SIZES, DEFAULT_SIZE].sort((x, y) => x - y).map((n) => <option key={n} value={n === DEFAULT_SIZE ? '' : n}>{n}</option>)}
+            {SIZES.map((n) => <option key={n} value={n === DEFAULT_SIZE ? '' : n}>{n}</option>)}
           </select>
           <select title='Font' aria-label='Font' value={fmt.font || ''} onChange={(e) => formatRange({ font: e.target.value || null })}>
             <option value=''>Sans</option>

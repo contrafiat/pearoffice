@@ -1,7 +1,7 @@
 import { ChartFrame } from './ChartFrame.jsx'
 import React, { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { colName } from './a1.js'
-import { textStyle, borderCss, hasBorder, neededHeight, inkOn } from './cellStyle.js'
+import { textStyle, borderCss, hasBorder, neededHeight, inkOn, BASE_FONT_PX } from './cellStyle.js'
 import { Funnel, CaretDown } from '@phosphor-icons/react'
 import { CfIcon } from './cfIcons.jsx'
 import { haptic } from '../haptic.js'
@@ -486,7 +486,7 @@ export const Grid = forwardRef(function Grid (props, ref) {
   const isEditingHere = editing && editing.source !== 'bar' && editing.row >= firstRow && editing.row <= lastRow
 
   return (
-    <div className='grid' style={{ '--row-h': ROW_H + 'px', '--head-h': HEAD_H + 'px', '--rowhead-w': ROWHEAD_W + 'px', '--cell-font': Math.round(14 * zoom * 10) / 10 + 'px' }}>
+    <div className='grid' style={{ '--row-h': ROW_H + 'px', '--head-h': HEAD_H + 'px', '--rowhead-w': ROWHEAD_W + 'px', '--cell-font': Math.round(BASE_FONT_PX * zoom * 10) / 10 + 'px' }}>
       <div className='corner' />
       <div className='col-heads'>
         <div style={{ transform: `translateX(${-scroll.left}px)`, width: totalW, position: 'relative', height: '100%' }}>
