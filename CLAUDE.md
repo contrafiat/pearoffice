@@ -331,7 +331,8 @@ take five scenes: files, sheet, document, slides, sharing.
   window and real key and mouse events, in fourteen parts. Each part is its own
   launch with a throwaway data folder and a 60 s limit, and prints one
   `ok`/`not ok` line, then a summary line. `sheets` is the grid editor
-  (typing, formulas, spilling, fill, charts, copy and paste, undo, zoom; about
+  (typing, formulas, pointing at cells while typing one, spilling, fill,
+  charts, copy and paste, undo, zoom; about
   21 s). `sheet-files` is cell formats, filters, comments, validation, colour
   rules and names, then .xlsx, .csv, .json and PDF out, tabs, tidy up and
   .json, .csv and .xlsx in (about 32 s). `docs` is documents (about 9 s).

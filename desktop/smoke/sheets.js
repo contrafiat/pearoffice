@@ -39,6 +39,40 @@ module.exports = async function sheets (t) {
   await js("document.querySelector('.grid .body').focus()")
   step('formula suggestions')
 
+  // Pointing: while a formula is typed, dragging over cells puts the range
+  // in, a click puts a cell in and an arrow key moves to one. In B4 and B5,
+  // cleared afterwards.
+  const editorValue = "(document.querySelector('.grid .editor') || {}).value"
+  const middle = async (sel) => js(`(() => { const r = (${sel}).getBoundingClientRect(); return [Math.round(r.left + r.width / 2), Math.round(r.top + r.height / 2)] })()`)
+  const [b1x, b1y] = await middle(cellNode(1, 2))
+  const [b2x, b2y] = await middle(cellNode(2, 2))
+  await type('=SUM(')
+  await waitFor('editing', editorValue + " === '=SUM('")
+  wc.sendInputEvent({ type: 'mouseDown', x: b1x, y: b1y, button: 'left', clickCount: 1 })
+  for (let i = 1; i <= 4; i++) { wc.sendInputEvent({ type: 'mouseMove', x: b1x, y: b1y + Math.round((b2y - b1y) * i / 4), button: 'left' }); await sleep(40) }
+  wc.sendInputEvent({ type: 'mouseUp', x: b2x, y: b2y, button: 'left', clickCount: 1 })
+  await waitFor('range pointed', editorValue + " === '=SUM(B1:B2' && !!document.querySelector('.point-box')")
+  await type(')')
+  await key('Enter')
+  await waitFor('pointed sum', cellNode(4, 2) + ".textContent === '1650.5'")
+  await type('=')
+  await waitFor('editing', editorValue + " === '='")
+  wc.sendInputEvent({ type: 'mouseDown', x: b1x, y: b1y, button: 'left', clickCount: 1 })
+  wc.sendInputEvent({ type: 'mouseUp', x: b1x, y: b1y, button: 'left', clickCount: 1 })
+  await waitFor('cell pointed', editorValue + " === '=B1'")
+  await type('+')
+  await key('Up'); await key('Up'); await key('Up')
+  await waitFor('arrow pointed', editorValue + " === '=B1+B2'")
+  await key('Enter')
+  await waitFor('pointed add', cellNode(5, 2) + ".textContent === '1650.5'")
+  result.pointed = true
+  await key('Up')
+  await sendMod('Up', ['shift'])
+  await key('Delete')
+  await waitFor('cleared', cellNode(4, 2) + ".textContent === '' && " + cellNode(5, 2) + ".textContent === ''")
+  await key('Up')
+  step('pointing')
+
   // Spilling: =SEQUENCE(3) in H1 fills H1:H3 and outlines the block; a
   // value typed in H3 blocks it (#SPILL!) with a note saying why.
   for (let i = 0; i < 6; i++) await key('Right')
@@ -280,5 +314,5 @@ module.exports = async function sheets (t) {
     step('screenshot', process.env.PEAROFFICE_SMOKE_SHOT)
   }
 
-  return result.moreChartTypes && result.spill && result.quickWins && result.findSort && result.fill && result.charts && result.suggested === 'SUBSTITUTE,SUBTOTAL,SUM' && result.argHelp === 'number1' && result.pastedFormula === '=SUM(C1:C2)' && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
+  return result.pointed && result.moreChartTypes && result.spill && result.quickWins && result.findSort && result.fill && result.charts && result.suggested === 'SUBSTITUTE,SUBTOTAL,SUM' && result.argHelp === 'number1' && result.pastedFormula === '=SUM(C1:C2)' && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
 }

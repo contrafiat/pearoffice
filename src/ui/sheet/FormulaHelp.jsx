@@ -1,7 +1,7 @@
 import React, { useLayoutEffect, useState } from 'react'
-import { helpFor, insertFunction } from '../../sheet/formula/help.js'
+import { helpFor, insertFunction, canPoint, refText } from '../../sheet/formula/help.js'
 
-export { helpFor, insertFunction }
+export { helpFor, insertFunction, canPoint, refText }
 
 function Args ({ args, current }) {
   if (!args) return <span className='args'>()</span>

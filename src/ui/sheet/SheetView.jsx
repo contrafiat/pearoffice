@@ -23,7 +23,7 @@ import { ChartView, downloadChart, chartSvg } from './Chart.jsx'
 import { guessChart } from '../../sheet/charts.js'
 import { readPref, writePref } from '../prefs.js'
 import { Minus, ArrowCounterClockwise, ArrowClockwise, TextB, TextItalic, TextAUnderline, PaintBucket, Copy, Scissors, ClipboardText, Eraser, Numpad, FileXls, Plus, MagnifyingGlass, X, ChartBar, PencilSimple, DownloadSimple, Trash, TextUnderline, TextStrikethrough, TextAlignLeft, TextAlignCenter, TextAlignRight, ArrowUDownLeft, FrameCorners, AlignTop, AlignCenterVertical, AlignBottom, ArrowsOutLineHorizontal } from '@phosphor-icons/react'
-import { FormulaHelp, helpFor, insertFunction } from './FormulaHelp.jsx'
+import { FormulaHelp, helpFor, insertFunction, canPoint, refText } from './FormulaHelp.jsx'
 import { exportSheet, exportCsv, exportJson, printTab, isMobile } from './xlsx.js'
 import { usePrintKey } from '../printKey.js'
 
@@ -120,6 +120,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
   const [helpSel, setHelpSel] = useState(0)
   const [helpOff, setHelpOff] = useState(null) // the partial name Escape hid
   const nextCaret = useRef(null)
+  const pointRef = useRef(null) // { start, end, anchor, to }: see point()
   // Refresh the sidebar when the title changes from anywhere: a rename on
   // another device, or the name arriving after this device joined.
   const title = view ? view.title : null
@@ -820,7 +821,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
   const help = editing && canEdit ? helpFor(editValue, caretAt, nameHelp) : null
   const shownHelp = help && help.list && helpOff === help.partial ? null : help
   useEffect(() => { setHelpSel(0) }, [help && help.partial])
-  useEffect(() => { if (!editing) { setCaret(null); setHelpOff(null) } }, [!!editing])
+  useEffect(() => { if (!editing) { setCaret(null); setHelpOff(null); pointRef.current = null } }, [!!editing])
   // Put the caret where an inserted function name ended.
   useLayoutEffect(() => {
     if (nextCaret.current === null) return
@@ -838,6 +839,34 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
     setEditing((ed) => ({ ...ed, value: r.value }))
   }
 
+  // Pointing, as in Excel: while a formula is typed, a clicked, dragged or
+  // tapped cell puts its address in at the caret. pointRef is the address
+  // put in last (where it sits in the text and the cells it names), so a
+  // drag, another click or an arrow key replaces it.
+  function pointCaret () {
+    const el = document.activeElement
+    return el && el.tagName === 'INPUT' && typeof el.selectionStart === 'number' ? el.selectionStart : caretAt
+  }
+  // True if the cell went into the formula; false leaves the click to select.
+  function point (row, col, extend = false) {
+    const ed = editingRef.current
+    if (!ed || !canEdit) return false
+    const at = pointCaret()
+    const p = pointRef.current && pointRef.current.end === at ? pointRef.current : null
+    if (!p && !canPoint(ed.value, at)) return false
+    const start = p ? p.start : at
+    const end = p ? p.end : at
+    const anchor = p && extend ? p.anchor : { row, col }
+    const text = refText(anchor, { row, col })
+    pointRef.current = { start, end: start + text.length, anchor, to: { row, col } }
+    nextCaret.current = start + text.length
+    setEditing({ ...ed, value: ed.value.slice(0, start) + text + ed.value.slice(end) })
+    return true
+  }
+  const pointBox = editing && pointRef.current
+    ? (({ anchor: a, to: b }) => ({ r1: Math.min(a.row, b.row), c1: Math.min(a.col, b.col), r2: Math.max(a.row, b.row), c2: Math.max(a.col, b.col) }))(pointRef.current)
+    : null
+
   function onEditKey (e) {
     if (shownHelp && shownHelp.list) {
       const n = shownHelp.list.length
@@ -845,6 +874,16 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
       if (e.key === 'ArrowUp') { e.preventDefault(); setHelpSel((i) => (i - 1 + n) % n); return }
       if (e.key === 'Tab' || e.key === 'Enter') { e.preventDefault(); pickFunction(shownHelp.list[Math.min(helpSel, n - 1)].name); return }
       if (e.key === 'Escape') { e.preventDefault(); setHelpOff(shownHelp.partial); return }
+    }
+    // Arrow keys point when the edit began by typing in the cell (Excel's
+    // Enter mode); after F2, a double-click or in the bar they move the caret.
+    const arrow = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] }[e.key]
+    const ed = editingRef.current
+    if (arrow && view && ed && ed.source === 'grid' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      const from = pointRef.current && pointRef.current.end === pointCaret() ? pointRef.current.to : ed
+      const row = Math.max(1, Math.min(view.rows, from.row + arrow[0]))
+      const col = Math.max(1, Math.min(view.cols, from.col + arrow[1]))
+      if (point(row, col, e.shiftKey)) { e.preventDefault(); return }
     }
     if (e.key === 'Enter') { e.preventDefault(); commit([e.shiftKey ? -1 : 1, 0]) }
     else if (e.key === 'Tab') { e.preventDefault(); commit([0, e.shiftKey ? -1 : 1]) }
@@ -1078,7 +1117,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
           readOnly={!canEdit || (spilled && !editing)}
           value={barValue}
           onFocus={() => { if (canEdit && !editing && !spilled) setEditing({ ...sel, value: selected ? selected.input : '', source: 'bar' }) }}
-          onChange={(e) => { setEditing({ ...sel, value: e.target.value, source: 'bar' }); setCaret(e.target.selectionStart) }}
+          onChange={(e) => { pointRef.current = null; setEditing({ ...sel, value: e.target.value, source: 'bar' }); setCaret(e.target.selectionStart) }}
           onSelect={(e) => setCaret(e.target.selectionStart)}
           onKeyDown={onEditKey}
           onBlur={() => { if (editing) commit(null) }}
@@ -1119,7 +1158,9 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
         onCopy={onCopy}
         onPaste={onPaste}
         onEdit={(row, col) => { select(row, col); if (canEdit) setEditing({ row, col, value: (cells.get(row + ',' + col) || {}).input || '' }) }}
-        onEditChange={(value) => setEditing((ed) => ({ ...ed, value }))}
+        onEditChange={(value) => { pointRef.current = null; setEditing((ed) => ({ ...ed, value })) }}
+        onPoint={point}
+        pointBox={pointBox}
         onEditCaret={setCaret}
         onEditKey={onEditKey}
         onEditBlur={() => commit(null)}

@@ -574,6 +574,9 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 /* The fill handle (mouse) and what a drag will fill. */
 .fill-handle { position: absolute; width: 8px; height: 8px; background: var(--pear); border: 1px solid var(--panel); cursor: crosshair; z-index: 5; }
 @media (pointer: coarse) { .fill-handle { display: none; } }
+.point-box { position: absolute; border: 2px dashed var(--pear-dark); background: color-mix(in srgb, var(--pear) 12%, transparent); pointer-events: none; margin: -1px 0 0 -1px; z-index: 4; }
+.point-handle { display: none; position: absolute; width: 18px; height: 18px; border-radius: 50%; background: var(--pear-dark); border: 3px solid var(--panel); box-shadow: 0 1px 4px rgb(0 0 0 / 0.3); touch-action: none; z-index: 5; }
+@media (pointer: coarse) { .point-handle { display: block; } }
 .fill-preview { position: absolute; border: 1px dashed var(--pear-dark); pointer-events: none; margin: -1px 0 0 -1px; z-index: 4; }
 
 /* Charts (proposals/2026-10-04-charts.md). */
