@@ -21,6 +21,7 @@ import { PicturesContext, usePictureCache, hasText } from './objects.jsx'
 import { InsertShape, ShapeTools, AnchorButtons } from './ShapeTools.jsx'
 import { exportDeck } from './pdfExport.jsx'
 import { usePrintKey } from '../printKey.js'
+import { useToolOverflow } from '../toolOverflow.jsx'
 import { ChartTools, ChartDataPanel } from './ChartTools.jsx'
 import { sampleChart } from './SlideChart.jsx'
 
@@ -72,6 +73,7 @@ export function SlidesView ({ sheetId, onTitleChange, onError, onGone }) {
   // tablet narrower than 1000 px (an iPad upright) does too.
   const touch = isMobile()
   const { phone, listBelow } = useTouchLayout(touch)
+  const toolRow = useToolOverflow(!phone)
   const errorRef = useRef(onError)
   errorRef.current = onError
   const goneRef = useRef(onGone)
@@ -482,7 +484,7 @@ export function SlidesView ({ sheetId, onTitleChange, onError, onGone }) {
           }}
         />
         {note && <div className='banner info'>{note}</div>}
-        <div className={'doc-tools slides-tools' + (phone ? ' phone' : '')} role='toolbar' aria-label='Slide tools'>
+        <div ref={toolRow.ref} className={'doc-tools slides-tools' + (phone ? ' phone' : '')} role='toolbar' aria-label='Slide tools'>
           {canEdit && btn('Undo (Ctrl+Z)', ArrowCounterClockwise, undefined, () => undo.undo(), { disabled: !undo.undoStack.length, className: 'undo-button' })}
           {canEdit && btn('Redo (Ctrl+Y)', ArrowClockwise, undefined, () => undo.redo(), { disabled: !undo.redoStack.length, className: 'redo-button' })}
           {canEdit && <span className='sep' />}
@@ -512,7 +514,8 @@ export function SlidesView ({ sheetId, onTitleChange, onError, onGone }) {
               : selChart
                 ? <ChartTools value={selChart.chart} theme={deck.theme} btn={btn} phone={phone} setChart={(patch) => change((doc) => slidesModel.setChart(doc, chartSlide, selChart.id, { chart: patch }))} onEditData={() => setDataPanel(selChart.id)} />
                 : canEdit && <TextTools editor={toolEditor} defaultSize={defaultSize(deck.theme, editingBox ? editingBox.role : 'body')} phone={phone} btn={btn} afterAlign={anchorTools} />}
-          {!phone && <button className='present-button' title='Present (F5, or Shift+F5 from this slide)' onMouseDown={(e) => e.preventDefault()} onClick={() => startShow(true)} disabled={!deck.slides.length}><Play size={ICON} weight='fill' /> Present</button>}
+          {toolRow.moreButton}
+          {!phone && <button className='present-button tool-keep' title='Present (F5, or Shift+F5 from this slide)' onMouseDown={(e) => e.preventDefault()} onClick={() => startShow(true)} disabled={!deck.slides.length}><Play size={ICON} weight='fill' /> Present</button>}
         </div>
         <div className='slides-row'>
           {!listBelow && <SlideList slides={deck.slides} current={current} onPick={setCurrent} size={deck.size} theme={deck.theme} canEdit={canEdit} phone={false} people={bySlide} sheetId={sheetId} onAdd={addSlide} onDuplicate={duplicate} onDelete={remove} onMove={move} />}

@@ -282,5 +282,21 @@ module.exports = async function docs (t) {
   result.docPastePicture = true
   step('pasted pictures')
 
-  return result.docPrintKey && result.docPastePicture && result.docPicture && result.docPictureCopy && result.docPictureCut && result.docPaste && result.docOutline && result.docImport && result.docImportNotice && result.docExport && result.docCursors && result.docCard && result.docReopened && result.docWords === '10 words'
+  // A narrow window: the toolbar keeps to one row, More tools shows the rest
+  // on more rows and hides them again.
+  const barH = "document.querySelector('.doc-tools').getBoundingClientRect().height"
+  const moreShown = "!!document.querySelector('.doc-tools .tool-more:not([data-tool-hidden])')"
+  const [w0, h0] = t.win.getContentSize()
+  t.win.setContentSize(960, h0)
+  await waitFor('one row', `${moreShown} && ${barH} < 50 && !!document.querySelector('.doc-tools [data-tool-hidden]')`)
+  await js("document.querySelector('.doc-tools .tool-more').click()")
+  await waitFor('all tools', `${barH} > 60 && !document.querySelector('.doc-tools [data-tool-hidden]') && !!document.querySelector('.doc-tools .outline-button')`)
+  await js("document.querySelector('.doc-tools .tool-more').click()")
+  await waitFor('one row again', `${barH} < 50`)
+  t.win.setContentSize(w0, h0)
+  await waitFor('wide again', `!${moreShown} || ${barH} < 50`)
+  result.docToolRow = true
+  step('toolbar keeps to one row')
+
+  return result.docToolRow && result.docPrintKey && result.docPastePicture && result.docPicture && result.docPictureCopy && result.docPictureCut && result.docPaste && result.docOutline && result.docImport && result.docImportNotice && result.docExport && result.docCursors && result.docCard && result.docReopened && result.docWords === '10 words'
 }
