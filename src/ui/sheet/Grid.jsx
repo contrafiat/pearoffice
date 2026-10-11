@@ -18,7 +18,7 @@ export const MAX_ZOOM = 2.5
 // sheets stay fast. Headers are drawn outside the scroll area and moved with
 // the scroll position.
 export const Grid = forwardRef(function Grid (props, ref) {
-  const { view, cells, sel, ext = sel, range, spillBox, editing, onSelect, onEdit, onEditChange, onEditKey, onEditBlur, onEditCaret = () => {}, onKeyDown, onHeaderMenu, onCellMenu = () => {}, onFill = null, charts = [], selectedChart = null, chartActions = null, onResize, onRowResize = () => {}, onCopy, onPaste, zoom = 1, onZoom, inputMode, hiddenRows = null, hiddenCols = null, unhideMarks = null, onUnhide = () => {}, onAutoFit = () => {}, filterHead = null, onFilterMenu = () => {}, commentMarks = null, onComment = () => {}, invalidCells = null, cfStyles = null, dropdownAt = null, onDropdown = () => {}, others = [] } = props
+  const { view, cells, sel, ext = sel, range, spillBox, editing, onSelect, onEdit, onEditChange, onEditKey, onEditBlur, onEditCaret = () => {}, onKeyDown, onHeaderMenu, onCellMenu = () => {}, onFill = null, charts = [], selectedChart = null, chartActions = null, onResize, onRowResize = () => {}, onCopy, onPaste, zoom = 1, onZoom, inputMode, hiddenRows = null, hiddenCols = null, unhideMarks = null, onUnhide = () => {}, onAutoFit = () => {}, filterHead = null, onFilterMenu = () => {}, commentMarks = null, onComment = () => {}, invalidCells = null, cfStyles = null, dropdownAt = null, onDropdown = () => {}, others = [], onPoint = () => false, pointBox = null } = props
   // Row height and column widths scale with the zoom (pinch on a phone);
   // stored widths stay unzoomed.
   const ROW_H = Math.round(BASE_ROW_H * zoom)
@@ -31,6 +31,7 @@ export const Grid = forwardRef(function Grid (props, ref) {
 
   // Drag to select a range.
   const dragging = useRef(false)
+  const pointing = useRef(false) // dragging out a range into a formula
   // Drag the fill handle: the cell the pointer is over, while dragging.
   const [fillTo, setFillTo] = useState(null)
   const filling = useRef(false)
@@ -51,6 +52,7 @@ export const Grid = forwardRef(function Grid (props, ref) {
   useEffect(() => {
     const up = () => {
       dragging.current = false
+      pointing.current = false
       if (filling.current) {
         filling.current = false
         setFillTo((to) => {
@@ -168,7 +170,7 @@ export const Grid = forwardRef(function Grid (props, ref) {
     onTouchMove: (e) => {
       const p = press.current
       const t = e.touches[0]
-      if (p && t && Math.hypot(t.clientX - p.x, t.clientY - p.y) > 8) clearTimeout(p.timer)
+      if (p && t && Math.hypot(t.clientX - p.x, t.clientY - p.y) > 8) { clearTimeout(p.timer); p.moved = true }
     }
   })
   // Ends a press; true if it opened a menu (so the tap does nothing else).
@@ -365,13 +367,19 @@ export const Grid = forwardRef(function Grid (props, ref) {
             style={{ top: rowY[r], height: m ? span(m.r1, m.r2) : rowH[r], left: colX[c], width: m ? colX[Math.min(m.c2, view.cols) + 1] - colX[c] : widths[c], color: fmt.color || inkOn(fmt.fill), background: fmt.fill }}
             data-r={r}
             data-c={c}
-            onMouseDown={(e) => { dragging.current = true; onSelect(r, c, e.shiftKey) }}
-            onMouseEnter={() => { if (filling.current) setFillTo({ row: r, col: c }); else if (dragging.current) onSelect(r, c, true) }}
+            // While a formula is typed, the cell goes into it instead and the
+            // editor keeps focus.
+            onMouseDown={(e) => { if (onPoint(r, c, e.shiftKey)) { e.preventDefault(); pointing.current = true; return } dragging.current = true; onSelect(r, c, e.shiftKey) }}
+            onMouseEnter={() => { if (pointing.current) onPoint(r, c, true); else if (filling.current) setFillTo({ row: r, col: c }); else if (dragging.current) onSelect(r, c, true) }}
             onDoubleClick={() => onEdit(r, c)}
             onContextMenu={(e) => { e.preventDefault(); onCellMenu(r, c, e.clientX, e.clientY) }}
             // Touch screens: tapping the cell that is already selected edits it.
             {...longPress((x, y) => onCellMenu(r, c, x, y))}
-            onTouchEnd={(e) => { if (endPress()) { e.preventDefault(); return } if (!pinched.current && e.touches.length === 0 && sel.row === r && sel.col === c) { e.preventDefault(); onEdit(r, c) } }}
+            onTouchEnd={(e) => {
+              const tap = press.current && !press.current.moved
+              if (endPress()) { e.preventDefault(); return }
+              if (tap && !pinched.current && e.touches.length === 0 && onPoint(r, c, false)) { e.preventDefault(); return }
+              if (!pinched.current && e.touches.length === 0 && sel.row === r && sel.col === c) { e.preventDefault(); onEdit(r, c) } }}
             title={cell && cell.volatile ? 'Changes on each device (time or random)' : cell && cell.blocked ? 'This answer cannot fill in. Select the cell to see why.' : undefined}
           >
             {cf && cf.bar && <span className='cf-bar' style={{ left: cf.bar.from * 100 + '%', width: Math.max(0, cf.bar.to - cf.bar.from) * 100 + '%', background: cf.bar.color }} />}
@@ -572,6 +580,28 @@ export const Grid = forwardRef(function Grid (props, ref) {
               if (cell) onSelect(Number(cell.dataset.r), Number(cell.dataset.c), true)
             }}
           />
+          {/* The cells a formula being typed points at; on touch screens,
+              drag its handle to make it a range. */}
+          {pointBox && (
+            <>
+              <div
+                className='point-box'
+                style={{ top: rowY[pointBox.r1], left: colX[pointBox.c1], width: colX[Math.min(pointBox.c2, view.cols) + 1] - colX[pointBox.c1], height: span(pointBox.r1, pointBox.r2) }}
+              />
+              <div
+                className='point-handle'
+                style={{ top: rowY[Math.min(pointBox.r2, view.rows) + 1] - 9, left: colX[Math.min(pointBox.c2, view.cols) + 1] - 9 }}
+                onTouchStart={(e) => { e.stopPropagation() }}
+                onTouchMove={(e) => {
+                  const t = e.touches[0]
+                  const el = document.elementFromPoint(t.clientX, t.clientY)
+                  const cell = el && el.closest && el.closest('.cell')
+                  if (cell) onPoint(Number(cell.dataset.r), Number(cell.dataset.c), true)
+                }}
+                onTouchEnd={(e) => { e.stopPropagation(); e.preventDefault() }}
+              />
+            </>
+          )}
           {isEditingHere && !inFrozen(editing.row, editing.col) && editorAt()}
           {dropdownAt && !editing && !inFrozen(dropdownAt.row, dropdownAt.col) && rowH[dropdownAt.row] > 0 && (
             <button

@@ -57,4 +57,36 @@ function insertFunction (value, caret, partial, name, isName = false) {
   return { value: value.slice(0, start) + add + rest, caret: start + name.length + 1 }
 }
 
-module.exports = { analyze, helpFor, insertFunction }
+// Pointing (as in Excel): while a formula is typed, clicking a cell puts its
+// address in. True when the caret is where an address can go: after =, a
+// bracket, a comma or an operator, not inside a "string" and not in the
+// middle of a name.
+function canPoint (value, caret) {
+  if (typeof value !== 'string' || value[0] !== '=' || caret < 1) return false
+  const before = value.slice(0, caret)
+  let quotes = 0
+  for (const ch of before) if (ch === '"') quotes++
+  if (quotes % 2 === 1) return false
+  const prev = before.trimEnd().slice(-1)
+  if (!'=(,;+-*/^&<>:'.includes(prev)) return false
+  const next = value[caret]
+  return next === undefined || ' ),;+-*/^&<>=:'.includes(next)
+}
+
+function colName (n) {
+  let s = ''
+  for (; n > 0; n = Math.floor((n - 1) / 26)) s = String.fromCharCode(65 + (n - 1) % 26) + s
+  return s
+}
+
+// The address of a cell, or of the box from one cell to another.
+function refText (from, to = from) {
+  const r1 = Math.min(from.row, to.row)
+  const r2 = Math.max(from.row, to.row)
+  const c1 = Math.min(from.col, to.col)
+  const c2 = Math.max(from.col, to.col)
+  const a = colName(c1) + r1
+  return r1 === r2 && c1 === c2 ? a : a + ':' + colName(c2) + r2
+}
+
+module.exports = { analyze, helpFor, insertFunction, canPoint, refText }
