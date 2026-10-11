@@ -1,11 +1,23 @@
 // Desktop toolbars keep to one row: tools that do not fit are hidden and a
 // More tools button at the end shows them all, wrapping onto more rows.
 // An item with the class `tool-keep` (Present) always stays. Phones keep
-// their one scrolling row and do not use this.
+// their one scrolling row; there the bar gets `data-fade-start` and
+// `data-fade-end` while more tools lie past that edge, for a fade.
 import React, { useCallback, useLayoutEffect, useRef, useState } from 'react'
 import { CaretDown } from '@phosphor-icons/react'
 
 const HIDDEN = 'data-tool-hidden' // an attribute React leaves alone, unlike className
+
+// A phone's scrolling row: which edges have tools hidden past them.
+function fades (el) {
+  if (!el.dataset.fadeWatch) {
+    el.dataset.fadeWatch = ''
+    el.addEventListener('scroll', () => fades(el), { passive: true })
+  }
+  const max = el.scrollWidth - el.clientWidth
+  el.toggleAttribute('data-fade-start', max > 1 && el.scrollLeft > 1)
+  el.toggleAttribute('data-fade-end', max > 1 && el.scrollLeft < max - 1)
+}
 
 export function useToolOverflow (enabled = true) {
   const bar = useRef(null)
@@ -17,6 +29,7 @@ export function useToolOverflow (enabled = true) {
   const measure = useCallback(() => {
     const el = bar.current
     if (!el) return
+    if (!enabled) { fades(el); return }
     const kids = [...el.children]
     for (const k of kids) k.removeAttribute(HIDDEN)
     const more = kids.find((k) => k.classList.contains('tool-more'))
@@ -51,7 +64,7 @@ export function useToolOverflow (enabled = true) {
   const ref = useCallback((el) => {
     if (watch.current) { watch.current.disconnect(); watch.current = null }
     bar.current = el
-    if (el && enabled) {
+    if (el) {
       watch.current = new ResizeObserver(() => measure())
       watch.current.observe(el)
     }
