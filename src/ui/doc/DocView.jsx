@@ -16,6 +16,7 @@ import { readPref, writePref } from '../prefs.js'
 import { isMobile } from '../sheet/xlsx.js'
 import { exportDocument, tidyPaste } from './docFiles.js'
 import { usePrintKey } from '../printKey.js'
+import { useToolOverflow } from '../toolOverflow.jsx'
 import { Outline } from './Outline.jsx'
 import { documentExtensions, FindReplace, findKey, changeCaseCommand, LINE_HEIGHTS, SIZES } from './extensions.js'
 import { PictureView, pictureCache, preparePicture, isPicture, toB64, fromB64, noteCopied, pictureClipboard, foreignPictures, adoptPictures } from './pictures.js'
@@ -260,6 +261,7 @@ export function DocView ({ sheetId, onTitleChange, onError, onGone }) {
 }
 
 function DocEditor ({ sheetId, pictures, ydoc, canEdit, phone, finding, setFinding, outline, toggleOutline, editorRef, onBlur, cursors, onCursor }) {
+  const toolRow = useToolOverflow(!phone)
   const canEditRef = useRef(canEdit)
   canEditRef.current = canEdit
   // A short note when a paste left something out.
@@ -487,7 +489,7 @@ function DocEditor ({ sheetId, pictures, ydoc, canEdit, phone, finding, setFindi
 
   return (
     <div className='doc-main' onKeyDown={onKeyDown}>
-      <div className={'doc-tools' + (phone ? ' phone' : '')} role='toolbar' aria-label='Formatting' hidden={!canEdit}>
+      <div ref={toolRow.ref} className={'doc-tools' + (phone ? ' phone' : '')} role='toolbar' aria-label='Formatting' hidden={!canEdit}>
         {btn('Undo (Ctrl+Z)', ArrowCounterClockwise, undefined, () => editor.chain().focus().undo().run(), { disabled: !s.canUndo })}
         {btn('Redo (Ctrl+Y)', ArrowClockwise, undefined, () => editor.chain().focus().redo().run(), { disabled: !s.canRedo })}
         <span className='sep' />
@@ -534,6 +536,7 @@ function DocEditor ({ sheetId, pictures, ydoc, canEdit, phone, finding, setFindi
         {btn('Clear formatting', Eraser, undefined, () => editor.chain().focus().unsetAllMarks().unsetTextAlign().run())}
         {btn('Find and replace (Ctrl+F)', MagnifyingGlass, finding, () => setFinding(!finding))}
         {btn('Outline', TreeView, outline, toggleOutline, { className: 'outline-button' + (outline ? ' on' : '') })}
+        {toolRow.moreButton}
       </div>
       {menu && <div className='doc-scrim' onMouseDown={() => setMenu(null)} />}
       {menu && (menu.kind === 'color' || menu.kind === 'highlight') && (

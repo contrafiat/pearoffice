@@ -26,6 +26,7 @@ import { Minus, ArrowCounterClockwise, ArrowClockwise, TextB, TextItalic, TextAU
 import { FormulaHelp, helpFor, insertFunction, canPoint, refText } from './FormulaHelp.jsx'
 import { exportSheet, exportCsv, exportJson, printTab, isMobile } from './xlsx.js'
 import { usePrintKey } from '../printKey.js'
+import { useToolOverflow } from '../toolOverflow.jsx'
 
 const COLOURS = ['#1f2420', '#b3261e', '#c2410c', '#a16207', '#15803d', '#0e7490', '#1d4ed8', '#7e22ce']
 const ZOOM_STEPS = [0.5, 0.67, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5]
@@ -585,6 +586,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
   // The tab's charts as SVG for PDF and print, in light colours on white.
   const PAPER = { ink: '#1f2420', muted: '#6b716b', line: '#e2e3dd', lineStrong: '#c9cbc2', panel: '#ffffff' }
   const printCharts = () => (view.charts || []).map((c) => chartSvg(c, c.size.w, c.size.h, PAPER)).filter(Boolean)
+  const toolRow = useToolOverflow(!phone)
   usePrintKey(() => printTab(view, 'print', printCharts()).catch((err) => onError(err.message)))
 
   // Freeze panes (proposals/2026-10-04-freeze-filter.md), shared by everyone.
@@ -968,7 +970,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
           </>
         )}
       >
-        <div className={'tools' + (phone ? ' phone-row' : '')} role='toolbar' aria-label='Formatting' hidden={!canEdit}>
+        <div ref={toolRow.ref} className={'tools' + (phone ? ' phone-row' : '')} role='toolbar' aria-label='Formatting' hidden={!canEdit}>
           <button title='Undo (Ctrl+Z)' aria-label='Undo' disabled={!view.canUndo} onClick={() => run('sheet:undo')}><ArrowCounterClockwise size={ICON} /></button>
           <button title='Redo (Ctrl+Y)' aria-label='Redo' disabled={!view.canRedo} onClick={() => run('sheet:redo')}><ArrowClockwise size={ICON} /></button>
           <span className='sep' />
@@ -1094,6 +1096,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
               </button>
             </>
           )}
+          {toolRow.moreButton}
         </div>
         {window.pearoffice && !phone && (
           <button className='export icon-button' title='Save a copy as an Excel file' aria-label='Export' onClick={() => exportSheet(sheetId).catch((err) => onError(err.message))}><FileXls size={ICON} /></button>

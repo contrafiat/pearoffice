@@ -148,13 +148,14 @@ button, input, select { font: inherit; color: inherit; }
 .title:focus { outline: none; border-color: var(--pear); background: var(--paper); }
 .tools { display: flex; align-items: center; gap: 4px; }
 .tools button, .tools select {
-  border: 1px solid var(--line);
+  border: 1px solid transparent;
   background: var(--panel);
   border-radius: 6px;
-  padding: 4px 10px;
+  padding: 4px 6px;
   cursor: pointer;
-  min-width: 32px;
+  min-width: 30px;
 }
+.tools select { border-color: var(--line); padding: 0 4px; }
 .tools button { display: inline-flex; align-items: center; justify-content: center; height: 30px; color: var(--ink); }
 .tools select { height: 30px; }
 .tools button:hover:not(:disabled), .tools select:hover { border-color: var(--line-strong); }
@@ -162,7 +163,7 @@ button, input, select { font: inherit; color: inherit; }
 .tools button.on { background: var(--pear-soft); border-color: var(--pear); color: var(--pear-dark); }
 .tools .fmt-b { font-weight: 700; }
 .tools .fmt-i { font-style: italic; font-family: Georgia, serif; }
-.tools .sep { width: 1px; height: 20px; background: var(--line); margin: 0 6px; }
+.tools .sep { width: 1px; height: 20px; background: var(--line); margin: 0 4px; }
 
 .formula-bar { display: flex; align-items: center; gap: 8px; padding: 6px 14px; background: var(--panel); border-bottom: 1px solid var(--line); }
 .formula-bar .address { width: 64px; text-align: center; font-variant-numeric: tabular-nums; color: var(--muted); border-right: 1px solid var(--line); padding-right: 8px; }
@@ -608,7 +609,7 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 
 /* Borders menu (proposals/2026-10-04-cell-formats.md). */
 .palette.borders-menu { grid-template-columns: repeat(4, auto); width: max-content; align-items: center; }
-.tools .palette .border-preset { min-width: 0; padding: 4px 8px; font-size: 12px; height: auto; }
+.tools .palette .border-preset { min-width: 0; padding: 4px 8px; font-size: 12px; height: auto; border-color: var(--line); }
 .palette.borders-menu select { grid-column: 1 / -1; height: 30px; }
 .border-colours { grid-column: 1 / -1; display: flex; gap: 6px; }
 .tools .palette .border-colours .swatch.on { outline: 2px solid var(--pear); }
@@ -1308,3 +1309,11 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
   .card-more { top: 50%; transform: translateY(-50%); }
   .folder-head h1 { font-size: 20px; }
 }
+
+/* Desktop toolbars keep to one row (src/ui/toolOverflow.jsx): tools that do
+   not fit hide behind More tools, which shows them all on more rows. */
+[data-tool-hidden] { display: none !important; }
+.tools .tool-more, .doc-tools .tool-more { flex: none; min-width: 30px; padding: 0 6px; border: 1px solid var(--line); border-radius: 6px; color: var(--ink); }
+.tool-more svg { transition: transform 0.2s ease; }
+.tool-more.open { background: var(--pear-soft); border-color: var(--pear); color: var(--pear-dark); }
+.tool-more.open svg { transform: rotate(180deg); }
