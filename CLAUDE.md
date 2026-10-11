@@ -143,7 +143,10 @@ Code that works for any kind of file sits apart from each editor's own
   printing the open file on desktop (`printKey.js`; in a smoke run `app:print`
   writes `printed.html` to the data folder). On phones a tap on any button or menu item buzzes
   (`haptic.js`, the shell's `app:haptic` with expo-haptics; `danger` controls
-  buzz a warning, `data-haptic` picks another kind). `src/ui/sheet/` is the spreadsheet editor
+  buzz a warning, `data-haptic` picks another kind). On desktop each editor's
+  toolbar keeps to one row (`toolOverflow.jsx`: tools that do not fit get
+  `data-tool-hidden`, More tools shows them all; `tool-keep` items stay).
+  `src/ui/sheet/` is the spreadsheet editor
   (grid, toolbar, its panels, charts, `xlsx.js` file handling). Talks only to
   `window.pearoffice` (`call`, `on`), which the desktop preload and the mobile
   WebView provide. Built to `dist/ui` by `scripts/build-ui.mjs`.
