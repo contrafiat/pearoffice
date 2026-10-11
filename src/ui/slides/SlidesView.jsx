@@ -515,7 +515,10 @@ export function SlidesView ({ sheetId, onTitleChange, onError, onGone }) {
               ? btn(cropping ? 'Finish cropping (Enter)' : 'Crop', Crop, !!cropping, () => (cropping ? setCropping(null) : setCropping(selPicture.id)), { className: 'crop-button' + (cropping ? ' on' : '') })
               : selChart
                 ? <ChartTools value={selChart.chart} theme={deck.theme} btn={btn} phone={phone} setChart={(patch) => change((doc) => slidesModel.setChart(doc, chartSlide, selChart.id, { chart: patch }))} onEditData={() => setDataPanel(selChart.id)} />
-                : canEdit && <TextTools editor={toolEditor} defaultSize={defaultSize(deck.theme, editingBox ? editingBox.role : 'body')} phone={phone} btn={btn} afterAlign={anchorTools} />}
+                : canEdit && (phone && !toolEditor
+                  // Phones: a note in place of text tools that cannot work yet.
+                  ? <span className='tool-hint'>Tap text to format it</span>
+                  : <TextTools editor={toolEditor} defaultSize={defaultSize(deck.theme, editingBox ? editingBox.role : 'body')} phone={phone} btn={btn} afterAlign={anchorTools} />)}
           {toolRow.moreButton}
         </div>
         <div className='slides-row'>

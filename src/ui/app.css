@@ -1316,3 +1316,10 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 .tool-more svg { transition: transform 0.2s ease; }
 .tool-more.open { background: var(--pear-soft); border-color: var(--pear); color: var(--pear-dark); }
 .tool-more.open svg { transform: rotate(180deg); }
+
+/* Phones: a fade at the right edge of a toolbar row that scrolls, so it
+   shows there is more. It sticks to the edge while there is more to see,
+   and at the end sits over empty space. */
+.tools.phone-row::after { content: ''; position: sticky; right: 0; flex: none; align-self: stretch; width: 32px; margin-left: -4px; background: linear-gradient(to right, transparent, var(--panel) 85%); pointer-events: none; }
+@media (max-width: 720px) { .doc-tools.phone::after { content: ''; position: sticky; right: 0; flex: none; align-self: stretch; width: 32px; margin-left: -4px; background: linear-gradient(to right, transparent, var(--panel) 85%); pointer-events: none; } }
+.doc-tools .tool-hint { flex: none; color: var(--muted); font-size: 13px; padding: 0 6px; white-space: nowrap; }
