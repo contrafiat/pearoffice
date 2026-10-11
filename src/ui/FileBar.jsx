@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { call, on } from './bridge.js'
 import { SharePanel } from './SharePanel.jsx'
 import { PeopleStack } from './Avatar.jsx'
@@ -30,6 +30,19 @@ export function FileBar ({ sheetId, noun, title, myRole, frozen, canEdit, badge,
   const [moving, setMoving] = useState(false) // Move to folder
   const ICON = phone ? 20 : 18 // toolbar icon size
   const close = () => setMore(false)
+  // A press anywhere outside the menu, or Esc, closes it.
+  const moreRef = useRef(null)
+  useEffect(() => {
+    if (!more) return
+    const away = (e) => { if (moreRef.current && !moreRef.current.contains(e.target)) setMore(false) }
+    const esc = (e) => { if (e.key === 'Escape') { e.stopPropagation(); setMore(false) } }
+    document.addEventListener('pointerdown', away, true)
+    document.addEventListener('keydown', esc, true)
+    return () => {
+      document.removeEventListener('pointerdown', away, true)
+      document.removeEventListener('keydown', esc, true)
+    }
+  }, [more])
 
   async function rename (value) {
     try { await call('file:setTitle', { sheetId, title: value }) } catch (err) { onError(err.message) }
@@ -53,7 +66,7 @@ export function FileBar ({ sheetId, noun, title, myRole, frozen, canEdit, badge,
         {members.length > 1 && <PeopleStack sheetId={sheetId} members={members} present={present} max={phone ? 2 : 3} size={26} noun={noun} onClick={() => setSharing(true)} />}
         {!phone && <button className='share' onClick={() => setSharing(true)}>Share</button>}
         {phone && members.length <= 1 && <button className='share-icon icon-button' aria-label='Share' title='Share' onClick={() => setSharing(true)}><UserPlus size={ICON} /></button>}
-        <span className='more'>
+        <span className='more' ref={moreRef}>
           <button className='more-button icon-button' aria-label='More' title='More' onClick={() => setMore(!more)}><DotsThree size={ICON} weight='bold' /></button>
           {more && (
             <ul className='menu more-menu' role='menu' onClick={close}>

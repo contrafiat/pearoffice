@@ -27,6 +27,21 @@ module.exports = async function app (t) {
   await t.newSheet()
   step('two sheets created')
 
+  // The file's More menu closes on Esc and on a press outside it.
+  const moreOpen = "!!document.querySelector('.more-menu')"
+  await js("document.querySelector('.toolbar .more-button').click()")
+  await waitFor('more menu', moreOpen)
+  t.wc.sendInputEvent({ type: 'keyDown', keyCode: 'Escape' }); t.wc.sendInputEvent({ type: 'keyUp', keyCode: 'Escape' })
+  await waitFor('closed by Esc', '!' + moreOpen)
+  await js("document.querySelector('.toolbar .more-button').click()")
+  await waitFor('more menu', moreOpen)
+  const [ox, oy] = await js("(() => { const r = document.querySelector('.toolbar .title').getBoundingClientRect(); return [Math.round(r.left + 10), Math.round(r.top + r.height / 2)] })()")
+  t.wc.sendInputEvent({ type: 'mouseDown', x: ox, y: oy, button: 'left', clickCount: 1 })
+  t.wc.sendInputEvent({ type: 'mouseUp', x: ox, y: oy, button: 'left', clickCount: 1 })
+  await waitFor('closed by a press outside', '!' + moreOpen)
+  await js("document.activeElement && document.activeElement.blur()")
+  step('more menu closes')
+
   // With a file worth recovering, a dot on Settings (and on Devices inside
   // it) asks for the phrase to be written down, until it is shown below.
   // PEAROFFICE_SMOKE_NUDGE_SHOT=<file> saves the side menu and Settings.
