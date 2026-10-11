@@ -246,7 +246,9 @@ export const Grid = forwardRef(function Grid (props, ref) {
   const frozenW = fc ? colX[fc + 1] : 0
   const inFrozen = (r, c) => r <= fr || c <= fc
 
-  // Keep the moving corner of the selection in view.
+  // Keep the moving corner of the selection in view, with room past it
+  // for the fill handle.
+  const EDGE = 8
   useEffect(() => {
     const el = bodyRef.current
     if (!el) return
@@ -256,11 +258,11 @@ export const Grid = forwardRef(function Grid (props, ref) {
     // A frozen row or column is always in view; others must clear the frozen part.
     if (ext.row > fr) {
       if (y - frozenH < el.scrollTop) el.scrollTop = y - frozenH
-      else if (y + rowH[ext.row] > el.scrollTop + el.clientHeight) el.scrollTop = y + rowH[ext.row] - el.clientHeight
+      else if (y + rowH[ext.row] + EDGE > el.scrollTop + el.clientHeight) el.scrollTop = y + rowH[ext.row] + EDGE - el.clientHeight
     }
     if (ext.col > fc) {
       if (x - frozenW < el.scrollLeft) el.scrollLeft = x - frozenW
-      else if (x + w > el.scrollLeft + el.clientWidth) el.scrollLeft = x + w - el.clientWidth
+      else if (x + w + EDGE > el.scrollLeft + el.clientWidth) el.scrollLeft = x + w + EDGE - el.clientWidth
     }
     // Only when the selection moves: a pinch zoom must not snap back to it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -423,7 +425,9 @@ export const Grid = forwardRef(function Grid (props, ref) {
           autoFocus
           aria-label='Edit cell'
           inputMode={inputMode}
-          style={{ top: rowY[editing.row], left: colX[editing.col], minWidth: widths[editing.col], height: rowH[editing.row], ...textStyle((cells.get(editing.row + ',' + editing.col) || {}).fmt, zoom), textAlign: undefined }}
+          // The cell's width, growing with longer text (an input is otherwise
+          // about 20 characters wide, wider than most columns).
+          style={{ top: rowY[editing.row], left: colX[editing.col], width: 'max(' + widths[editing.col] + 'px, ' + (editing.value.length + 2) + 'ch)', height: rowH[editing.row], ...textStyle((cells.get(editing.row + ',' + editing.col) || {}).fmt, zoom), textAlign: undefined }}
           value={editing.value}
           onChange={(e) => { onEditChange(e.target.value); onEditCaret(e.target.selectionStart) }}
           onSelect={(e) => onEditCaret(e.target.selectionStart)}
