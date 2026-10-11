@@ -1317,9 +1317,13 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 .tool-more.open { background: var(--pear-soft); border-color: var(--pear); color: var(--pear-dark); }
 .tool-more.open svg { transform: rotate(180deg); }
 
-/* Phones: a fade at the right edge of a toolbar row that scrolls, so it
-   shows there is more. It sticks to the edge while there is more to see,
-   and at the end sits over empty space. */
-.tools.phone-row::after { content: ''; position: sticky; right: 0; flex: none; align-self: stretch; width: 32px; margin-left: -4px; background: linear-gradient(to right, transparent, var(--panel) 85%); pointer-events: none; }
-@media (max-width: 720px) { .doc-tools.phone::after { content: ''; position: sticky; right: 0; flex: none; align-self: stretch; width: 32px; margin-left: -4px; background: linear-gradient(to right, transparent, var(--panel) 85%); pointer-events: none; } }
+/* Phones: a fade at either edge of a toolbar row that scrolls while more
+   tools lie past it (toolOverflow.jsx sets the attributes). */
+.tools.phone-row, .doc-tools.phone { --fade-l: 0px; --fade-r: 0px; }
+.tools.phone-row[data-fade-start], .doc-tools.phone[data-fade-start] { --fade-l: 32px; }
+.tools.phone-row[data-fade-end], .doc-tools.phone[data-fade-end] { --fade-r: 32px; }
+.tools.phone-row:is([data-fade-start], [data-fade-end]), .doc-tools.phone:is([data-fade-start], [data-fade-end]) {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 var(--fade-l), #000 calc(100% - var(--fade-r)), transparent);
+  mask-image: linear-gradient(to right, transparent, #000 var(--fade-l), #000 calc(100% - var(--fade-r)), transparent);
+}
 .doc-tools .tool-hint { flex: none; color: var(--muted); font-size: 13px; padding: 0 6px; white-space: nowrap; }
