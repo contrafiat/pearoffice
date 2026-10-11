@@ -3,7 +3,7 @@ import { call, on } from '../bridge.js'
 import { Grid, MIN_ZOOM, MAX_ZOOM } from './Grid.jsx'
 import { colName } from './a1.js'
 import { changeDecimals, jumpTarget, todaySerial } from './cellTools.js'
-import { SIZES, borderCss, fitWidth } from './cellStyle.js'
+import { SIZES, DEFAULT_SIZE, borderCss, fitWidth } from './cellStyle.js'
 import { shiftA1 } from '../../sheet/refs.js'
 import { colourFor } from '../Avatar.jsx'
 import { FileBar, useMembers } from '../FileBar.jsx'
@@ -993,8 +993,8 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
             )}
           </span>
           <select title='Font size' aria-label='Font size' className='size-select' value={fmt.size || ''} onChange={(e) => formatRange({ size: e.target.value ? Number(e.target.value) : null })}>
-            <option value=''>Size</option>
-            {SIZES.map((n) => <option key={n} value={n}>{n}</option>)}
+            {/* The default size has no value: picking it clears the cell's size. */}
+            {[...SIZES, DEFAULT_SIZE].sort((x, y) => x - y).map((n) => <option key={n} value={n === DEFAULT_SIZE ? '' : n}>{n}</option>)}
           </select>
           <select title='Font' aria-label='Font' value={fmt.font || ''} onChange={(e) => formatRange({ font: e.target.value || null })}>
             <option value=''>Sans</option>

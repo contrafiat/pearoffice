@@ -9,6 +9,8 @@ export const FONTS = {
   mono: "ui-monospace, 'SF Mono', Menlo, Consolas, monospace"
 }
 export const SIZES = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36]
+// The size of text with no size set: BASE_FONT_PX in points.
+export const DEFAULT_SIZE = BASE_FONT_PX * 3 / 4
 const WIDTHS = { thin: 1, medium: 2, thick: 3, dashed: 1, double: 3 }
 
 // Font size in pixels at 100% (sizes are points).
