@@ -242,7 +242,7 @@ module.exports = async function sheetFiles (t) {
   step('renamed')
 
   // Export to .xlsx, then import that file back through the file picker.
-  await js("document.querySelector('.toolbar .export').click()")
+  await more('Save as an Excel file')
   const file = path.join(downloads, 'Household budget.xlsx')
   const start = Date.now()
   while (!(fs.existsSync(file) && fs.statSync(file).size > 1000) && Date.now() - start < 20000) await sleep(200)

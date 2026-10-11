@@ -482,7 +482,9 @@ export function SlidesView ({ sheetId, onTitleChange, onError, onGone }) {
               </>
             )
           }}
-        />
+        >
+          {!phone && <button className='present-button title-action' title='Present (F5, or Shift+F5 from this slide)' onMouseDown={(e) => e.preventDefault()} onClick={() => startShow(true)} disabled={!deck.slides.length}><Play size={18} weight='fill' /> Present</button>}
+        </FileBar>
         {note && <div className='banner info'>{note}</div>}
         <div ref={toolRow.ref} className={'doc-tools slides-tools' + (phone ? ' phone' : '')} role='toolbar' aria-label='Slide tools'>
           {canEdit && btn('Undo (Ctrl+Z)', ArrowCounterClockwise, undefined, () => undo.undo(), { disabled: !undo.undoStack.length, className: 'undo-button' })}
@@ -515,7 +517,6 @@ export function SlidesView ({ sheetId, onTitleChange, onError, onGone }) {
                 ? <ChartTools value={selChart.chart} theme={deck.theme} btn={btn} phone={phone} setChart={(patch) => change((doc) => slidesModel.setChart(doc, chartSlide, selChart.id, { chart: patch }))} onEditData={() => setDataPanel(selChart.id)} />
                 : canEdit && <TextTools editor={toolEditor} defaultSize={defaultSize(deck.theme, editingBox ? editingBox.role : 'body')} phone={phone} btn={btn} afterAlign={anchorTools} />}
           {toolRow.moreButton}
-          {!phone && <button className='present-button tool-keep' title='Present (F5, or Shift+F5 from this slide)' onMouseDown={(e) => e.preventDefault()} onClick={() => startShow(true)} disabled={!deck.slides.length}><Play size={ICON} weight='fill' /> Present</button>}
         </div>
         <div className='slides-row'>
           {!listBelow && <SlideList slides={deck.slides} current={current} onPick={setCurrent} size={deck.size} theme={deck.theme} canEdit={canEdit} phone={false} people={bySlide} sheetId={sheetId} onAdd={addSlide} onDuplicate={duplicate} onDelete={remove} onMove={move} />}
