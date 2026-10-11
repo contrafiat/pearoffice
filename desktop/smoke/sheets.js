@@ -318,5 +318,5 @@ module.exports = async function sheets (t) {
     step('screenshot', process.env.PEAROFFICE_SMOKE_SHOT)
   }
 
-  return result.sizeShown === '10.5,false' && result.editorFits && result.pointed && result.moreChartTypes && result.spill && result.quickWins && result.findSort && result.fill && result.charts && result.suggested === 'SUBSTITUTE,SUBTOTAL,SUM' && result.argHelp === 'number1' && result.pastedFormula === '=SUM(C1:C2)' && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
+  return result.sizeShown === '11,false' && result.editorFits && result.pointed && result.moreChartTypes && result.spill && result.quickWins && result.findSort && result.fill && result.charts && result.suggested === 'SUBSTITUTE,SUBTOTAL,SUM' && result.argHelp === 'number1' && result.pastedFormula === '=SUM(C1:C2)' && result.afterUndo === '1650.5' && result.grid.B3 === '1650.5' && result.grid.A1 === 'Rent' && result.formulaBar === '=SUM(B1:B2)'
 }

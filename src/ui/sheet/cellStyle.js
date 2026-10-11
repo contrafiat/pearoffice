@@ -2,15 +2,16 @@
 // sizes, alignment, borders, and how tall a row must be for its text. Shared
 // by the grid and the printable page.
 
-export const BASE_FONT_PX = 14
+// The size of text with no size set, in points (as in Excel and Word), and
+// in pixels.
+export const DEFAULT_SIZE = 11
+export const BASE_FONT_PX = Math.round(DEFAULT_SIZE * 4 / 3 * 10) / 10
 export const FONTS = {
   sans: "system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
   serif: "Georgia, 'Times New Roman', serif",
   mono: "ui-monospace, 'SF Mono', Menlo, Consolas, monospace"
 }
 export const SIZES = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36]
-// The size of text with no size set: BASE_FONT_PX in points.
-export const DEFAULT_SIZE = BASE_FONT_PX * 3 / 4
 const WIDTHS = { thin: 1, medium: 2, thick: 3, dashed: 1, double: 3 }
 
 // Font size in pixels at 100% (sizes are points).

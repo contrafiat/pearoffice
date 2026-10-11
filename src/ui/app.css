@@ -211,7 +211,7 @@ button, input, select { font: inherit; color: inherit; }
   justify-content: flex-end;
   overflow: hidden;
   cursor: cell;
-  font-size: var(--cell-font, 14px);
+  font-size: var(--cell-font, 14.7px);
 }
 /* The text inside a cell: one line unless the cell wraps. Bottom-aligned
    by default, as in Excel; a default-height row looks centred. */
@@ -239,7 +239,7 @@ button, input, select { font: inherit; color: inherit; }
   background: var(--panel);
   outline: none;
   box-shadow: 0 2px 10px rgb(0 0 0 / 0.12);
-  font-size: var(--cell-font, 14px);
+  font-size: var(--cell-font, 14.7px);
 }
 
 .menu {

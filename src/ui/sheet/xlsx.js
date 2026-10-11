@@ -15,7 +15,10 @@ import { isMobile, fileName, saveFile } from '../save.js'
 import { isDocFile, importDocument } from '../doc/docFiles.js'
 import { isPptxFile, importPresentation } from '../slides/pptxImport.js'
 import { checkZip } from '../slides/importOoxml.js'
-import { borderCss, fontPx, FONTS } from './cellStyle.js'
+import { borderCss, fontPx, FONTS, BASE_FONT_PX } from './cellStyle.js'
+
+// The printed page draws the default text at 11px.
+const PRINT = 11 / BASE_FONT_PX
 
 const MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 export { isMobile }
@@ -147,7 +150,7 @@ export function tabHtml (view, chartSvgs = []) {
   let body = ''
   for (let r = 1; r <= rows; r++) {
     const rh = view.heights && view.heights[r]
-    body += rh ? '<tr style="height:' + Math.round(rh * 11 / 14) + 'px">' : '<tr>'
+    body += rh ? '<tr style="height:' + Math.round(rh * PRINT) + 'px">' : '<tr>'
     for (let c = 1; c <= cols; c++) {
       if (covered.has(r + ',' + c)) continue
       const x = at.get(r + ',' + c)
@@ -157,7 +160,7 @@ export function tabHtml (view, chartSvgs = []) {
         f.align ? 'text-align:' + f.align : x && (x.kind === 'number' || x.kind === 'bool') ? 'text-align:right' : '',
         'vertical-align:' + (f.valign || 'bottom'),
         f.wrap ? 'white-space:pre-wrap' : '',
-        f.size ? 'font-size:' + Math.round(fontPx(f) * 11 / 14 * 10) / 10 + 'px' : '',
+        f.size ? 'font-size:' + Math.round(fontPx(f) * PRINT * 10) / 10 + 'px' : '',
         f.font ? 'font-family:' + FONTS[f.font].replace(/"/g, "'") : '',
         f.u || f.s ? 'text-decoration:' + [f.u && 'underline', f.s && 'line-through'].filter(Boolean).join(' ') : '',
         f.b ? 'font-weight:bold' : '',
