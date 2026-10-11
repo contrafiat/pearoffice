@@ -253,7 +253,9 @@ export function DocView ({ sheetId, onTitleChange, onError, onGone }) {
             </>
           )
         }}
-      />
+      >
+        {!phone && <button className='find-button icon-button title-action' title='Find and replace (Ctrl+F)' aria-label='Find' onClick={() => setFinding(!finding)}><MagnifyingGlass size={18} /></button>}
+      </FileBar>
       {note && <div className='banner info'>{note}</div>}
       <DocEditor sheetId={sheetId} pictures={pictures} ydoc={ydoc} canEdit={canEdit} phone={phone} finding={finding} setFinding={setFinding} outline={outline} toggleOutline={toggleOutline} editorRef={editorRef} onBlur={() => flushRef.current()} cursors={cursors} onCursor={onCursor} />
     </div>
@@ -534,7 +536,6 @@ function DocEditor ({ sheetId, pictures, ydoc, canEdit, phone, finding, setFindi
         <span className='sep' />
         {btn('Change case', TextAa, undefined, (e) => openMenu('case', e.currentTarget), { 'aria-haspopup': 'menu', disabled: s.empty })}
         {btn('Clear formatting', Eraser, undefined, () => editor.chain().focus().unsetAllMarks().unsetTextAlign().run())}
-        {btn('Find and replace (Ctrl+F)', MagnifyingGlass, finding, () => setFinding(!finding))}
         {btn('Outline', TreeView, outline, toggleOutline, { className: 'outline-button' + (outline ? ' on' : '') })}
         {toolRow.moreButton}
       </div>

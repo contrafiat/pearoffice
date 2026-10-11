@@ -288,7 +288,9 @@ button, input, select { font: inherit; color: inherit; }
 .people-stack .avatar { box-shadow: 0 0 0 2px var(--panel); }
 .people-stack .avatar + .avatar { margin-left: -8px; }
 .people-stack .more-people { background: var(--head); color: var(--ink); font-weight: 600; }
-.toolbar .export + .people-stack, .toolbar .find-button + .people-stack, .toolbar .people-stack + .share { margin-left: 0; }
+/* Title row actions (Find, Present) sit at the right, before the people and Share. */
+.toolbar .title-action { margin-left: auto; }
+.toolbar .title-action + .title-action, .toolbar .title-action + .people-stack, .toolbar .title-action + .share, .toolbar .people-stack + .share { margin-left: 0; }
 .sheet-link.waiting { color: var(--muted); font-style: italic; }
 .badge { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.03em; color: var(--muted); background: var(--head); border-radius: 999px; padding: 2px 8px; white-space: nowrap; }
 .badge.view-only { color: var(--pear-dark); background: var(--pear-soft); }
@@ -351,8 +353,6 @@ button, input, select { font: inherit; color: inherit; }
 .my-name input { border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; background: var(--paper); font-size: 13px; color: var(--ink); }
 .my-name input:focus { outline: none; border-color: var(--pear); }
 
-.toolbar .export { margin-left: auto; border: 1px solid var(--line-strong); background: var(--panel); border-radius: 8px; padding: 6px 12px; cursor: pointer; }
-.toolbar .export + .share { margin-left: 0; }
 .join-sheet.import { text-align: center; display: block; }
 .toolbar .share {
   margin-left: auto;
@@ -555,8 +555,6 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 
 /* Find and replace, and Sort. */
 .toolbar .find-button { border: 1px solid var(--line-strong); background: var(--panel); border-radius: 8px; cursor: pointer; }
-.toolbar .export + .find-button + .share { margin-left: 0; }
-.toolbar .find-button + .share { margin-left: 0; }
 .find-form { display: flex; flex-direction: column; gap: 10px; }
 .find-options { display: flex; flex-wrap: wrap; gap: 6px 16px; }
 .find-options .check { font-size: 13px; align-items: center; }
@@ -1085,8 +1083,9 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 
 /* Presenting (src/ui/slides/Present.jsx). The slide fills the screen with
    black around it; the presenter view is dark whatever the app's theme. */
-.slides-tools .present-button { margin-left: auto; gap: 6px; padding: 0 12px; border-color: var(--pear); background: var(--pear); color: #fff; font-weight: 600; }
-.slides-tools .present-button:hover:not(:disabled) { border-color: var(--pear); filter: brightness(0.93); }
+.toolbar .present-button { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 14px; border: 1px solid var(--pear); border-radius: 8px; background: var(--panel); color: var(--pear-dark); font: inherit; font-weight: 600; cursor: pointer; }
+.toolbar .present-button:hover:not(:disabled) { background: var(--pear-soft); }
+.toolbar .present-button:disabled { opacity: 0.45; cursor: default; }
 /* Below the phone side menu (25 and 30) so it never covers Settings or About. */
 /* Under menus and sheets (the scrim is 9), above the slide. */
 .present-fab { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 8; display: inline-flex; align-items: center; gap: 8px; padding: 12px 22px; border: 0; border-radius: 999px; background: var(--pear); color: #fff; font: inherit; font-weight: 600; font-size: 16px; box-shadow: 0 6px 18px rgb(0 0 0 / 0.25); }

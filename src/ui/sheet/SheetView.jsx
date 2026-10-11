@@ -953,7 +953,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
         menuItems={(close) => (
           <>
             <li role='menuitem' onClick={() => setFinding({ replace: canEdit })}>Find and replace</li>
-            {phone && window.pearoffice && <li role='menuitem' onClick={() => exportSheet(sheetId).catch((err) => onError(err.message))}>Save as an Excel file</li>}
+            {window.pearoffice && <li role='menuitem' onClick={() => exportSheet(sheetId).catch((err) => onError(err.message))}>Save as an Excel file</li>}
             <li role='menuitem' onClick={() => exportCsv(view).catch((err) => onError(err.message))}>Download this tab as CSV</li>
             <li role='menuitem' onClick={() => exportJson(sheetId).catch((err) => onError(err.message))}>Save as JSON</li>
             <li role='menuitem' onClick={() => printTab(view, 'pdf', printCharts()).catch((err) => onError(err.message))}>Save this tab as PDF</li>
@@ -1098,12 +1098,10 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
           )}
           {toolRow.moreButton}
         </div>
-        {window.pearoffice && !phone && (
-          <button className='export icon-button' title='Save a copy as an Excel file' aria-label='Export' onClick={() => exportSheet(sheetId).catch((err) => onError(err.message))}><FileXls size={ICON} /></button>
-        )}
-        {/* Phones keep the title readable: Find and Export move into More,
-            and the people (or a share icon when alone) open Share. */}
-        {!phone && <button className='find-button icon-button' title='Find and replace (Ctrl+F)' aria-label='Find' onClick={() => setFinding({ replace: false })}><MagnifyingGlass size={ICON} /></button>}
+        {/* Export is in More, as in every editor. Phones keep the title
+            readable: Find moves into More too, and the people (or a share
+            icon when alone) open Share. */}
+        {!phone && <button className='find-button icon-button title-action' title='Find and replace (Ctrl+F)' aria-label='Find' onClick={() => setFinding({ replace: false })}><MagnifyingGlass size={ICON} /></button>}
       </FileBar>
 
       {note && <div className='banner info'>{note}</div>}

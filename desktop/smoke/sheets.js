@@ -218,7 +218,7 @@ module.exports = async function sheets (t) {
   await sleep(300)
   const png = fs.existsSync(pngFile) ? fs.readFileSync(pngFile) : Buffer.alloc(0)
   // The .xlsx export carries the chart (src/sheet/xlsxCharts.js).
-  await js("document.querySelector('.toolbar .export').click()")
+  await t.more('Save as an Excel file')
   const chartXlsx = path.join(dataDir, 'downloads', 'Untitled sheet.xlsx')
   for (const t0 = Date.now(); !fs.existsSync(chartXlsx) && Date.now() - t0 < 10000;) await sleep(200)
   await sleep(500)

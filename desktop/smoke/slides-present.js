@@ -162,7 +162,7 @@ async function run (t) {
   process.env.PEAROFFICE_FAKE_DISPLAYS = '2'
   await pick(s1)
   await waitFor('first slide', `document.querySelector('.slide-thumb.current').dataset.id === ${JSON.stringify(s1)}`)
-  await js("document.querySelector('.slides-tools .present-button').click()")
+  await js("document.querySelector('.toolbar .present-button').click()")
   await waitFor('presenter view', "!!document.querySelector('.presenter .presenter-current .slide')", 5000)
   let audience = null
   for (let i = 0; i < 50 && !audience; i++) {
@@ -225,7 +225,7 @@ async function run (t) {
       await pwait('phone deck', `!!document.querySelector('.slides.phone .present-button') && !!document.querySelector('.slide-thumbs .slide-thumb[data-id=${JSON.stringify(s3)}]')`)
       await pjs(`document.querySelector('.slide-thumbs .slide-thumb[data-id=${JSON.stringify(s3)}]').click(); true`)
       await sleep(200)
-      await pjs("document.querySelector('.slides-tools .present-button').click(); true")
+      await pjs("document.querySelector('.slides.phone .present-button').click(); true")
       await pwait('show with notes', "!!document.querySelector('.show.phone.with-notes .present-notes-text')")
       await sleep(300)
       fs.writeFileSync(process.env.PEAROFFICE_SMOKE_PHONE_SHOT, (await phone.webContents.capturePage()).toPNG())
