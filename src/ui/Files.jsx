@@ -1,7 +1,8 @@
-import React from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { CaretLeft, DotsThree, FileText, FolderPlus, FolderSimple, PresentationChart, Table, X } from '@phosphor-icons/react'
 import { MemberAvatar } from './Avatar.jsx'
 import { filesIn, countLabel } from './Folders.jsx'
+import { haptic } from './haptic.js'
 
 // The kinds of file PearOffice makes (proposals/2026-10-06-rename-to-pearoffice.md,
 // 2026-10-06-slides.md). A kind marked `soon` shows in New as coming soon.
@@ -72,12 +73,14 @@ const RECOVERY_TITLES = {
   copy: 'Nobody else can let this device in. Open it to make a copy you own.'
 }
 
-function FileCard ({ f, onOpen, onWaiting, onRecover, onMenu, draggable }) {
+function FileCard ({ f, onOpen, onWaiting, onRecover, onMenu, draggable, onHold }) {
   return (
     <li
       className='file-cell'
       draggable={draggable && !f.joining}
-      onDragStart={(e) => { e.dataTransfer.setData('application/x-pearoffice-file', f.sheetId); e.dataTransfer.effectAllowed = 'move' }}
+      onDragStart={(e) => dragFile(e, f.sheetId)}
+      onTouchStart={onHold ? (e) => onHold(e, f) : undefined}
+      onContextMenu={onHold ? (e) => e.preventDefault() : undefined}
     >
       <button
         className={'file-card' + (f.waiting ? ' waiting' : '') + (f.removed ? ' removed' : '')}
@@ -105,19 +108,94 @@ function FileCard ({ f, onOpen, onWaiting, onRecover, onMenu, draggable }) {
   )
 }
 
-// Where a dragged file can go (desktop): a folder card, or the way back to
-// Your files from inside a folder.
-function dropTarget (onDrop, folder) {
-  const has = (e) => [...(e.dataTransfer.types || [])].includes('application/x-pearoffice-file')
+const FILE_TYPE = 'application/x-pearoffice-file'
+
+// Desktop: a file being dragged, from a card or the side list.
+export function dragFile (e, sheetId) {
+  e.dataTransfer.setData(FILE_TYPE, sheetId)
+  e.dataTransfer.effectAllowed = 'move'
+}
+
+// Where a dragged file can go (desktop): a folder card or a folder in the
+// side list, or, for no folder, the way back to Your files and All files.
+export function dropTarget (onDrop, folder) {
+  const has = (e) => [...(e.dataTransfer.types || [])].includes(FILE_TYPE)
   return {
     onDragOver: (e) => { if (has(e)) { e.preventDefault(); e.currentTarget.classList.add('drop-here') } },
     onDragLeave: (e) => e.currentTarget.classList.remove('drop-here'),
     onDrop: (e) => {
       e.currentTarget.classList.remove('drop-here')
-      const sheetId = e.dataTransfer.getData('application/x-pearoffice-file')
+      const sheetId = e.dataTransfer.getData(FILE_TYPE)
       if (sheetId) { e.preventDefault(); onDrop(sheetId, folder) }
     }
   }
+}
+
+// Phones: hold a file card for a moment, then drag it onto a folder card
+// (or the way back to Your files). A touch that moves first scrolls the
+// list. Drop targets carry data-drop-folder: a folder's id, or 'top'.
+function useTouchDrag (onDrop) {
+  const [ghost, setGhost] = useState(null) // { x, y, title } while dragging
+  const drag = useRef(null) // { sheetId, x, y, on, timer }
+  const over = useRef(null)
+  const dropRef = useRef(onDrop)
+  dropRef.current = onDrop
+  const mark = (el) => {
+    if (over.current === el) return
+    if (over.current) over.current.classList.remove('drop-here')
+    over.current = el
+    if (el) el.classList.add('drop-here')
+  }
+  useEffect(() => {
+    const move = (e) => {
+      const d = drag.current
+      const t = e.touches[0]
+      if (!d || !t) return
+      if (!d.on) {
+        if (Math.hypot(t.clientX - d.x, t.clientY - d.y) > 8) { clearTimeout(d.timer); drag.current = null }
+        return
+      }
+      e.preventDefault() // no scrolling while a file is held
+      setGhost((g) => g && { ...g, x: t.clientX, y: t.clientY })
+      const el = document.elementFromPoint(t.clientX, t.clientY)
+      mark(el && el.closest('[data-drop-folder]'))
+    }
+    const end = (e) => {
+      const d = drag.current
+      if (!d) return
+      clearTimeout(d.timer)
+      drag.current = null
+      if (!d.on) return
+      if (e.cancelable) e.preventDefault() // the held file does not open
+      const el = over.current
+      mark(null)
+      setGhost(null)
+      if (el && e.type === 'touchend') {
+        const folder = el.dataset.dropFolder
+        dropRef.current(d.sheetId, folder === 'top' ? null : folder)
+      }
+    }
+    document.addEventListener('touchmove', move, { passive: false })
+    document.addEventListener('touchend', end, { passive: false })
+    document.addEventListener('touchcancel', end)
+    return () => {
+      document.removeEventListener('touchmove', move)
+      document.removeEventListener('touchend', end)
+      document.removeEventListener('touchcancel', end)
+    }
+  }, [])
+  const hold = (e, f) => {
+    if (e.touches.length !== 1 || f.joining) return
+    const t = e.touches[0]
+    const d = { sheetId: f.sheetId, x: t.clientX, y: t.clientY, on: false }
+    d.timer = setTimeout(() => {
+      d.on = true
+      haptic('press')
+      setGhost({ x: d.x, y: d.y, kind: f.kind, title: f.title || untitled(f.kind) })
+    }, 400)
+    drag.current = d
+  }
+  return { ghost, hold }
 }
 
 // The start screen: folders first, then the files in no folder, newest
@@ -126,18 +204,27 @@ function dropTarget (onDrop, folder) {
 export function FileHome ({ files, actions, onOpen, onWaiting, onRecover = onOpen, folders = [], places = {}, folder = null, onFolder = () => {}, onNewFolder = () => {}, onFolderMenu = () => {}, onFileMenu = () => {}, onDrop = () => {}, desktop = false }) {
   const open = folder && folders.find((x) => x.id === folder)
   const shown = filesIn([...files].reverse(), places, open ? open.id : null)
-  const card = (f) => <FileCard key={f.sheetId} f={f} onOpen={onOpen} onWaiting={onWaiting} onRecover={onRecover} onMenu={onFileMenu} draggable={desktop} />
+  const { ghost, hold } = useTouchDrag(onDrop)
+  // Phones drag only when there is somewhere to drop.
+  const onHold = !desktop && (open || folders.length > 0) ? hold : null
+  const card = (f) => <FileCard key={f.sheetId} f={f} onOpen={onOpen} onWaiting={onWaiting} onRecover={onRecover} onMenu={onFileMenu} draggable={desktop} onHold={onHold} />
+  const dragGhost = ghost && (
+    <div className='drag-ghost' style={{ left: ghost.x, top: ghost.y }} aria-hidden='true'>
+      <KindIcon kind={ghost.kind} size={20} /> {ghost.title}
+    </div>
+  )
   if (open) {
     return (
       <div className='files-home in-folder'>
         <div className='folder-head'>
-          <button className='link-button folder-back' {...(desktop ? dropTarget(onDrop, null) : {})} onClick={() => onFolder(null)}><CaretLeft size={16} aria-hidden='true' /> Your files</button>
+          <button className='link-button folder-back' data-drop-folder='top' {...(desktop ? dropTarget(onDrop, null) : {})} onClick={() => onFolder(null)}><CaretLeft size={16} aria-hidden='true' /> Your files</button>
           <h1><FolderSimple size={24} weight='duotone' aria-hidden='true' /> {open.name}</h1>
           <button className='icon-button folder-more' aria-label='Folder menu' title='Folder menu' onClick={(e) => onFolderMenu(e, open)}><DotsThree size={20} weight='bold' /></button>
         </div>
         <div className='files-actions'>{actions}</div>
         {shown.length === 0 && <p className='muted folder-empty'>{desktop ? 'This folder is empty. Drag a file here, or use Move to folder in a file\'s menu.' : 'This folder is empty. Use Move to folder in a file\'s menu.'}</p>}
         <ul className='file-grid' aria-label={open.name}>{shown.map(card)}</ul>
+        {dragGhost}
       </div>
     )
   }
@@ -150,7 +237,7 @@ export function FileHome ({ files, actions, onOpen, onWaiting, onRecover = onOpe
           const n = filesIn(files, places, x.id).length
           return (
             <li key={x.id} className='file-cell'>
-              <button className='file-card folder-card' {...(desktop ? dropTarget(onDrop, x.id) : {})} onClick={() => onFolder(x.id)}>
+              <button className='file-card folder-card' data-drop-folder={x.id} {...(desktop ? dropTarget(onDrop, x.id) : {})} onClick={() => onFolder(x.id)}>
                 <span className='kind-icon kind-folder'><FolderSimple size={28} weight='duotone' aria-hidden='true' /></span>
                 <span className='file-title'>{x.name}</span>
                 <span className='file-meta'><span className='muted'>{countLabel(n)}</span></span>
@@ -167,6 +254,7 @@ export function FileHome ({ files, actions, onOpen, onWaiting, onRecover = onOpe
         </li>
         {shown.map(card)}
       </ul>
+      {dragGhost}
     </div>
   )
 }

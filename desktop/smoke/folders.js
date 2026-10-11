@@ -108,6 +108,17 @@ module.exports = async function folders (t) {
   await snap('side-list')
   result.folderSide = true
 
+  // The side list: drag Tools onto All files (out of the folder), then
+  // onto the folder again.
+  const sideLink = (title) => `[...document.querySelectorAll('.sidebar .sheet-link')].find((b) => (b.querySelector('.sheet-title') || {}).textContent === ${JSON.stringify(title)})`
+  await drag(sideLink('Tools'), "document.querySelector('.sidebar .all-files')")
+  await waitFor('Tools out from the side', `${places}.then((f) => Object.keys(f.places).length === 2)`)
+  await waitFor('side count', "document.querySelector('.sidebar .folder-count').textContent === '2'")
+  await drag(sideLink('Tools'), "document.querySelector('.sidebar .folder-link')")
+  await waitFor('Tools in from the side', `${places}.then((f) => Object.keys(f.places).length === 3)`)
+  result.folderSideDrag = true
+  step('dragged in the side list')
+
   // Rename from the folder's menu.
   await js("document.querySelector('.folder-card').click()")
   await waitFor('inside Garden', "!!document.querySelector('.folder-more')")
@@ -144,5 +155,5 @@ module.exports = async function folders (t) {
   result.folderDelete = true
   step('deleted')
 
-  return result.folderMove && result.folderNewInside && result.folderMenuMove && result.folderDrag && result.folderSide && result.folderRename && result.folderReopened && result.folderDelete
+  return result.folderMove && result.folderNewInside && result.folderMenuMove && result.folderDrag && result.folderSide && result.folderSideDrag && result.folderRename && result.folderReopened && result.folderDelete
 }

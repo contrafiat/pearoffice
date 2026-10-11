@@ -13,7 +13,7 @@ import { SettingsPanel } from './SettingsPanel.jsx'
 import { UpdateBar } from './UpdateBar.jsx'
 import { applyTheme } from './theme.js'
 import { haptic, hapticTaps } from './haptic.js'
-import { FileHome, KindIcon, NewPanel, RecoverPanel, untitled } from './Files.jsx'
+import { FileHome, KindIcon, NewPanel, RecoverPanel, dragFile, dropTarget, untitled } from './Files.jsx'
 import { DeleteFolderPanel, FolderNamePanel, MoveToFolderPanel, filesIn, useFolders } from './Folders.jsx'
 import { DonationReminder, donationsShown } from './About.jsx'
 import { Onboarding } from './Onboarding.jsx'
@@ -335,13 +335,18 @@ export function App () {
     }
   }
 
-  // A file in the side list.
+  // A file dropped on a folder, or on All files for no folder.
+  const placeFile = (sheetId, folder) => call('file:place', { sheetId, folder }).catch((err) => setError(err.message))
+
+  // A file in the side list; on desktop it can be dragged onto a folder.
   const sideLink = (s) => (
     <button
       key={s.sheetId}
       className={'sheet-link' + (s.sheetId === current ? ' active' : '') + (s.joining ? ' joining' : '') + (s.waiting ? ' waiting' : '') + (s.removed ? ' removed' : '')}
       title={s.waiting ? 'Waiting for someone in this file to come online' : s.removed ? 'You were removed from this file' : undefined}
       onClick={() => (s.waiting ? setWaitingJoin(s.sheetId) : setCurrent(s.sheetId))}
+      draggable={desktop && !s.joining}
+      onDragStart={(e) => dragFile(e, s.sheetId)}
     >
       <KindIcon kind={s.kind} size={18} />
       {s.owner
@@ -377,7 +382,7 @@ export function App () {
         <nav className='sheet-list' aria-label='Your files'>
           {sheets === null && <p className='muted'>Starting...</p>}
           {sheets && sheets.length > 0 && (
-            <button className={'sheet-link all-files' + (current ? '' : ' active')} onClick={() => { setCurrent(null); setFolder(null) }}>
+            <button className={'sheet-link all-files' + (current ? '' : ' active')} {...(desktop ? dropTarget(placeFile, null) : {})} onClick={() => { setCurrent(null); setFolder(null) }}>
               <House size={18} aria-hidden='true' /><span className='sheet-title'>All files</span>
             </button>
           )}
@@ -387,7 +392,7 @@ export function App () {
             const shown = sideOpen.includes(fd.id)
             return (
               <div key={fd.id} className='side-folder'>
-                <button className='sheet-link folder-link' aria-expanded={shown} onClick={() => toggleSide(fd.id)}>
+                <button className='sheet-link folder-link' aria-expanded={shown} {...(desktop ? dropTarget(placeFile, fd.id) : {})} onClick={() => toggleSide(fd.id)}>
                   {shown ? <CaretDown size={14} aria-hidden='true' /> : <CaretRight size={14} aria-hidden='true' />}
                   <FolderSimple size={18} weight='duotone' aria-hidden='true' />
                   <span className='sheet-title'>{fd.name}</span>
@@ -564,7 +569,7 @@ export function App () {
                     onNewFolder={() => setNaming({})}
                     onFolderMenu={(e, fd) => { const r = e.currentTarget.getBoundingClientRect(); setCardMenu({ x: r.right, y: r.bottom, folder: fd }) }}
                     onFileMenu={(e, f) => { const r = e.currentTarget.getBoundingClientRect(); setCardMenu({ x: r.right, y: r.bottom, file: f }) }}
-                    onDrop={(sheetId, fd) => call('file:place', { sheetId, folder: fd }).catch((err) => setError(err.message))}
+                    onDrop={placeFile}
                     desktop={desktop}
                     actions={<StartActions onNew={() => setNewFile(true)} onJoin={() => setJoining('')} onImported={opened} onError={setError} />}
                   />
