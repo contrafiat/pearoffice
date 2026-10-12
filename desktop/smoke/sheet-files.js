@@ -250,6 +250,25 @@ module.exports = async function sheetFiles (t) {
   result.exportedBytes = fs.existsSync(file) ? fs.statSync(file).size : 0
   step('export')
 
+  // The same sheet as an OpenDocument file, for LibreOffice, with a chart
+  // from A1:B2 in it; imported back below. The chart is deleted after.
+  await js("document.querySelector('.grid .body').focus()")
+  await sendMod('Home', ['control'])
+  await sendMod('Down', ['shift']); await sendMod('Right', ['shift'])
+  await js("document.querySelector('.insert-chart').click()")
+  await waitFor('chart inserted', "!!document.querySelector('.chart-frame svg') && !!document.querySelector('.chart-panel')")
+  await js("document.querySelector('.chart-panel .close').click()")
+  await more('Save as an OpenDocument file (.ods)')
+  const odsFile = path.join(downloads, 'Household budget.ods')
+  for (const t0 = Date.now(); !(fs.existsSync(odsFile) && fs.statSync(odsFile).size > 1000) && Date.now() - t0 < 10000;) await sleep(200)
+  await sleep(300)
+  if (!fs.existsSync(odsFile)) throw new Error('no .ods saved')
+  await js("document.querySelector('.chart-frame').click()")
+  await waitFor('chart tools', "!!document.querySelector('.chart-tools [aria-label=\"Delete chart\"]')")
+  await js("document.querySelector('.chart-tools [aria-label=\"Delete chart\"]').click()")
+  await waitFor('chart deleted', "!document.querySelector('.chart-frame')")
+  step('ods')
+
   // CSV and PDF of this tab from the More menu; duplicate a tab and delete
   // the copy from the tab menu.
   await more('Download this tab as CSV')
@@ -357,5 +376,25 @@ module.exports = async function sheetFiles (t) {
   result.importedFormats = true
   step('import')
 
-  return result.importedFormats && result.formats && result.csvPdf && result.printKey && result.tabs && result.tidied && result.jsonImport && result.csvImport && result.importedFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000
+  const odsB64 = fs.readFileSync(odsFile).toString('base64')
+  await js(`(() => {
+    const bytes = Uint8Array.from(atob(${JSON.stringify(odsB64)}), (c) => c.charCodeAt(0))
+    const dt = new DataTransfer()
+    dt.items.add(new File([bytes], 'From LibreOffice.ods'))
+    const input = document.querySelector('.import input[type=file]')
+    input.files = dt.files
+    input.dispatchEvent(new Event('change', { bubbles: true }))
+  })()`)
+  await waitFor('ods sheet open', "document.querySelector('.title').value === 'From LibreOffice'")
+  await waitFor('ods values', "[...document.querySelectorAll('.cell')].some((c) => c.textContent === '1650.5') && [...document.querySelectorAll('.cell')].some((c) => c.textContent === 'Rent')")
+  await js("document.querySelector('.grid .body').focus()")
+  await sendMod('Home', ['control'])
+  for (let i = 0; i < 2; i++) await key('Down')
+  await key('Right')
+  result.odsFormula = await js("document.querySelector('.formula-bar input').value")
+  await waitFor('ods chart', "!!document.querySelector('.chart-frame svg')")
+  result.odsChart = true
+  step('ods import')
+
+  return result.importedFormats && result.formats && result.csvPdf && result.printKey && result.tabs && result.tidied && result.jsonImport && result.csvImport && result.importedFormula === '=SUM(B1:B2)' && result.odsFormula === '=SUM(B1:B2)' && result.odsChart && result.exportedBytes > 1000
 }

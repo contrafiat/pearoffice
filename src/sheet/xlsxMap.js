@@ -222,9 +222,7 @@ function insertBefore (xml, piece, tags) {
 function workbookBytes (XLSX, fflate, dump) {
   const wb = dumpToWorkbook(XLSX, dump)
   const bytes = new Uint8Array(XLSX.write(wb, { type: 'array', bookType: 'xlsx' }))
-  const names = new Map(dump.tabs.map((t, i) => [String(t.name).toUpperCase(), wb.SheetNames[i]]))
-  const rename = (data) => String(data || '').replace(/^'((?:[^']|'')+)'!|^([A-Za-z_][\w.]*)!/, (m, q, b) => { const n = names.get((q !== undefined ? q.replace(/''/g, "'") : b).toUpperCase()); return n ? "'" + n.replace(/'/g, "''") + "'!" : m })
-  const tabs = dump.tabs.map((t, i) => ({ name: wb.SheetNames[i], charts: (t.charts || []).map((c) => ({ ...c, data: rename(c.data) })) }))
+  const tabs = chartTabs(wb, dump)
   // Styles first (src/sheet/xlsxStyles.js), then frozen panes, then charts.
   const files = fflate.unzipSync(bytes)
   const { dxfId } = require('./xlsxStyles').addStyles(files, dump.tabs, fflate)
@@ -253,6 +251,23 @@ function workbookBytes (XLSX, fflate, dump) {
   return require('./xlsxCharts').addChartsToXlsx(fflate.zipSync(files), tabs, fflate)
 }
 
+// The sheet as an OpenDocument spreadsheet (.ods), for LibreOffice and
+// OpenOffice: values, formulas (src/sheet/odsFormula.js), tabs, number
+// formats and charts (src/sheet/odsCharts.js). No styles, frozen panes,
+// colour rules or validation.
+function odsBytes (XLSX, fflate, dump) {
+  const wb = dumpToWorkbook(XLSX, dump)
+  return require('./odsFormula').writeOds(XLSX, fflate, wb, chartTabs(wb, dump))
+}
+
+// Each tab's charts with their data ranges under the tab names the workbook
+// uses (SheetJS may have changed a name).
+function chartTabs (wb, dump) {
+  const names = new Map(dump.tabs.map((t, i) => [String(t.name).toUpperCase(), wb.SheetNames[i]]))
+  const rename = (data) => String(data || '').replace(/^'((?:[^']|'')+)'!|^([A-Za-z_][\w.]*)!/, (m, q, b) => { const n = names.get((q !== undefined ? q.replace(/''/g, "'") : b).toUpperCase()); return n ? "'" + n.replace(/'/g, "''") + "'!" : m })
+  return dump.tabs.map((t, i) => ({ name: wb.SheetNames[i], charts: (t.charts || []).map((c) => ({ ...c, data: rename(c.data) })) }))
+}
+
 // Each tab's colour rules from an .xlsx file, in tab order.
 function condFormatsFromXlsx (bytes, fflate) {
   let files
@@ -270,4 +285,4 @@ function validationsFromXlsx (bytes, fflate) {
   return require('./xlsxStyles').sheetPaths(files, fflate.strFromU8).map((p) => (p && files[p] ? require('./validation').fromXlsx(fflate.strFromU8(files[p])) : []))
 }
 
-module.exports = { condFormatsFromXlsx, validationsFromXlsx, insertBefore, AFTER_VALIDATION, freezeFromXlsx, workbookBytes, workbookToTabs, dumpToWorkbook, textInput, toFile, fromFile, READ_OPTIONS, MAX_IMPORT_CELLS }
+module.exports = { condFormatsFromXlsx, validationsFromXlsx, insertBefore, AFTER_VALIDATION, freezeFromXlsx, workbookBytes, odsBytes, workbookToTabs, dumpToWorkbook, textInput, toFile, fromFile, READ_OPTIONS, MAX_IMPORT_CELLS }

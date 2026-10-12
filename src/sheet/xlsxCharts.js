@@ -292,4 +292,4 @@ function addChartsToXlsx (bytes, tabs, { unzipSync, zipSync, strToU8, strFromU8 
   return zipSync(files)
 }
 
-module.exports = { addChartsToXlsx, chartXml }
+module.exports = { addChartsToXlsx, chartXml, layout, PALETTE }
