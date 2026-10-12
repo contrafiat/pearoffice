@@ -159,8 +159,9 @@ WORKTREES=()
 _worktree_cleanup() {
   local w
   for w in "${WORKTREES[@]:-}"; do
-    [ -n "$w" ] && git -C "${w%%|*}" worktree remove --force "${w#*|}" 2>/dev/null
+    [ -n "$w" ] && { git -C "${w%%|*}" worktree remove --force "${w#*|}" 2>/dev/null || true; }
   done
+  WORKTREES=()
   return 0
 }
 # Also stops the background Mac build (step 5b) if the run ends early.
@@ -1477,8 +1478,13 @@ if ! $SKIP_SEEDER_STORE && $UMBREL_BUILT; then
     echo ""
     read -rp "    Merge the community store PR for $APP_VERSION now (publishes it)? [y/N] " _r || _r=n
     if [[ "$_r" == [Yy]* ]]; then
+      # Step 7b's temporary checkout still holds the PR branch, and git will
+      # not delete a branch a worktree is using, which made gh report a
+      # failure after a merge that worked. Remove those checkouts first.
+      _worktree_cleanup
+      git -C "$_store_repo" worktree prune
       (cd "$_store_repo" && gh pr merge "$_branch_pr" --merge --delete-branch) \
-        || echo "    WARNING: merging the store PR failed."
+        || echo "    WARNING: merging the store PR, or deleting its branch, failed (checked below)."
     fi
   fi
   git -C "$_store_repo" fetch -q origin master
