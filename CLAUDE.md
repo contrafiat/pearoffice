@@ -202,7 +202,7 @@ publish to, sets the version everywhere (`scripts/release/bump.js`), runs
 `npm run verify`, builds Android (`scripts/build-android-release.sh`),
 writes the release notes from the merged PRs (or starts from
 `notes/release-<v>.md` if it exists, suite rule 13) and opens them in
-`$EDITOR`, builds the desktop apps, the seeder download, the Umbrel image
+vi, builds the desktop apps, the seeder download, the Umbrel image
 and the .s9pk, then commits the version, pushes the tag and publishes,
 asking before each step: the GitHub release on the public
 `peerloomllc/pearoffice-releases` (a `.sha256` for every file), the seeder

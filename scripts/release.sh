@@ -557,7 +557,7 @@ fi # end NEEDS_BUILD
 #
 # When notes/release-<version>.md exists (plain-language notes written by
 # hand, suite rule 13), it is the starting point instead. Either way the file
-# opens in $EDITOR and every destination reads release_notes.md afterwards.
+# opens in vi (as in the other apps) and every destination reads release_notes.md afterwards.
 #
 # From git: each merge commit since the previous vX.Y.Z tag is a PR, titled
 # from the GitHub API when a token works, else from its branch name.
@@ -655,8 +655,8 @@ else
   printf "%b" "$NOTES" > release_notes.md
 fi
 sed -i 's/\*\*//g' release_notes.md
-echo "    Opening release notes in ${EDITOR:-vi} for review/editing (write them for the people using the app)..."
-"${EDITOR:-vi}" release_notes.md
+echo "    Opening release notes in vi for review/editing (write them for the people using the app)..."
+vi release_notes.md
 echo "--- Release notes ---"
 cat release_notes.md
 echo "---"
@@ -1372,8 +1372,8 @@ sys.stdout.write("\n".join(out))
   NOSTR_RELAYS=(wss://relay.damus.io wss://nos.lol wss://relay.primal.net wss://relay.nostr.net)
   NOSTR_DRAFT=$(mktemp /tmp/nostr-note-XXXXXX.txt)
   printf '%s' "$NOTE_CONTENT" > "$NOSTR_DRAFT"
-  echo "    Opening note in ${EDITOR:-vi} for review/editing..."
-  "${EDITOR:-vi}" "$NOSTR_DRAFT"
+  echo "    Opening note in vi for review/editing..."
+  vi "$NOSTR_DRAFT"
   NOTE_CONTENT=$(cat "$NOSTR_DRAFT")
   rm -f "$NOSTR_DRAFT"
   echo "    Final content:"
