@@ -6,6 +6,7 @@ import * as fflate from 'fflate'
 import { workbookToTabs, workbookBytes, odsBytes, freezeFromXlsx, validationsFromXlsx, condFormatsFromXlsx, READ_OPTIONS, MAX_IMPORT_CELLS } from '../../sheet/xlsxMap.js'
 import { stylesFromXlsx } from '../../sheet/xlsxStyles.js'
 import { fixOdsWorkbook } from '../../sheet/odsFormula.js'
+import { chartsFromOdsBytes } from '../../sheet/odsCharts.js'
 import { chartsFromXlsx } from '../../sheet/xlsxChartsRead.js'
 import { jsonFileToTabs } from '../../sheet/jsonImport.js'
 import { csvBytesToTabs } from '../../sheet/csvImport.js'
@@ -24,8 +25,10 @@ const PRINT = 11 / BASE_FONT_PX
 const MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 export { isMobile }
 
-function importWorkbook (wb, name, bytes) {
+// odsCharts: a .ods file's charts per tab (its bytes are not an .xlsx).
+function importWorkbook (wb, name, bytes, odsCharts) {
   const { tabs, names } = workbookToTabs(XLSX, wb)
+  if (odsCharts) odsCharts.forEach((v, i) => { if (tabs[i] && v.length) tabs[i].charts = v })
   // Frozen panes come from the raw file (SheetJS does not report them).
   if (bytes) freezeFromXlsx(bytes, fflate).forEach((f, i) => { if (f && tabs[i]) tabs[i].freeze = f })
   // So are cell styles and row heights.
@@ -91,7 +94,10 @@ export async function pickAndImport () {
 async function readWorkbook (bytes, name) {
   if (bytes[0] === 0x50 && bytes[1] === 0x4b) await checkZip(bytes, 'This is not a spreadsheet PearOffice can read.')
   const wb = XLSX.read(bytes, { type: 'array', ...READ_OPTIONS })
-  if (isOds(name)) return importWorkbook(fixOdsWorkbook(XLSX, fflate, wb, bytes), name, null)
+  if (isOds(name)) {
+    fixOdsWorkbook(XLSX, fflate, wb, bytes)
+    return importWorkbook(wb, name, null, chartsFromOdsBytes(bytes, fflate, wb.SheetNames))
+  }
   return importWorkbook(wb, name, bytes)
 }
 const isOds = (name) => /\.ods$/i.test(String(name || ''))
@@ -102,8 +108,8 @@ export async function exportSheet (sheetId) {
   return saveFile(fileName(dump.title) + '.xlsx', MIME, bytes)
 }
 
-// For LibreOffice and OpenOffice: values, formulas and tabs (no styles,
-// charts, frozen panes, colour rules or validation).
+// For LibreOffice and OpenOffice: values, formulas, tabs and charts (no
+// styles, frozen panes, colour rules or validation).
 export async function exportOds (sheetId) {
   const dump = await call('sheet:dump', { sheetId })
   return saveFile(fileName(dump.title) + '.ods', 'application/vnd.oasis.opendocument.spreadsheet', odsBytes(XLSX, fflate, dump))

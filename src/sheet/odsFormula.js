@@ -206,9 +206,21 @@ function fixOdsWorkbook (XLSX, fflate, wb, bytes) {
 }
 
 // A workbook as .ods bytes: SheetJS writes it with each formula replaced by a
-// marker, then the markers are swapped for the formulas converted here.
-function writeOds (XLSX, fflate, wb) {
+// marker, then the markers are swapped for the formulas converted here, and
+// the charts are added (src/sheet/odsCharts.js). tabs: [{ name, charts }] in
+// sheet order.
+function writeOds (XLSX, fflate, wb, tabs = []) {
   const formulas = []
+  wb.SheetNames.forEach((name, t) => {
+    // A chart's anchor cell must be inside the range SheetJS writes.
+    const ws = wb.Sheets[name]
+    const anchors = ((tabs[t] && tabs[t].charts) || []).filter((c) => c.anchor).map((c) => c.anchor)
+    if (anchors.length) {
+      const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:A1')
+      for (const a of anchors) { range.e.r = Math.max(range.e.r, a.row - 1); range.e.c = Math.max(range.e.c, a.col - 1) }
+      ws['!ref'] = XLSX.utils.encode_range(range)
+    }
+  })
   for (const name of wb.SheetNames) {
     const ws = wb.Sheets[name]
     for (const k of Object.keys(ws)) {
@@ -222,7 +234,11 @@ function writeOds (XLSX, fflate, wb) {
   }
   const files = fflate.unzipSync(new Uint8Array(XLSX.write(wb, { type: 'array', bookType: 'ods' })))
   const xml = fflate.strFromU8(files['content.xml'])
-  files['content.xml'] = fflate.strToU8(xml.replace(/table:formula="of:=(?:&quot;|")PEAROFFICEF(\d+)(?:&quot;|")"/g, (m, n) => 'table:formula="' + escapeXml(formulas[Number(n)]) + '"'))
+  files['content.xml'] = fflate.strToU8(xml
+    .replace(/table:formula="of:=(?:&quot;|")PEAROFFICEF(\d+)(?:&quot;|")"/g, (m, n) => 'table:formula="' + escapeXml(formulas[Number(n)]) + '"')
+    // Notes stay hidden until hovered, as in the app and in .xlsx files.
+    .replace(/<office:annotation office:display="true"/g, '<office:annotation office:display="false"'))
+  require('./odsCharts').addChartsToOds(files, tabs, fflate)
   // The mimetype entry must come first and stay uncompressed.
   const out = { mimetype: [files.mimetype, { level: 0 }] }
   for (const [k, v] of Object.entries(files)) if (k !== 'mimetype') out[k] = v

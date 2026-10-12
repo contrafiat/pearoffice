@@ -113,3 +113,58 @@ test('LibreOffice reads our .ods and computes the same totals, and we read its .
     fs.rmSync(dir, { recursive: true, force: true })
   }
 })
+
+// Charts (src/sheet/odsCharts.js).
+const { chartsFromOdsBytes } = require('../src/sheet/odsCharts')
+function chartDump () {
+  const resolved = { categories: ['Jan', 'Feb'], series: [{ name: 'Rent', values: [1200, 1250] }, { name: 'Food', values: [400, 300] }] }
+  const cells = [['Month', 'Rent', 'Food'], ['Jan', 1200, 400], ['Feb', 1250, 300]].flatMap((line, r) => line.map((v, c) => ({ row: r + 1, col: c + 1, input: String(v), value: v, fmt: {} })))
+  const types = ['column', 'bar', 'line', 'area', 'pie', 'doughnut', 'scatter', 'radar', 'combo']
+  const charts = types.map((type, i) => ({
+    id: 'c' + i, type, data: 'A1:C3', seriesIn: 'columns', labels: { row: true, col: true }, legend: i % 2 ? 'right' : 'bottom',
+    title: 'Chart ' + type, xTitle: type === 'pie' || type === 'doughnut' ? undefined : 'Month', yTitle: type === 'pie' || type === 'doughnut' ? undefined : 'Cost',
+    stacked: type === 'area' || undefined, dataLabels: type === 'pie' || undefined, lineSeries: type === 'combo' ? [1] : undefined, secondAxis: type === 'combo' ? [1] : undefined,
+    anchor: { row: 5 + i * 16, col: 2, dx: 3, dy: 4 }, size: { w: 480, h: 300 }, resolved
+  }))
+  return { title: 'Charts', tabs: [{ name: 'Data & more', cells, widths: {}, charts }] }
+}
+const expected = (c) => {
+  const out = { type: c.type, data: c.data, seriesIn: c.seriesIn, labels: c.labels, title: c.title, legend: c.legend }
+  if (c.stacked) out.stacked = true
+  if (c.dataLabels) out.dataLabels = true
+  if (c.lineSeries) { out.lineSeries = c.lineSeries; out.secondAxis = c.secondAxis }
+  if (c.xTitle) out.xTitle = c.xTitle
+  if (c.yTitle) out.yTitle = c.yTitle
+  return out
+}
+const pick = (c) => { const o = { ...c }; delete o.anchor; delete o.size; return o }
+
+test('charts go out to .ods and come back', () => {
+  const dump = chartDump()
+  const back = chartsFromOdsBytes(odsBytes(XLSX, fflate, dump), fflate, ['Data & more'])[0]
+  assert.equal(back.length, 9)
+  dump.tabs[0].charts.forEach((c, i) => {
+    assert.deepEqual(pick(back[i]), expected(c), c.type)
+    assert.deepEqual(back[i].anchor, c.anchor, c.type + ' anchor')
+    assert.deepEqual(back[i].size, c.size, c.type + ' size')
+  })
+})
+
+test('LibreOffice keeps our charts, and we read its file back', { skip: !soffice && 'needs soffice' }, () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pearoffice-odsc-'))
+  try {
+    const ours = path.join(dir, 'charts.ods')
+    fs.writeFileSync(ours, odsBytes(XLSX, fflate, chartDump()))
+    const out = path.join(dir, 'lo')
+    execFileSync('soffice', ['--headless', '-env:UserInstallation=file://' + path.join(dir, 'profile'), '--convert-to', 'ods', '--outdir', out, ours], { stdio: 'ignore', timeout: 120000 })
+    const back = chartsFromOdsBytes(fs.readFileSync(path.join(out, 'charts.ods')), fflate, ['Data & more'])[0]
+    const dump = chartDump()
+    assert.equal(back.length, 9, 'LibreOffice kept all nine charts')
+    dump.tabs[0].charts.forEach((c, i) => {
+      assert.deepEqual(pick(back[i]), expected(c), c.type)
+      assert.deepEqual(back[i].anchor, c.anchor, c.type + ' anchor')
+    })
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+})
