@@ -1,6 +1,6 @@
 {
   "name": "pearoffice",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "description": "Peer-to-peer shared spreadsheets. No accounts, no servers.",
   "license": "MIT",
