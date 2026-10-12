@@ -100,7 +100,9 @@ Code that works for any kind of file sits apart from each editor's own
   as scatter, stock as line, histogram and waterfall as columns;
   `odsStyles.js`: cell looks, widths, heights, hidden rows and columns,
   frozen panes in settings.xml; `python3 scripts/check-ods-view.py f.ods`
-  shows LibreOffice's frozen panes, which a headless conversion drops), and `sheetMethods.js` (the
+  shows LibreOffice's frozen panes, which a headless conversion drops;
+  `odsRules.js`: colour rules in LibreOffice's calcext:conditional-formats,
+  validation in table:content-validations, a saved filter read on import), and `sheetMethods.js` (the
   sheet's IPC methods, run in the worklet).
 - `src/worklet/` - the Bare program: `bare.js` entry, `engine.js` (core
   wiring), `sheetWire.js` (apply rules), `yOps.js` (edits over 1 MB split into parts), `membership.js` (signed membership
@@ -359,7 +361,8 @@ take five scenes: files, sheet, document, slides, sharing.
   charts, copy and paste, undo, zoom; about
   21 s). `sheet-files` is cell formats, filters, comments, validation, colour
   rules and names, then .xlsx, .ods, .csv, .json and PDF out, tabs, tidy up and
-  .json, .csv, .xlsx and .ods in (a chart and the formats included) (about 32 s). `docs` is documents (about 9 s).
+  .json, .csv, .xlsx and .ods in (a chart, the formats, colour rules and
+  validation included) (about 32 s). `docs` is documents (about 9 s).
   `slides` is a deck: two layouts, typing a title, undo and redo, moving,
   resizing and rotating a box with the mouse, nudging, a text box added and
   deleted, someone else's selection, reordering by keys and by drag,

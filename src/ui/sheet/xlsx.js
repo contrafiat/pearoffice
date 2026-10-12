@@ -3,11 +3,12 @@
 // On phones the shell does the file handling (share sheet, file picker).
 import * as XLSX from 'xlsx/dist/xlsx.mini.min.js'
 import * as fflate from 'fflate'
-import { workbookToTabs, workbookBytes, odsBytes, freezeFromXlsx, validationsFromXlsx, condFormatsFromXlsx, READ_OPTIONS, MAX_IMPORT_CELLS } from '../../sheet/xlsxMap.js'
+import { workbookToTabs, workbookBytes, odsBytes, fromFile, freezeFromXlsx, validationsFromXlsx, condFormatsFromXlsx, READ_OPTIONS, MAX_IMPORT_CELLS } from '../../sheet/xlsxMap.js'
 import { stylesFromXlsx } from '../../sheet/xlsxStyles.js'
 import { fixOdsWorkbook } from '../../sheet/odsFormula.js'
 import { chartsFromOdsBytes } from '../../sheet/odsCharts.js'
 import { stylesFromOdsBytes } from '../../sheet/odsStyles.js'
+import { rulesFromOdsBytes } from '../../sheet/odsRules.js'
 import { chartsFromXlsx } from '../../sheet/xlsxChartsRead.js'
 import { jsonFileToTabs } from '../../sheet/jsonImport.js'
 import { csvBytesToTabs } from '../../sheet/csvImport.js'
@@ -38,6 +39,11 @@ function importWorkbook (wb, name, bytes, ods) {
       tabs[i].widths = { ...tabs[i].widths, ...x.widths }
       tabs[i].hidden = x.hidden
       if (x.freeze) tabs[i].freeze = x.freeze
+    })
+    ods.rules.forEach((x, i) => {
+      if (!tabs[i] || !x) return
+      if (x.condFormats.length) tabs[i].condFormats = x.condFormats.map((r) => (r.formula ? { ...r, formula: fromFile(r.formula) } : r))
+      if (x.validations.length) tabs[i].validations = x.validations
     })
   }
   // Frozen panes come from the raw file (SheetJS does not report them).
@@ -107,7 +113,10 @@ async function readWorkbook (bytes, name) {
   const wb = XLSX.read(bytes, { type: 'array', ...READ_OPTIONS })
   if (isOds(name)) {
     fixOdsWorkbook(XLSX, fflate, wb, bytes)
-    return importWorkbook(wb, name, null, { charts: chartsFromOdsBytes(bytes, fflate, wb.SheetNames), looks: stylesFromOdsBytes(bytes, fflate, wb.SheetNames) })
+    const rules = rulesFromOdsBytes(bytes, fflate, wb.SheetNames)
+    // A filter in the file becomes this device's filter, as from .xlsx.
+    rules.forEach((x, i) => { if (x && x.filter) wb.Sheets[wb.SheetNames[i]]['!autofilter'] = { ref: x.filter } })
+    return importWorkbook(wb, name, null, { charts: chartsFromOdsBytes(bytes, fflate, wb.SheetNames), looks: stylesFromOdsBytes(bytes, fflate, wb.SheetNames), rules })
   }
   return importWorkbook(wb, name, bytes)
 }
@@ -120,8 +129,8 @@ export async function exportSheet (sheetId) {
 }
 
 // For LibreOffice and OpenOffice: values, formulas, tabs, charts, cell
-// looks, widths, heights, hidden rows and columns and frozen panes (no colour
-// rules or validation).
+// looks, widths, heights, hidden rows and columns, frozen panes, colour rules
+// and validation.
 export async function exportOds (sheetId) {
   const dump = await call('sheet:dump', { sheetId })
   return saveFile(fileName(dump.title) + '.ods', 'application/vnd.oasis.opendocument.spreadsheet', odsBytes(XLSX, fflate, dump))

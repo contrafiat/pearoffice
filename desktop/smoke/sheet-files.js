@@ -401,7 +401,15 @@ module.exports = async function sheetFiles (t) {
   for (let i = 0; i < 12; i++) await key('Right')
   for (let i = 0; i < 30; i++) await key('Down')
   await waitFor('ods formats', cellNode(30, 13) + ".querySelector('.cell-text').style.textDecoration === 'underline line-through' && " + cellNode(31, 13) + ".querySelector('.cell-text').style.fontSize === '32px' && !!" + cellNode(31, 13) + ".querySelector('.cell-borders') && " + rowHead(29) + '.getBoundingClientRect().height > 45')
+  // Colour rules and validation: the icons in B1 and B3, the list in P5.
+  await sendMod('Home', ['control'])
+  await waitFor('ods icons', '!!' + cellNode(1, 2) + ".querySelector('.cf-icon svg') && !!" + cellNode(3, 2) + ".querySelector('.cf-icon svg')")
+  for (let i = 0; i < 15; i++) await key('Right')
+  for (let i = 0; i < 4; i++) await key('Down')
+  await waitFor('ods at P5', "document.querySelector('.formula-bar .address').textContent === 'P5'")
+  await waitFor('ods list', "!!document.querySelector('.list-button')")
+  result.odsRules = true
   step('ods import')
 
-  return result.importedFormats && result.formats && result.csvPdf && result.printKey && result.tabs && result.tidied && result.jsonImport && result.csvImport && result.importedFormula === '=SUM(B1:B2)' && result.odsFormula === '=SUM(B1:B2)' && result.odsChart && result.exportedBytes > 1000
+  return result.importedFormats && result.formats && result.csvPdf && result.printKey && result.tabs && result.tidied && result.jsonImport && result.csvImport && result.importedFormula === '=SUM(B1:B2)' && result.odsFormula === '=SUM(B1:B2)' && result.odsChart && result.odsRules && result.exportedBytes > 1000
 }
