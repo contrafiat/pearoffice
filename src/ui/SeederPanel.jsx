@@ -187,7 +187,7 @@ export function SeederPanel ({ initialLink = '', onBack = null, onClose, onError
           value={link}
           onChange={(e) => setLink(e.target.value)}
         />
-        <ScanButton prefix='pearoffice://seeder?' what='a PearOffice seeder code' onError={onError} onLink={(l) => { setLink(l); pair(null, l) }} />
+        <ScanButton prefix={['pearoffice://seeder?', 'peerloom://seeder?']} what='a seeder code' onError={onError} onLink={(l) => { setLink(l); pair(null, l) }} />
         {done && <p className='muted'>Paired. Your files are backing up.</p>}
         <div className='row end'>
           <button className='primary' type='submit' disabled={busy || !link.trim()}>{busy ? 'Pairing...' : 'Pair'}</button>

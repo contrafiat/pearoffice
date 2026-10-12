@@ -10,7 +10,7 @@ export function QrCode ({ value, size = 220, label = 'QR code' }) {
 }
 
 // "Scan QR code" on phones: opens the camera in the shell and hands back a
-// link that starts with `prefix`. Renders nothing elsewhere.
+// link that starts with `prefix` (or one of a list). Renders nothing elsewhere.
 export function ScanButton ({ prefix, what, onLink, onError }) {
   if (!isMobile()) return null
   return (
@@ -21,7 +21,7 @@ export function ScanButton ({ prefix, what, onLink, onError }) {
         try {
           const { text } = await call('app:scanQr')
           if (!text) return
-          if (!String(text).startsWith(prefix)) return onError('That QR code is not ' + what + '.')
+          if (![].concat(prefix).some((p) => String(text).startsWith(p))) return onError('That QR code is not ' + what + '.')
           onLink(String(text))
         } catch (err) { onError(err.message) }
       }}

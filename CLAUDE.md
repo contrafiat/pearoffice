@@ -154,12 +154,15 @@ Code that works for any kind of file sits apart from each editor's own
   the bare-runtime binary and relays IPC, `preload.js` is the bridge,
   `smoke.js`, `smoke-run.js` and `smoke/` are the offscreen smoke test. Has its own
   `package.json` (Electron): `npm install --prefix desktop`.
-- `src/seeder/` - the blind seeder: `seeder.js` (blind-peer plus the rule
-  that it stores only sheets a paired device registered, and keyrings:
-  `keyring-put`, `-get`, `-claim`), `keyringRecord.js` (what it checks
-  without the seed), `protocol.js`
-  (pairing link and topic, shared with the app), `bare.js` (CLI entry).
-  The app side is `src/worklet/seeding.js`.
+- `src/seeder/` - the blind seeder, which is the suite's shared seeder
+  `@peerloom/seeder` (`../peerloom-seeder`), copied into `src/seeder/vendor/`
+  by `node scripts/vendor-peerloom-seeder.js` (run it after changing the
+  package; `test/vendor.test.js` fails when the copy is stale). Never edit
+  the copy. `seeder.js` starts it with PearOffice's state folder and
+  `pearoffice://` links, `protocol.js` and `keyringRecord.js` re-export its
+  PearOffice names and keyring checks, `bare.js` is the CLI entry. The app
+  side is `src/worklet/seeding.js`, on the package's client (DECISIONS.md
+  2026-10-12).
 - The repo root is also the Expo app (as in PearPetal): BareKit links the
   native addons it finds in the root's dependencies. `mobile/App.js` is the
   shell (starts the worklet, hosts the UI in a WebView, relays IPC),
@@ -453,7 +456,8 @@ are replaced at start-up (`src/sheet/formula/detmath.js`). A test fails if a
 
 - **Blind seeder.** The seeder stores and relays only encrypted blocks and is
   never given the sheet's encryption key. Nothing the seeder receives at
-  pairing may let it decrypt. PearOffice ships its own seeder. See `DECISIONS.md`.
+  pairing may let it decrypt. PearOffice's seeder is the suite's shared one
+  (`../peerloom-seeder`). See `DECISIONS.md`.
 - **Deterministic merge and formulas.** Every device must reach the same cell
   values whatever order edits arrive in. Yjs does the merging. Formula
   evaluation is a pure function of the merged cells, so the seeder never needs

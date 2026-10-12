@@ -2,6 +2,29 @@
 
 Append-only, newest on top. Per Constitution §4.
 
+## 2026-10-12 - The seeder becomes the suite's shared seeder
+Tier: T2
+Context: one seeder for every PeerLoom app (suite
+proposals/2026-10-12-generic-seeder.md, approved by Tim). PearOffice's seeder
+was the only one that never needed to know its app, so it is the start.
+Choice: the seeder and the device side's pairing and requests move to
+`@peerloom/seeder` (../peerloom-seeder), copied into src/seeder/vendor by
+scripts/vendor-peerloom-seeder.js. A copy, not a `file:` dependency: with the
+dependency the bundles carried a second copy of about 97 modules, native
+addons included, and the hypercore patches no longer reached the seeder.
+PearOffice keeps its names: seeders show `pearoffice://` links, requests go
+out under `pearoffice/seeder/1`, the state folder stays `pearoffice-state`.
+The shared seeder answers both names, so older PearOffice versions keep
+working with it. The app now also reads `peerloom://seeder` links, and sends
+"PearOffice" as its label when pairing.
+Alternatives: keep PearOffice's own copy and start the shared seeder fresh,
+which would be a fourth seeder to keep in step.
+Consequences: a seeder set up by 0.1.x keeps its key, devices and files
+(checked by starting the old seeder, pairing and storing, then the new one on
+the same folder). Two reasons the seeder gives changed wording ("This seeder
+does not hold that", "This device does not back that up here"). The shared
+seeder adds a storage limit per device, off unless set.
+
 ## 2026-10-08 - The desktop data folder stays pearoffice-desktop
 Tier: T1
 Context: the release review asked whether to rename the folder before the
