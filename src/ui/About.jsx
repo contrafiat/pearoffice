@@ -45,9 +45,6 @@ export function openUrl (url) {
   call('app:openUrl', { url }).catch(() => {})
 }
 
-// Donations stay hidden on iOS until the first App Store release.
-export const donationsShown = () => !(window.pearoffice && window.pearoffice.os === 'ios')
-
 const mobile = () => !!(window.pearoffice && window.pearoffice.platform === 'mobile')
 
 function Section ({ id, title, open, onToggle, children }) {
@@ -77,7 +74,6 @@ function CopyButton ({ text, label, done = 'Copied' }) {
 export function AboutContent ({ startSection = null, onBitcoin, onTour }) {
   const [open, setOpen] = useState(startSection)
   const toggle = (id) => setOpen((s) => (s === id ? null : id))
-  const donate = donationsShown()
   // Every licence text, from the app's own copy (app:licenses).
   const [licences, setLicences] = useState(null)
   const showLicences = () => call('app:licenses').then((r) => setLicences((r && r.text) || 'The full licence list comes with the installed app.'), (err) => setLicences(err.message))
@@ -103,21 +99,17 @@ export function AboutContent ({ startSection = null, onBitcoin, onTour }) {
           <button onClick={() => openUrl('https://pears.com/')}><ArrowSquareOut size={16} /> Learn more</button>
         </div>
       </Section>
-      {donate && (
-        <Section id='support' title='Support development' open={open === 'support'} onToggle={toggle}>
-          <p>PearOffice is free, with no ads, accounts or subscriptions. If you get value from it, please consider returning value.</p>
-          <div className='row equal'>
-            <button className='primary donate-btc' onClick={bitcoin}><Lightning size={16} weight='fill' /> BTC</button>
-            <button className='donate-usd' onClick={() => openUrl(BUYMEACOFFEE_URL)}>$ USD</button>
-          </div>
-        </Section>
-      )}
-      {donate && (
-        <Section id='bitcoin' title='Learn about Bitcoin' open={open === 'bitcoin'} onToggle={toggle}>
-          <p>New to Bitcoin? The Satoshi Nakamoto Institute has a free, short crash course on how Bitcoin works and why it matters.</p>
-          <div className='row center'><button onClick={() => openUrl('https://nakamotoinstitute.org/crash-course/')}><ArrowSquareOut size={16} /> Bitcoin crash course</button></div>
-        </Section>
-      )}
+      <Section id='support' title='Support development' open={open === 'support'} onToggle={toggle}>
+        <p>PearOffice is free, with no ads, accounts or subscriptions. If you get value from it, please consider returning value.</p>
+        <div className='row equal'>
+          <button className='primary donate-btc' onClick={bitcoin}><Lightning size={16} weight='fill' /> BTC</button>
+          <button className='donate-usd' onClick={() => openUrl(BUYMEACOFFEE_URL)}>$ USD</button>
+        </div>
+      </Section>
+      <Section id='bitcoin' title='Learn about Bitcoin' open={open === 'bitcoin'} onToggle={toggle}>
+        <p>New to Bitcoin? The Satoshi Nakamoto Institute has a free, short crash course on how Bitcoin works and why it matters.</p>
+        <div className='row center'><button onClick={() => openUrl('https://nakamotoinstitute.org/crash-course/')}><ArrowSquareOut size={16} /> Bitcoin crash course</button></div>
+      </Section>
       <Section id='share' title='Share the app' open={open === 'share'} onToggle={toggle}>
         <p>Know someone who would want private spreadsheets, documents and slides they can share without a server? Tell them about PearOffice.</p>
         <div className='row center'>
