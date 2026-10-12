@@ -246,6 +246,7 @@ export function DocView ({ sheetId, onTitleChange, onError, onGone }) {
               <li role='menuitem' onClick={toggleOutline}>{outline ? 'Hide the outline' : 'Show the outline'}</li>
               {canEdit && <li role='menuitem' onClick={() => editorRef.current && pastePlain(editorRef.current).catch((err) => onError(err.message))}>Paste as plain text</li>}
               <li role='menuitem' onClick={() => save('docx')}>Save as a Word file</li>
+              <li role='menuitem' onClick={() => save('odt')}>Save as an OpenDocument file (.odt)</li>
               <li role='menuitem' onClick={() => save('md')}>Save as Markdown</li>
               <li role='menuitem' onClick={() => save('txt')}>Save as plain text</li>
               <li role='menuitem' onClick={() => save('pdf')}>Save as PDF</li>

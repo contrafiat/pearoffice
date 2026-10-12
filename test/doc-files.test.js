@@ -321,3 +321,111 @@ test('doc:import makes a document from a file', async (t) => {
   assert.equal(list.filter((x) => x.sheetId === sheetId).map((x) => x.kind + ':' + x.title).join(), 'doc:Plan')
   await assert.rejects(call(e, 'doc:import', { title: 'Bad', update: b4a.toString(b4a.from([1, 2, 3, 250, 9]), 'base64') }))
 })
+
+// OpenDocument text (src/ui/doc/odt.js).
+test('.odt export reads back with its headings, bold, lists, table and formatting', async () => {
+  const f = await load()
+  const { json } = await f.fileToJson('Plan.md', enc(MD))
+  const style = (attrs) => ({ type: 'textStyle', attrs })
+  json.content.unshift(
+    { type: 'paragraph', attrs: { blockStyle: 'title' }, content: [{ type: 'text', text: 'The title' }] },
+    { type: 'paragraph', attrs: { blockStyle: 'subtitle' }, content: [{ type: 'text', text: 'The subtitle' }] }
+  )
+  json.content.push(
+    { type: 'paragraph', attrs: { textAlign: 'center', lineHeight: '2', indent: 2 }, content: [
+      { type: 'text', text: 'Big blue ', marks: [style({ fontSize: '18pt', color: '#1d4ed8', fontFamily: 'serif' })] },
+      { type: 'text', text: 'lit', marks: [{ type: 'highlight', attrs: { color: '#bbf7d0' } }] },
+      { type: 'text', text: ' under', marks: [{ type: 'underline' }] },
+      { type: 'text', text: ' gone', marks: [{ type: 'strike' }] },
+      { type: 'text', text: '2', marks: [{ type: 'superscript' }] },
+      { type: 'text', text: ' it', marks: [{ type: 'italic' }] }
+    ] },
+    { type: 'paragraph', attrs: { textAlign: 'right' }, content: [{ type: 'text', text: 'two  spaces', marks: [style({ fontFamily: 'monospace' })] }] }
+  )
+  const bytes = f.exportOdtForTest ? f.exportOdtForTest(json) : (await import(path.join(__dirname, '..', 'src', 'ui', 'doc', 'odt.js'))).toOdt(json, 'Plan')
+  assert.equal(String.fromCharCode(bytes[0], bytes[1]), 'PK')
+  const back = (await f.fileToJson('Plan.odt', bytes)).json
+  assert.equal(blocks(back).slice(0, 3).join('|'), 'The title|The subtitle|Weekly plan')
+  assert.equal(back.content[0].attrs.blockStyle, 'title')
+  assert.equal(back.content[1].attrs.blockStyle, 'subtitle')
+  assert.equal(types(back).split(',').slice(2, 5).join(), 'heading1,paragraph,heading2')
+  const bold = find(back, (n) => n.type === 'text' && (n.marks || []).some((m) => m.type === 'bold'))
+  assert.equal(bold.text, 'bold')
+  const link = find(back, (n) => n.type === 'text' && (n.marks || []).some((m) => m.type === 'link'))
+  assert.equal(link.marks.find((m) => m.type === 'link').attrs.href, 'https://example.com/page')
+  assert.equal(blocks(find(back, (n) => n.type === 'bulletList')).join('|'), 'First|Second|Nested')
+  assert.equal(blocks(find(back, (n) => n.type === 'orderedList')).join('|'), 'One|Two')
+  const tasks = find(back, (n) => n.type === 'taskList')
+  assert.equal(blocks(tasks).join('|'), 'Open task|Done task')
+  assert.equal(tasks.content.map((i) => String(i.attrs.checked)).join(), 'false,true')
+  assert.equal(blocks(find(back, (n) => n.type === 'blockquote')).join('|'), 'A quote')
+  assert.equal(blocks(find(back, (n) => n.type === 'codeBlock')).join('|'), 'let a = 1')
+  assert.equal(blocks(find(back, (n) => n.type === 'table')).join('|'), 'Name|Role|Ann|Owner')
+  const runs = []
+  const walk = (n) => { if (n.type === 'text') runs.push(n); else (n.content || []).forEach(walk) }
+  walk({ content: back.content.slice(-2) })
+  const show = (n) => n.text + ':' + (n.marks || []).map((m) => m.type + (m.attrs ? '=' + Object.entries(m.attrs).filter(([, v]) => v != null && v !== '').sort().map(([k, v]) => k + '/' + v).join('+') : '')).sort().join(',')
+  assert.equal(runs.map(show).join('|'), [
+    'Big blue :textStyle=color/#1d4ed8+fontFamily/serif+fontSize/18pt',
+    'lit:highlight=color/#bbf7d0',
+    ' under:underline',
+    ' gone:strike',
+    '2:superscript',
+    ' it:italic',
+    'two  spaces:textStyle=fontFamily/monospace'
+  ].join('|'))
+  const [p1, p2] = back.content.slice(-2)
+  assert.equal(p1.attrs.textAlign + '/' + p1.attrs.lineHeight + '/' + p1.attrs.indent, 'center/2/2')
+  assert.equal(p2.attrs.textAlign, 'right')
+})
+
+const { execFileSync } = require('node:child_process')
+const fs = require('node:fs')
+const os = require('node:os')
+const soffice = (() => { try { execFileSync('soffice', ['--version'], { stdio: 'ignore' }); return true } catch { return false } })()
+// A 2x1 red and blue PNG.
+const PNG = Uint8Array.from(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAIAAAB7QOjdAAAAEElEQVR4nGP4z8DAwMDAAAAN/gH/a1d6FAAAAABJRU5ErkJggg==', 'base64'))
+
+test('LibreOffice opens our .odt, and we open what it saves', { skip: !soffice && 'needs soffice' }, async () => {
+  const f = await load()
+  const { toOdt } = await import(path.join(__dirname, '..', 'src', 'ui', 'doc', 'odt.js'))
+  const { json } = await f.fileToJson('Plan.md', enc(MD))
+  json.content.unshift({ type: 'paragraph', attrs: { blockStyle: 'title' }, content: [{ type: 'text', text: 'The title' }] })
+  json.content.push({ type: 'image', attrs: { ref: 'p1', mime: 'image/png', w: 200, h: 100, width: 50, align: 'center', alt: 'A flag' } })
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pearoffice-odt-'))
+  try {
+    const ours = path.join(dir, 'plan.odt')
+    fs.writeFileSync(ours, toOdt(json, 'Plan', new Map([['p1', { bytes: PNG, mime: 'image/png' }]])))
+    const lo = (file, to, out = path.join(dir, 'lo')) => execFileSync('soffice', ['--headless', '-env:UserInstallation=file://' + path.join(dir, 'profile'), '--convert-to', to, '--outdir', out, file], { stdio: 'ignore', timeout: 120000 })
+    // LibreOffice reads every block.
+    lo(ours, 'txt:Text')
+    const text = fs.readFileSync(path.join(dir, 'lo', 'plan.txt'), 'utf8').replace(/^﻿/, '')
+    for (const want of ['The title', 'Weekly plan', 'Some bold words and a link.', 'First', 'Nested', 'One', 'Open task', 'A quote', 'let a = 1', 'Name', 'Owner']) assert.ok(text.includes(want), 'LibreOffice reads ' + want)
+    // Saved again by LibreOffice, it comes back with the same blocks and the picture.
+    lo(ours, 'odt', path.join(dir, 'again'))
+    const back = (await f.fileToJson('plan.odt', fs.readFileSync(path.join(dir, 'again', 'plan.odt'))))
+    assert.equal(back.json.content[0].attrs.blockStyle, 'title')
+    assert.equal(types(back.json).split(',').slice(1, 4).join(), 'heading1,paragraph,heading2')
+    assert.equal(blocks(find(back.json, (n) => n.type === 'bulletList')).join('|'), 'First|Second|Nested')
+    assert.equal(blocks(find(back.json, (n) => n.type === 'orderedList')).join('|'), 'One|Two')
+    assert.equal(blocks(find(back.json, (n) => n.type === 'taskList')).join('|'), 'Open task|Done task')
+    assert.equal(blocks(find(back.json, (n) => n.type === 'blockquote')).join('|'), 'A quote')
+    assert.equal(blocks(find(back.json, (n) => n.type === 'codeBlock')).join('|'), 'let a = 1')
+    assert.equal(blocks(find(back.json, (n) => n.type === 'table')).join('|'), 'Name|Role|Ann|Owner')
+    assert.equal(back.pictures.length, 1, 'the picture')
+    const img = find(back.json, (n) => n.type === 'image')
+    assert.equal(img.attrs.alt + '/' + img.attrs.width, 'A flag/50')
+    // A Word file turned into .odt by LibreOffice (its own styles and lists).
+    const docx = path.join(dir, 'word.docx')
+    fs.writeFileSync(docx, await f.toDocx(json, 'Plan'))
+    lo(docx, 'odt')
+    const fromWord = (await f.fileToJson('word.odt', fs.readFileSync(path.join(dir, 'lo', 'word.odt')))).json
+    assert.equal(fromWord.content[0].attrs.blockStyle, 'title')
+    assert.equal(blocks(find(fromWord, (n) => n.type === 'bulletList')).join('|'), 'First|Second|Nested')
+    assert.equal(blocks(find(fromWord, (n) => n.type === 'orderedList')).join('|'), 'One|Two')
+    assert.equal(blocks(find(fromWord, (n) => n.type === 'table')).join('|'), 'Name|Role|Ann|Owner')
+    assert.equal(find(fromWord, (n) => n.type === 'text' && (n.marks || []).some((m) => m.type === 'bold')).text, 'bold')
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+})
