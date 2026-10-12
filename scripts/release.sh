@@ -163,7 +163,18 @@ _worktree_cleanup() {
   done
   return 0
 }
-trap _worktree_cleanup EXIT
+# Also stops the background Mac build (step 5b) if the run ends early.
+_on_exit() {
+  _worktree_cleanup
+  if [ -n "${_MAC_PID:-}" ] && kill -0 "$_MAC_PID" 2>/dev/null; then _kill_tree "$_MAC_PID"; fi
+  return 0
+}
+_kill_tree() {
+  local _c
+  for _c in $(pgrep -P "$1" 2>/dev/null); do _kill_tree "$_c"; done
+  kill "$1" 2>/dev/null || true
+}
+trap _on_exit EXIT
 _worktree() {
   local repo="$1" remote="$2" base="$3" branch="$4"
   WT="$(mktemp -d)/wt"
@@ -381,6 +392,7 @@ APK_SIZE=""
 AAB_NAME=""
 AAB_SIZE=""
 DESKTOP_ARTIFACTS=()
+_MAC_PID=""
 SEEDER_ARTIFACTS=()
 START9_S9PK=""
 UMBREL_BUILT=false
@@ -689,9 +701,14 @@ if $NEEDS_BUILD; then
 #
 # One desktop/ project builds every target, so 5b2 is absent and
 # --skip-linux / --skip-windows / --skip-macos select inside this step.
-# Each runs after the notes so the machine works unattended, one after
-# another (they share the staged resources in desktop/build/resources), and
-# each ends with its packaged smoke test. Best-effort: a failed platform is
+# They run after the notes so the machine works unattended, and each ends
+# with its packaged smoke test. The two Mac builds run on the Mac Mini in the
+# background, one after the other (they share its build folder), while Linux
+# and Windows build here one after the other (they share the staged
+# resources in desktop/build/resources), then the seeder and store packages
+# (5c, 5d). The Mac copy takes only the source, never the folders the local
+# builds write, and every build names its own files, so they cannot collide.
+# The Mac results are collected before 5e. Best-effort: a failed platform is
 # logged and skipped, never blocking the rest of the release.
 # ---------------------------------------------------------------------------
 _desktop() { # _desktop <label> <log> <command...>
@@ -714,10 +731,15 @@ else
   if $SKIP_MACOS; then
     echo "--> macOS    (skipped via --skip-macos)"
   else
-    _desktop "macOS, Apple silicon (signed, notarized)" /tmp/pearoffice-build-mac-arm64.log npm run dist:mac \
-      && DESKTOP_ARTIFACTS+=("$_DD/PearOffice-$_DV-mac-arm64.dmg" "$_DD/PearOffice-$_DV-mac-arm64.zip")
-    _desktop "macOS, Intel (signed, notarized)" /tmp/pearoffice-build-mac-x64.log npm run dist:mac:intel \
-      && DESKTOP_ARTIFACTS+=("$_DD/PearOffice-$_DV-mac-x64.dmg" "$_DD/PearOffice-$_DV-mac-x64.zip")
+    echo "--> macOS    (Apple silicon, then Intel, on the Mac Mini in the background)"
+    _MAC_DONE="$(mktemp -d)"
+    (
+      _desktop "macOS, Apple silicon (signed, notarized)" /tmp/pearoffice-build-mac-arm64.log npm run dist:mac \
+        && touch "$_MAC_DONE/arm64"
+      _desktop "macOS, Intel (signed, notarized)" /tmp/pearoffice-build-mac-x64.log npm run dist:mac:intel \
+        && touch "$_MAC_DONE/x64"
+    ) > "$_MAC_DONE/report" 2>&1 < /dev/null &
+    _MAC_PID=$!
   fi
   if $SKIP_LINUX; then
     echo "--> Linux    (skipped via --skip-linux)"
@@ -745,17 +767,6 @@ else
   else
     _desktop "Windows (.exe, built with Wine, untested)" /tmp/pearoffice-build-windows.log npm run dist:windows \
       && DESKTOP_ARTIFACTS+=("$_DD/PearOffice-Setup-$_DV.exe")
-  fi
-  _have=()
-  for _f in "${DESKTOP_ARTIFACTS[@]}"; do
-    if [ -f "$_f" ]; then _have+=("$_f"); else echo "    WARNING: expected $_f, not found."; fi
-  done
-  DESKTOP_ARTIFACTS=("${_have[@]}")
-  if [ ${#DESKTOP_ARTIFACTS[@]} -gt 0 ]; then
-    echo "==> Desktop installers built (${#DESKTOP_ARTIFACTS[@]}):"
-    for _f in "${DESKTOP_ARTIFACTS[@]}"; do echo "    - $(basename "$_f")  ($(du -sh "$_f" | cut -f1))"; done
-  else
-    echo "==> No desktop installers produced (all skipped or failed); the release continues."
   fi
 fi
 
@@ -813,6 +824,30 @@ else
     fi
   else
     echo "    WARNING: StartOS package build failed, skipping it. Log: /tmp/pearoffice-build-start9.log"
+  fi
+fi
+
+# The desktop installers from 5b: the Mac builds finish here.
+if ! $SKIP_DESKTOP; then
+  if [ -n "$_MAC_PID" ]; then
+    echo ""
+    echo "==> Waiting for the Mac builds on the Mac Mini..."
+    wait "$_MAC_PID" || true
+    _MAC_PID=""
+    cat "$_MAC_DONE/report"
+    [ -e "$_MAC_DONE/arm64" ] && DESKTOP_ARTIFACTS+=("$_DD/PearOffice-$_DV-mac-arm64.dmg" "$_DD/PearOffice-$_DV-mac-arm64.zip")
+    [ -e "$_MAC_DONE/x64" ] && DESKTOP_ARTIFACTS+=("$_DD/PearOffice-$_DV-mac-x64.dmg" "$_DD/PearOffice-$_DV-mac-x64.zip")
+  fi
+  _have=()
+  for _f in "${DESKTOP_ARTIFACTS[@]}"; do
+    if [ -f "$_f" ]; then _have+=("$_f"); else echo "    WARNING: expected $_f, not found."; fi
+  done
+  DESKTOP_ARTIFACTS=("${_have[@]}")
+  if [ ${#DESKTOP_ARTIFACTS[@]} -gt 0 ]; then
+    echo "==> Desktop installers built (${#DESKTOP_ARTIFACTS[@]}):"
+    for _f in "${DESKTOP_ARTIFACTS[@]}"; do echo "    - $(basename "$_f")  ($(du -sh "$_f" | cut -f1))"; done
+  else
+    echo "==> No desktop installers produced (all skipped or failed); the release continues."
   fi
 fi
 
