@@ -182,6 +182,35 @@ module.exports = async function docs (t) {
   if (!result.docPrintKey) throw new Error('Ctrl+P did not print the document')
   step('Ctrl+P prints')
 
+  // OpenDocument (src/ui/doc/odt.js): saved as .odt with its picture, then
+  // that file imported back as a new document.
+  await more('Save as an OpenDocument file (.odt)')
+  const odtOut = await waitFile(path.join(downloads, 'Smoke import.odt'))
+  let odtXml = ''
+  let odtPictures = 0
+  try {
+    const zip = fflate.unzipSync(new Uint8Array(odtOut))
+    odtXml = fflate.strFromU8(zip['content.xml'])
+    odtPictures = Object.keys(zip).filter((k) => k.startsWith('Pictures/')).length
+  } catch {}
+  if (fflate && !(odtXml.includes('Imported heading') && odtXml.includes('Tent') && odtPictures === 1)) throw new Error('odt export: ' + odtXml.slice(0, 200))
+  await js(`(() => {
+    const bytes = Uint8Array.from(atob(${JSON.stringify(odtOut.toString('base64'))}), (c) => c.charCodeAt(0))
+    const dt = new DataTransfer()
+    dt.items.add(new File([bytes], 'From LibreOffice.odt'))
+    const input = document.querySelector('.import input[type=file]')
+    input.files = dt.files
+    input.dispatchEvent(new Event('change', { bubbles: true }))
+  })()`)
+  await waitFor('odt doc open', "document.querySelector('.toolbar .title').value === 'From LibreOffice' && (document.querySelector('.doc-body h1') || {}).textContent === 'Imported heading'")
+  await waitFor('odt doc content', "document.querySelectorAll('.doc-body li[data-checked=\"true\"]').length === 1 && (document.querySelector('.doc-body p strong') || {}).textContent === 'bold' && (document.querySelector('.doc-body table') || {}).textContent === 'ItemCostTent80'")
+  await waitFor('odt picture shown', "(() => { const i = document.querySelector('.doc-body .doc-picture-frame img'); return !!i && !i.hidden && i.complete && i.naturalWidth > 0 })()")
+  result.docOdt = true
+  await js("document.querySelector('.sheet-link.all-files').click()")
+  await js("[...document.querySelectorAll('.file-card')].find((c) => c.querySelector('.file-title').textContent === 'Smoke import').click()")
+  await waitFor('back to import', "document.querySelector('.toolbar .title').value === 'Smoke import' && document.querySelectorAll('.doc-body .doc-picture-frame').length === 1")
+  step('document as .odt')
+
   // Copy the picture from this document and paste it into "Smoke notes":
   // it is stored again there, so the new node points at that file's own
   // picture core and shows.
@@ -298,5 +327,5 @@ module.exports = async function docs (t) {
   result.docToolRow = true
   step('toolbar keeps to one row')
 
-  return result.docToolRow && result.docPrintKey && result.docPastePicture && result.docPicture && result.docPictureCopy && result.docPictureCut && result.docPaste && result.docOutline && result.docImport && result.docImportNotice && result.docExport && result.docCursors && result.docCard && result.docReopened && result.docWords === '10 words'
+  return result.docToolRow && result.docPrintKey && result.docOdt && result.docPastePicture && result.docPicture && result.docPictureCopy && result.docPictureCut && result.docPaste && result.docOutline && result.docImport && result.docImportNotice && result.docExport && result.docCursors && result.docCard && result.docReopened && result.docWords === '10 words'
 }

@@ -21,11 +21,13 @@ import { documentExtensions, SIZES, LINE_HEIGHTS, MAX_INDENT } from './extension
 import { call } from '../bridge.js'
 import { fileName, saveFile, isMobile } from '../save.js'
 import { preparePicture, wordPicture, toB64, fromB64 } from './pictures.js'
+import { toOdt, odtToHtml } from './odt.js'
+import * as fflate from 'fflate'
 
 const FIELD = 'body' // src/doc/docModel.js
 const DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 
-export const isDocFile = (name) => /\.(docx|md|markdown|txt|html?)$/i.test(String(name || ''))
+export const isDocFile = (name) => /\.(docx|odt|md|markdown|txt|html?)$/i.test(String(name || ''))
 
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 
@@ -77,6 +79,8 @@ function tidy (html, styles, paste = false) {
       const next = doc.createElement('img')
       next.setAttribute('data-ref', ref)
       if (img.getAttribute('alt')) next.setAttribute('alt', img.getAttribute('alt'))
+      // A width as a share of the page (.odt import gives one).
+      if (/^\d+$/.test(img.getAttribute('data-width') || '')) next.setAttribute('data-width', img.getAttribute('data-width'))
       // The editor's parser puts it on its own line.
       img.replaceWith(next)
       kept.add(next)
@@ -651,6 +655,15 @@ export async function fileToJson (name, bytes) {
       convertImage: mammoth.images.imgElement(async (image) => ({ src: 'data:' + image.contentType + ';base64,' + await image.read('base64') }))
     })
     html = out.value
+  } else if (ext === 'odt') {
+    // OpenDocument (LibreOffice): turned into HTML here (odt.js), then read
+    // like any other.
+    await checkZip(bytes, 'This is not an OpenDocument file PearOffice can read.')
+    const odt = odtToHtml(fflate.unzipSync(bytes))
+    const t = tidy(odt.html, null)
+    const json = htmlToJson(t.html)
+    eachNode(json, (n) => { if (n.type === 'text') n.text = n.text.replace(/\u00a0/g, ' ') })
+    return { json, dropped: t.dropped || odt.dropped, pictures: t.pictures }
   } else if (ext === 'md' || ext === 'markdown') {
     html = marked.parse(new TextDecoder().decode(bytes).replace(/^\ufeff/, ''), { gfm: true, async: false })
   } else {
@@ -1129,8 +1142,8 @@ export async function picturesOf (json, fetchPicture) {
   return out
 }
 
-// Save the document as 'docx', 'md', 'txt', 'pdf' or 'print' (print on
-// desktop only, as for sheets).
+// Save the document as 'docx', 'odt', 'md', 'txt', 'pdf' or 'print' (print
+// on desktop only, as for sheets).
 export async function exportDocument (ydoc, title, format, sheetId) {
   const json = docToJson(ydoc)
   const name = fileName(title || 'Untitled document')
@@ -1141,6 +1154,7 @@ export async function exportDocument (ydoc, title, format, sheetId) {
     for (const [ref, p] of pictures) pictures.set(ref, await wordPicture(p.bytes, p.mime).catch(() => p))
     return saveFile(name + '.docx', DOCX, await toDocx(json, title, pictures))
   }
+  if (format === 'odt') return saveFile(name + '.odt', 'application/vnd.oasis.opendocument.text', toOdt(json, title, pictures))
   if (format === 'md') return saveFile(name + '.md', 'text/markdown', toMarkdown(json, pictures))
   return call(format === 'print' ? 'app:print' : 'app:savePdf', { html: toHtml(json, title, pictures), name: name + '.pdf' })
 }
