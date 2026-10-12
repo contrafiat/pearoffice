@@ -6,6 +6,7 @@
 # read by plugins/with-android-release-signing.js.
 #
 # Usage: scripts/build-android-release.sh
+# The version is app.json's: scripts/release.sh sets it first.
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 [ -f scripts/.env ] || { echo "no scripts/.env with the signing credentials" >&2; exit 1; }
@@ -16,7 +17,8 @@ CODE=$(node -p "require('./app.json').expo.android.versionCode")
 npm run build:bare:mobile
 npm run build:ui:mobile
 # Every time: the signing config lives in the generated build.gradle.
-npx expo prebuild --platform android --no-install
+# PREBUILT=1: scripts/release.sh ran it already (its step 2).
+[ "${PREBUILT:-0}" = 1 ] || npx expo prebuild --platform android --no-install
 (cd android && ./gradlew assembleRelease bundleRelease -PreactNativeArchitectures=arm64-v8a)
 
 OUT=dist/android
