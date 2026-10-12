@@ -12,13 +12,13 @@
 //
 // blind-peering sends core keys and lengths. It never sends the encryption
 // key or the topic key.
+//
+// Talking to seeders is @peerloom/seeder's client (vendored in src/seeder/vendor). This
+// file decides which sheets go to which seeders.
 
-const BlindPeering = require('blind-peering')
-const Wakeup = require('protomux-wakeup')
-const Protomux = require('protomux')
-const c = require('compact-encoding')
 const b4a = require('b4a')
-const { PAIR_PROTOCOL, PAIR_WINDOW_MS, SEEDER_PROTOCOL, DROP_GRACE_MS, pairTopic, parseSeederLink } = require('../seeder/protocol')
+const { createPeering, pair: pairWithSeeder, createAsker } = require('../seeder/vendor/peerloom-seeder/src/client')
+const { PAIR_WINDOW_MS, DROP_GRACE_MS } = require('../seeder/protocol')
 const m = require('./membership')
 
 const hex = (buf) => b4a.toString(buf, 'hex')
@@ -34,13 +34,9 @@ function createSeeding ({ engine, dhtOf = (dht) => dht, getPictures = () => null
   let closed = false
   let rebuildNeeded = false
 
+  // Dials with this device's swarm key, the one sent at pairing.
   function makePeering () {
-    peering = new BlindPeering(dhtOf(engine.swarm.dht), engine.store, { wakeup: new Wakeup() })
-    // blind-peering dials with `peering.keyPair`, which it never sets, so the
-    // DHT falls back to a random key per process. The seeder recognises paired
-    // devices by key, so dial with this device's swarm key (the one sent at
-    // pairing).
-    peering.keyPair = engine.swarm.keyPair
+    peering = createPeering({ dht: dhtOf(engine.swarm.dht), store: engine.store, keyPair: engine.swarm.keyPair })
   }
 
   // blind-peering cannot forget one base, so when a seeder is taken off a
@@ -163,51 +159,14 @@ function createSeeding ({ engine, dhtOf = (dht) => dht, getPictures = () => null
     return out
   }
 
-  // Pair with a seeder from the link it shows. Resolves once the seeder has
-  // accepted this device.
-  function pair (link, { timeoutMs = PAIR_WINDOW_MS } = {}) {
-    const { rv, seederKey } = parseSeederLink(link)
-    const topic = pairTopic(rv)
-    const swarm = engine.swarm
-    return new Promise((resolve, reject) => {
-      let done = false
-      const channels = []
-      const finish = async (err) => {
-        if (done) return
-        done = true
-        clearTimeout(timer)
-        clearInterval(again)
-        for (const ch of channels) { try { ch.close() } catch {} }
-        swarm.off('connection', onConnection)
-        swarm.leave(topic).catch(() => {})
-        if (err) return reject(err)
-        await engine.localDb.put('seeders:' + hex(seederKey), { seederKey: hex(seederKey), pairedAt: Date.now() })
-        sweep().catch(() => {})
-        resolve({ seederKey: hex(seederKey) })
-      }
-      const onConnection = (conn) => {
-        // Talk only to the seeder the link names.
-        if (!conn.remotePublicKey || !b4a.equals(conn.remotePublicKey, seederKey)) return
-        const mux = Protomux.from(conn)
-        const ch = mux.createChannel({ protocol: PAIR_PROTOCOL, id: rv, onopen: () => msg.send({ t: 'trust', deviceKey: hex(swarm.keyPair.publicKey) }) })
-        if (!ch) return
-        channels.push(ch)
-        const msg = ch.addMessage({
-          encoding: c.json,
-          onmessage: (r) => {
-            if (r && r.t === 'ok') finish(null)
-            else if (r && r.t === 'no') finish(new Error(r.reason || 'The seeder refused'))
-          }
-        })
-        ch.open()
-      }
-      const timer = setTimeout(() => finish(new Error('Could not reach the seeder. Check it is running and the pairing window is open.')), timeoutMs)
-      swarm.on('connection', onConnection)
-      for (const conn of swarm.connections) onConnection(conn)
-      const discovery = swarm.join(topic, { server: false, client: true })
-      // Look again while waiting, as joins do.
-      const again = setInterval(() => discovery.refresh({ server: false, client: true }).catch(() => {}), 4000)
-    })
+  // Pair with a seeder from the link it shows, either a PearOffice seeder's
+  // or a shared PeerLoom seeder's. Resolves once the seeder has accepted this
+  // device.
+  async function pair (link, { timeoutMs = PAIR_WINDOW_MS } = {}) {
+    const { seederKey } = await pairWithSeeder({ swarm: engine.swarm, link, app: 'PearOffice', timeoutMs })
+    await engine.localDb.put('seeders:' + seederKey, { seederKey, pairedAt: Date.now() })
+    sweep().catch(() => {})
+    return { seederKey }
   }
 
   // Ask every seeder this device is paired with, and that the sheet lists,
@@ -258,81 +217,18 @@ function createSeeding ({ engine, dhtOf = (dht) => dht, getPictures = () => null
     })
   }
 
-  // One request to a seeder on `pearoffice/seeder/1`. Goes over the backup
-  // connection to that seeder when one is open: dialling a second one is
-  // slow, and the seeder then drops the backup connection in its favour.
-  // Requests to one seeder run one at a time, as the seeder answers on a
-  // single channel per connection.
-  const queues = new Map() // seederKey -> the last request's promise
-  function ask (seederKey, request, timeoutMs = 20000) {
-    const prev = queues.get(seederKey) || Promise.resolve()
-    // A new connection that fails without an answer is tried once more: if
-    // the direct attempt could not holepunch, the second one goes through the
-    // relay (relay.js relayingDht).
-    const fresh = () => askOver(null, seederKey, request, timeoutMs).catch((e) => {
-      if (e.answered) throw e
-      return askOver(null, seederKey, request, timeoutMs)
-    })
-    const run = prev.catch(() => {}).then(() => {
-      const open = openBackupSocket(seederKey)
-      if (!open) return fresh()
-      return askOver(open, seederKey, request, timeoutMs).catch((e) => {
-        if (e.answered) throw e
-        return fresh()
-      })
-    })
-    queues.set(seederKey, run)
-    run.catch(() => {}).then(() => { if (queues.get(seederKey) === run) queues.delete(seederKey) })
-    return run
-  }
-
-  function openBackupSocket (seederKey) {
-    const bp = peering && peering.blindPeers.get(seederKey)
-    const socket = bp && bp.connected && bp.socket
-    return socket && !socket.destroying && !socket.destroyed ? socket : null
-  }
-
-  // Over `socket` if given (left open afterwards), else over a new direct
-  // connection that is closed once answered.
-  function askOver (socket, seederKey, request, timeoutMs) {
-    const own = !socket
-    return new Promise((resolve, reject) => {
-      if (own) socket = dhtOf(engine.swarm.dht).connect(b4a.from(seederKey, 'hex'), { keyPair: engine.swarm.keyPair })
-      let ch = null
-      let finished = false
-      const done = (err, value) => {
-        if (finished) return
-        finished = true
-        clearTimeout(timer)
-        if (ch) try { ch.close() } catch {}
-        if (own) try { socket.destroy() } catch {}
-        if (err) reject(err); else resolve(value)
-      }
-      const timer = setTimeout(() => done(new Error('seeder did not answer')), timeoutMs)
-      const answer = (m) => {
-        if (m && m.t === 'ok') return done(null, m)
-        const err = new Error((m && m.reason) || 'refused')
-        err.answered = true
-        done(err)
-      }
-      const start = () => {
-        ch = Protomux.from(socket).createChannel({
-          protocol: SEEDER_PROTOCOL,
-          onopen: () => msg.send(request),
-          onclose: () => done(new Error('connection to the seeder closed'))
-        })
-        if (!ch) return done(new Error('could not open a channel'))
-        const msg = ch.addMessage({ encoding: c.json, onmessage: answer })
-        ch.open()
-      }
-      if (own) {
-        socket.on('error', () => {})
-        socket.on('open', start)
-      } else {
-        start()
-      }
-    })
-  }
+  // One request to a seeder, over the backup connection to it when one is
+  // open. Always under the `pearoffice/seeder/1` name: PearOffice seeders know
+  // only that one, and shared seeders answer it too.
+  const { ask } = createAsker({
+    dht: () => dhtOf(engine.swarm.dht),
+    keyPair: () => engine.swarm.keyPair,
+    openSocket: (seederKey) => {
+      const bp = peering && peering.blindPeers.get(seederKey)
+      return bp && bp.connected && bp.socket
+    },
+    styleOf: () => 'pearoffice'
+  })
 
   // --- keyrings (proposals/2026-10-07-phrase-recovers-files.md) -------------
 

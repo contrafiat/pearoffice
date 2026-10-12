@@ -133,7 +133,7 @@ test('deleting sheets', async (t) => {
     const other = await device('Other')
     await call(other, 'seeder:pair', { link: seeder.openPairing().link })
     const results = await other.seeding.requestDrop({ bootstrap, seederKeys: [hex(seeder.seederKey)], afterMs: 0 })
-    assert.match(results[0].error, /does not back up that file/)
+    assert.match(results[0].error, /does not back that up here/)
     assert.ok(seeder.allowedSheets().includes(bootstrap))
     assert.equal((await seeder.drops()).some((d) => d.sheet === bootstrap), false)
   })
