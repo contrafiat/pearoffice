@@ -15,7 +15,7 @@ import { applyTheme } from './theme.js'
 import { haptic, hapticTaps } from './haptic.js'
 import { FileHome, KindIcon, NewPanel, RecoverPanel, dragFile, dropTarget, untitled } from './Files.jsx'
 import { DeleteFolderPanel, FolderNamePanel, MoveToFolderPanel, filesIn, useFolders } from './Folders.jsx'
-import { DonationReminder, donationsShown } from './About.jsx'
+import { DonationReminder } from './About.jsx'
 import { Onboarding } from './Onboarding.jsx'
 import { CaretRight, CircleNotch, FileArrowUp, FolderSimple, GearSix, House, Info, LinkSimple, List, Plus } from '@phosphor-icons/react'
 import { PearMark } from './PearMark.jsx'
@@ -308,10 +308,10 @@ export function App () {
   }
 
   // The two-week donation nudge: asked once the file list is loaded, shown
-  // once ever (marked shown as soon as it appears). Not on iOS for now.
+  // once ever (marked shown as soon as it appears).
   const askedDonation = useRef(false)
   useEffect(() => {
-    if (!sheets || askedDonation.current || !donationsShown()) return
+    if (!sheets || askedDonation.current) return
     askedDonation.current = true
     call('donation:status').then((r) => {
       if (r && r.due) { setDonateNudge(true); call('donation:dismiss').catch(() => {}) }
