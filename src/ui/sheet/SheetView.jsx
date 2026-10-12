@@ -24,7 +24,7 @@ import { guessChart } from '../../sheet/charts.js'
 import { readPref, writePref } from '../prefs.js'
 import { Minus, ArrowCounterClockwise, ArrowClockwise, TextB, TextItalic, TextAUnderline, PaintBucket, Copy, Scissors, ClipboardText, Eraser, Numpad, FileXls, Plus, MagnifyingGlass, X, ChartBar, PencilSimple, DownloadSimple, Trash, TextUnderline, TextStrikethrough, TextAlignLeft, TextAlignCenter, TextAlignRight, ArrowUDownLeft, FrameCorners, AlignTop, AlignCenterVertical, AlignBottom, ArrowsOutLineHorizontal } from '@phosphor-icons/react'
 import { FormulaHelp, helpFor, insertFunction, canPoint, refText } from './FormulaHelp.jsx'
-import { exportSheet, exportCsv, exportJson, printTab, isMobile } from './xlsx.js'
+import { exportSheet, exportOds, exportCsv, exportJson, printTab, isMobile } from './xlsx.js'
 import { usePrintKey } from '../printKey.js'
 import { useToolOverflow } from '../toolOverflow.jsx'
 
@@ -954,6 +954,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
           <>
             <li role='menuitem' onClick={() => setFinding({ replace: canEdit })}>Find and replace</li>
             {window.pearoffice && <li role='menuitem' onClick={() => exportSheet(sheetId).catch((err) => onError(err.message))}>Save as an Excel file</li>}
+            {window.pearoffice && <li role='menuitem' onClick={() => exportOds(sheetId).catch((err) => onError(err.message))}>Save as an OpenDocument file (.ods)</li>}
             <li role='menuitem' onClick={() => exportCsv(view).catch((err) => onError(err.message))}>Download this tab as CSV</li>
             <li role='menuitem' onClick={() => exportJson(sheetId).catch((err) => onError(err.message))}>Save as JSON</li>
             <li role='menuitem' onClick={() => printTab(view, 'pdf', printCharts()).catch((err) => onError(err.message))}>Save this tab as PDF</li>

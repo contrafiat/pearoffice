@@ -253,6 +253,14 @@ function workbookBytes (XLSX, fflate, dump) {
   return require('./xlsxCharts').addChartsToXlsx(fflate.zipSync(files), tabs, fflate)
 }
 
+// The sheet as an OpenDocument spreadsheet (.ods), for LibreOffice and
+// OpenOffice: values, formulas (src/sheet/odsFormula.js), tabs and number
+// formats. SheetJS writes no styles, charts, frozen panes, colour rules or
+// validation into one.
+function odsBytes (XLSX, fflate, dump) {
+  return require('./odsFormula').writeOds(XLSX, fflate, dumpToWorkbook(XLSX, dump))
+}
+
 // Each tab's colour rules from an .xlsx file, in tab order.
 function condFormatsFromXlsx (bytes, fflate) {
   let files
@@ -270,4 +278,4 @@ function validationsFromXlsx (bytes, fflate) {
   return require('./xlsxStyles').sheetPaths(files, fflate.strFromU8).map((p) => (p && files[p] ? require('./validation').fromXlsx(fflate.strFromU8(files[p])) : []))
 }
 
-module.exports = { condFormatsFromXlsx, validationsFromXlsx, insertBefore, AFTER_VALIDATION, freezeFromXlsx, workbookBytes, workbookToTabs, dumpToWorkbook, textInput, toFile, fromFile, READ_OPTIONS, MAX_IMPORT_CELLS }
+module.exports = { condFormatsFromXlsx, validationsFromXlsx, insertBefore, AFTER_VALIDATION, freezeFromXlsx, workbookBytes, odsBytes, workbookToTabs, dumpToWorkbook, textInput, toFile, fromFile, READ_OPTIONS, MAX_IMPORT_CELLS }

@@ -250,6 +250,14 @@ module.exports = async function sheetFiles (t) {
   result.exportedBytes = fs.existsSync(file) ? fs.statSync(file).size : 0
   step('export')
 
+  // The same sheet as an OpenDocument file, for LibreOffice; imported back below.
+  await more('Save as an OpenDocument file (.ods)')
+  const odsFile = path.join(downloads, 'Household budget.ods')
+  for (const t0 = Date.now(); !(fs.existsSync(odsFile) && fs.statSync(odsFile).size > 1000) && Date.now() - t0 < 10000;) await sleep(200)
+  await sleep(300)
+  if (!fs.existsSync(odsFile)) throw new Error('no .ods saved')
+  step('ods')
+
   // CSV and PDF of this tab from the More menu; duplicate a tab and delete
   // the copy from the tab menu.
   await more('Download this tab as CSV')
@@ -357,5 +365,23 @@ module.exports = async function sheetFiles (t) {
   result.importedFormats = true
   step('import')
 
-  return result.importedFormats && result.formats && result.csvPdf && result.printKey && result.tabs && result.tidied && result.jsonImport && result.csvImport && result.importedFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000
+  const odsB64 = fs.readFileSync(odsFile).toString('base64')
+  await js(`(() => {
+    const bytes = Uint8Array.from(atob(${JSON.stringify(odsB64)}), (c) => c.charCodeAt(0))
+    const dt = new DataTransfer()
+    dt.items.add(new File([bytes], 'From LibreOffice.ods'))
+    const input = document.querySelector('.import input[type=file]')
+    input.files = dt.files
+    input.dispatchEvent(new Event('change', { bubbles: true }))
+  })()`)
+  await waitFor('ods sheet open', "document.querySelector('.title').value === 'From LibreOffice'")
+  await waitFor('ods values', "[...document.querySelectorAll('.cell')].some((c) => c.textContent === '1650.5') && [...document.querySelectorAll('.cell')].some((c) => c.textContent === 'Rent')")
+  await js("document.querySelector('.grid .body').focus()")
+  await sendMod('Home', ['control'])
+  for (let i = 0; i < 2; i++) await key('Down')
+  await key('Right')
+  result.odsFormula = await js("document.querySelector('.formula-bar input').value")
+  step('ods import')
+
+  return result.importedFormats && result.formats && result.csvPdf && result.printKey && result.tabs && result.tidied && result.jsonImport && result.csvImport && result.importedFormula === '=SUM(B1:B2)' && result.odsFormula === '=SUM(B1:B2)' && result.exportedBytes > 1000
 }

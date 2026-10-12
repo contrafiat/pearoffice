@@ -87,7 +87,9 @@ Code that works for any kind of file sits apart from each editor's own
   `sheetModel.js` (the Yjs document), `refs.js` (A1 <-> id formula
   references), `formula/` (evaluator, deterministic maths, formulajs fills,
   vendored fast-formula-parser), charts, fill, filter, validation, colour
-  rules, .xlsx/.csv/.json import and export, and `sheetMethods.js` (the
+  rules, .xlsx/.csv/.json import and export, .ods import and export
+  (`odsFormula.js`: SheetJS for the values and tabs, our own formula
+  conversion and tab names, since SheetJS gets both wrong), and `sheetMethods.js` (the
   sheet's IPC methods, run in the worklet).
 - `src/worklet/` - the Bare program: `bare.js` entry, `engine.js` (core
   wiring), `sheetWire.js` (apply rules), `yOps.js` (edits over 1 MB split into parts), `membership.js` (signed membership
@@ -342,8 +344,8 @@ take five scenes: files, sheet, document, slides, sharing.
   (typing, formulas, pointing at cells while typing one, spilling, fill,
   charts, copy and paste, undo, zoom; about
   21 s). `sheet-files` is cell formats, filters, comments, validation, colour
-  rules and names, then .xlsx, .csv, .json and PDF out, tabs, tidy up and
-  .json, .csv and .xlsx in (about 32 s). `docs` is documents (about 9 s).
+  rules and names, then .xlsx, .ods, .csv, .json and PDF out, tabs, tidy up and
+  .json, .csv, .xlsx and .ods in (about 32 s). `docs` is documents (about 9 s).
   `slides` is a deck: two layouts, typing a title, undo and redo, moving,
   resizing and rotating a box with the mouse, nudging, a text box added and
   deleted, someone else's selection, reordering by keys and by drag,
