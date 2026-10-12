@@ -168,3 +168,73 @@ test('LibreOffice keeps our charts, and we read its file back', { skip: !soffice
     fs.rmSync(dir, { recursive: true, force: true })
   }
 })
+
+// Looks (src/sheet/odsStyles.js).
+const { stylesFromOdsBytes } = require('../src/sheet/odsStyles')
+function looksDump () {
+  const f = {
+    '1,1': { b: true, fill: '#ffcc00', bb: 'medium:#cc0000' },
+    '1,2': { i: true, u: true, align: 'center' },
+    '2,1': { s: true, size: 14, font: 'serif', color: '#2f7d8c' },
+    '2,2': { align: 'right', valign: 'top', wrap: true, bt: 'thin', bl: 'dashed', br: 'double', num: '$#,##0.00' },
+    '3,1': { font: 'mono', valign: 'middle' },
+    '7,3': { fill: '#e0e0ff' } // an empty cell with a fill
+  }
+  const values = { '1,1': 'Item', '1,2': 'Cost', '2,1': 'Rent', '2,2': 1200, '3,1': 'Code' }
+  const cells = Object.keys(f).map((k) => {
+    const [row, col] = k.split(',').map(Number)
+    const v = values[k]
+    return { row, col, input: v === undefined ? '' : String(v), value: v === undefined ? null : v, fmt: f[k] }
+  })
+  return { title: 'Looks', tabs: [{ name: 'Looks', cells, widths: { 1: 180 }, heights: { 2: 40 }, hidden: { rows: [5], cols: [4] }, freeze: { rows: 1, cols: 1 } }] }
+}
+function checkLooks (x) {
+  const at = new Map(x.styles.map(([r, c, f]) => [r + ',' + c, f]))
+  const want = looksDump().tabs[0].cells
+  for (const c of want) {
+    const f = { ...c.fmt }
+    delete f.num
+    assert.deepEqual(at.get(c.row + ',' + c.col), f, 'cell ' + c.row + ',' + c.col)
+  }
+  assert.equal(x.styles.length, want.length, 'no other cells styled')
+  assert.equal(x.widths[1], 180)
+  assert.equal(x.heights[2], 40)
+  assert.deepEqual(x.hidden, { rows: [5], cols: [4] })
+  assert.deepEqual(x.freeze, { rows: 1, cols: 1 })
+}
+
+test('cell looks, widths, heights, hidden rows and columns and frozen panes go out to .ods and come back', () => {
+  checkLooks(stylesFromOdsBytes(odsBytes(XLSX, fflate, looksDump()), fflate, ['Looks'])[0])
+})
+
+test('LibreOffice keeps the looks, and we read its file back', { skip: !soffice && 'needs soffice' }, () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pearoffice-odss-'))
+  try {
+    const ours = path.join(dir, 'looks.ods')
+    fs.writeFileSync(ours, odsBytes(XLSX, fflate, looksDump()))
+    const out = path.join(dir, 'lo')
+    execFileSync('soffice', ['--headless', '-env:UserInstallation=file://' + path.join(dir, 'profile'), '--convert-to', 'ods', '--outdir', out, ours], { stdio: 'ignore', timeout: 120000 })
+    // A headless LibreOffice writes no view settings, so frozen panes are
+    // not in its file (scripts/check-ods-view.py checks them with a view).
+    checkLooks({ ...stylesFromOdsBytes(fs.readFileSync(path.join(out, 'looks.ods')), fflate, ['Looks'])[0], freeze: { rows: 1, cols: 1 } })
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('an .xlsx that LibreOffice turns into .ods keeps its looks', { skip: !soffice && 'needs soffice' }, () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pearoffice-odsx-'))
+  try {
+    const xlsx = path.join(dir, 'looks.xlsx')
+    fs.writeFileSync(xlsx, require('../src/sheet/xlsxMap').workbookBytes(XLSX, fflate, looksDump()))
+    execFileSync('soffice', ['--headless', '-env:UserInstallation=file://' + path.join(dir, 'profile'), '--convert-to', 'ods', '--outdir', dir, xlsx], { stdio: 'ignore', timeout: 120000 })
+    const x = stylesFromOdsBytes(fs.readFileSync(path.join(dir, 'looks.ods')), fflate, ['Looks'])[0]
+    // The width went through .xlsx's character units on the way, which
+    // LibreOffice measures in its own font; the height in points.
+    assert.ok(x.widths[1] > 150, 'width ' + x.widths[1])
+    assert.ok(Math.abs(x.heights[2] - 40) <= 2, 'height ' + x.heights[2])
+    checkLooks({ ...x, widths: { 1: 180 }, heights: { 2: 40 }, freeze: { rows: 1, cols: 1 } })
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+})

@@ -257,7 +257,12 @@ function workbookBytes (XLSX, fflate, dump) {
 // colour rules or validation.
 function odsBytes (XLSX, fflate, dump) {
   const wb = dumpToWorkbook(XLSX, dump)
-  return require('./odsFormula').writeOds(XLSX, fflate, wb, chartTabs(wb, dump))
+  const tabs = chartTabs(wb, dump).map((t, i) => {
+    const d = dump.tabs[i]
+    const styles = (d.cells || []).filter((c) => c.fmt && Object.keys(c.fmt).some((k) => k !== 'num')).map((c) => [c.row, c.col, c.fmt])
+    return { ...t, styles, widths: d.widths || {}, heights: d.heights || {}, hidden: d.hidden || { rows: [], cols: [] }, freeze: d.freeze || null }
+  })
+  return require('./odsFormula').writeOds(XLSX, fflate, wb, tabs)
 }
 
 // Each tab's charts with their data ranges under the tab names the workbook

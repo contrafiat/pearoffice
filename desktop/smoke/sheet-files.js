@@ -394,6 +394,13 @@ module.exports = async function sheetFiles (t) {
   result.odsFormula = await js("document.querySelector('.formula-bar input').value")
   await waitFor('ods chart', "!!document.querySelector('.chart-frame svg')")
   result.odsChart = true
+  // The same formats as the .xlsx brought back: M30 underlined and struck
+  // through, M31 at 24pt with borders, row 29's height.
+  await js("document.querySelector('.grid .body').focus()")
+  await sendMod('Home', ['control'])
+  for (let i = 0; i < 12; i++) await key('Right')
+  for (let i = 0; i < 30; i++) await key('Down')
+  await waitFor('ods formats', cellNode(30, 13) + ".querySelector('.cell-text').style.textDecoration === 'underline line-through' && " + cellNode(31, 13) + ".querySelector('.cell-text').style.fontSize === '32px' && !!" + cellNode(31, 13) + ".querySelector('.cell-borders') && " + rowHead(29) + '.getBoundingClientRect().height > 45')
   step('ods import')
 
   return result.importedFormats && result.formats && result.csvPdf && result.printKey && result.tabs && result.tidied && result.jsonImport && result.csvImport && result.importedFormula === '=SUM(B1:B2)' && result.odsFormula === '=SUM(B1:B2)' && result.odsChart && result.exportedBytes > 1000

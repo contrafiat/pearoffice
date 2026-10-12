@@ -7,6 +7,7 @@ import { workbookToTabs, workbookBytes, odsBytes, freezeFromXlsx, validationsFro
 import { stylesFromXlsx } from '../../sheet/xlsxStyles.js'
 import { fixOdsWorkbook } from '../../sheet/odsFormula.js'
 import { chartsFromOdsBytes } from '../../sheet/odsCharts.js'
+import { stylesFromOdsBytes } from '../../sheet/odsStyles.js'
 import { chartsFromXlsx } from '../../sheet/xlsxChartsRead.js'
 import { jsonFileToTabs } from '../../sheet/jsonImport.js'
 import { csvBytesToTabs } from '../../sheet/csvImport.js'
@@ -25,10 +26,20 @@ const PRINT = 11 / BASE_FONT_PX
 const MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 export { isMobile }
 
-// odsCharts: a .ods file's charts per tab (its bytes are not an .xlsx).
-function importWorkbook (wb, name, bytes, odsCharts) {
+// ods: a .ods file's charts and looks per tab (its bytes are not an .xlsx).
+function importWorkbook (wb, name, bytes, ods) {
   const { tabs, names } = workbookToTabs(XLSX, wb)
-  if (odsCharts) odsCharts.forEach((v, i) => { if (tabs[i] && v.length) tabs[i].charts = v })
+  if (ods) {
+    ods.charts.forEach((v, i) => { if (tabs[i] && v.length) tabs[i].charts = v })
+    ods.looks.forEach((x, i) => {
+      if (!tabs[i] || !x) return
+      tabs[i].styles = x.styles
+      tabs[i].heights = x.heights
+      tabs[i].widths = { ...tabs[i].widths, ...x.widths }
+      tabs[i].hidden = x.hidden
+      if (x.freeze) tabs[i].freeze = x.freeze
+    })
+  }
   // Frozen panes come from the raw file (SheetJS does not report them).
   if (bytes) freezeFromXlsx(bytes, fflate).forEach((f, i) => { if (f && tabs[i]) tabs[i].freeze = f })
   // So are cell styles and row heights.
@@ -96,7 +107,7 @@ async function readWorkbook (bytes, name) {
   const wb = XLSX.read(bytes, { type: 'array', ...READ_OPTIONS })
   if (isOds(name)) {
     fixOdsWorkbook(XLSX, fflate, wb, bytes)
-    return importWorkbook(wb, name, null, chartsFromOdsBytes(bytes, fflate, wb.SheetNames))
+    return importWorkbook(wb, name, null, { charts: chartsFromOdsBytes(bytes, fflate, wb.SheetNames), looks: stylesFromOdsBytes(bytes, fflate, wb.SheetNames) })
   }
   return importWorkbook(wb, name, bytes)
 }
@@ -108,8 +119,9 @@ export async function exportSheet (sheetId) {
   return saveFile(fileName(dump.title) + '.xlsx', MIME, bytes)
 }
 
-// For LibreOffice and OpenOffice: values, formulas, tabs and charts (no
-// styles, frozen panes, colour rules or validation).
+// For LibreOffice and OpenOffice: values, formulas, tabs, charts, cell
+// looks, widths, heights, hidden rows and columns and frozen panes (no colour
+// rules or validation).
 export async function exportOds (sheetId) {
   const dump = await call('sheet:dump', { sheetId })
   return saveFile(fileName(dump.title) + '.ods', 'application/vnd.oasis.opendocument.spreadsheet', odsBytes(XLSX, fflate, dump))

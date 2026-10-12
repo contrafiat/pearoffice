@@ -207,19 +207,26 @@ function fixOdsWorkbook (XLSX, fflate, wb, bytes) {
 
 // A workbook as .ods bytes: SheetJS writes it with each formula replaced by a
 // marker, then the markers are swapped for the formulas converted here, and
-// the charts are added (src/sheet/odsCharts.js). tabs: [{ name, charts }] in
-// sheet order.
+// the looks and the charts are added (src/sheet/odsStyles.js,
+// src/sheet/odsCharts.js). tabs: [{ name, charts, styles, widths, heights,
+// hidden, freeze }] in sheet order.
 function writeOds (XLSX, fflate, wb, tabs = []) {
   const formulas = []
   wb.SheetNames.forEach((name, t) => {
-    // A chart's anchor cell must be inside the range SheetJS writes.
+    // Chart anchors, styled cells and hidden rows must be inside the range
+    // SheetJS writes. Columns and row heights are written by odsStyles.js.
     const ws = wb.Sheets[name]
-    const anchors = ((tabs[t] && tabs[t].charts) || []).filter((c) => c.anchor).map((c) => c.anchor)
-    if (anchors.length) {
-      const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:A1')
-      for (const a of anchors) { range.e.r = Math.max(range.e.r, a.row - 1); range.e.c = Math.max(range.e.c, a.col - 1) }
-      ws['!ref'] = XLSX.utils.encode_range(range)
-    }
+    const tab = tabs[t] || {}
+    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:A1')
+    const reach = (r, c) => { range.e.r = Math.max(range.e.r, r - 1); range.e.c = Math.max(range.e.c, c - 1) }
+    for (const c of tab.charts || []) if (c.anchor) reach(c.anchor.row, c.anchor.col)
+    for (const [r, c] of tab.styles || []) reach(r, c)
+    for (const r of (tab.hidden && tab.hidden.rows) || []) reach(r, 1)
+    for (const r of Object.keys(tab.heights || {})) reach(Number(r), 1)
+    ws['!ref'] = XLSX.utils.encode_range(range)
+    tab.cols = range.e.c + 1
+    delete ws['!cols']
+    delete ws['!rows']
   })
   for (const name of wb.SheetNames) {
     const ws = wb.Sheets[name]
@@ -238,6 +245,7 @@ function writeOds (XLSX, fflate, wb, tabs = []) {
     .replace(/table:formula="of:=(?:&quot;|")PEAROFFICEF(\d+)(?:&quot;|")"/g, (m, n) => 'table:formula="' + escapeXml(formulas[Number(n)]) + '"')
     // Notes stay hidden until hovered, as in the app and in .xlsx files.
     .replace(/<office:annotation office:display="true"/g, '<office:annotation office:display="false"'))
+  require('./odsStyles').addStylesToOds(files, tabs, wb.SheetNames, fflate)
   require('./odsCharts').addChartsToOds(files, tabs, fflate)
   // The mimetype entry must come first and stay uncompressed.
   const out = { mimetype: [files.mimetype, { level: 0 }] }
