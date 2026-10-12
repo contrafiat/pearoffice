@@ -23,6 +23,12 @@ Builds on `@peerloom/core` (`/home/tim/peerloomllc/peerloom-core/`)
 for identity, pairing and sync rather than copy-forking (confirmed in the wire
 protocol proposal).
 
+`.npmrc` sets `install-links=true`, so `npm install` copies `../peerloom-core`
+into `node_modules` instead of linking it. The bundles then carry one copy of each
+library. With the link, core's own `node_modules` put a second set into them
+(an older hypercore and a second copy of each native addon). After changing core,
+run `npm install` here to pick it up.
+
 Origin, competitor survey and open hard parts: the PearSheet entry in
 `/home/tim/peerloomllc/APP-IDEAS.md`.
 
