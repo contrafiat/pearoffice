@@ -27,7 +27,10 @@ protocol proposal).
 into `node_modules` instead of linking it. The bundles then carry one copy of each
 library. With the link, core's own `node_modules` put a second set into them
 (an older hypercore and a second copy of each native addon). After changing core,
-run `npm install` here to pick it up.
+run `npm install` here to pick it up. npm alone does not copy a package again
+while its version is unchanged (even `npm ci` can hand back an old copy), so a
+postinstall step, `scripts/sync-peerloom-packages.js`, copies the sibling's
+current files over it.
 
 Origin, competitor survey and open hard parts: the PearSheet entry in
 `/home/tim/peerloomllc/APP-IDEAS.md`.

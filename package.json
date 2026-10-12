@@ -25,7 +25,8 @@
     "build:android": "scripts/build-android.sh",
     "dist:seeder": "node scripts/dist-seeder.js",
     "build:bare:ios": "bare-pack --preset ios --defer fs --defer path --defer bare-process --imports scripts/bare-imports.js -o assets/bare-ios.bundle src/worklet/bare.js",
-    "dist:mac:intel": "SIGN=1 scripts/build-desktop-mac.sh x64"
+    "dist:mac:intel": "SIGN=1 scripts/build-desktop-mac.sh x64",
+    "postinstall": "node scripts/sync-peerloom-packages.js"
   },
   "dependencies": {
     "@formulajs/formulajs": "^4.6.1",
