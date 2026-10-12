@@ -898,11 +898,12 @@ export function noticeFor (lost) {
 const defaultPrepare = (bytes, mime) => preparePicture(new Blob([bytes], { type: mime }), mime)
 
 // Import a .pptx as a new deck. Resolves to { sheetId, dropped, notice,
-// lost }. Options are for tests: `prepare` shrinks a picture ({ bytes,
-// mime, w, h }), `call` reaches the worklet and `Y` is the Yjs copy
+// lost }. `read` turns the file into plain data (readPresentation; odp.js
+// readOdp for .odp). Options are also for tests: `prepare` shrinks a picture
+// ({ bytes, mime, w, h }), `call` reaches the worklet and `Y` is the Yjs copy
 // slidesModel uses.
-export async function importPresentation (bytes, name, { prepare = defaultPrepare, call = bridgeCall, Y: Yx = Y } = {}) {
-  const parsed = await readPresentation(bytes)
+export async function importPresentation (bytes, name, { prepare = defaultPrepare, call = bridgeCall, Y: Yx = Y, read = readPresentation } = {}) {
+  const parsed = await read(bytes)
   const lost = parsed.lost
   const ready = new Map()
   for (const [path, mime] of parsed.media) {

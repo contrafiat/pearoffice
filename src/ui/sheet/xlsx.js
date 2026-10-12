@@ -18,6 +18,7 @@ import { writePref } from '../prefs.js'
 import { isMobile, fileName, saveFile } from '../save.js'
 import { isDocFile, importDocument } from '../doc/docFiles.js'
 import { isPptxFile, importPresentation } from '../slides/pptxImport.js'
+import { isOdpFile, readOdp } from '../slides/odp.js'
 import { checkZip } from '../slides/importOoxml.js'
 import { borderCss, fontPx, FONTS, BASE_FONT_PX } from './cellStyle.js'
 
@@ -88,6 +89,7 @@ function importText (bytes, name) {
 export async function importFile (file) {
   const data = new Uint8Array(await file.arrayBuffer())
   if (isPptxFile(file.name)) return importPresentation(data, file.name)
+  if (isOdpFile(file.name)) return importPresentation(data, file.name, { read: readOdp })
   if (isDocFile(file.name)) return importDocument(data, file.name)
   if (isJson(file.name) || isCsv(file.name)) return importText(data, file.name)
   return readWorkbook(data, file.name)
@@ -99,6 +101,7 @@ export async function pickAndImport () {
   if (!picked || picked.canceled) return null
   const bytes = Uint8Array.from(atob(picked.base64), (ch) => ch.charCodeAt(0))
   if (isPptxFile(picked.name)) return importPresentation(bytes, picked.name)
+  if (isOdpFile(picked.name)) return importPresentation(bytes, picked.name, { read: readOdp })
   if (isDocFile(picked.name)) return importDocument(bytes, picked.name)
   if (isJson(picked.name) || isCsv(picked.name)) return importText(bytes, picked.name)
   return readWorkbook(bytes, picked.name)

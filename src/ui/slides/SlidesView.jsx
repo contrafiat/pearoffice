@@ -477,6 +477,7 @@ export function SlidesView ({ sheetId, onTitleChange, onError, onGone }) {
             return (
               <>
                 <li role='menuitem' onClick={() => save('pptx')}>Save as a PowerPoint file</li>
+                <li role='menuitem' onClick={() => save('odp')}>Save as an OpenDocument file (.odp)</li>
                 <li role='menuitem' onClick={() => save('pdf')}>Save as PDF</li>
                 {!touch && <li role='menuitem' onClick={() => save('print')}>Print...</li>}
               </>

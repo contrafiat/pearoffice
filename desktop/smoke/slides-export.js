@@ -118,7 +118,7 @@ async function run (t) {
   await waitFor('more menu', "!!document.querySelector('.more-menu li')")
   const items = await js("[...document.querySelectorAll('.more-menu li')].map((l) => l.textContent).join('|')")
   await js("document.querySelector('.toolbar .more-button').click()")
-  result.exportMenu = ['Save as a PowerPoint file', 'Save as PDF', 'Print...'].every((s) => items.split('|').includes(s))
+  result.exportMenu = ['Save as a PowerPoint file', 'Save as an OpenDocument file (.odp)', 'Save as PDF', 'Print...'].every((s) => items.split('|').includes(s))
   if (!result.exportMenu) throw new Error('more menu: ' + items)
 
   // PDF: saved without a dialog in the data folder.
@@ -169,6 +169,35 @@ async function run (t) {
   result.exportPptx = Object.values(checks).every(Boolean)
   if (!result.exportPptx) throw new Error('pptx: ' + JSON.stringify(checks))
   step('PowerPoint saved: ' + slideCount + ' slides, ' + pptMs + ' ms')
+
+  // OpenDocument (src/ui/slides/odp.js): saved from the menu, then that file
+  // imported back as a new deck.
+  const odpBefore = fs.existsSync(downloads) ? fs.readdirSync(downloads) : []
+  await more('Save as an OpenDocument file (.odp)')
+  const odp = await newFile(downloads, '.odp', odpBefore, sleep)
+  if (!odp) throw new Error('no .odp saved')
+  const odpBytes = fs.readFileSync(odp)
+  if (JSZip) {
+    const zip = await JSZip.loadAsync(odpBytes)
+    const content = zip.file('content.xml') ? await zip.file('content.xml').async('string') : ''
+    const ok = content.includes('Export smoke') && content.includes('Second page') && Object.keys(zip.files).some((n) => n.startsWith('Pictures/')) && (content.match(/<draw:page /g) || []).length === 2
+    if (!ok) throw new Error('odp: ' + content.slice(0, 300))
+  }
+  await js(`(() => {
+    const b = atob(${JSON.stringify(odpBytes.toString('base64'))})
+    const u = new Uint8Array(b.length)
+    for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i)
+    const dt = new DataTransfer()
+    dt.items.add(new File([u], 'From LibreOffice.odp'))
+    const input = document.querySelector('.import input[type=file]')
+    input.files = dt.files
+    input.dispatchEvent(new Event('change', { bubbles: true }))
+  })()`)
+  await waitFor('odp deck open', "!!document.querySelector('.slides .slide-stage .slide') && document.querySelector('.toolbar .title').value === 'From LibreOffice' && document.querySelectorAll('.slide-thumbs .slide-thumb[data-id]').length === 2", 40000)
+  await waitFor('odp slide content', "[...document.querySelectorAll('.slide-stage .slide-el')].some((e) => e.textContent.includes('Export smoke')) && !!document.querySelector('.slide-stage .slide-el[data-type=shape]')")
+  await waitFor('odp picture shown', "(() => { const i = document.querySelector('.slide-stage .slide-el[data-type=picture] img.slide-picture'); return !!i && i.complete && i.naturalWidth > 0 })()")
+  result.exportOdp = true
+  step('OpenDocument saved and opened')
 
   if (shots) {
     fs.copyFileSync(pdf, path.join(shots, 'export-app.pdf'))
