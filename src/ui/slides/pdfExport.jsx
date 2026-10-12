@@ -7,6 +7,7 @@ import { fromB64, wordPicture } from '../doc/pictures.js'
 import { FONT_CSS } from '../fonts.js'
 import slidesModel from '../../slides/slidesModel.js'
 import { boxesOf } from './deck.js'
+import { deckToOdp, ODP } from './odp.js'
 import { themeFor } from './themes.js'
 import { StaticSlide } from './StaticSlide.jsx'
 import { PicturesContext } from './objects.jsx'
@@ -135,5 +136,6 @@ export async function exportDeck (ydoc, title, format, sheetId) {
     for (const [ref, p] of pictures) pictures.set(ref, await wordPicture(p.bytes, p.mime).catch(() => p))
     return saveFile(name + '.pptx', PPTX, await deckToPptx(ydoc, { title, pictures }))
   }
+  if (format === 'odp') return saveFile(name + '.odp', ODP, deckToOdp(ydoc, { title, pictures }))
   return call(format === 'print' ? 'app:print' : 'app:savePdf', { html: await deckHtml(ydoc, title, pictures), name: name + '.pdf', pageSize: pageSize(ydoc) })
 }

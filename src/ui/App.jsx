@@ -23,7 +23,7 @@ import { PearMark } from './PearMark.jsx'
 applyTheme()
 
 // Import a file: .xlsx, .ods, .csv, .tsv or .json make a sheet; .docx, .odt, .md, .txt
-// or .html a document; .pptx a slide deck. A file input on desktop, the
+// or .html a document; .pptx or .odp a slide deck. A file input on desktop, the
 // shell's file picker on phones. onImported gets the new file's id and the
 // import's result.
 function ImportButton ({ className, onImported, onError }) {
@@ -47,7 +47,7 @@ function ImportButton ({ className, onImported, onError }) {
       <FileArrowUp size={16} /> Import a file
       <input
         type='file'
-        accept='.xlsx,.ods,.csv,.tsv,.json,.docx,.odt,.md,.markdown,.txt,.html,.htm,.pptx'
+        accept='.xlsx,.ods,.csv,.tsv,.json,.docx,.odt,.md,.markdown,.txt,.html,.htm,.pptx,.odp'
         hidden
         onChange={async (e) => {
           const file = e.target.files && e.target.files[0]

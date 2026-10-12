@@ -90,7 +90,7 @@ async function shellMethod (method, args) {
   if (method === 'app:pickFile') {
     // A picture file for a document (args.images) or a file to import.
     const res = await DocumentPicker.getDocumentAsync({
-      type: args && args.images ? ['image/*'] : ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.oasis.opendocument.spreadsheet', 'text/csv', 'text/comma-separated-values', 'text/tab-separated-values', 'application/json', 'text/json', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.oasis.opendocument.text', 'application/vnd.openxmlformats-officedocument.presentationml.presentation', 'text/markdown', 'text/x-markdown', 'text/plain', 'text/html', 'application/octet-stream'],
+      type: args && args.images ? ['image/*'] : ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.oasis.opendocument.spreadsheet', 'text/csv', 'text/comma-separated-values', 'text/tab-separated-values', 'application/json', 'text/json', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.oasis.opendocument.text', 'application/vnd.openxmlformats-officedocument.presentationml.presentation', 'application/vnd.oasis.opendocument.presentation', 'text/markdown', 'text/x-markdown', 'text/plain', 'text/html', 'application/octet-stream'],
       copyToCacheDirectory: true
     })
     if (res.canceled || !res.assets || !res.assets[0]) return { canceled: true }
