@@ -181,4 +181,4 @@ function ruleFor (rules, row, col) {
   return found
 }
 
-module.exports = { KINDS, OPS, bound, normalize, typed, allows, explain, ruleFor, toXlsx, fromXlsx }
+module.exports = { KINDS, OPS, bound, fromSerial, normalize, typed, allows, explain, ruleFor, toXlsx, fromXlsx }

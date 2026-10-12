@@ -238,3 +238,91 @@ test('an .xlsx that LibreOffice turns into .ods keeps its looks', { skip: !soffi
     fs.rmSync(dir, { recursive: true, force: true })
   }
 })
+
+// Colour rules, validation and filters (src/sheet/odsRules.js).
+const { rulesFromOdsBytes } = require('../src/sheet/odsRules')
+const ODS_RULES = [
+  { range: 'A1:A9', kind: 'gt', a: '5', style: { fill: '#ffc7ce', color: '#9c0006' } },
+  { range: 'B1:B9', kind: 'text', op: 'contains', text: 'x"y', style: { b: true } },
+  { range: 'C1:C9', kind: 'date', period: 'thisWeek', style: { fill: '#c6efce', color: '#006100' } },
+  { range: 'D1:D9', kind: 'top', n: 10, percent: true, style: { s: true, color: '#808080' } },
+  { range: 'E1:E9', kind: 'scale', colors: ['#63be7b', '#ffeb84', '#f8696b'] },
+  { range: 'F1:F9', kind: 'bar', color: '#638ec6' },
+  { range: 'G1:G9', kind: 'between', a: 1, b: 5, style: { i: true } },
+  { range: 'H1:H9', kind: 'below', style: { fill: '#ffc7ce', color: '#9c0006' } },
+  { range: 'I1:I9', kind: 'blank', style: { fill: '#ffeb9c' } },
+  { range: 'J1:J9', kind: 'eq', a: 'done', style: { b: true } },
+  { range: 'K1:K9', kind: 'lt', a: '0', style: { color: '#ff0000' } },
+  { range: 'L1:L9', kind: 'dup', style: { fill: '#ffc7ce' } },
+  { range: 'M1:M9', kind: 'unique', style: { fill: '#c6efce' } },
+  { range: 'N1:N9', kind: 'bottom', n: 3, percent: false, style: { b: true } },
+  { range: 'O1:O9', kind: 'above', style: { fill: '#c6efce' } },
+  { range: 'P1:P9', kind: 'notBlank', style: { i: true } },
+  { range: 'Q1:Q9', kind: 'formula', formula: 'Q1>A1', style: { fill: '#ffeb9c' } },
+  { range: 'R1:R9', kind: 'icons', set: '3traffic', reverse: true },
+  { range: 'S1:S9', kind: 'text', op: 'begins', text: 'ab', style: { b: true } },
+  { range: 'T1:T9', kind: 'text', op: 'notContains', text: 'zz', style: { b: true } },
+  { range: 'U1:U9', kind: 'text', op: 'ends', text: 'q', style: { b: true } },
+  { range: 'V1:V9', kind: 'date', period: 'last7', style: { b: true } },
+  { range: 'W1:W9', kind: 'scale', colors: ['#ffffff', '#63be7b'] },
+  { range: 'X1:X9', kind: 'icons', set: '5ratings', iconOnly: true }
+]
+const ODS_VALID = [
+  { range: 'B2:B5', kind: 'list', items: ['a', 'b'], dropdown: true, onBad: 'stop' },
+  { range: 'C2:C9', kind: 'whole', op: 'between', a: '1', b: '10', onBad: 'warn', message: '1 to 10' },
+  { range: 'D2', kind: 'date', op: 'ge', a: '2026-01-01', onBad: 'stop' },
+  { range: 'E2:E3', kind: 'list', source: 'G1:G4', dropdown: false, onBad: 'stop' },
+  { range: 'F2', kind: 'decimal', op: 'gt', a: '1.5', onBad: 'stop' },
+  { range: 'H2', kind: 'time', op: 'lt', a: '17:30', onBad: 'stop' },
+  { range: 'I2', kind: 'length', op: 'le', a: '10', onBad: 'stop' },
+  { range: 'J2', kind: 'whole', op: 'notBetween', a: '1', b: '3', onBad: 'stop' },
+  { range: 'K2', kind: 'decimal', op: 'ne', a: '0', onBad: 'stop' }
+]
+const rulesDump = () => ({ title: 'Rules', tabs: [
+  { name: 'A', cells: [{ row: 1, col: 1, input: 'x', value: 'x', fmt: {} }], widths: {}, condFormats: ODS_RULES },
+  { name: 'V', cells: [{ row: 1, col: 1, input: 'x', value: 'x', fmt: {} }], widths: {}, validations: ODS_VALID }
+] })
+// LibreOffice has no reversed icon order, and reads no "icons only" from a
+// .ods (it keeps it from an .xlsx).
+const rulesBack = (loOpened) => ODS_RULES.map((r) => { const o = { ...r }; delete o.reverse; if (loOpened) delete o.iconOnly; return o })
+function checkRules (back, loOpened) {
+  assert.deepEqual(back[0].condFormats, rulesBack(loOpened))
+  assert.deepEqual(back[1].validations, ODS_VALID)
+}
+
+test('colour rules and validation go out to .ods and come back', () => {
+  checkRules(rulesFromOdsBytes(odsBytes(XLSX, fflate, rulesDump()), fflate, ['A', 'V']))
+})
+
+test('LibreOffice keeps the rules, and reads them from our .xlsx the same way', { skip: !soffice && 'needs soffice' }, () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pearoffice-odsr-'))
+  try {
+    const run = (file, to) => execFileSync('soffice', ['--headless', '-env:UserInstallation=file://' + path.join(dir, 'profile'), '--convert-to', to, '--outdir', path.join(dir, 'lo'), file], { stdio: 'ignore', timeout: 120000 })
+    const ours = path.join(dir, 'rules.ods')
+    fs.writeFileSync(ours, odsBytes(XLSX, fflate, rulesDump()))
+    run(ours, 'ods')
+    checkRules(rulesFromOdsBytes(fs.readFileSync(path.join(dir, 'lo', 'rules.ods')), fflate, ['A', 'V']), true)
+    const xlsx = path.join(dir, 'fromxlsx.xlsx')
+    fs.writeFileSync(xlsx, require('../src/sheet/xlsxMap').workbookBytes(XLSX, fflate, rulesDump()))
+    run(xlsx, 'ods')
+    checkRules(rulesFromOdsBytes(fs.readFileSync(path.join(dir, 'lo', 'fromxlsx.ods')), fflate, ['A', 'V']))
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+})
+
+test('a filter in a LibreOffice file comes in', { skip: !soffice && 'needs soffice' }, () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pearoffice-odsf-'))
+  try {
+    const ws = XLSX.utils.aoa_to_sheet([['Item', 'Cost'], ['Rent', 1200], ['Food', 450]])
+    ws['!autofilter'] = { ref: 'A1:B3' }
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Costs')
+    const xlsx = path.join(dir, 'f.xlsx')
+    fs.writeFileSync(xlsx, XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }))
+    execFileSync('soffice', ['--headless', '-env:UserInstallation=file://' + path.join(dir, 'profile'), '--convert-to', 'ods', '--outdir', dir, xlsx], { stdio: 'ignore', timeout: 120000 })
+    assert.equal(rulesFromOdsBytes(fs.readFileSync(path.join(dir, 'f.ods')), fflate, ['Costs'])[0].filter, 'A1:B3')
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+})

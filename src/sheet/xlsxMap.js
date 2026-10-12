@@ -260,7 +260,8 @@ function odsBytes (XLSX, fflate, dump) {
   const tabs = chartTabs(wb, dump).map((t, i) => {
     const d = dump.tabs[i]
     const styles = (d.cells || []).filter((c) => c.fmt && Object.keys(c.fmt).some((k) => k !== 'num')).map((c) => [c.row, c.col, c.fmt])
-    return { ...t, styles, widths: d.widths || {}, heights: d.heights || {}, hidden: d.hidden || { rows: [], cols: [] }, freeze: d.freeze || null }
+    const condFormats = (d.condFormats || []).map((r) => (r.formula ? { ...r, formula: toFile(r.formula) } : r))
+    return { ...t, styles, widths: d.widths || {}, heights: d.heights || {}, hidden: d.hidden || { rows: [], cols: [] }, freeze: d.freeze || null, condFormats, validations: d.validations || [] }
   })
   return require('./odsFormula').writeOds(XLSX, fflate, wb, tabs)
 }

@@ -219,6 +219,12 @@ function writeOds (XLSX, fflate, wb, tabs = []) {
     const tab = tabs[t] || {}
     const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:A1')
     const reach = (r, c) => { range.e.r = Math.max(range.e.r, r - 1); range.e.c = Math.max(range.e.c, c - 1) }
+    // Validation over a whole column reaches 200 rows past the data at most.
+    const used = range.e.r + 1
+    for (const v of tab.validations || []) {
+      const box = require('./charts').parseRange(v.range)
+      if (box) reach(Math.min(box.r2, Math.max(used, box.r1) + 200), box.c2)
+    }
     for (const c of tab.charts || []) if (c.anchor) reach(c.anchor.row, c.anchor.col)
     for (const [r, c] of tab.styles || []) reach(r, c)
     for (const r of (tab.hidden && tab.hidden.rows) || []) reach(r, 1)
@@ -246,6 +252,7 @@ function writeOds (XLSX, fflate, wb, tabs = []) {
     // Notes stay hidden until hovered, as in the app and in .xlsx files.
     .replace(/<office:annotation office:display="true"/g, '<office:annotation office:display="false"'))
   require('./odsStyles').addStylesToOds(files, tabs, wb.SheetNames, fflate)
+  require('./odsRules').addRulesToOds(files, tabs, wb.SheetNames, fflate)
   require('./odsCharts').addChartsToOds(files, tabs, fflate)
   // The mimetype entry must come first and stay uncompressed.
   const out = { mimetype: [files.mimetype, { level: 0 }] }
