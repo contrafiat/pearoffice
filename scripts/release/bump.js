@@ -1,28 +1,46 @@
-// Set the release version everywhere it is written (scripts/release.sh
-// prepare). Android's versionCode and iOS's buildNumber go up by one.
+// Set the release version everywhere it is written (scripts/release.sh,
+// step 0). Android's versionCode and iOS's buildNumber go up by one. Run
+// again at the same version (a --retag), it changes nothing.
 //
-//   node scripts/release/bump.js <version> <notes-file>
+//   node scripts/release/bump.js <version>
+//   node scripts/release/bump.js --notes <notes-file>     (step 5)
 //
 // The StartOS package keeps a graph of its versions: the current one moves
-// to versions/v<old>.ts and a new current.ts takes the new version, with the
-// notes' first paragraph as its release notes.
+// to versions/v<old>.ts and a new current.ts takes the new version. --notes
+// puts the notes' first lines into current.ts as its release notes.
 
 const fs = require('fs')
 const path = require('path')
 
 const root = path.join(__dirname, '..', '..')
-const [version, notesFile] = process.argv.slice(2)
-if (!/^\d+\.\d+\.\d+$/.test(version || '') || !notesFile) {
-  console.error('usage: node scripts/release/bump.js <x.y.z> <notes-file>')
-  process.exit(2)
-}
 const at = (p) => path.join(root, p)
 const read = (p) => fs.readFileSync(at(p), 'utf8')
 const write = (p, s) => fs.writeFileSync(at(p), s)
 const json = (p, fn) => { const o = JSON.parse(read(p)); fn(o); write(p, JSON.stringify(o, null, 2) + '\n') }
+const dir = 'start9/seeder/startos/versions'
+
+if (process.argv[2] === '--notes') {
+  // The notes as one plain line: the first paragraph, or the first bullets,
+  // without headings or markdown, at most 500 characters.
+  const text = fs.readFileSync(path.resolve(process.argv[3]), 'utf8')
+  const lines = text.split('\n').filter((l) => !/^\s*#/.test(l))
+  const block = lines.join('\n').trim().split(/\n\s*\n/)[0] || ''
+  let notes = block.split('\n').map((l) => l.replace(/^\s*[-*]\s+/, '').replace(/\*\*/g, '').trim()).filter(Boolean).map((l) => (/[.!?]$/.test(l) ? l : l + '.')).join(' ')
+  if (notes.length > 500) notes = notes.slice(0, 500).replace(/\s+\S*$/, '') + '...'
+  const file = dir + '/current.ts'
+  write(file, read(file).replace(/en_US: .*,\n/, 'en_US: ' + JSON.stringify(notes) + ',\n'))
+  console.log('StartOS release notes: ' + notes)
+  process.exit(0)
+}
+
+const version = process.argv[2]
+if (!/^\d+\.\d+\.\d+$/.test(version || '')) {
+  console.error('usage: node scripts/release/bump.js <x.y.z> | --notes <notes-file>')
+  process.exit(2)
+}
 
 const old = JSON.parse(read('package.json')).version
-if (old === version) { console.error('already at ' + version); process.exit(1) }
+if (old === version) { console.log('already at ' + version); process.exit(0) }
 
 json('package.json', (o) => { o.version = version })
 json('desktop/package.json', (o) => { o.version = version })
@@ -40,17 +58,15 @@ const manifest = 'start9/seeder/startos/manifest/index.ts'
 write(manifest, read(manifest).replace(/pearoffice-seeder:\d+\.\d+\.\d+/, 'pearoffice-seeder:' + version))
 
 // The StartOS version graph.
-const dir = 'start9/seeder/startos/versions'
 const oldName = 'v' + old.replace(/\./g, '_')
 const current = read(dir + '/current.ts')
 write(dir + '/' + oldName + '.ts', current.replace('export const current =', 'export const ' + oldName + ' ='))
-const firstPara = read(path.relative(root, path.resolve(notesFile))).split(/\n\s*\n/)[0].replace(/\s+/g, ' ').trim()
 write(dir + '/current.ts', `import { IMPOSSIBLE, VersionInfo } from '@start9labs/start-sdk'
 
 export const current = VersionInfo.of({
   version: '${version}:0',
   releaseNotes: {
-    en_US: ${JSON.stringify(firstPara)},
+    en_US: ${JSON.stringify('PearOffice ' + version)},
   },
   migrations: {
     up: async ({ effects }) => {},

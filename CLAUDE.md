@@ -193,19 +193,24 @@ The store entry is `peerloom-umbrel-app-store/peerloom-pearoffice-seeder/`;
 the official one is `pearoffice-seeder` in getumbrel/umbrel-apps (first
 listing PR #6172, from PeerLoom's fork `../umbrel-apps`).
 
-Releasing: write `notes/release-<v>.md` (rule 13, a `## Downloads` section
-last), run `scripts/release.sh prepare <v>` (sets the version everywhere with
-`scripts/release/bump.js`, opens the PR), merge it, then `scripts/release.sh
-publish` on main. It builds and tests every platform and publishes, asking
-before each publishing step: the GitHub release on the public
-`peerloomllc/pearoffice-releases` (a `.sha256` for every file), Zapstore,
-the App Store (app 6820799007; `scripts/ios-appstore.sh`), the Umbrel image
-and both Umbrel stores, the StartOS registry on the website
-(`start9/registry/build-registry-04.js`), prints the Google Play steps and
-last posts a Nostr note from the Zapstore key (`scripts/release/nostr-bullets.js`
-picks the bullets; the note opens in `$EDITOR` first).
-`DRY_RUN=1` builds but publishes nothing; steps can be named
-(`scripts/release.sh publish github zapstore`).
+Releasing: `./scripts/release.sh` on main, the same script and steps as the
+other apps (`/home/tim/peerloomllc/RELEASE-PIPELINE.md`, checked by
+`../check-release-pipeline.sh pearoffice`; settings in `scripts/app.conf`,
+helpers from `../peerloom-release`). It takes the next version from the
+latest `vX.Y.Z` tag (or `vX.Y.Z` as an argument), asks which places to
+publish to, sets the version everywhere (`scripts/release/bump.js`), runs
+`npm run verify`, builds Android (`scripts/build-android-release.sh`),
+writes the release notes from the merged PRs (or starts from
+`notes/release-<v>.md` if it exists, suite rule 13) and opens them in
+`$EDITOR`, builds the desktop apps, the seeder download, the Umbrel image
+and the .s9pk, then commits the version, pushes the tag and publishes,
+asking before each step: the GitHub release on the public
+`peerloomllc/pearoffice-releases` (a `.sha256` for every file), the seeder
+stores (image to ghcr, both Umbrel stores, the StartOS registry PR on the
+website), Zapstore, Google Play (the API when gcloud is set up, else the
+Console steps), the App Store (app 6820799007; `scripts/ios-appstore.sh`)
+and a Nostr note. `--check-versions` shows what each place has; `--retag`
+redoes a failed release; `--skip-<target>` leaves one out (`--help`).
 
 Updates (proposals/2026-10-05-update-checker.md): the desktop
 app checks it through `desktop/updates.js` and shows `src/ui/UpdateBar.jsx`;
@@ -466,7 +471,7 @@ are replaced at start-up (`src/sheet/formula/detmath.js`). A test fails if a
 ## Branch Strategy
 
 Always branch before work. Never commit directly to main (the initial repo
-scaffold commit excepted).
+scaffold commit and `scripts/release.sh`'s version commit excepted).
 - Feature branches: `feature/description`
 - Bug fix branches: `bugfix/description`
 - Merge via GitHub PR
