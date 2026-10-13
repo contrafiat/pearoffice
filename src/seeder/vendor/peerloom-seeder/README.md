@@ -1,1 +1,1 @@
-Copied from peerloom-seeder (376eefd) by scripts/vendor-peerloom-seeder.js. Do not edit here.
+Copied from peerloom-seeder (f698fad) by scripts/vendor-peerloom-seeder.js. Do not edit here.
