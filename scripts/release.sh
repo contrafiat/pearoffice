@@ -11,7 +11,10 @@
 #
 # Every platform in one run: Android (APK and app bundle), iOS, the desktop
 # app for Mac (Apple silicon and Intel, signed and notarized), Linux and
-# Windows, the Linux seeder download, the Umbrel image and the StartOS .s9pk.
+# Windows and the Linux seeder download. The PearOffice seeder is now PeerLoom
+# Seeder: the Linux download is the last one (it runs PeerLoom Seeder on the
+# old data folder), and the Umbrel and StartOS packages are no longer built
+# (their last releases were made by hand, 2026-10-14).
 # The downloads go on the public peerloomllc/pearoffice-releases repo; the tag
 # goes on this (private) one.
 #
@@ -29,7 +32,7 @@
 #   --skip-windows     Skip Windows desktop build (.exe)
 #   --skip-macos       Skip macOS desktop builds (.dmg + .zip, both chips)
 #   --skip-seeder      Skip the Linux seeder download
-#   --skip-seeder-store Skip the Umbrel image and the StartOS .s9pk
+#   --skip-seeder-store Accepted and ignored: the seeder stores are retired
 #                      (aliases: --skip-umbrel, --skip-start9)
 #   --skip-android     Skip Android APK/AAB build (auto-disables Play + Zapstore;
 #                      the GitHub release re-attaches the previous APK)
@@ -219,7 +222,9 @@ SKIP_LINUX=false
 SKIP_WINDOWS=false
 SKIP_MACOS=false
 SKIP_SEEDER=false
-SKIP_SEEDER_STORE=false
+# Retired: PeerLoom Seeder replaced the PearOffice seeder's Umbrel and StartOS
+# packages (proposals/2026-10-12-peerloom-seeder-product.md in the suite root).
+SKIP_SEEDER_STORE=true
 SKIP_ANDROID=false
 
 for arg in "$@"; do
@@ -455,12 +460,7 @@ if $SKIP_SEEDER; then echo "    - Seeder download (skipped via --skip-seeder)"
 elif _ask "Build the Linux seeder download?" y; then echo "    ✓ Seeder download"
 else SKIP_SEEDER=true; echo "    ✗ Seeder download (skipped)"; fi
 
-if $SKIP_SEEDER_STORE; then echo "    - Seeder stores (skipped via --skip-seeder-store)"
-elif ! command -v start-cli-1.1.0 >/dev/null || ! command -v podman >/dev/null; then
-  SKIP_SEEDER_STORE=true
-  echo "    - Seeder stores (skipped — needs podman and start-cli-1.1.0)"
-elif _ask "Build the seeder for Umbrel and StartOS, and update their stores?" y; then echo "    ✓ Seeder stores"
-else SKIP_SEEDER_STORE=true; echo "    ✗ Seeder stores (skipped)"; fi
+echo "    - Seeder stores (retired: the PearOffice seeder is now PeerLoom Seeder)"
 
 if $SKIP_NOSTR; then echo "    - Nostr (skipped via --skip-nostr)"
 elif _ask "Post release announcement to Nostr?" y; then PUBLISH_NOSTR=true; echo "    ✓ Nostr"
@@ -688,12 +688,6 @@ t = re.sub('[\U0001F000-\U0001FAFF☀-➿️]', '', t)
 t = re.sub(r'(?m)^#+[ \t]*', '', t)
 print(re.sub(r'(?m)^[ \t]+$', '', t).strip())
 " "$MOBILE_NOTES")
-
-# The StartOS package shows the notes too; the line goes into its current
-# version (start9/seeder/startos/versions/current.ts), committed in step 6.
-if $NEEDS_BUILD; then
-  node scripts/release/bump.js --notes "$MOBILE_NOTES"
-fi
 
 if $NEEDS_BUILD; then
 
@@ -929,8 +923,6 @@ _bump_paths=(
   desktop/package.json
   desktop/package-lock.json
   app.json
-  start9/seeder/startos/manifest/index.ts
-  start9/seeder/startos/versions
   "metadata/ios/version/$APP_VERSION"
   "$HAND_NOTES"
 )

@@ -2,6 +2,30 @@
 
 Append-only, newest on top. Per Constitution §4.
 
+## 2026-10-14 - The seeder packages retire into PeerLoom Seeder
+Tier: T2
+Context: PeerLoom Seeder 1.0.0 is released and serves every app (suite
+proposals/2026-10-12-peerloom-seeder-product.md, section 6 and the 2026-10-13
+decision). PearOffice's seeder runs the same code on the same data layout.
+Choice: each package gets one last release that runs PeerLoom Seeder on its
+existing data. Umbrel: the community store entry 1.0.1 points at the
+peerloom-seeder image (store #32). StartOS: 1.1.1:0 runs the peerloom-seeder
+image on the same volume. Linux: the download carries the published PeerLoom
+Seeder build in seeder/peerloom-seeder behind a launcher that sets the old
+data folder; the older launcher's `update` installs it, since it moves bare,
+seeder/ and the launcher (bare and seeder/seeder.bundle are links into the
+copy). release.sh no longer builds the Umbrel image or the .s9pk and bump.js
+no longer touches the StartOS package; the Linux download is still built each
+release so older installs find it as the latest.
+Alternatives: leave the packages running PearOffice's copy, which would need
+releases of its own; or remove them, which strands installs with no updates.
+Consequences: checked that a folder made and paired by pearoffice-seeder
+1.0.0 (Umbrel image) opens under peerloom-seeder 1.0.0 with the same key and
+device; that the 1.0.0 Linux download updates itself to the new one and
+comes up with the same key (`npm run dist:seeder`); and on the Start9, where
+0.1.0 migrated to 1.1.1 with the same seeder key. The official Umbrel
+submission #6172 was closed for PeerLoom Seeder's #6199.
+
 ## 2026-10-12 - The seeder becomes the suite's shared seeder
 Tier: T2
 Context: one seeder for every PeerLoom app (suite
