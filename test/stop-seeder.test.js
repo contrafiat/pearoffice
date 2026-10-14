@@ -119,11 +119,19 @@ test('stop backing up to a seeder', async (t) => {
     const preview = await call(editor, 'seeder:stopPreview', { seederKey })
     assert.deepEqual([preview.stop.map((x) => x.sheetId), preview.keep.map((x) => x.sheetId)], [[own], [sheetId]])
     const r = await call(editor, 'seeder:stopUsing', { seederKey })
-    assert.deepEqual(r, { stopped: 1, keptByOthers: 1 })
+    assert.deepEqual([r.stopped, r.keptByOthers, r.kept.map((x) => x.sheetId)], [1, 1, [sheetId]])
+    assert.ok(r.kept[0].addedByName !== undefined)
     assert.deepEqual(await call(editor, 'seeder:list'), [])
+    // The drop requests go in the background.
+    await editor.seeding.settled()
     assert.ok((await seeder.drops()).some((d) => d.sheet === ownBootstrap), 'the editor sheet will be dropped')
     assert.ok(!(await seeder.drops()).some((d) => d.sheet === bootstrap), 'the shared one stays')
     assert.deepEqual(await listed(owner), [seederKey])
+    // Pairing again puts it back on the file the editor took it off, and
+    // leaves the owner's file as it was.
+    await call(editor, 'seeder:pair', { link: seeder.openPairing().link })
+    await waitFor('back on the editor file', async () => !!(await editor.bases.get(own).view.get('seeder/' + seederKey)))
+    assert.equal((await call(editor, 'seeder:list'))[0].seederKey, seederKey)
   })
 
   await t.test('forgetting a device drops only the sheets nobody else paired registered', async () => {

@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react'
-import { CaretLeft, QrCode as QrIcon, X } from '@phosphor-icons/react'
+import { createPortal } from 'react-dom'
+import { ArrowSquareOut, CaretLeft, CircleNotch, QrCode as QrIcon, X } from '@phosphor-icons/react'
 import { call } from './bridge.js'
 import { toSvg } from '../shared/qr.js'
-import { ScanButton } from './Qr.jsx'
+import { isMobile } from './sheet/xlsx.js'
+import { openUrl } from './About.jsx'
 
 // "Run a seeder on this computer" (desktop): a separate blind process the
 // desktop app starts and stops. Shows its pairing QR and what it holds.
@@ -107,102 +109,154 @@ function HostDevices ({ onError }) {
   )
 }
 
-// "Stop using this seeder" on this device, with what it will change.
-function StopUsing ({ seederKey, onDone, onError }) {
-  const [preview, setPreview] = useState(null)
-  const [busy, setBusy] = useState(false)
-  if (!preview) {
-    return (
-      <button type='button' className='link-button' onClick={async () => { try { setPreview(await call('seeder:stopPreview', { seederKey })) } catch (err) { onError(err.message) } }}>
-        Stop using
-      </button>
-    )
-  }
-  const names = (list) => list.map((x) => x.title || 'Untitled file').join(', ')
-  return (
-    <div className='stop-using'>
-      {preview.stop.length > 0 && <p className='small'>Stops backing up: {names(preview.stop)}. The seeder deletes its copies after 7 days.</p>}
-      {preview.keep.length > 0 && <p className='small muted'>Still backed up there by other people: {names(preview.keep)}.</p>}
-      {!preview.stop.length && !preview.keep.length && <p className='small muted'>No files back up to it.</p>}
-      <div className='row'>
-        <button
-          type='button'
-          className='danger'
-          disabled={busy}
-          onClick={async () => {
-            setBusy(true)
-            try { await call('seeder:stopUsing', { seederKey }); onDone() } catch (err) { onError(err.message); setBusy(false) }
-          }}
-        >
-          {busy ? 'Stopping...' : 'Stop using this seeder'}
-        </button>
-        <button type='button' onClick={() => setPreview(null)}>Keep</button>
+// The seeder panel's modal: a question with two buttons, a spinner while
+// something runs, or a result with one button. On document.body, above the
+// panel.
+function SeederModal ({ title, text, busy = false, confirmLabel, danger = false, onConfirm, onClose, closeLabel = 'Cancel' }) {
+  return createPortal(
+    <div className='seeder-modal-backdrop'>
+      <div className='seeder-modal' role='alertdialog' aria-label={title}>
+        {busy && <CircleNotch className='join-spinner' size={32} aria-hidden='true' />}
+        <h3>{title}</h3>
+        {text && <p className='muted'>{text}</p>}
+        {!busy && (onConfirm || onClose) && (
+          <div className='actions'>
+            {onConfirm && <button type='button' className={danger ? 'danger' : 'primary'} onClick={onConfirm}>{confirmLabel}</button>}
+            {onClose && <button type='button' onClick={onClose}>{closeLabel}</button>}
+          </div>
+        )}
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
+const PREFIXES = ['pearoffice://seeder?', 'peerloom://seeder?']
+const names = (list) => list.map((x) => x.title || 'Untitled file').join(', ')
+const files = (n) => n + ' file' + (n === 1 ? '' : 's')
+
 export function SeederPanel ({ initialLink = '', onBack = null, onClose, onError }) {
+  const desktop = !isMobile()
   const [link, setLink] = useState(initialLink)
+  const [pasting, setPasting] = useState(desktop || !!initialLink)
   const [busy, setBusy] = useState(false)
   const [seeders, setSeeders] = useState(null)
-  const [done, setDone] = useState(false)
+  const [msg, setMsg] = useState(null)
+  const [modal, setModal] = useState(null) // SeederModal's props, or null
+  const close = () => setModal(null)
 
   async function load () {
     try { setSeeders(await call('seeder:list')) } catch (err) { onError(err.message) }
   }
-  useEffect(() => { load() }, [])
+  useEffect(() => { load(); const t = setInterval(load, 5000); return () => clearInterval(t) }, [])
 
-  async function pair (e, scanned) {
-    if (e) e.preventDefault()
+  async function pair (text) {
+    const clean = String(text || '').trim()
+    if (!clean) return
     setBusy(true)
-    setDone(false)
+    setMsg(null)
+    setModal({ busy: true, title: 'Pairing...', text: 'This can take up to a minute.' })
     try {
-      await call('seeder:pair', { link: (scanned || link).trim() })
+      await call('seeder:pair', { link: clean })
       setLink('')
-      setDone(true)
-      load()
+      if (!desktop) setPasting(false)
+      close()
+      setMsg('Paired. Your files are backing up to it.')
     } catch (err) {
-      onError(err.message)
+      setModal({ title: 'Could not pair', text: err.message, onClose: close, closeLabel: 'OK' })
     }
     setBusy(false)
+    load()
+  }
+
+  async function scan () {
+    try {
+      const { text } = await call('app:scanQr')
+      if (!text) return
+      if (!PREFIXES.some((p) => String(text).startsWith(p))) return setModal({ title: 'Could not pair', text: 'That QR code is not a seeder code.', onClose: close, closeLabel: 'OK' })
+      pair(String(text))
+    } catch (err) { onError(err.message) }
+  }
+
+  async function stop (seederKey) {
+    setModal({ busy: true, title: 'Stopping...' })
+    try {
+      const r = await call('seeder:stopUsing', { seederKey })
+      await load()
+      const kept = r.kept || []
+      if (kept.length) {
+        const list = kept.map((x) => (x.title || 'Untitled file') + (x.addedByName ? ' (added by ' + x.addedByName + ')' : '')).join(', ')
+        setModal({ title: 'Stopped on this device', text: (kept.length === 1 ? 'This file still backs up to it: ' : 'These files still back up to it: ') + list + '. Only the file\'s owner or whoever added it there can stop that.', onClose: close, closeLabel: 'OK' })
+      } else {
+        close()
+        setMsg('Stopped using this seeder.')
+      }
+    } catch (err) {
+      await load()
+      setModal({ title: 'Could not stop', text: err.message, onClose: close, closeLabel: 'OK' })
+    }
+  }
+
+  async function askStop (seederKey) {
+    let preview = null
+    try { preview = await call('seeder:stopPreview', { seederKey }) } catch {}
+    const parts = []
+    if (preview && preview.stop.length) parts.push('Stops backing up ' + names(preview.stop) + '.')
+    if (preview && preview.keep.length) parts.push('Others still back up ' + names(preview.keep) + ' there.')
+    setModal({
+      title: 'Stop using this seeder?',
+      text: parts.join(' ') || 'No files back up to it.',
+      confirmLabel: 'Stop using',
+      danger: true,
+      onConfirm: () => stop(seederKey),
+      onClose: close
+    })
   }
 
   return (
-    <div className='panel-backdrop' onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
-      <form className='panel' role='dialog' aria-label='Seeder' onSubmit={pair}>
+    <div className='panel-backdrop' onMouseDown={(e) => { if (e.target === e.currentTarget && !modal) onClose() }}>
+      <form className='panel seeder-panel' role='dialog' aria-label='Seeder' onSubmit={(e) => { e.preventDefault(); pair(link) }}>
         <header>
           {onBack && <button type='button' className='link-button back' onClick={onBack}><CaretLeft size={14} /> Settings</button>}
           <h2>Seeder</h2>
           <button type='button' className='close' aria-label='Close' onClick={onClose}><X size={18} /></button>
         </header>
-        <p>
-          A seeder is an always-on computer that keeps an encrypted copy of your files, so people can catch up
-          even when nobody else is online. It cannot read your files: it never gets their keys.
+        <p className='muted'>
+          A seeder is an always-on computer that keeps your files in sync while phones sleep.
+          It stores them scrambled and cannot read them.
         </p>
-        <p>Start the seeder, then paste the pairing link it shows. Links work for 5 minutes.</p>
-        <input
-          aria-label='Seeder pairing link'
-          placeholder='pearoffice://seeder?...'
-          value={link}
-          onChange={(e) => setLink(e.target.value)}
-        />
-        <ScanButton prefix={['pearoffice://seeder?', 'peerloom://seeder?']} what='a seeder code' onError={onError} onLink={(l) => { setLink(l); pair(null, l) }} />
-        {done && <p className='muted'>Paired. Your files are backing up.</p>}
-        <div className='row end'>
-          <button className='primary' type='submit' disabled={busy || !link.trim()}>{busy ? 'Pairing...' : 'Pair'}</button>
+        {!desktop && <button type='button' className='primary' disabled={busy} onClick={scan}><QrIcon size={16} /> Scan seeder QR</button>}
+        {pasting && (
+          <div className='row'>
+            <input
+              aria-label='Seeder pairing link'
+              placeholder='Paste the seeder link'
+              value={link}
+              autoCapitalize='none'
+              autoCorrect='off'
+              spellCheck={false}
+              onChange={(e) => setLink(e.target.value)}
+            />
+            <button className='primary' type='submit' disabled={busy || !link.trim()}>Pair</button>
+          </div>
+        )}
+        <div className='row seeder-links'>
+          {!desktop && <button type='button' className='link-button' onClick={() => setPasting((v) => !v)}>{pasting ? 'Cancel' : 'Paste a link instead'}</button>}
+          <button type='button' className='link-button' onClick={() => openUrl('https://peerloomllc.com/seeder')}>Get PeerLoom Seeder <ArrowSquareOut size={13} /></button>
         </div>
-        {window.pearoffice && window.pearoffice.platform === 'desktop' && <LocalSeeder onPaired={() => { setDone(true); load() }} onError={onError} />}
-        <h3>Paired seeders</h3>
-        {seeders && seeders.length === 0 && <p className='muted'>None yet.</p>}
-        <ul className='people'>
-          {(seeders || []).map((s) => (
-            <li key={s.seederKey} className='seeder-row'>
-              <span className='who mono'>{s.seederKey.slice(0, 16)}...</span>
-              <StopUsing seederKey={s.seederKey} onDone={load} onError={onError} />
-            </li>
-          ))}
-        </ul>
+        {msg && <p className='muted small'>{msg}</p>}
+        {desktop && window.pearoffice && window.pearoffice.platform === 'desktop' && <LocalSeeder onPaired={() => { setMsg('Paired. Your files are backing up to it.'); load() }} onError={onError} />}
+        {seeders && seeders.length > 0 && (
+          <ul className='people'>
+            {seeders.map((s) => (
+              <li key={s.seederKey} className='seeder-row'>
+                <span className='who'><span className='mono'>{s.seederKey.slice(0, 16)}...</span> <span className='muted small'>{files(s.sheets || 0)}</span></span>
+                <button type='button' className='danger' onClick={() => askStop(s.seederKey)}>Stop using</button>
+              </li>
+            ))}
+          </ul>
+        )}
+        {modal && <SeederModal {...modal} />}
       </form>
     </div>
   )
