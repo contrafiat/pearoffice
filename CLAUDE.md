@@ -203,6 +203,13 @@ newline JSON instead; the desktop app uses that for "Run a seeder on this
 computer" (`desktop/seeder-process.js`, a separate process from the member
 worklet).
 
+The PearOffice seeder is now PeerLoom Seeder (`../peerloom-seeder`), and its
+packages are retired (2026-10-14). Their last releases run PeerLoom Seeder on
+the old data folder: the Umbrel store entry 1.0.1 and StartOS 1.1.1 (made by
+hand; `release.sh` no longer builds either) and the Linux download, which
+`npm run dist:seeder` still builds for each release so older installs find it
+with `pearoffice-seeder update`. What follows is the history.
+
 The Umbrel app (proposals/2026-10-05-umbrel-seeder.md) is the seeder plus
 a web dashboard: `seeder-dist/umbrel/server.js` (login from
 `@peerloom/host/dashboard-auth`, copied from the sibling `../peerloom-host`)
@@ -243,9 +250,11 @@ and `PEAROFFICE_UPDATE_LATEST_URL`; `node scripts/check-update.js`
 runs Update now on a real AppImage. `PEAROFFICE_NO_UPDATE_CHECK=1` turns it
 off.
 
-`npm run dist:seeder` builds the headless download for Linux x64 and arm64
-(`dist/seeder-pkg/*.tar.gz`: Bare runtime, seeder bundle, launcher, systemd
-user unit, README from `seeder-dist/`) and checks the x64 one starts.
+`npm run dist:seeder` builds the last Linux seeder download for x64 and arm64
+(`dist/seeder-pkg/*.tar.gz`: the published PeerLoom Seeder build in
+`seeder/peerloom-seeder`, the launcher, unit and README from `seeder-dist/`).
+It then updates the previous PearOffice seeder download to it from a fake
+release and checks PeerLoom Seeder starts with the same seeder key.
 
 ## Android
 
