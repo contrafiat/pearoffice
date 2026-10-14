@@ -165,6 +165,19 @@ function createSeeding ({ engine, dhtOf = (dht) => dht, getPictures = () => null
   async function pair (link, { timeoutMs = PAIR_WINDOW_MS } = {}) {
     const { seederKey } = await pairWithSeeder({ swarm: engine.swarm, link, app: 'PearOffice', timeoutMs })
     await engine.localDb.put('seeders:' + seederKey, { seederKey, pairedAt: Date.now() })
+    // Pairing again is a deliberate choice: files this person took the
+    // seeder off (Stop using, or per file) back up to it again. Taken off by
+    // someone else stays off.
+    const me = hex(engine.identity.publicKey)
+    for (const [sheetId, base] of engine.bases) {
+      if (!base.writable) continue
+      const off = (await base.view.get('seederOff/' + seederKey))?.value
+      if (!off || off.by !== me) continue
+      const member = (await base.view.get('member/' + me))?.value
+      if (!member || (member.role !== 'owner' && member.role !== 'editor')) continue
+      await engine.append(sheetId, m.seederOp({ sheetId, identity: engine.identity, seederKey })).catch((e) => log('re-adding a seeder failed: ' + e.message))
+      keepInBackground(hex(base.key), seederKey).catch(() => {})
+    }
     sweep().catch(() => {})
     return { seederKey }
   }
@@ -301,23 +314,44 @@ function createSeeding ({ engine, dhtOf = (dht) => dht, getPictures = () => null
     keepInBackground(hex(base.key), seederKey).then(() => sweep()).catch(() => {})
   }
 
-  // Stop using a seeder on this device: take it off every sheet where we may,
-  // ask it to drop those, then forget it. Listings by other people stay.
+  // The drop requests stopUsing sent in the background (tests wait on them).
+  const pendingDrops = new Set()
+  function settled () { return Promise.all([...pendingDrops]) }
+
+  // Stop using a seeder on this device: take it off every sheet where we may
+  // and forget it, then ask it to drop those sheets. Listings by other people
+  // stay; `kept` names them and who added the seeder there.
   async function stopUsing (seederKey) {
     let stopped = 0
-    let kept = 0
+    const kept = []
+    const drops = []
     for (const [sheetId, base] of engine.bases) {
       const listing = (await base.view.get('seeder/' + seederKey))?.value
       if (!listing) continue
-      if (!(await canStop(base, listing))) { kept++; continue }
+      if (!(await canStop(base, listing))) {
+        const title = (await engine.localDb.get('groups:joined:' + sheetId))?.value?.name || ''
+        const adder = listing.addedBy ? (await base.view.get('member/' + listing.addedBy))?.value : null
+        kept.push({ sheetId, title, addedByName: adder?.name || null })
+        continue
+      }
       await engine.append(sheetId, m.seederOffOp({ sheetId, identity: engine.identity, seederKey }))
-      await requestDrop({ bootstrap: hex(base.key), seederKeys: [seederKey], afterMs: DROP_GRACE_MS }).catch(() => {})
+      drops.push(hex(base.key))
       stopped++
     }
     await engine.localDb.del('seeders:' + seederKey)
-    await sweep()
-    log('stopped using seeder ' + seederKey.slice(0, 8) + ': ' + stopped + ' sheet(s) off, ' + kept + ' kept by others')
-    return { stopped, keptByOthers: kept }
+    sweep().catch(() => {})
+    // In the background, so an unreachable seeder does not hold up the
+    // screen. One after another over the backup connection, which answers in
+    // milliseconds; separate connections in parallel lost requests.
+    const dropped = (async () => {
+      for (const bootstrap of drops) {
+        await dropAt(seederKey, bootstrap, DROP_GRACE_MS).catch((e) => log('drop request to ' + seederKey.slice(0, 8) + ' failed: ' + e.message))
+      }
+    })()
+    pendingDrops.add(dropped)
+    dropped.finally(() => pendingDrops.delete(dropped))
+    log('stopped using seeder ' + seederKey.slice(0, 8) + ': ' + stopped + ' sheet(s) off, ' + kept.length + ' kept by others')
+    return { stopped, keptByOthers: kept.length, kept }
   }
 
   // What stopping a seeder would do, for the confirmation.
@@ -332,8 +366,13 @@ function createSeeding ({ engine, dhtOf = (dht) => dht, getPictures = () => null
     return out
   }
 
+  // Paired seeders, each with how many sheets back up to it.
   async function list () {
-    return (await pairedSeeders()).map((seederKey) => ({ seederKey }))
+    const counts = new Map()
+    for (const [, base] of engine.bases) {
+      for (const key of await seedersOf(base).catch(() => [])) counts.set(key, (counts.get(key) || 0) + 1)
+    }
+    return (await pairedSeeders()).map((seederKey) => ({ seederKey, sheets: counts.get(seederKey) || 0 }))
   }
 
   async function close () {
@@ -342,7 +381,7 @@ function createSeeding ({ engine, dhtOf = (dht) => dht, getPictures = () => null
     if (peering) await peering.close().catch(() => {})
   }
 
-  return { start, pair, list, hint, keyringPut, keyringGet, keyringClaim, register, sweep, close, requestDrop, requestKeep, sheetSeeders, removeFromSheet, addToSheet, stopUsing, stopPreview, get peering () { return peering } }
+  return { start, pair, list, hint, keyringPut, keyringGet, keyringClaim, register, sweep, close, requestDrop, requestKeep, sheetSeeders, removeFromSheet, addToSheet, stopUsing, stopPreview, settled, get peering () { return peering } }
 }
 
 module.exports = { createSeeding }

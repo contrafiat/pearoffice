@@ -87,7 +87,8 @@ module.exports = async function app (t) {
   // The Seeder and Devices panels reach the engine (seeder: and link: calls).
   await openSettings()
   await js("document.querySelector('.panel .settings-seeder').click()")
-  await waitFor('seeder panel lists seeders', "!!document.querySelector('.panel') && document.querySelector('.panel').textContent.includes('None yet')")
+  await waitFor('seeder panel', "!!document.querySelector('.panel.seeder-panel input[aria-label=\"Seeder pairing link\"]')")
+  await waitFor('seeder list from the engine', "(async () => Array.isArray(await window.pearoffice.call('seeder:list')))()")
   await js("document.querySelector('.panel .close').click()")
   await openSettings()
   await js("document.querySelector('.panel .settings-devices').click()")
@@ -171,7 +172,7 @@ module.exports = async function app (t) {
   seederMs.start = Date.now() - t0
   t0 = Date.now()
   await js("[...document.querySelectorAll('.panel button')].find((b) => b.textContent.trim() === 'Pair this device with it').click()")
-  await waitFor('paired with the local seeder', "document.querySelector('.panel').textContent.includes('Paired. Your files are backing up.')", 60000)
+  await waitFor('paired with the local seeder', "document.querySelector('.panel').textContent.includes('Paired. Your files are backing up to it.')", 60000)
   seederMs.pair = Date.now() - t0
   await t.shot('PEAROFFICE_SMOKE_SEEDER_SHOT', 300)
   t0 = Date.now()
