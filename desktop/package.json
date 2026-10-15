@@ -18,7 +18,7 @@
     "name": "PeerLoom LLC",
     "email": "support@peerloomllc.com"
   },
-  "homepage": "https://github.com/peerloomllc/pearoffice-releases",
+  "homepage": "https://github.com/peerloomllc/pearoffice",
   "build": {
     "appId": "com.peerloomllc.pearoffice",
     "productName": "PearOffice",

@@ -10,9 +10,9 @@ and no company holds a copy.
 Part of the [PeerLoom](https://peerloomllc.com) suite of account-free,
 peer-to-peer apps.
 
-Status: before the first release. Downloads will be on
-[pearoffice-releases](https://github.com/peerloomllc/pearoffice-releases)
-once it is published. The phone apps are not in the app stores yet.
+Downloads for Mac, Windows, Linux and Android are on the
+[releases page](https://github.com/peerloomllc/pearoffice/releases/latest).
+The Android app is also on [Zapstore](https://zapstore.dev/apps/com.pearoffice).
 
 ---
 
