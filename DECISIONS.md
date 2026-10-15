@@ -2,6 +2,21 @@
 
 Append-only, newest on top. Per Constitution §4.
 
+## 2026-10-14 - Releases stop carrying the Linux seeder download
+Tier: T1
+Context: the earlier 2026-10-14 entry (below) kept building the Linux seeder download
+each release so 1.0.0 and 1.1.0 installs could update to PeerLoom Seeder.
+The migrating download had not been published yet (1.1.0's was built before
+it).
+Choice: Tim chose to drop it. `release.sh` has no step 5c and no
+`--skip-seeder`.
+Alternatives: build it every release without asking; or ship it once in
+1.1.1 and drop it after.
+Consequences: a 1.0.0 or 1.1.0 seeder download install sees "PearOffice
+seeder X is out" but `pearoffice-seeder update` finds no file for it, so it
+stays on the old seeder until moved to PeerLoom Seeder by hand.
+`npm run dist:seeder` and `seeder-dist/` stay in the repo, unused by releases.
+
 ## 2026-10-14 - The seeder packages retire into PeerLoom Seeder
 Tier: T2
 Context: PeerLoom Seeder 1.0.0 is released and serves every app (suite
