@@ -230,12 +230,12 @@ publish to, sets the version everywhere (`scripts/release/bump.js`), runs
 `npm run verify`, builds Android (`scripts/build-android-release.sh`),
 writes the release notes from the merged PRs (or starts from
 `notes/release-<v>.md` if it exists, suite rule 13) and opens them in
-vi, builds the desktop apps, the seeder download, the Umbrel image
-and the .s9pk, then commits the version, pushes the tag and publishes,
-asking before each step: the GitHub release on the public
-`peerloomllc/pearoffice-releases` (a `.sha256` for every file), the seeder
-stores (image to ghcr, both Umbrel stores, the StartOS registry PR on the
-website), Zapstore, Google Play (the API when gcloud is set up, else the
+vi, builds the desktop apps and the seeder download (still built so older
+seeder installs update to PeerLoom Seeder; the Umbrel and StartOS packages
+are released from `../peerloom-seeder`), then commits the version, pushes
+the tag and publishes, asking before each step: the GitHub release on the
+public `peerloomllc/pearoffice-releases` (a `.sha256` for every file),
+Zapstore, Google Play (the API when gcloud is set up, else the
 Console steps), the App Store (app 6820799007; `scripts/ios-appstore.sh`)
 and a Nostr note. `--check-versions` shows what each place has; `--retag`
 redoes a failed release; `--skip-<target>` leaves one out (`--help`).

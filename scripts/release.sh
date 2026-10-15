@@ -12,9 +12,10 @@
 # Every platform in one run: Android (APK and app bundle), iOS, the desktop
 # app for Mac (Apple silicon and Intel, signed and notarized), Linux and
 # Windows and the Linux seeder download. The PearOffice seeder is now PeerLoom
-# Seeder: the Linux download is the last one (it runs PeerLoom Seeder on the
-# old data folder), and the Umbrel and StartOS packages are no longer built
-# (their last releases were made by hand, 2026-10-14).
+# Seeder (peerloom-seeder/ has its own release.sh). The Linux download is
+# still built each release so older installs update to it (it runs PeerLoom
+# Seeder on the old data folder); PearOffice no longer has Umbrel or StartOS
+# packages, so it has no step 5d, 7b or 13c (DECISIONS.md 2026-10-14).
 # The downloads go on the public peerloomllc/pearoffice-releases repo; the tag
 # goes on this (private) one.
 #
@@ -32,8 +33,6 @@
 #   --skip-windows     Skip Windows desktop build (.exe)
 #   --skip-macos       Skip macOS desktop builds (.dmg + .zip, both chips)
 #   --skip-seeder      Skip the Linux seeder download
-#   --skip-seeder-store Accepted and ignored: the seeder stores are retired
-#                      (aliases: --skip-umbrel, --skip-start9)
 #   --skip-android     Skip Android APK/AAB build (auto-disables Play + Zapstore;
 #                      the GitHub release re-attaches the previous APK)
 #   --skip-mobile      Skip both Android and iOS builds (shorthand)
@@ -58,9 +57,7 @@
 #   WINDOWS_VM_HOST              - ssh target of the win11-pearguard VM
 #   NOSTR_NOTE_BUDGET            - characters of notes in the Nostr note (900)
 #
-# Needs: gh, asc, podman and skopeo (ghcr login), start-cli-1.1.0, the Mac
-# Mini, and clones of the sibling repos ../website, ../peerloom-umbrel-app-store
-# and ../umbrel-apps (PeerLoom's fork).
+# Needs: gh, asc and the Mac Mini.
 
 set -euo pipefail
 
@@ -72,7 +69,6 @@ trap 'echo; echo "Interrupted (SIGINT) - aborting release."; exit 130' INT
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-PEERLOOM="$(dirname "$REPO_ROOT")"
 
 # Shared release helpers, one copy for every PeerLoom app, in the sibling repo
 # peerloomllc/peerloom-release (proposals/2026-09-17-shared-release-library.md).
@@ -101,7 +97,7 @@ fi
 
 # Required app.conf keys, checked once, up front. No hard-coded defaults: a
 # copied default is how PearGuard once announced itself as PearCal.
-for _k in APP_NAME ARTIFACT_PREFIX BUNDLE_ID RELEASES_REPO ASC_APP_ID UMBREL_IMAGE; do
+for _k in APP_NAME ARTIFACT_PREFIX BUNDLE_ID RELEASES_REPO ASC_APP_ID; do
   if [ -z "${!_k:-}" ]; then
     echo "error: $_k is not set — check $SCRIPT_DIR/app.conf" >&2
     exit 1
@@ -135,41 +131,9 @@ print(vs[0] if vs else '')
 }
 
 # ---------------------------------------------------------------------------
-# Helper: the highest X.Y.Z tag of the seeder image on ghcr (public, so an
-# anonymous pull token is enough). Returns "" when unknown.
+# Helper: stop the background Mac build (step 5b) if the run ends early.
 # ---------------------------------------------------------------------------
-_umbrel_latest_version() {
-  local host="${UMBREL_IMAGE%%/*}" repo="${UMBREL_IMAGE#*/}" token
-  token=$(curl -s --max-time 8 "https://${host}/token?scope=repository:${repo}:pull" 2>/dev/null \
-    | python3 -c "import sys,json; print(json.load(sys.stdin).get('token',''))" 2>/dev/null || echo "")
-  [ -z "$token" ] && return 0
-  curl -s --max-time 8 -H "Authorization: Bearer $token" "https://${host}/v2/${repo}/tags/list" 2>/dev/null \
-    | python3 -c "
-import sys, json
-best = ()
-for t in json.load(sys.stdin).get('tags', []) or []:
-    p = tuple(int(x) for x in t.lstrip('v').split('.') if x.isdigit())
-    if len(p) == 3 and p > best: best = p
-print('.'.join(map(str, best)) if best else '')
-" 2>/dev/null || echo ""
-}
-
-# ---------------------------------------------------------------------------
-# Helper: a fresh checkout of <repo>'s <remote>/<base> on <branch>, in a
-# temporary folder removed on exit. Sets WT to the folder.
-# ---------------------------------------------------------------------------
-WORKTREES=()
-_worktree_cleanup() {
-  local w
-  for w in "${WORKTREES[@]:-}"; do
-    [ -n "$w" ] && { git -C "${w%%|*}" worktree remove --force "${w#*|}" 2>/dev/null || true; }
-  done
-  WORKTREES=()
-  return 0
-}
-# Also stops the background Mac build (step 5b) if the run ends early.
 _on_exit() {
-  _worktree_cleanup
   if [ -n "${_MAC_PID:-}" ] && kill -0 "$_MAC_PID" 2>/dev/null; then _kill_tree "$_MAC_PID"; fi
   return 0
 }
@@ -179,31 +143,6 @@ _kill_tree() {
   kill "$1" 2>/dev/null || true
 }
 trap _on_exit EXIT
-_worktree() {
-  local repo="$1" remote="$2" base="$3" branch="$4"
-  WT="$(mktemp -d)/wt"
-  git -C "$repo" fetch -q "$remote"
-  git -C "$repo" worktree add -q -B "$branch" "$WT" "$remote/$base"
-  WORKTREES+=("$repo|$WT")
-}
-
-# ---------------------------------------------------------------------------
-# Helper: version, release notes and image digest in an Umbrel app's files.
-# Usage: _umbrel_bump <app-dir> <version> <digest> <notes>
-# ---------------------------------------------------------------------------
-_umbrel_bump() {
-  node - "$@" <<'EOF'
-const fs = require('fs')
-const [dir, v, digest, notes] = process.argv.slice(2)
-let app = fs.readFileSync(dir + '/umbrel-app.yml', 'utf8')
-app = app.replace(/^version: .*$/m, `version: "${v}"`)
-app = app.replace(/^releaseNotes: [\s\S]*?(?=^\S)/m, 'releaseNotes: >-\n' + notes.split('\n').map((l) => (l ? '  ' + l : '')).join('\n') + '\n')
-fs.writeFileSync(dir + '/umbrel-app.yml', app)
-let compose = fs.readFileSync(dir + '/docker-compose.yml', 'utf8')
-compose = compose.replace(/pearoffice-seeder:[\w.]+@sha256:[0-9a-f]+/, `pearoffice-seeder:${v}@${digest}`)
-fs.writeFileSync(dir + '/docker-compose.yml', compose)
-EOF
-}
 
 # ---------------------------------------------------------------------------
 # Parse arguments
@@ -222,9 +161,6 @@ SKIP_LINUX=false
 SKIP_WINDOWS=false
 SKIP_MACOS=false
 SKIP_SEEDER=false
-# Retired: PeerLoom Seeder replaced the PearOffice seeder's Umbrel and StartOS
-# packages (proposals/2026-10-12-peerloom-seeder-product.md in the suite root).
-SKIP_SEEDER_STORE=true
 SKIP_ANDROID=false
 
 for arg in "$@"; do
@@ -241,7 +177,6 @@ for arg in "$@"; do
     --skip-windows) SKIP_WINDOWS=true ;;
     --skip-macos) SKIP_MACOS=true ;;
     --skip-seeder) SKIP_SEEDER=true ;;
-    --skip-seeder-store|--skip-umbrel|--skip-start9) SKIP_SEEDER_STORE=true ;;
     --skip-android) SKIP_ANDROID=true ;;
     --skip-mobile) SKIP_ANDROID=true; SKIP_IOS=true ;;
     v[0-9]*.[0-9]*.[0-9]*)
@@ -328,7 +263,6 @@ GH_VERSION=$(_github_latest_version "$GH_TOKEN" "$RELEASES_REPO")
 ZSP_VERSION_CURRENT=$(_zapstore_latest_version "$ZSP_IDENTIFIER")
 PLAY_VERSION_CURRENT=$(_play_latest_version "$ZSP_IDENTIFIER" "${PLAY_SERVICE_ACCOUNT_JSON:-}" "${PLAY_TRACK:-alpha}")
 ASC_VERSION_CURRENT=$(_appstore_latest_version)
-UMBREL_VERSION_CURRENT=$(_umbrel_latest_version)
 
 echo "    GitHub       : ${GH_VERSION:-unknown} ($RELEASES_REPO)"
 echo "    Zapstore     : ${ZSP_VERSION_CURRENT:-unknown}"
@@ -338,7 +272,6 @@ else
   echo "    Google Play  : (not configured — uploaded by hand, step 10 prints how)"
 fi
 echo "    App Store    : ${ASC_VERSION_CURRENT:-unknown}"
-echo "    Umbrel (ghcr): ${UMBREL_VERSION_CURRENT:-unknown} ($UMBREL_IMAGE)"
 
 if $CHECK_VERSIONS_ONLY; then
   echo ""
@@ -400,9 +333,6 @@ AAB_SIZE=""
 DESKTOP_ARTIFACTS=()
 _MAC_PID=""
 SEEDER_ARTIFACTS=()
-START9_S9PK=""
-UMBREL_BUILT=false
-STORE_PR_URL=""
 
 _ask() { # _ask <question> <default y|n> -> 0 for yes
   local _r
@@ -460,20 +390,18 @@ if $SKIP_SEEDER; then echo "    - Seeder download (skipped via --skip-seeder)"
 elif _ask "Build the Linux seeder download?" y; then echo "    ✓ Seeder download"
 else SKIP_SEEDER=true; echo "    ✗ Seeder download (skipped)"; fi
 
-echo "    - Seeder stores (retired: the PearOffice seeder is now PeerLoom Seeder)"
-
 if $SKIP_NOSTR; then echo "    - Nostr (skipped via --skip-nostr)"
 elif _ask "Post release announcement to Nostr?" y; then PUBLISH_NOSTR=true; echo "    ✓ Nostr"
 else PUBLISH_NOSTR=false; echo "    ✗ Nostr (skipped)"; fi
 echo ""
 
-if ! $PUBLISH_GITHUB && ! $PUBLISH_ZAPSTORE && ! $PUBLISH_NOSTR && ! $PUBLISH_PLAY && ! $PUBLISH_APP_STORE && $SKIP_SEEDER_STORE; then
+if ! $PUBLISH_GITHUB && ! $PUBLISH_ZAPSTORE && ! $PUBLISH_NOSTR && ! $PUBLISH_PLAY && ! $PUBLISH_APP_STORE; then
   echo "No destinations selected. Aborted."
   exit 0
 fi
 
 # Zapstore alone does not need a build when GitHub already has this version.
-if $PUBLISH_GITHUB || $PUBLISH_PLAY || $PUBLISH_APP_STORE || ! $SKIP_SEEDER_STORE; then
+if $PUBLISH_GITHUB || $PUBLISH_PLAY || $PUBLISH_APP_STORE; then
   NEEDS_BUILD=true
 fi
 if [ "${GH_VERSION:-}" != "$APP_VERSION" ] && ! $NEEDS_BUILD; then
@@ -489,9 +417,8 @@ if $NEEDS_BUILD; then
 #
 # scripts/release/bump.js sets the version everywhere PearOffice writes it:
 # package.json, desktop/package.json, both lock files, app.json (Android
-# versionCode and iOS buildNumber go up by one) and the StartOS package
-# (image tag and version graph). At the same version (--retag) it changes
-# nothing.
+# versionCode and iOS buildNumber go up by one). At the same version
+# (--retag) it changes nothing.
 # ---------------------------------------------------------------------------
 echo "==> Updating the version to $APP_VERSION..."
 node scripts/release/bump.js "$APP_VERSION"
@@ -700,8 +627,7 @@ if $NEEDS_BUILD; then
 # with its packaged smoke test. The two Mac builds run on the Mac Mini in the
 # background, one after the other (they share its build folder), while Linux
 # and Windows build here one after the other (they share the staged
-# resources in desktop/build/resources), then the seeder and store packages
-# (5c, 5d). The Mac copy takes only the source, never the folders the local
+# resources in desktop/build/resources), then the seeder download (5c). The Mac copy takes only the source, never the folders the local
 # builds write, and every build names its own files, so they cannot collide.
 # The Mac results are collected before 5e. Best-effort: a failed platform is
 # logged and skipped, never blocking the rest of the release.
@@ -787,41 +713,6 @@ else
   fi
 fi
 
-# ---------------------------------------------------------------------------
-# 5d. Build the store packages (Umbrel image, StartOS .s9pk)
-#
-# Both built here and not pushed: the image goes to ghcr and the stores are
-# updated in step 7b, after the tag. Best-effort.
-# ---------------------------------------------------------------------------
-if $SKIP_SEEDER_STORE; then
-  echo "==> Skipping the Umbrel image and the StartOS package."
-else
-  echo ""
-  echo "==> Building the Umbrel image (amd64 + arm64, not pushed yet)..."
-  echo "    Full log: /tmp/pearoffice-build-umbrel.log"
-  if PUSH=0 scripts/build-umbrel-image.sh "$APP_VERSION" > /tmp/pearoffice-build-umbrel.log 2>&1 < /dev/null; then
-    UMBREL_BUILT=true
-    echo "    Umbrel image OK."
-  else
-    echo "    WARNING: Umbrel image build failed, skipping the seeder stores. Log: /tmp/pearoffice-build-umbrel.log"
-  fi
-  echo "==> Building the StartOS package..."
-  echo "    Full log: /tmp/pearoffice-build-start9.log"
-  if ( cd start9/seeder && npm install --silent --no-audit --no-fund && make ) > /tmp/pearoffice-build-start9.log 2>&1 < /dev/null; then
-    _s9="$REPO_ROOT/start9/seeder/pearoffice-seeder_x86_64.s9pk"
-    _got=$(start-cli-1.1.0 s9pk inspect "$_s9" manifest 2>/dev/null \
-      | node -p "JSON.parse(require('fs').readFileSync(0,'utf8')).version" 2>/dev/null || echo "")
-    if [ "$_got" = "$APP_VERSION:0" ]; then
-      START9_S9PK="$_s9"
-      echo "    StartOS package OK ($(du -h "$START9_S9PK" | cut -f1))."
-    else
-      echo "    WARNING: the .s9pk says ${_got:-nothing}, expected $APP_VERSION:0; skipping it."
-    fi
-  else
-    echo "    WARNING: StartOS package build failed, skipping it. Log: /tmp/pearoffice-build-start9.log"
-  fi
-fi
-
 # The desktop installers from 5b: the Mac builds finish here.
 if ! $SKIP_DESKTOP; then
   if [ -n "$_MAC_PID" ]; then
@@ -852,7 +743,7 @@ fi
 # The last confirm before anything irreversible: step 6 commits and step 6b
 # pushes the tag. See RELEASE-PIPELINE.md §2.
 # ---------------------------------------------------------------------------
-for _artifact in "${DESKTOP_ARTIFACTS[@]}" "${SEEDER_ARTIFACTS[@]}" "$START9_S9PK"; do
+for _artifact in "${DESKTOP_ARTIFACTS[@]}" "${SEEDER_ARTIFACTS[@]}"; do
   [ -z "$_artifact" ] && continue
   [ -f "$_artifact" ] || continue
   ( cd "$(dirname "$_artifact")" && sha256sum "$(basename "$_artifact")" > "$(basename "$_artifact").sha256" )
@@ -866,8 +757,6 @@ _RELEASE_SUMMARY=""
 [ -n "$APK_NAME" ] && _RELEASE_SUMMARY="APK ($APK_SIZE), AAB ($AAB_SIZE)"
 [ ${#DESKTOP_ARTIFACTS[@]} -gt 0 ] && _RELEASE_SUMMARY="${_RELEASE_SUMMARY:+$_RELEASE_SUMMARY, }${#DESKTOP_ARTIFACTS[@]} desktop installer(s)"
 [ ${#SEEDER_ARTIFACTS[@]} -gt 0 ] && _RELEASE_SUMMARY="${_RELEASE_SUMMARY:+$_RELEASE_SUMMARY, }${#SEEDER_ARTIFACTS[@]} seeder download(s)"
-$UMBREL_BUILT && _RELEASE_SUMMARY="${_RELEASE_SUMMARY:+$_RELEASE_SUMMARY, }Umbrel image"
-[ -n "$START9_S9PK" ] && _RELEASE_SUMMARY="${_RELEASE_SUMMARY:+$_RELEASE_SUMMARY, }StartOS .s9pk"
 [ -z "$_RELEASE_SUMMARY" ] && _RELEASE_SUMMARY="no new artifacts"
 _confirm "$_RELEASE_SUMMARY ready to publish?"
 
@@ -896,7 +785,6 @@ if $PUBLISH_GITHUB; then
   [ -n "$APK_NAME" ] && [ -f "$APK_NAME" ] && _have_upload=true
   [ ${#DESKTOP_ARTIFACTS[@]} -gt 0 ] && _have_upload=true
   [ ${#SEEDER_ARTIFACTS[@]} -gt 0 ] && _have_upload=true
-  [ -n "$START9_S9PK" ] && _have_upload=true
   if ! $_have_upload; then
     echo ""
     echo "==> No artifacts to upload — skipping GitHub release step."
@@ -967,13 +855,13 @@ fi # end NEEDS_BUILD (commit and tag)
 # ---------------------------------------------------------------------------
 # 7. Create GitHub release and upload assets
 #
-# On the public releases repo, where the website, the desktop update check and
-# the StartOS registry link. Every file with its .sha256 sidecar.
+# On the public releases repo, where the website and the desktop update check
+# link. Every file with its .sha256 sidecar.
 # ---------------------------------------------------------------------------
 if $PUBLISH_GITHUB; then
   echo "==> Creating GitHub release $RELEASE_TAG on $RELEASES_REPO..."
   RELEASE_ASSETS=()
-  for _a in "$APK_NAME" "${DESKTOP_ARTIFACTS[@]}" "${SEEDER_ARTIFACTS[@]}" "$START9_S9PK"; do
+  for _a in "$APK_NAME" "${DESKTOP_ARTIFACTS[@]}" "${SEEDER_ARTIFACTS[@]}"; do
     [ -n "$_a" ] && [ -f "$_a" ] || continue
     RELEASE_ASSETS+=("$_a")
     [ -f "${_a}.sha256" ] && RELEASE_ASSETS+=("${_a}.sha256")
@@ -1012,98 +900,6 @@ if $PUBLISH_GITHUB; then
 else
   echo ""
   echo "==> Skipping GitHub release (not selected)."
-fi
-
-# ---------------------------------------------------------------------------
-# 7b. Refresh external registries
-#
-# The seeder's stores, after the release exists (the StartOS registry links
-# this tag's .s9pk): push the image to ghcr, open the PeerLoom community
-# store PR, update the official getumbrel/umbrel-apps listing and open the
-# website PR for the StartOS registry. Each asks first. Step 13c then makes
-# sure the community store really serves the new version.
-# ---------------------------------------------------------------------------
-if ! $SKIP_SEEDER_STORE && $UMBREL_BUILT; then
-  echo ""
-  echo "==> Seeder stores for $APP_VERSION..."
-  _digest=""
-  if _ask "Push $UMBREL_IMAGE:$APP_VERSION (amd64, arm64) to ghcr?" y; then
-    if scripts/build-umbrel-image.sh "$APP_VERSION" > /tmp/pearoffice-push-umbrel.log 2>&1 < /dev/null; then
-      echo "    Pushed. Log: /tmp/pearoffice-push-umbrel.log"
-    else
-      PUBLISH_FAILED=true
-      echo "    ERROR: pushing the image failed. Log: /tmp/pearoffice-push-umbrel.log"
-    fi
-  fi
-  _digest="sha256:$(skopeo inspect --raw "docker://$UMBREL_IMAGE:$APP_VERSION" 2>/dev/null | sha256sum | cut -d' ' -f1)"
-  if ! skopeo inspect --raw "docker://$UMBREL_IMAGE:$APP_VERSION" >/dev/null 2>&1; then
-    echo "    No $UMBREL_IMAGE:$APP_VERSION on ghcr, so the Umbrel stores are not updated."
-    _digest=""
-  fi
-  _store_notes="Updated PearOffice Seeder to $APP_VERSION. Full release notes: https://github.com/$RELEASES_REPO/releases/tag/$RELEASE_TAG"
-
-  if [ -n "$_digest" ]; then
-    # The PeerLoom community store.
-    _worktree "$PEERLOOM/peerloom-umbrel-app-store" origin master "pearoffice-seeder-v$APP_VERSION"; _store="$WT"
-    _umbrel_bump "$_store/peerloom-pearoffice-seeder" "$APP_VERSION" "$_digest" "$_store_notes"
-    git -C "$_store" diff --stat
-    if _ask "Open the PeerLoom community store PR for $APP_VERSION?" y; then
-      git -C "$_store" commit -qam "peerloom-pearoffice-seeder: update to $APP_VERSION"
-      git -C "$_store" push -q -f origin "pearoffice-seeder-v$APP_VERSION"
-      STORE_PR_URL=$(cd "$_store" && gh pr create --base master --title "peerloom-pearoffice-seeder: update to $APP_VERSION" \
-        --body "Image pinned to the multi-arch manifest-list digest ($_digest)." 2>&1 | tail -1)
-      echo "    $STORE_PR_URL"
-    fi
-
-    # The official store. While the first listing is open its branch is
-    # refreshed; once merged, each release opens an update PR off upstream.
-    _fork="$PEERLOOM/umbrel-apps"
-    git -C "$_fork" remote get-url upstream >/dev/null 2>&1 \
-      || git -C "$_fork" remote add upstream https://github.com/getumbrel/umbrel-apps.git
-    git -C "$_fork" fetch -q upstream
-    if git -C "$_fork" cat-file -e upstream/master:pearoffice-seeder/umbrel-app.yml 2>/dev/null; then
-      _obranch="pearoffice-seeder-v$APP_VERSION"
-      _worktree "$_fork" upstream master "$_obranch"; _official="$WT"
-    else
-      _obranch="pearoffice-seeder"
-      git -C "$_fork" fetch -q origin "$_obranch"
-      _worktree "$_fork" origin "$_obranch" "$_obranch-update"; _official="$WT"
-    fi
-    _umbrel_bump "$_official/pearoffice-seeder" "$APP_VERSION" "$_digest" "$_store_notes"
-    git -C "$_official" diff --stat
-    if _ask "Push the official getumbrel/umbrel-apps update for $APP_VERSION?" y; then
-      git -C "$_official" commit -qam "pearoffice-seeder: update to $APP_VERSION"
-      git -C "$_official" push -q -f origin "HEAD:$_obranch"
-      if [ "$_obranch" = pearoffice-seeder ]; then
-        echo "    Refreshed the open listing PR: https://github.com/getumbrel/umbrel-apps/pull/${UMBREL_OFFICIAL_PR:-}"
-      else
-        gh pr create --repo getumbrel/umbrel-apps --base master --head "peerloomllc:$_obranch" \
-          --title "pearoffice-seeder: update to $APP_VERSION" \
-          --body "Bump PearOffice Seeder to $APP_VERSION (image pinned to the multi-arch manifest-list digest)." \
-          || echo "    WARNING: could not open the official store PR."
-      fi
-    fi
-  fi
-
-  # The StartOS registry on the website (merging the PR publishes it).
-  if [ -n "$START9_S9PK" ] && $PUBLISH_GITHUB; then
-    _worktree "$PEERLOOM/website" origin main "registry/pearoffice-seeder-$APP_VERSION"; _site="$WT"
-    if START_CLI=start-cli-1.1.0 node start9/registry/build-registry-04.js "$START9_S9PK" \
-         --url https://peerloomllc.com/package/v1/pearoffice-seeder.s9pk --icon start9/seeder/icon.png \
-         --out "$_site/registry/0.4/index.json"; then
-      sed -i -E "s#(pearoffice-releases/releases/download/)v[0-9.]+(/pearoffice-seeder_x86_64.s9pk)#\1$RELEASE_TAG\2#" "$_site/_redirects"
-      git -C "$_site" diff --stat
-      if _ask "Open the website PR for the StartOS registry ($APP_VERSION)? (Merging it publishes.)" y; then
-        git -C "$_site" commit -qam "StartOS registry: PearOffice seeder $APP_VERSION"
-        git -C "$_site" push -q -f origin "registry/pearoffice-seeder-$APP_VERSION"
-        (cd "$_site" && gh pr create --title "StartOS registry: PearOffice seeder $APP_VERSION" \
-          --body "pearoffice-seeder $APP_VERSION:0 in registry/0.4/index.json and its s9pk redirect to the $RELEASE_TAG release asset.") \
-          || echo "    WARNING: could not open the website PR."
-      fi
-    else
-      echo "    WARNING: building the StartOS registry entry failed - refresh the website registry by hand."
-    fi
-  fi
 fi
 
 # ---------------------------------------------------------------------------
@@ -1427,8 +1223,6 @@ if $PUBLISH_PLAY; then _report "Google Play" "uploaded"
 elif [ -f "$PLAY_AAB" ] && ! $SKIP_PLAY; then _report "Google Play" "by hand (steps above)"
 else _report "Google Play" "skipped"; fi
 $PUBLISH_APP_STORE && _report "App Store"   "uploaded"  || _report "App Store"   "skipped"
-$UMBREL_BUILT      && _report "Umbrel"      "built"     || _report "Umbrel"      "skipped"
-[ -n "$START9_S9PK" ] && _report "StartOS"  "built"     || _report "StartOS"     "skipped"
 $PUBLISH_NOSTR     && _report "Nostr"       "announced" || _report "Nostr"       "skipped"
 if $PUBLISH_FAILED; then
   echo ""
@@ -1451,48 +1245,4 @@ if $APP_STORE_DEFERRED; then
   echo "      asc review submissions-create --app $ASC_APP_ID --platform IOS"
   echo "      asc review items-add --submission <SID> --item-type appStoreVersions --item-id <VID>"
   echo "      asc review submissions-submit --id <SID> --confirm"
-fi
-
-# ---------------------------------------------------------------------------
-# 13c. Community app store: publish it, then gate on it being published
-#
-# The store serves its default branch, so an open PR publishes nothing. This
-# offers to merge the PR step 7b opened, then checks what origin/master
-# serves, and exits non-zero while it is still the old version: an
-# instruction can be walked past, a failed release cannot. Nothing above is
-# rolled back; this only refuses to call the run clean.
-# ---------------------------------------------------------------------------
-if ! $SKIP_SEEDER_STORE && $UMBREL_BUILT; then
-  _store_repo="$PEERLOOM/peerloom-umbrel-app-store"
-  _branch_pr="pearoffice-seeder-v$APP_VERSION"
-  _pr_state=$(cd "$_store_repo" && gh pr view "$_branch_pr" --json state -q .state 2>/dev/null || echo "")
-  if [ "$_pr_state" = OPEN ]; then
-    echo ""
-    read -rp "    Merge the community store PR for $APP_VERSION now (publishes it)? [y/N] " _r || _r=n
-    if [[ "$_r" == [Yy]* ]]; then
-      # Step 7b's temporary checkout still holds the PR branch, and git will
-      # not delete a branch a worktree is using, which made gh report a
-      # failure after a merge that worked. Remove those checkouts first.
-      _worktree_cleanup
-      git -C "$_store_repo" worktree prune
-      (cd "$_store_repo" && gh pr merge "$_branch_pr" --merge --delete-branch) \
-        || echo "    WARNING: merging the store PR, or deleting its branch, failed (checked below)."
-    fi
-  fi
-  git -C "$_store_repo" fetch -q origin master
-  _served=$(git -C "$_store_repo" show origin/master:peerloom-pearoffice-seeder/umbrel-app.yml 2>/dev/null \
-    | sed -nE 's/^version: "?([0-9.]+)"?.*/\1/p')
-  if [ "$_served" != "$APP_VERSION" ]; then
-    echo ""
-    echo "=========================================================================="
-    echo "  RELEASE INCOMPLETE: the community app store was NOT published"
-    echo "=========================================================================="
-    echo ""
-    echo "  The PeerLoom community store still serves ${_served:-nothing} for the seeder."
-    echo "  Merge ${STORE_PR_URL:-its update PR} so Umbrel users get $APP_VERSION."
-    echo "  Everything else in this release is live."
-    echo ""
-    exit 1
-  fi
-  echo "    Community store serves $APP_VERSION ✓"
 fi
