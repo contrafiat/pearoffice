@@ -13,7 +13,7 @@ const { UpdateApplier } = require('./vendor/peerloom-host/update-apply')
 const CONFIG = {
   name: 'PearOffice',
   slug: 'pearoffice',
-  repo: 'peerloomllc/pearoffice-releases',
+  repo: 'peerloomllc/pearoffice',
   envPrefix: 'PEAROFFICE',
   // The names electron-builder gives them (desktop/package.json).
   assets: {

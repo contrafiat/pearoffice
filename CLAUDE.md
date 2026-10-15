@@ -234,8 +234,10 @@ writes the release notes from the merged PRs (or starts from
 `notes/release-<v>.md` if it exists, suite rule 13) and opens them in
 vi, builds the desktop apps (seeder packages are released from
 `../peerloom-seeder`), then commits the version, pushes
-the tag and publishes, asking before each step: the GitHub release on the
-public `peerloomllc/pearoffice-releases` (a `.sha256` for every file),
+the tag and publishes, asking before each step: the GitHub release on
+this repo (a `.sha256` for every file; until
+`OLD_RELEASES_REPO` is removed from `scripts/app.conf`, also
+`peerloomllc/pearoffice-releases`, where installs up to 1.1.1 check),
 Zapstore, Google Play (the API when gcloud is set up, else the
 Console steps), the App Store (app 6820799007; `scripts/ios-appstore.sh`)
 and a Nostr note. `--check-versions` shows what each place has; `--retag`

@@ -14,8 +14,9 @@
 # Windows. The PearOffice seeder is now PeerLoom Seeder, which has its own
 # release.sh (peerloom-seeder/), so PearOffice has no seeder steps (5c, 5d,
 # 7b, 13c; DECISIONS.md 2026-10-14).
-# The downloads go on the public peerloomllc/pearoffice-releases repo; the tag
-# goes on this (private) one.
+# The downloads go on this repo's releases (RELEASES_REPO), and once more on
+# the old peerloomllc/pearoffice-releases (OLD_RELEASES_REPO) while installed
+# copies still check it.
 #
 # Flags:
 #   vX.Y.Z             Override the auto-detected version
@@ -822,9 +823,28 @@ fi # end NEEDS_BUILD (commit and tag)
 # ---------------------------------------------------------------------------
 # 7. Create GitHub release and upload assets
 #
-# On the public releases repo, where the website and the desktop update check
-# link. Every file with its .sha256 sidecar.
+# On RELEASES_REPO, where the website and the desktop update check link, and
+# on OLD_RELEASES_REPO if set. Every file with its .sha256 sidecar.
 # ---------------------------------------------------------------------------
+# Usage: _publish_release <repo>. Creates the release, or replaces the notes
+# and files of one that exists (--retag).
+_publish_release() {
+  local repo="$1"
+  if gh release view "$RELEASE_TAG" -R "$repo" >/dev/null 2>&1; then
+    echo "    GitHub release $RELEASE_TAG already exists on $repo -- replacing its notes and assets."
+    if ! { gh release edit "$RELEASE_TAG" -R "$repo" --notes-file release_notes.md >/dev/null \
+           && gh release upload "$RELEASE_TAG" -R "$repo" --clobber "${RELEASE_ASSETS[@]}"; }; then
+      PUBLISH_FAILED=true
+      echo "ERROR: updating the GitHub release on $repo failed. Fix and re-run with ./scripts/release.sh $RELEASE_TAG --retag"
+    fi
+  elif gh release create "$RELEASE_TAG" -R "$repo" --title "$APP_NAME $APP_VERSION" \
+         --notes-file release_notes.md "${RELEASE_ASSETS[@]}"; then
+    echo "==> All ${#RELEASE_ASSETS[@]} assets uploaded to $repo."
+  else
+    PUBLISH_FAILED=true
+    echo "ERROR: creating the GitHub release on $repo failed. The tag is pushed; re-run with ./scripts/release.sh $RELEASE_TAG --retag"
+  fi
+}
 if $PUBLISH_GITHUB; then
   echo "==> Creating GitHub release $RELEASE_TAG on $RELEASES_REPO..."
   RELEASE_ASSETS=()
@@ -845,25 +865,13 @@ if $PUBLISH_GITHUB; then
     fi
   fi
   echo ""
-  echo "    Repo   : $RELEASES_REPO"
+  echo "    Repo   : $RELEASES_REPO${OLD_RELEASES_REPO:+ (and $OLD_RELEASES_REPO)}"
   echo "    Tag    : $RELEASE_TAG"
   echo "    Assets :"
   for _a in "${RELEASE_ASSETS[@]}"; do echo "             - $(basename "$_a") ($(du -sh "$_a" | cut -f1))"; done
   _confirm "Create public GitHub release $RELEASE_TAG and upload ${#RELEASE_ASSETS[@]} assets?"
-  if gh release view "$RELEASE_TAG" -R "$RELEASES_REPO" >/dev/null 2>&1; then
-    echo "    GitHub release $RELEASE_TAG already exists -- replacing its notes and assets."
-    if ! { gh release edit "$RELEASE_TAG" -R "$RELEASES_REPO" --notes-file release_notes.md >/dev/null \
-           && gh release upload "$RELEASE_TAG" -R "$RELEASES_REPO" --clobber "${RELEASE_ASSETS[@]}"; }; then
-      PUBLISH_FAILED=true
-      echo "ERROR: updating the GitHub release failed. Fix and re-run with ./scripts/release.sh $RELEASE_TAG --retag"
-    fi
-  elif gh release create "$RELEASE_TAG" -R "$RELEASES_REPO" --title "$APP_NAME $APP_VERSION" \
-         --notes-file release_notes.md "${RELEASE_ASSETS[@]}"; then
-    echo "==> All ${#RELEASE_ASSETS[@]} assets uploaded."
-  else
-    PUBLISH_FAILED=true
-    echo "ERROR: creating the GitHub release failed. The tag is pushed; re-run with ./scripts/release.sh $RELEASE_TAG --retag"
-  fi
+  _publish_release "$RELEASES_REPO"
+  [ -n "${OLD_RELEASES_REPO:-}" ] && _publish_release "$OLD_RELEASES_REPO"
 else
   echo ""
   echo "==> Skipping GitHub release (not selected)."
