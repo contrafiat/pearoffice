@@ -206,9 +206,11 @@ worklet).
 The PearOffice seeder is now PeerLoom Seeder (`../peerloom-seeder`), and its
 packages are retired (2026-10-14). Their last releases run PeerLoom Seeder on
 the old data folder: the Umbrel store entry 1.0.1 and StartOS 1.1.1 (made by
-hand; `release.sh` no longer builds either) and the Linux download, which
-`npm run dist:seeder` still builds for each release so older installs find it
-with `pearoffice-seeder update`. What follows is the history.
+hand; `release.sh` no longer builds either). The Linux download that moves an
+install to PeerLoom Seeder (`npm run dist:seeder`) was never published:
+releases no longer carry a seeder download, so an install from 1.0.0 or
+1.1.0 is told an update is out but cannot download it (decided 2026-10-14).
+What follows is the history.
 
 The Umbrel app (proposals/2026-10-05-umbrel-seeder.md) is the seeder plus
 a web dashboard: `seeder-dist/umbrel/server.js` (login from
@@ -230,9 +232,8 @@ publish to, sets the version everywhere (`scripts/release/bump.js`), runs
 `npm run verify`, builds Android (`scripts/build-android-release.sh`),
 writes the release notes from the merged PRs (or starts from
 `notes/release-<v>.md` if it exists, suite rule 13) and opens them in
-vi, builds the desktop apps and the seeder download (still built so older
-seeder installs update to PeerLoom Seeder; the Umbrel and StartOS packages
-are released from `../peerloom-seeder`), then commits the version, pushes
+vi, builds the desktop apps (seeder packages are released from
+`../peerloom-seeder`), then commits the version, pushes
 the tag and publishes, asking before each step: the GitHub release on the
 public `peerloomllc/pearoffice-releases` (a `.sha256` for every file),
 Zapstore, Google Play (the API when gcloud is set up, else the

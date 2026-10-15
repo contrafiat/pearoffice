@@ -11,11 +11,9 @@
 #
 # Every platform in one run: Android (APK and app bundle), iOS, the desktop
 # app for Mac (Apple silicon and Intel, signed and notarized), Linux and
-# Windows and the Linux seeder download. The PearOffice seeder is now PeerLoom
-# Seeder (peerloom-seeder/ has its own release.sh). The Linux download is
-# still built each release so older installs update to it (it runs PeerLoom
-# Seeder on the old data folder); PearOffice no longer has Umbrel or StartOS
-# packages, so it has no step 5d, 7b or 13c (DECISIONS.md 2026-10-14).
+# Windows. The PearOffice seeder is now PeerLoom Seeder, which has its own
+# release.sh (peerloom-seeder/), so PearOffice has no seeder steps (5c, 5d,
+# 7b, 13c; DECISIONS.md 2026-10-14).
 # The downloads go on the public peerloomllc/pearoffice-releases repo; the tag
 # goes on this (private) one.
 #
@@ -32,7 +30,6 @@
 #   --skip-linux       Skip Linux desktop build (.AppImage + .deb)
 #   --skip-windows     Skip Windows desktop build (.exe)
 #   --skip-macos       Skip macOS desktop builds (.dmg + .zip, both chips)
-#   --skip-seeder      Skip the Linux seeder download
 #   --skip-android     Skip Android APK/AAB build (auto-disables Play + Zapstore;
 #                      the GitHub release re-attaches the previous APK)
 #   --skip-mobile      Skip both Android and iOS builds (shorthand)
@@ -160,7 +157,6 @@ SKIP_DESKTOP=false
 SKIP_LINUX=false
 SKIP_WINDOWS=false
 SKIP_MACOS=false
-SKIP_SEEDER=false
 SKIP_ANDROID=false
 
 for arg in "$@"; do
@@ -176,7 +172,6 @@ for arg in "$@"; do
     --skip-linux) SKIP_LINUX=true ;;
     --skip-windows) SKIP_WINDOWS=true ;;
     --skip-macos) SKIP_MACOS=true ;;
-    --skip-seeder) SKIP_SEEDER=true ;;
     --skip-android) SKIP_ANDROID=true ;;
     --skip-mobile) SKIP_ANDROID=true; SKIP_IOS=true ;;
     v[0-9]*.[0-9]*.[0-9]*)
@@ -332,7 +327,6 @@ AAB_NAME=""
 AAB_SIZE=""
 DESKTOP_ARTIFACTS=()
 _MAC_PID=""
-SEEDER_ARTIFACTS=()
 
 _ask() { # _ask <question> <default y|n> -> 0 for yes
   local _r
@@ -386,9 +380,6 @@ elif _ask "Build the desktop apps (Mac, Linux, Windows)?" y; then
   fi
 else SKIP_DESKTOP=true; echo "    ✗ Desktop apps (skipped)"; fi
 
-if $SKIP_SEEDER; then echo "    - Seeder download (skipped via --skip-seeder)"
-elif _ask "Build the Linux seeder download?" y; then echo "    ✓ Seeder download"
-else SKIP_SEEDER=true; echo "    ✗ Seeder download (skipped)"; fi
 
 if $SKIP_NOSTR; then echo "    - Nostr (skipped via --skip-nostr)"
 elif _ask "Post release announcement to Nostr?" y; then PUBLISH_NOSTR=true; echo "    ✓ Nostr"
@@ -487,7 +478,7 @@ done
 echo ""
 _BUILD_SUMMARY=""
 [ -n "$APK_NAME" ] && _BUILD_SUMMARY="APK ($APK_SIZE), AAB ($AAB_SIZE)"
-[ -z "$_BUILD_SUMMARY" ] && _BUILD_SUMMARY="desktop and seeder only (no mobile artifacts)"
+[ -z "$_BUILD_SUMMARY" ] && _BUILD_SUMMARY="desktop only (no mobile artifacts)"
 _confirm "$_BUILD_SUMMARY look correct — proceed with release notes?"
 
 fi # end NEEDS_BUILD
@@ -627,8 +618,8 @@ if $NEEDS_BUILD; then
 # with its packaged smoke test. The two Mac builds run on the Mac Mini in the
 # background, one after the other (they share its build folder), while Linux
 # and Windows build here one after the other (they share the staged
-# resources in desktop/build/resources), then the seeder download (5c). The Mac copy takes only the source, never the folders the local
-# builds write, and every build names its own files, so they cannot collide.
+# resources in desktop/build/resources). The Mac copy takes only the source,
+# never the folders the local builds write, and every build names its own files, so they cannot collide.
 # The Mac results are collected before 5e. Best-effort: a failed platform is
 # logged and skipped, never blocking the rest of the release.
 # ---------------------------------------------------------------------------
@@ -691,28 +682,6 @@ else
   fi
 fi
 
-# ---------------------------------------------------------------------------
-# 5c. Build the seeder download (Linux x64 and arm64)
-#
-# The headless seeder: Bare runtime, seeder bundle, launcher and systemd unit.
-# The x64 one is started once as a check. Best-effort.
-# ---------------------------------------------------------------------------
-if $SKIP_SEEDER; then
-  echo "==> Skipping the seeder download (--skip-seeder)."
-else
-  echo ""
-  echo "==> Building the seeder download (Linux x64 + arm64)..."
-  if npm run dist:seeder > /tmp/pearoffice-build-seeder.log 2>&1 < /dev/null; then
-    for _arch in x64 arm64; do
-      _f="$REPO_ROOT/dist/seeder-pkg/pearoffice-seeder-$APP_VERSION-linux-$_arch.tar.gz"
-      [ -f "$_f" ] && SEEDER_ARTIFACTS+=("$_f")
-    done
-    echo "    Seeder download OK (${#SEEDER_ARTIFACTS[@]} files)."
-  else
-    echo "    WARNING: seeder download build failed, skipping it. Log: /tmp/pearoffice-build-seeder.log"
-  fi
-fi
-
 # The desktop installers from 5b: the Mac builds finish here.
 if ! $SKIP_DESKTOP; then
   if [ -n "$_MAC_PID" ]; then
@@ -743,7 +712,7 @@ fi
 # The last confirm before anything irreversible: step 6 commits and step 6b
 # pushes the tag. See RELEASE-PIPELINE.md §2.
 # ---------------------------------------------------------------------------
-for _artifact in "${DESKTOP_ARTIFACTS[@]}" "${SEEDER_ARTIFACTS[@]}"; do
+for _artifact in "${DESKTOP_ARTIFACTS[@]}"; do
   [ -z "$_artifact" ] && continue
   [ -f "$_artifact" ] || continue
   ( cd "$(dirname "$_artifact")" && sha256sum "$(basename "$_artifact")" > "$(basename "$_artifact").sha256" )
@@ -756,7 +725,6 @@ echo ""
 _RELEASE_SUMMARY=""
 [ -n "$APK_NAME" ] && _RELEASE_SUMMARY="APK ($APK_SIZE), AAB ($AAB_SIZE)"
 [ ${#DESKTOP_ARTIFACTS[@]} -gt 0 ] && _RELEASE_SUMMARY="${_RELEASE_SUMMARY:+$_RELEASE_SUMMARY, }${#DESKTOP_ARTIFACTS[@]} desktop installer(s)"
-[ ${#SEEDER_ARTIFACTS[@]} -gt 0 ] && _RELEASE_SUMMARY="${_RELEASE_SUMMARY:+$_RELEASE_SUMMARY, }${#SEEDER_ARTIFACTS[@]} seeder download(s)"
 [ -z "$_RELEASE_SUMMARY" ] && _RELEASE_SUMMARY="no new artifacts"
 _confirm "$_RELEASE_SUMMARY ready to publish?"
 
@@ -784,7 +752,6 @@ if $PUBLISH_GITHUB; then
   _have_upload=false
   [ -n "$APK_NAME" ] && [ -f "$APK_NAME" ] && _have_upload=true
   [ ${#DESKTOP_ARTIFACTS[@]} -gt 0 ] && _have_upload=true
-  [ ${#SEEDER_ARTIFACTS[@]} -gt 0 ] && _have_upload=true
   if ! $_have_upload; then
     echo ""
     echo "==> No artifacts to upload — skipping GitHub release step."
@@ -861,7 +828,7 @@ fi # end NEEDS_BUILD (commit and tag)
 if $PUBLISH_GITHUB; then
   echo "==> Creating GitHub release $RELEASE_TAG on $RELEASES_REPO..."
   RELEASE_ASSETS=()
-  for _a in "$APK_NAME" "${DESKTOP_ARTIFACTS[@]}" "${SEEDER_ARTIFACTS[@]}"; do
+  for _a in "$APK_NAME" "${DESKTOP_ARTIFACTS[@]}"; do
     [ -n "$_a" ] && [ -f "$_a" ] || continue
     RELEASE_ASSETS+=("$_a")
     [ -f "${_a}.sha256" ] && RELEASE_ASSETS+=("${_a}.sha256")
