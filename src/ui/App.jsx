@@ -15,6 +15,7 @@ import { applyTheme } from './theme.js'
 import { haptic, hapticTaps } from './haptic.js'
 import { FileHome, KindIcon, NewPanel, RecoverPanel, dragFile, dropTarget, untitled } from './Files.jsx'
 import { DeleteFolderPanel, FolderNamePanel, MoveToFolderPanel, filesIn, useFolders } from './Folders.jsx'
+import { DeletePanel } from './DeletePanel.jsx'
 import { DonationReminder } from './About.jsx'
 import { Onboarding } from './Onboarding.jsx'
 import { CaretRight, CircleNotch, FileArrowUp, FolderSimple, GearSix, House, Info, LinkSimple, List, Plus } from '@phosphor-icons/react'
@@ -178,6 +179,7 @@ export function App () {
   const [droppingFolder, setDroppingFolder] = useState(null)
   const [moving, setMoving] = useState(null) // a file to move to a folder
   const [cardMenu, setCardMenu] = useState(null) // { x, y, file } or { x, y, folder }
+  const [deleting, setDeleting] = useState(null) // { file, kind: 'local' or 'everyone' }
   // Folders open in the side list, per device.
   const [sideOpen, setSideOpen] = useState(() => { try { return JSON.parse(readPref('pearoffice:openFolders') || '[]') } catch { return [] } })
   const toggleSide = (id) => setSideOpen((list) => {
@@ -422,8 +424,10 @@ export function App () {
       {cardMenu && (
         <>
           <div className='doc-scrim' onPointerDown={() => setCardMenu(null)} />
-          <ul className='menu card-menu' role='menu' style={{ right: Math.max(8, window.innerWidth - cardMenu.x), top: Math.min(cardMenu.y + 4, window.innerHeight - 120) }} onClick={() => setCardMenu(null)}>
+          <ul className='menu card-menu' role='menu' style={{ ...(cardMenu.pointer ? { left: Math.max(8, Math.min(cardMenu.x, window.innerWidth - 200)) } : { right: Math.max(8, window.innerWidth - cardMenu.x) }), top: Math.min(cardMenu.y + 4, window.innerHeight - 150) }} onClick={() => setCardMenu(null)}>
             {cardMenu.file && <li role='menuitem' onClick={() => setMoving(cardMenu.file)}>Move to folder...</li>}
+            {cardMenu.file && <li role='menuitem' onClick={() => setDeleting({ file: cardMenu.file, kind: 'local' })}>Remove from this device</li>}
+            {cardMenu.file && cardMenu.file.owner && cardMenu.file.owner.isMe && !cardMenu.file.removed && <li role='menuitem' className='danger' onClick={() => setDeleting({ file: cardMenu.file, kind: 'everyone' })}>Delete for everyone</li>}
             {cardMenu.folder && <li role='menuitem' onClick={() => setNaming({ folder: cardMenu.folder })}>Rename</li>}
             {cardMenu.folder && <li role='menuitem' className='danger' onClick={() => setDroppingFolder(cardMenu.folder)}>Delete folder</li>}
           </ul>
@@ -456,6 +460,17 @@ export function App () {
               setFolder((f) => (f === droppingFolder.id ? null : f))
             } catch (err) { setError(err.message) }
           }}
+        />
+      )}
+      {deleting && (
+        <DeletePanel
+          sheetId={deleting.file.sheetId}
+          title={deleting.file.title || untitled(deleting.file.kind)}
+          noun={deleting.file.kind === 'doc' ? 'document' : deleting.file.kind === 'slides' ? 'deck' : 'sheet'}
+          kind={deleting.kind}
+          onClose={() => setDeleting(null)}
+          onError={setError}
+          onDone={async () => { forget(deleting.file.sheetId); setDeleting(null); await refresh() }}
         />
       )}
       {moving && <MoveToFolderPanel sheetId={moving.sheetId} title={moving.title || untitled(moving.kind)} onClose={() => setMoving(null)} onError={setError} />}
@@ -570,8 +585,8 @@ export function App () {
                     folder={folderRef.current}
                     onFolder={setFolder}
                     onNewFolder={() => setNaming({})}
-                    onFolderMenu={(e, fd) => { const r = e.currentTarget.getBoundingClientRect(); setCardMenu({ x: r.right, y: r.bottom, folder: fd }) }}
-                    onFileMenu={(e, f) => { const r = e.currentTarget.getBoundingClientRect(); setCardMenu({ x: r.right, y: r.bottom, file: f }) }}
+                    onFolderMenu={(fd, at) => setCardMenu({ ...at, folder: fd })}
+                    onFileMenu={(f, at) => setCardMenu({ ...at, file: f })}
                     onDrop={placeFile}
                     desktop={desktop}
                     actions={<StartActions onNew={() => setNewFile(true)} onJoin={() => setJoining('')} onImported={opened} onError={setError} />}

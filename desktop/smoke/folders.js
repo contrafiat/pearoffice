@@ -1,7 +1,8 @@
 // Smoke test part "folders" (proposals/2026-10-10-folders.md): New folder,
 // Move to folder from a card and from the file's own menu, opening a folder,
 // New inside it, dragging a file in and back out, the side list, renaming,
-// reopening and deleting a folder (its files stay).
+// reopening and deleting a folder (its files stay), then a file removed
+// from its right-click menu.
 
 const fs = require('node:fs')
 const path = require('node:path')
@@ -155,5 +156,17 @@ module.exports = async function folders (t) {
   result.folderDelete = true
   step('deleted')
 
-  return result.folderMove && result.folderNewInside && result.folderMenuMove && result.folderDrag && result.folderSide && result.folderSideDrag && result.folderRename && result.folderReopened && result.folderDelete
+  // Right-click a file card: its menu, with both deletes for the owner;
+  // Remove from this device takes it off the list.
+  await js(`(() => { const r = ${cardOf('Tools')}.getBoundingClientRect(); ${cardOf('Tools')}.querySelector('.file-card').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: r.left + 20, clientY: r.top + 20 })) })()`)
+  await waitFor('right-click menu', "[...document.querySelectorAll('.card-menu li')].map((l) => l.textContent).join('|') === 'Move to folder...|Remove from this device|Delete for everyone'")
+  await snap('context-menu')
+  await js("[...document.querySelectorAll('.card-menu li')].find((l) => l.textContent === 'Remove from this device').click()")
+  await waitFor('remove panel', "!!document.querySelector('.panel .primary')")
+  await js("document.querySelector('.panel .primary').click()")
+  await waitFor('Tools removed', `!document.querySelector('.panel') && !${cardOf('Tools')} && !!${cardOf('Seeds')}`)
+  result.fileContextMenu = true
+  step('removed from a right-click menu')
+
+  return result.folderMove && result.folderNewInside && result.folderMenuMove && result.folderDrag && result.folderSide && result.folderSideDrag && result.folderRename && result.folderReopened && result.folderDelete && result.fileContextMenu
 }
