@@ -73,14 +73,26 @@ const RECOVERY_TITLES = {
   copy: 'Nobody else can let this device in. Open it to make a copy you own.'
 }
 
-function FileCard ({ f, onOpen, onWaiting, onRecover, onMenu, draggable, onHold }) {
+// A menu's place: under a menu button's right edge, or at the pointer for a
+// right-click or a held card (the menu then opens to the right).
+const below = (e) => { const r = e.currentTarget.getBoundingClientRect(); return { x: r.right, y: r.bottom } }
+const atPointer = (e) => ({ x: e.clientX, y: e.clientY, pointer: true })
+
+// Right-click opens a card's menu on desktop. Phones hold the card instead
+// (useTouchDrag), so the WebView's own long-press menu is kept away.
+const contextMenu = (desktop, open) => (e) => {
+  e.preventDefault()
+  if (desktop) open(atPointer(e))
+}
+
+function FileCard ({ f, onOpen, onWaiting, onRecover, onMenu, desktop, onHold }) {
   return (
     <li
       className='file-cell'
-      draggable={draggable && !f.joining}
+      draggable={desktop && !f.joining}
       onDragStart={(e) => dragFile(e, f.sheetId)}
       onTouchStart={onHold ? (e) => onHold(e, f) : undefined}
-      onContextMenu={onHold ? (e) => e.preventDefault() : undefined}
+      onContextMenu={contextMenu(desktop, (at) => { if (!f.joining) onMenu(f, at) })}
     >
       <button
         className={'file-card' + (f.waiting ? ' waiting' : '') + (f.removed ? ' removed' : '')}
@@ -102,7 +114,7 @@ function FileCard ({ f, onOpen, onWaiting, onRecover, onMenu, draggable, onHold 
         </span>
       </button>
       {!f.joining && (
-        <button className='card-more icon-button' aria-label='File menu' title='File menu' onClick={(e) => onMenu(e, f)}><DotsThree size={18} weight='bold' /></button>
+        <button className='card-more icon-button' aria-label='File menu' title='File menu' onClick={(e) => onMenu(f, below(e))}><DotsThree size={18} weight='bold' /></button>
       )}
     </li>
   )
@@ -132,14 +144,19 @@ export function dropTarget (onDrop, folder) {
 }
 
 // Phones: hold a file card for a moment, then drag it onto a folder card
-// (or the way back to Your files). A touch that moves first scrolls the
-// list. Drop targets carry data-drop-folder: a folder's id, or 'top'.
-function useTouchDrag (onDrop) {
+// (or the way back to Your files), or let go without moving to open the
+// file's menu. A touch that moves first scrolls the list. Drop targets carry
+// data-drop-folder: a folder's id, or 'top'.
+function useTouchDrag (onDrop, onMenu, canDrag) {
   const [ghost, setGhost] = useState(null) // { x, y, title } while dragging
   const drag = useRef(null) // { sheetId, x, y, on, timer }
   const over = useRef(null)
   const dropRef = useRef(onDrop)
   dropRef.current = onDrop
+  const menuRef = useRef(onMenu)
+  menuRef.current = onMenu
+  const canDragRef = useRef(canDrag)
+  canDragRef.current = canDrag
   const mark = (el) => {
     if (over.current === el) return
     if (over.current) over.current.classList.remove('drop-here')
@@ -156,6 +173,9 @@ function useTouchDrag (onDrop) {
         return
       }
       e.preventDefault() // no scrolling while a file is held
+      if (!canDragRef.current) return
+      if (!d.moved && Math.hypot(t.clientX - d.x, t.clientY - d.y) <= 8) return
+      if (!d.moved) { d.moved = true; setGhost({ x: d.x, y: d.y, kind: d.file.kind, title: d.file.title || untitled(d.file.kind) }) }
       setGhost((g) => g && { ...g, x: t.clientX, y: t.clientY })
       const el = document.elementFromPoint(t.clientX, t.clientY)
       mark(el && el.closest('[data-drop-folder]'))
@@ -170,9 +190,11 @@ function useTouchDrag (onDrop) {
       const el = over.current
       mark(null)
       setGhost(null)
-      if (el && e.type === 'touchend') {
+      if (e.type !== 'touchend') return
+      if (!d.moved) menuRef.current(d.file, { x: d.x, y: d.y, pointer: true })
+      else if (el) {
         const folder = el.dataset.dropFolder
-        dropRef.current(d.sheetId, folder === 'top' ? null : folder)
+        dropRef.current(d.file.sheetId, folder === 'top' ? null : folder)
       }
     }
     document.addEventListener('touchmove', move, { passive: false })
@@ -187,11 +209,10 @@ function useTouchDrag (onDrop) {
   const hold = (e, f) => {
     if (e.touches.length !== 1 || f.joining) return
     const t = e.touches[0]
-    const d = { sheetId: f.sheetId, x: t.clientX, y: t.clientY, on: false }
+    const d = { file: f, x: t.clientX, y: t.clientY, on: false, moved: false }
     d.timer = setTimeout(() => {
       d.on = true
       haptic('press')
-      setGhost({ x: d.x, y: d.y, kind: f.kind, title: f.title || untitled(f.kind) })
     }, 400)
     drag.current = d
   }
@@ -204,10 +225,9 @@ function useTouchDrag (onDrop) {
 export function FileHome ({ files, actions, onOpen, onWaiting, onRecover = onOpen, folders = [], places = {}, folder = null, onFolder = () => {}, onNewFolder = () => {}, onFolderMenu = () => {}, onFileMenu = () => {}, onDrop = () => {}, desktop = false }) {
   const open = folder && folders.find((x) => x.id === folder)
   const shown = filesIn([...files].reverse(), places, open ? open.id : null)
-  const { ghost, hold } = useTouchDrag(onDrop)
   // Phones drag only when there is somewhere to drop.
-  const onHold = !desktop && (open || folders.length > 0) ? hold : null
-  const card = (f) => <FileCard key={f.sheetId} f={f} onOpen={onOpen} onWaiting={onWaiting} onRecover={onRecover} onMenu={onFileMenu} draggable={desktop} onHold={onHold} />
+  const { ghost, hold } = useTouchDrag(onDrop, onFileMenu, !!open || folders.length > 0)
+  const card = (f) => <FileCard key={f.sheetId} f={f} onOpen={onOpen} onWaiting={onWaiting} onRecover={onRecover} onMenu={onFileMenu} desktop={desktop} onHold={desktop ? null : hold} />
   const dragGhost = ghost && (
     <div className='drag-ghost' style={{ left: ghost.x, top: ghost.y }} aria-hidden='true'>
       <KindIcon kind={ghost.kind} size={20} /> {ghost.title}
@@ -219,7 +239,7 @@ export function FileHome ({ files, actions, onOpen, onWaiting, onRecover = onOpe
         <div className='folder-head'>
           <button className='link-button folder-back' data-drop-folder='top' {...(desktop ? dropTarget(onDrop, null) : {})} onClick={() => onFolder(null)}><CaretLeft size={16} aria-hidden='true' /> Your files</button>
           <h1><FolderSimple size={24} weight='duotone' aria-hidden='true' /> {open.name}</h1>
-          <button className='icon-button folder-more' aria-label='Folder menu' title='Folder menu' onClick={(e) => onFolderMenu(e, open)}><DotsThree size={20} weight='bold' /></button>
+          <button className='icon-button folder-more' aria-label='Folder menu' title='Folder menu' onClick={(e) => onFolderMenu(open, below(e))}><DotsThree size={20} weight='bold' /></button>
         </div>
         <div className='files-actions'>{actions}</div>
         {shown.length === 0 && <p className='muted folder-empty'>{desktop ? 'This folder is empty. Drag a file here, or use Move to folder in a file\'s menu.' : 'This folder is empty. Use Move to folder in a file\'s menu.'}</p>}
@@ -236,13 +256,13 @@ export function FileHome ({ files, actions, onOpen, onWaiting, onRecover = onOpe
         {folders.map((x) => {
           const n = filesIn(files, places, x.id).length
           return (
-            <li key={x.id} className='file-cell'>
+            <li key={x.id} className='file-cell' onContextMenu={contextMenu(desktop, (at) => onFolderMenu(x, at))}>
               <button className='file-card folder-card' data-drop-folder={x.id} {...(desktop ? dropTarget(onDrop, x.id) : {})} onClick={() => onFolder(x.id)}>
                 <span className='kind-icon kind-folder'><FolderSimple size={28} weight='duotone' aria-hidden='true' /></span>
                 <span className='file-title'>{x.name}</span>
                 <span className='file-meta'><span className='muted'>{countLabel(n)}</span></span>
               </button>
-              <button className='card-more icon-button' aria-label='Folder menu' title='Folder menu' onClick={(e) => onFolderMenu(e, x)}><DotsThree size={18} weight='bold' /></button>
+              <button className='card-more icon-button' aria-label='Folder menu' title='Folder menu' onClick={(e) => onFolderMenu(x, below(e))}><DotsThree size={18} weight='bold' /></button>
             </li>
           )
         })}
