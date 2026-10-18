@@ -62,16 +62,20 @@ function helpers ({ win, dataDir, result, log }) {
     return fs.existsSync(file) ? fs.readFileSync(file) : Buffer.alloc(0)
   }
 
-  // A new spreadsheet from the sidebar's New, with the grid focused.
+  // A new spreadsheet from the sidebar's New, with the grid focused. With a
+  // sheet already open its grid is on screen before the new one opens, so
+  // the side list's links are marked first and the new file's link (not
+  // marked) must be the open one. On a slow machine (the Intel Mac build
+  // under Rosetta) the grid could otherwise be swapped out mid-focus.
   async function newSheet () {
+    await js("document.querySelectorAll('.sheet-link').forEach((l) => { l.dataset.smokeOld = '1' })")
     await js("document.querySelector('.sidebar .new-sheet').click()")
     await waitFor('kind choices', "!!document.querySelector('.kind-choice.kind-sheet')")
     await js("document.querySelector('.kind-choice.kind-sheet').click()")
-    await waitFor('grid', "!!document.querySelector('.grid .body') && !!document.querySelector('.selection')")
+    await waitFor('new sheet open', "!!document.querySelector('.sheet-link.active:not([data-smoke-old])') && !!document.querySelector('.grid .body') && !!document.querySelector('.selection')")
     // Let the new sheet settle, then make sure the grid has focus.
     await sleep(500)
-    await js("document.querySelector('.grid .body').focus()")
-    await waitFor('grid focus', "document.activeElement === document.querySelector('.grid .body')")
+    await waitFor('grid focus', "(() => { const b = document.querySelector('.grid .body'); if (b && document.activeElement !== b) b.focus(); return !!b && document.activeElement === b })()")
   }
 
   // Saves a screenshot to the file an env var names, if it is set.
