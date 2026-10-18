@@ -14,9 +14,7 @@
 # Windows. The PearOffice seeder is now PeerLoom Seeder, which has its own
 # release.sh (peerloom-seeder/), so PearOffice has no seeder steps (5c, 5d,
 # 7b, 13c; DECISIONS.md 2026-10-14).
-# The downloads go on this repo's releases (RELEASES_REPO), and once more on
-# the old peerloomllc/pearoffice-releases (OLD_RELEASES_REPO) while installed
-# copies still check it.
+# The downloads go on this repo's releases (RELEASES_REPO).
 #
 # Flags:
 #   vX.Y.Z             Override the auto-detected version
@@ -327,6 +325,7 @@ APK_SIZE=""
 AAB_NAME=""
 AAB_SIZE=""
 DESKTOP_ARTIFACTS=()
+DESKTOP_MISSING=() # desktop builds that failed, shown again before the GitHub upload
 _MAC_PID=""
 
 _ask() { # _ask <question> <default y|n> -> 0 for yes
@@ -658,7 +657,8 @@ else
     echo "--> Linux    (skipped via --skip-linux)"
   else
     _desktop "Linux (.AppImage + .deb)" /tmp/pearoffice-build-linux.log npm run dist:linux \
-      && DESKTOP_ARTIFACTS+=("$_DD/pearoffice-$_DV-linux-x86_64.AppImage" "$_DD/pearoffice-$_DV-linux-amd64.deb")
+      && DESKTOP_ARTIFACTS+=("$_DD/pearoffice-$_DV-linux-x86_64.AppImage" "$_DD/pearoffice-$_DV-linux-amd64.deb") \
+      || DESKTOP_MISSING+=("Linux (/tmp/pearoffice-build-linux.log)")
   fi
   if $SKIP_WINDOWS; then
     echo "--> Windows  (skipped via --skip-windows)"
@@ -676,10 +676,12 @@ else
       return "$_s"
     }
     _desktop "Windows (.exe, built and tested on the VM)" /tmp/pearoffice-build-windows.log _win_vm \
-      && DESKTOP_ARTIFACTS+=("$_DD/PearOffice-Setup-$_DV.exe")
+      && DESKTOP_ARTIFACTS+=("$_DD/PearOffice-Setup-$_DV.exe") \
+      || DESKTOP_MISSING+=("Windows (/tmp/pearoffice-build-windows.log)")
   else
     _desktop "Windows (.exe, built with Wine, untested)" /tmp/pearoffice-build-windows.log npm run dist:windows \
-      && DESKTOP_ARTIFACTS+=("$_DD/PearOffice-Setup-$_DV.exe")
+      && DESKTOP_ARTIFACTS+=("$_DD/PearOffice-Setup-$_DV.exe") \
+      || DESKTOP_MISSING+=("Windows (/tmp/pearoffice-build-windows.log)")
   fi
 fi
 
@@ -691,8 +693,10 @@ if ! $SKIP_DESKTOP; then
     wait "$_MAC_PID" || true
     _MAC_PID=""
     cat "$_MAC_DONE/report"
-    [ -e "$_MAC_DONE/arm64" ] && DESKTOP_ARTIFACTS+=("$_DD/PearOffice-$_DV-mac-arm64.dmg" "$_DD/PearOffice-$_DV-mac-arm64.zip")
-    [ -e "$_MAC_DONE/x64" ] && DESKTOP_ARTIFACTS+=("$_DD/PearOffice-$_DV-mac-x64.dmg" "$_DD/PearOffice-$_DV-mac-x64.zip")
+    [ -e "$_MAC_DONE/arm64" ] && DESKTOP_ARTIFACTS+=("$_DD/PearOffice-$_DV-mac-arm64.dmg" "$_DD/PearOffice-$_DV-mac-arm64.zip") \
+      || DESKTOP_MISSING+=("macOS Apple silicon (/tmp/pearoffice-build-mac-arm64.log)")
+    [ -e "$_MAC_DONE/x64" ] && DESKTOP_ARTIFACTS+=("$_DD/PearOffice-$_DV-mac-x64.dmg" "$_DD/PearOffice-$_DV-mac-x64.zip") \
+      || DESKTOP_MISSING+=("macOS Intel (/tmp/pearoffice-build-mac-x64.log)")
   fi
   _have=()
   for _f in "${DESKTOP_ARTIFACTS[@]}"; do
@@ -823,8 +827,8 @@ fi # end NEEDS_BUILD (commit and tag)
 # ---------------------------------------------------------------------------
 # 7. Create GitHub release and upload assets
 #
-# On RELEASES_REPO, where the website and the desktop update check link, and
-# on OLD_RELEASES_REPO if set. Every file with its .sha256 sidecar.
+# On RELEASES_REPO, where the website and the desktop update check link.
+# Every file with its .sha256 sidecar.
 # ---------------------------------------------------------------------------
 # Usage: _upload_asset <repo> <release id> <file>. One file, with curl's
 # progress bar (gh release upload prints nothing until it is done). A file of
@@ -909,13 +913,18 @@ if $PUBLISH_GITHUB; then
     fi
   fi
   echo ""
-  echo "    Repo   : $RELEASES_REPO${OLD_RELEASES_REPO:+ (and $OLD_RELEASES_REPO)}"
+  echo "    Repo   : $RELEASES_REPO"
   echo "    Tag    : $RELEASE_TAG"
   echo "    Assets :"
   for _a in "${RELEASE_ASSETS[@]}"; do echo "             - $(basename "$_a") ($(du -sh "$_a" | cut -f1))"; done
+  if [ ${#DESKTOP_MISSING[@]} -gt 0 ]; then
+    echo ""
+    echo "    !!! MISSING: these desktop builds failed and are not in this release:"
+    for _m in "${DESKTOP_MISSING[@]}"; do echo "    !!!   - $_m"; done
+    echo "    !!! Users of those builds get no update. Fix and add them with --retag, or answer no to stop here."
+  fi
   _confirm "Create public GitHub release $RELEASE_TAG and upload ${#RELEASE_ASSETS[@]} assets?"
   _publish_release "$RELEASES_REPO"
-  [ -n "${OLD_RELEASES_REPO:-}" ] && _publish_release "$OLD_RELEASES_REPO"
 else
   echo ""
   echo "==> Skipping GitHub release (not selected)."

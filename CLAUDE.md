@@ -251,9 +251,8 @@ vi, builds the desktop apps (seeder packages are released from
 `../peerloom-seeder`), then commits the version, pushes
 the tag and publishes, asking before each step: the GitHub release on
 this repo (made as a draft, each file uploaded with a progress bar, then
-published; a `.sha256` for every file; until
-`OLD_RELEASES_REPO` is removed from `scripts/app.conf`, also
-`peerloomllc/pearoffice-releases`, where installs up to 1.1.1 check),
+published; a `.sha256` for every file; `peerloomllc/pearoffice-releases`
+had the releases up to 1.1.2 and gets no more),
 Zapstore, Google Play (the API when gcloud is set up, else the
 Console steps), the App Store (app 6820799007; `scripts/ios-appstore.sh`)
 and a Nostr note. `--check-versions` shows what each place has; `--retag`
@@ -341,6 +340,8 @@ test (`scripts/smoke-packaged.js`) run against the installed-layout app.
   `desktop/build/entitlements.mac.plist` (V8 JIT for Electron and Bare, Bare's
   addons, network). The Intel build is smoke-tested under Rosetta, with four parts
   (sheet-links, docs, slides, app; `SMOKE_PARTS=all` for every one).
+  The packaged smoke runs a failed part once more before it counts as
+  failed; a release drops a build whose smoke fails.
 - `npm run dist:windows` - NSIS installer, built here with Wine (about a
   minute). Staging fails if an addon the bundles load has no Windows file
   (`scripts/check-addons.js`, run for every platform). Before a release,

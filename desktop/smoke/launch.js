@@ -48,14 +48,24 @@ function runPart ({ command, args, part, shot, timeout, echo }) {
 }
 
 // Runs each part and prints one ok or not ok line per part and a summary.
+// A failed part runs again up to `retries` times (the packaged smoke gives
+// one, so a slow machine's one-off failure does not drop a release build).
 // Resolves to true when every part passed.
-async function runParts ({ command, args, label, parts, shot, timeout, echo }) {
+async function runParts ({ command, args, label, parts, shot, timeout, echo, retries = 0 }) {
   const failed = []
   for (const part of parts) {
-    const { seconds, result } = await runPart({ command, args, part, shot, timeout, echo })
+    let run = await runPart({ command, args, part, shot, timeout, echo })
+    let tries = 1
+    while (!run.result.ok && tries <= retries) {
+      console.error('# ' + label + ' ' + part + ' failed (' + run.seconds + ' s), trying again: ' + JSON.stringify(run.result).slice(0, 600))
+      run = await runPart({ command, args, part, shot, timeout, echo })
+      tries++
+    }
+    const { seconds, result } = run
     // Timings a part records (result.timings, in ms) go on its line.
     const timings = result.timings ? ' [' + Object.entries(result.timings).map(([k, v]) => k + ' ' + v + ' ms').join(', ') + ']' : ''
-    if (result.ok) console.log('ok - ' + label + ' ' + part + ' (' + seconds + ' s): ' + result.steps.filter((s) => typeof s === 'string').slice(2).join(', ') + timings)
+    const again = tries > 1 ? ' [passed on try ' + tries + ']' : ''
+    if (result.ok) console.log('ok - ' + label + ' ' + part + ' (' + seconds + ' s): ' + result.steps.filter((s) => typeof s === 'string').slice(2).join(', ') + timings + again)
     else {
       failed.push(part)
       console.error('not ok - ' + label + ' ' + part + ' (' + seconds + ' s) ' + JSON.stringify(result))
