@@ -826,23 +826,67 @@ fi # end NEEDS_BUILD (commit and tag)
 # On RELEASES_REPO, where the website and the desktop update check link, and
 # on OLD_RELEASES_REPO if set. Every file with its .sha256 sidecar.
 # ---------------------------------------------------------------------------
-# Usage: _publish_release <repo>. Creates the release, or replaces the notes
-# and files of one that exists (--retag).
+# Usage: _upload_asset <repo> <release id> <file>. One file, with curl's
+# progress bar (gh release upload prints nothing until it is done). A file of
+# the same name already on the release is replaced. Without a token, or if
+# curl fails, it falls back to gh.
+_upload_asset() {
+  local repo="$1" id="$2" file="$3" name old
+  name=$(basename "$file")
+  old=$(gh api "repos/$repo/releases/$id/assets" --paginate --jq ".[] | select(.name == \"$name\") | .id" 2>/dev/null || true)
+  if [ -n "$GH_TOKEN" ]; then
+    [ -n "$old" ] && gh api -X DELETE "repos/$repo/releases/assets/$old" >/dev/null 2>&1
+    # The bar ends in a bouncing line while GitHub answers, so clear it after.
+    curl -fS --progress-bar -o /dev/null -X POST -T "$file" \
+      -H "Authorization: Bearer $GH_TOKEN" -H "Content-Type: application/octet-stream" \
+      "https://uploads.github.com/repos/$repo/releases/$id/assets?name=$name" \
+      && { printf '\r\033[K' >&2; return 0; }
+    printf '\r\033[K' >&2
+    echo "    curl upload failed, trying gh..."
+  fi
+  gh release upload "$RELEASE_TAG" -R "$repo" --clobber "$file"
+}
+
+# Usage: _publish_release <repo>. Creates the release as a draft, uploads the
+# files one at a time with progress, then publishes it, so nobody sees it
+# half filled. A release that exists (--retag) gets new notes and files.
 _publish_release() {
-  local repo="$1"
+  local repo="$1" id _a _n=0 _of=${#RELEASE_ASSETS[@]} _new=false _ok=true
   if gh release view "$RELEASE_TAG" -R "$repo" >/dev/null 2>&1; then
     echo "    GitHub release $RELEASE_TAG already exists on $repo -- replacing its notes and assets."
-    if ! { gh release edit "$RELEASE_TAG" -R "$repo" --notes-file release_notes.md >/dev/null \
-           && gh release upload "$RELEASE_TAG" -R "$repo" --clobber "${RELEASE_ASSETS[@]}"; }; then
-      PUBLISH_FAILED=true
-      echo "ERROR: updating the GitHub release on $repo failed. Fix and re-run with ./scripts/release.sh $RELEASE_TAG --retag"
-    fi
+    # A draft left by a failed upload is published once the files are in.
+    [ "$(gh release view "$RELEASE_TAG" -R "$repo" --json isDraft --jq .isDraft 2>/dev/null)" = "true" ] && _new=true
+    gh release edit "$RELEASE_TAG" -R "$repo" --notes-file release_notes.md >/dev/null || _ok=false
   elif gh release create "$RELEASE_TAG" -R "$repo" --title "$APP_NAME $APP_VERSION" \
-         --notes-file release_notes.md "${RELEASE_ASSETS[@]}"; then
-    echo "==> All ${#RELEASE_ASSETS[@]} assets uploaded to $repo."
+         --notes-file release_notes.md --draft >/dev/null; then
+    _new=true
   else
     PUBLISH_FAILED=true
     echo "ERROR: creating the GitHub release on $repo failed. The tag is pushed; re-run with ./scripts/release.sh $RELEASE_TAG --retag"
+    return
+  fi
+  id=$(gh release view "$RELEASE_TAG" -R "$repo" --json databaseId --jq .databaseId 2>/dev/null || true)
+  [ -n "$id" ] || _ok=false
+  if $_ok; then
+    echo "==> Uploading $_of files to $repo..."
+    for _a in "${RELEASE_ASSETS[@]}"; do
+      _n=$((_n + 1))
+      echo "    [$_n/$_of] $(basename "$_a") ($(du -h "$_a" | cut -f1))"
+      _upload_asset "$repo" "$id" "$_a" || { _ok=false; break; }
+    done
+  fi
+  if $_ok && $_new; then
+    gh release edit "$RELEASE_TAG" -R "$repo" --draft=false >/dev/null || _ok=false
+  fi
+  if $_ok; then
+    echo "==> All $_of assets uploaded to $repo."
+  else
+    PUBLISH_FAILED=true
+    if $_new; then
+      echo "ERROR: uploading to $repo failed. The release is still a draft there; re-run with ./scripts/release.sh $RELEASE_TAG --retag"
+    else
+      echo "ERROR: updating the GitHub release on $repo failed. Fix and re-run with ./scripts/release.sh $RELEASE_TAG --retag"
+    fi
   fi
 }
 if $PUBLISH_GITHUB; then
