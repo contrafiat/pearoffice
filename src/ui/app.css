@@ -140,6 +140,27 @@ button, input, select { font: inherit; color: inherit; }
 .kind-choice .kind-label { color: var(--ink); font-weight: 600; }
 .kind-choice .kind-soon { color: var(--muted); font-size: 12px; }
 
+/* Templates in New (proposals/2026-10-18-templates.md) */
+.panel.new-file { max-height: min(90vh, 720px); overflow-y: auto; }
+.template-heading { margin: 18px 0 8px; font-size: 14px; font-weight: 600; text-align: center; color: var(--muted); }
+.template-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.template-choice { width: 100%; display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: none; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; font: inherit; color: var(--ink); text-align: left; }
+.template-choice:hover:not(:disabled) { border-color: var(--pear); background: var(--pear-soft); }
+.template-choice:disabled { cursor: default; opacity: 0.6; }
+.template-text { display: flex; flex-direction: column; min-width: 0; }
+.template-title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.template-about { color: var(--muted); font-size: 12px; }
+.template-hint { text-align: center; font-size: 13px; margin: 10px 0 0; }
+.template-search { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+.template-search input { border: 1px solid var(--line-strong); border-radius: 8px; padding: 8px 10px; background: var(--paper); color: var(--ink); font: inherit; }
+.template-kinds { display: flex; gap: 6px; }
+.template-kinds button { flex: 1; padding: 6px 4px; border: 1px solid var(--line-strong); border-radius: 999px; background: none; color: var(--ink); font: inherit; font-size: 13px; cursor: pointer; }
+.template-kinds button.on { background: var(--pear-soft); border-color: var(--pear); color: var(--pear-dark); font-weight: 600; }
+.template-group { display: flex; align-items: center; justify-content: center; gap: 4px; width: 100%; margin: 10px 0 6px; text-decoration: none; }
+.template-group svg { transition: transform 0.15s; }
+.template-group svg.open { transform: rotate(90deg); }
+.badge.template-badge { color: var(--pear-dark); background: var(--pear-soft); }
+
 .sheet { display: flex; flex-direction: column; height: 100%; min-height: 0; }
 
 .toolbar { display: flex; align-items: center; gap: 16px; padding: 10px 14px 8px; background: var(--panel); border-bottom: 1px solid var(--line); }

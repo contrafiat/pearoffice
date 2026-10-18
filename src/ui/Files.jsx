@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { CaretLeft, DotsThree, FileText, FolderPlus, FolderSimple, PresentationChart, Table, X } from '@phosphor-icons/react'
+import { CaretLeft, CaretRight, DotsThree, FileText, FolderPlus, FolderSimple, PresentationChart, Table, X } from '@phosphor-icons/react'
 import { MemberAvatar } from './Avatar.jsx'
 import { filesIn, countLabel } from './Folders.jsx'
 import { haptic } from './haptic.js'
@@ -22,8 +22,39 @@ export function KindIcon ({ kind, size = 20 }) {
   return <span className={'kind-icon kind-' + byKind(kind).kind} title={label}><Icon size={size} weight='duotone' aria-hidden='true' /></span>
 }
 
-// New asks which kind of file.
-export function NewPanel ({ onPick, onClose }) {
+// New asks which kind of file, or which template to start from
+// (proposals/2026-10-18-templates.md): yours and the ones shared with you
+// first, by name, then the built-in ones. Past SEARCH_AFTER templates
+// of your own, a search box and kind buttons narrow the list, and the
+// built-in ones fold into a group that opens on a tap (or while searching).
+const SEARCH_AFTER = 6
+const KIND_FILTERS = [['', 'All'], ['sheet', 'Sheets'], ['doc', 'Documents'], ['slides', 'Slides']]
+
+export function NewPanel ({ onPick, templates = [], builtIn = [], onTemplate, onBuiltIn, onClose }) {
+  const [busy, setBusy] = useState(null)
+  const [query, setQuery] = useState('')
+  const [only, setOnly] = useState('')
+  const [showBuiltIn, setShowBuiltIn] = useState(false)
+  const start = async (key, fn) => { if (busy) return; setBusy(key); try { await fn() } finally { setBusy(null) } }
+  const many = templates.length > SEARCH_AFTER
+  const q = query.trim().toLowerCase()
+  const fits = (kind, ...texts) => (!only || kind === only) && (!q || texts.some((x) => String(x || '').toLowerCase().includes(q)))
+  const mine = templates.filter((f) => fits(f.kind, f.title || untitled(f.kind), f.owner && f.owner.name))
+  const built = builtIn.filter((t) => fits(t.kind, t.title, t.about))
+  // With none of your own the built-in ones are the list; otherwise they
+  // fold away until asked for or searched.
+  const builtOpen = !templates.length || showBuiltIn || !!q
+  const choice = (key, kind, title, about, cls, onClick) => (
+    <li key={key}>
+      <button className={'template-choice' + cls} disabled={!!busy} onClick={() => start(key, onClick)}>
+        <KindIcon kind={kind} size={22} />
+        <span className='template-text'>
+          <span className='template-title'>{title}</span>
+          <span className='template-about'>{busy === key ? 'Making your copy...' : about}</span>
+        </span>
+      </button>
+    </li>
+  )
   return (
     <div className='panel-backdrop' onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
       <section className='panel new-file' role='dialog' aria-label='New file'>
@@ -40,6 +71,32 @@ export function NewPanel ({ onPick, onClose }) {
             </button>
           ))}
         </div>
+        <h3 className='template-heading'>From a template</h3>
+        {many && (
+          <div className='template-search'>
+            <input type='search' aria-label='Search templates' placeholder='Search templates' value={query} onChange={(e) => setQuery(e.target.value)} />
+            <div className='template-kinds' role='group' aria-label='Kind of template'>
+              {KIND_FILTERS.map(([kind, label]) => (
+                <button key={kind || 'all'} className={only === kind ? 'on' : ''} aria-pressed={only === kind} onClick={() => setOnly(kind)}>{label}</button>
+              ))}
+            </div>
+          </div>
+        )}
+        <ul className='template-list'>
+          {mine.map((f) => choice(f.sheetId, f.kind, f.title || untitled(f.kind), f.owner && !f.owner.isMe ? 'Shared by ' + (f.owner.name || 'someone') : 'Yours', '', () => onTemplate(f)))}
+        </ul>
+        {templates.length > 0 && built.length > 0 && (
+          <button className='link-button template-group' aria-expanded={builtOpen} onClick={() => setShowBuiltIn(!showBuiltIn)}>
+            <CaretRight size={14} className={builtOpen ? 'open' : ''} aria-hidden='true' /> Built-in ({built.length})
+          </button>
+        )}
+        {builtOpen && (
+          <ul className='template-list'>
+            {built.map((t) => choice(t.id, t.kind, t.title, t.about, ' built-in', () => onBuiltIn(t.id)))}
+          </ul>
+        )}
+        {!mine.length && !built.length && <p className='muted template-hint'>No templates match.</p>}
+        {!templates.length && <p className='muted template-hint'>Mark any file as a template from its menu to start from it here.</p>}
       </section>
     </div>
   )
@@ -107,6 +164,7 @@ function FileCard ({ f, onOpen, onWaiting, onRecover, onMenu, desktop, onHold })
               <MemberAvatar sheetId={f.sheetId} member={f.owner} size={20} />
             </span>
           )}
+          {f.template && <span className='badge template-badge'>Template</span>}
           {f.joining && !f.waiting && <span className='badge'>joining</span>}
           {f.recovery === 'waiting' && <span className='badge'>waiting to be let in</span>}
           {f.recovery === 'copy' && <span className='badge view-only'>make your copy</span>}

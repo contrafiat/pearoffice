@@ -8,7 +8,7 @@ const { helpers } = require('./smoke/common')
 
 // Parts run only when named: store-shots takes screenshots for the stores.
 const EXTRA_PARTS = ['store-shots']
-const PARTS = ['sheets', 'sheet-files', 'sheet-links', 'docs', 'slides', 'slides-present', 'slides-objects', 'slides-style', 'slides-export', 'slides-import', 'slides-charts', 'folders', 'app', 'onboarding', 'onboarding-restore']
+const PARTS = ['sheets', 'sheet-files', 'sheet-links', 'templates', 'docs', 'slides', 'slides-present', 'slides-objects', 'slides-style', 'slides-export', 'slides-import', 'slides-charts', 'folders', 'app', 'onboarding', 'onboarding-restore']
 
 async function run ({ app, win, ready, log, dataDir, getTray }) {
   const part = process.env.PEAROFFICE_SMOKE_PART

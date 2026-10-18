@@ -7,6 +7,7 @@ const b4a = require('b4a')
 const model = require('../sheet/sheetModel')
 const m = require('./membership')
 const { yOps } = require('./yOps')
+const { hasPictures } = require('./pictures')
 
 const DONATE_AFTER_MS = 14 * 24 * 3600 * 1000
 const INVITE_HOURS = 24
@@ -37,13 +38,15 @@ function createFileHelpers (sheets) {
       const sheet = (await base.view.get('sheet'))?.value
       let people = 0
       let owner = null
+      let myRole
+      const me = hex(ctx.identity.publicKey)
       for await (const { value } of base.view.createReadStream({ gt: 'member/', lt: 'member/~' })) {
         people++
         if (sheet && value.identity === sheet.owner) owner = value
+        if (value.identity === me) myRole = value.role
       }
-      if (!owner) return { people }
-      const me = hex(ctx.identity.publicKey)
-      return { people, owner: { identity: owner.identity, name: owner.name || '', avatarHash: owner.avatarHash || null, isMe: owner.identity === me } }
+      if (!owner) return { people, myRole }
+      return { people, myRole, owner: { identity: owner.identity, name: owner.name || '', avatarHash: owner.avatarHash || null, isMe: owner.identity === me } }
     } catch { return {} }
   }
 
@@ -127,7 +130,7 @@ function createFileHelpers (sheets) {
   return { profileName, viewGet, peopleOf, myRole, frozenInfo, isFrozen, requireOwner, requireEdit, commit, docFor, replicaState, replicaUpdate }
 }
 
-function createFileMethods (sheets, { getJoin, getMoves, getProfiles, getRestoring = () => null }) {
+function createFileMethods (sheets, { getJoin, getMoves, getProfiles, getPictures = () => null, getRestoring = () => null }) {
   const { profileName, viewGet, peopleOf, requireOwner, requireEdit, commit, docFor } = createFileHelpers(sheets)
   // The kind each join's invite named, for a just-joined file whose content
   // has not arrived yet (it would otherwise show as a sheet).
@@ -151,7 +154,7 @@ function createFileMethods (sheets, { getJoin, getMoves, getProfiles, getRestori
         // A file back from the phrase (restoring.js): whether this device is
         // let in yet, and its kind from the keyring until its content arrives.
         const { kindHint, ...recovery } = (getRestoring() && await getRestoring().fileState(value.groupId).catch(() => null)) || {}
-        out.push({ sheetId: value.groupId, title: (e && model.title(e.guarded.doc)) || value.name || '', kind: (e && e.guarded.doc.getMap('meta').get('kind')) || joinKinds.get(value.groupId) || kindHint || 'sheet', joining: joining.has(value.groupId) || undefined, removed: (moved && moved.removed) || undefined, ...(await peopleOf(ctx, value.groupId)), ...recovery })
+        out.push({ sheetId: value.groupId, title: (e && model.title(e.guarded.doc)) || value.name || '', kind: (e && e.guarded.doc.getMap('meta').get('kind')) || joinKinds.get(value.groupId) || kindHint || 'sheet', template: (e && model.isTemplate(e.guarded.doc)) || undefined, joining: joining.has(value.groupId) || undefined, removed: (moved && moved.removed) || undefined, ...(await peopleOf(ctx, value.groupId)), ...recovery })
         joining.delete(value.groupId)
       }
       // Joins that have not been welcomed yet have no base.
@@ -165,6 +168,50 @@ function createFileMethods (sheets, { getJoin, getMoves, getProfiles, getRestori
       await requireEdit(ctx, sheetId)
       const { doc } = await docFor(sheetId)
       return commit(ctx, sheetId, model.setTitle(doc, String(title)))
+    },
+
+    // Templates (proposals/2026-10-18-templates.md). The mark is in the file,
+    // so everyone in it sees it; viewers cannot change it.
+    setTemplate: async ({ sheetId, template }, ctx) => {
+      await requireEdit(ctx, sheetId)
+      const { doc } = await docFor(sheetId)
+      const r = await commit(ctx, sheetId, model.setTemplate(doc, !!template))
+      sheets.changed(sheetId)
+      return r
+    },
+
+    // A new file of this person's own from a template: its content as one
+    // update, without the mark or comments, pictures copied under the new
+    // file's key. Anyone in the template can do it, viewers too.
+    fromTemplate: async ({ sheetId }, ctx) => {
+      const { doc } = await docFor(sheetId)
+      if (!model.isTemplate(doc)) throw new Error('This file is not a template')
+      const title = model.title(doc)
+      const pictures = hasPictures(doc) ? getPictures() : null
+      if (pictures) {
+        const missing = await pictures.ensureAll(sheetId, doc)
+        if (missing.length) throw new Error((missing.length === 1 ? 'A picture in this template is' : missing.length + ' pictures in this template are') + ' not on this device yet. Try again once ' + (missing.length === 1 ? 'it has' : 'they have') + ' arrived.')
+      }
+      const { groupId } = await ctx.createGroup({ name: title })
+      const base = ctx.bases.get(groupId)
+      const e = sheets.entryFor(groupId)
+      e.loading = Promise.resolve()
+      let state = model.templateState(doc)
+      if (pictures) {
+        const scratch = model.createDoc()
+        try {
+          model.applyUpdate(scratch, state)
+          if (await pictures.rehome(sheetId, groupId, scratch)) state = model.encodeState(scratch)
+        } finally { scratch.destroy() }
+      }
+      for (const op of m.foundingOps({ sheetId: groupId, identity: ctx.identity, writerKey: hex(base.local.key), name: await profileName(ctx) })) {
+        await ctx.append(groupId, op)
+      }
+      if (getJoin()) getJoin().addSheet(groupId)
+      model.applyUpdate(e.guarded.doc, state)
+      await commit(ctx, groupId, state)
+      await sheets.attach(groupId)
+      return { sheetId: groupId }
     },
 
     invite: async ({ sheetId, role = 'editor', hours = INVITE_HOURS }, ctx) => {
