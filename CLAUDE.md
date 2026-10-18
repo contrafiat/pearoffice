@@ -331,6 +331,7 @@ test (`scripts/smoke-packaged.js`) run against the installed-layout app.
 - `npm run dist:linux` - AppImage and deb, built here.
 - `npm run dist:mac` (Apple silicon) and `npm run dist:mac:intel` - dmg and
   zip, built on the Mac Mini over SSH in `~/peerloomllc/pearoffice-build`
+  (Intel in `~/peerloomllc/pearoffice-build-x64`, so a release builds both at once)
   (`scripts/build-desktop-mac.sh` drives `scripts/mac-build-desktop.sh` on the
   Mac). Signed with the Developer ID Application certificate and notarized
   with a notarytool profile, both in the Mac's build keychain (empty

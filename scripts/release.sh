@@ -616,7 +616,7 @@ if $NEEDS_BUILD; then
 # --skip-linux / --skip-windows / --skip-macos select inside this step.
 # They run after the notes so the machine works unattended, and each ends
 # with its packaged smoke test. The two Mac builds run on the Mac Mini in the
-# background, one after the other (they share its build folder), while Linux
+# background, at the same time (each chip has its own build folder), while Linux
 # and Windows build here one after the other (they share the staged
 # resources in desktop/build/resources). The Mac copy takes only the source,
 # never the folders the local builds write, and every build names its own files, so they cannot collide.
@@ -643,14 +643,15 @@ else
   if $SKIP_MACOS; then
     echo "--> macOS    (skipped via --skip-macos)"
   else
-    echo "--> macOS    (Apple silicon, then Intel, on the Mac Mini in the background)"
+    echo "--> macOS    (Apple silicon and Intel side by side, on the Mac Mini in the background)"
     _MAC_DONE="$(mktemp -d)"
     (
-      _desktop "macOS, Apple silicon (signed, notarized)" /tmp/pearoffice-build-mac-arm64.log npm run dist:mac \
-        && touch "$_MAC_DONE/arm64"
-      _desktop "macOS, Intel (signed, notarized)" /tmp/pearoffice-build-mac-x64.log npm run dist:mac:intel \
-        && touch "$_MAC_DONE/x64"
-    ) > "$_MAC_DONE/report" 2>&1 < /dev/null &
+      ( _desktop "macOS, Apple silicon (signed, notarized)" /tmp/pearoffice-build-mac-arm64.log npm run dist:mac \
+          && touch "$_MAC_DONE/arm64" ) > "$_MAC_DONE/report-arm64" 2>&1 &
+      ( _desktop "macOS, Intel (signed, notarized)" /tmp/pearoffice-build-mac-x64.log npm run dist:mac:intel \
+          && touch "$_MAC_DONE/x64" ) > "$_MAC_DONE/report-x64" 2>&1 &
+      wait
+    ) < /dev/null &
     _MAC_PID=$!
   fi
   if $SKIP_LINUX; then
@@ -692,7 +693,7 @@ if ! $SKIP_DESKTOP; then
     echo "==> Waiting for the Mac builds on the Mac Mini..."
     wait "$_MAC_PID" || true
     _MAC_PID=""
-    cat "$_MAC_DONE/report"
+    cat "$_MAC_DONE/report-arm64" "$_MAC_DONE/report-x64" 2>/dev/null
     [ -e "$_MAC_DONE/arm64" ] && DESKTOP_ARTIFACTS+=("$_DD/PearOffice-$_DV-mac-arm64.dmg" "$_DD/PearOffice-$_DV-mac-arm64.zip") \
       || DESKTOP_MISSING+=("macOS Apple silicon (/tmp/pearoffice-build-mac-arm64.log)")
     [ -e "$_MAC_DONE/x64" ] && DESKTOP_ARTIFACTS+=("$_DD/PearOffice-$_DV-mac-x64.dmg" "$_DD/PearOffice-$_DV-mac-x64.zip") \

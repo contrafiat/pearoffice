@@ -2,7 +2,9 @@
 # Build and smoke-test the macOS desktop app on the Mac Mini over SSH.
 #
 # Syncs this repo and ../peerloom-core to an isolated folder on the Mac
-# (~/peerloomllc/pearoffice-build, so other apps' copies are untouched),
+# (~/peerloomllc/pearoffice-build for arm64, ~/peerloomllc/pearoffice-build-x64
+# for Intel, so other apps' copies are untouched and the two chips can build
+# at the same time; MAC_BUILD_DIR picks another),
 # installs, stages the resources for darwin-<arch>, runs electron-builder,
 # runs the packaged smoke test there and copies the dmg and zip back to
 # desktop/dist/.
@@ -21,7 +23,8 @@ set -euo pipefail
 
 ARCH="${1:-arm64}"
 MAC="${MAC_MINI_HOST:-Tims-Mac-mini.local}"
-REMOTE="peerloomllc/pearoffice-build"
+SUFFIX=""; [ "$ARCH" = "x64" ] && SUFFIX="-x64"
+REMOTE="${MAC_BUILD_DIR:-peerloomllc/pearoffice-build$SUFFIX}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RSYNC_PATH="/opt/homebrew/bin/rsync"
 
@@ -41,10 +44,10 @@ echo "==> packaged smoke on the Mac"
 APP_DIR=$([ "$ARCH" = "arm64" ] && echo mac-arm64 || echo mac)
 PARTS="${SMOKE_PARTS:-$([ "$ARCH" = "x64" ] && echo sheet-links,docs,slides,app || echo all)}"
 PART_ARG=$([ "$PARTS" = "all" ] || echo "--part $PARTS")
-ssh -o BatchMode=yes "$MAC" "zsh -lc 'cd ~/$REMOTE/pearoffice && node scripts/smoke-packaged.js desktop/dist/$APP_DIR/PearOffice.app/Contents/MacOS/PearOffice $PART_ARG /tmp/pearoffice-mac-smoke.png'"
+ssh -o BatchMode=yes "$MAC" "zsh -lc 'cd ~/$REMOTE/pearoffice && node scripts/smoke-packaged.js desktop/dist/$APP_DIR/PearOffice.app/Contents/MacOS/PearOffice $PART_ARG /tmp/pearoffice-mac-smoke-$ARCH.png'"
 
 echo "==> copy installers back"
 mkdir -p "$ROOT/desktop/dist"
 scp -q "$MAC:$REMOTE/pearoffice/desktop/dist/*.dmg" "$MAC:$REMOTE/pearoffice/desktop/dist/*.zip" "$ROOT/desktop/dist/"
-scp -q "$MAC:/tmp/pearoffice-mac-smoke.png" "$ROOT/desktop/dist/mac-smoke-$ARCH.png" || true
+scp -q "$MAC:/tmp/pearoffice-mac-smoke-$ARCH.png" "$ROOT/desktop/dist/mac-smoke-$ARCH.png" || true
 ls -la "$ROOT/desktop/dist/" | grep -E 'mac|dmg'
