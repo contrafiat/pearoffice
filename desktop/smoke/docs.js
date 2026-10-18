@@ -20,7 +20,13 @@ module.exports = async function docs (t) {
   await key('Return')
   await waitFor('heading', "(document.querySelector('.doc-body h1') || {}).textContent === 'Weekly plan'")
   await type('Hello world')
+  // On a busy machine the typing is still settling (each edit goes to the
+  // worklet and back) when the keys that select arrive, and the selection
+  // is lost; wait for the text, then for 'world' to be selected.
+  await waitFor('typed', "(document.querySelector('.doc-body p') || {}).textContent === 'Hello world'")
+  await sleep(300)
   for (let i = 0; i < 5; i++) await sendMod('Left', ['shift'])
+  await waitFor('word selected', "document.getSelection().toString() === 'world'")
   await sendMod('B', ['control'])
   await waitFor('bold word', "(document.querySelector('.doc-body p strong') || {}).textContent === 'world'")
   await js("(() => { const s = document.querySelector('.doc-tools .size-select'); s.value = '18'; s.dispatchEvent(new Event('change', { bubbles: true })) })()")
