@@ -19,6 +19,24 @@ const hex = (buf) => b4a.toString(buf, 'hex')
 
 // The text a cell shows, and what kind of value it is (the UI right-aligns
 // numbers). Number formats use Excel format codes through SSF.
+// Where a HYPERLINK formula goes: { url } for a web or email address, { to }
+// for a place in the file (#Sheet2!B4, #'My tab'!B4 or a tab's name), or
+// undefined for anything else, which then shows as plain text.
+function formulaLinkOf (doc, link) {
+  if (typeof link !== 'string' || link.length > 2048) return undefined
+  if (/^(https?:\/\/|mailto:)[^\s<>"]+$/i.test(link)) return { url: link }
+  if (link[0] !== '#') return undefined
+  const text = link.slice(1)
+  const tabs = model.tabIds(doc).map((id) => ({ id, name: doc.getMap('tab:' + id).get('name') }))
+  const byName = (n) => tabs.find((t) => String(t.name).toUpperCase() === String(n).toUpperCase())
+  const box = charts.parseRange(text)
+  const tab = box && box.sheet ? byName(box.sheet) : byName(text.replace(/^'(.*)'$/, '$1').replace(/''/g, "'"))
+  if (!tab) return undefined
+  const t = model.tabMap(doc, tab.id)
+  const fits = box && box.r1 <= t.get('rows').length && box.c1 <= t.get('cols').length
+  return { to: { tabId: tab.id, name: tab.name, row: fits ? box.r1 : null, col: fits ? box.c1 : null } }
+}
+
 function present (v, fmt) {
   if (v.error) return { display: v.error, kind: 'error' }
   const value = v.value
@@ -278,8 +296,11 @@ function createSheetMethods (sheets, { getJoin }) {
         if (row === undefined || col === undefined) continue
         const v = values.get(row + ',' + col) || { value: null }
         const fmt = model.getFormat(doc, tab, row, col)
-        const linkTo = fmt.link && fmt.link[0] === '#' ? model.linkTarget(doc, fmt.link) || { gone: true } : undefined
-        cells.push({ row, col, input: model.getInput(doc, tab, row, col), ...present(v, fmt), volatile: v.volatile, fmt, linkTo, spill: v.spill, blocked: v.blocked })
+        let linkTo = fmt.link && fmt.link[0] === '#' ? model.linkTarget(doc, fmt.link) || { gone: true } : undefined
+        // A HYPERLINK formula's address, when the cell has no link of its own.
+        const formulaLink = !fmt.link ? formulaLinkOf(doc, v.link) : undefined
+        if (formulaLink && formulaLink.to) linkTo = formulaLink.to
+        cells.push({ row, col, input: model.getInput(doc, tab, row, col), ...present(v, fmt), volatile: v.volatile, fmt, linkTo, formulaLink: formulaLink && (formulaLink.url || '#'), spill: v.spill, blocked: v.blocked })
       }
       // Cells a spilling formula fills (proposals/2026-10-04-spilling-formulas.md).
       // They take the anchor's number format unless they have their own.

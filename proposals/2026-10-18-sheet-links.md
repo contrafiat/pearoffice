@@ -107,7 +107,9 @@ an older build sees them. A later build can pick them up again.
 ## Open questions
 
 1. **HYPERLINK() formula.** Excel files use `=HYPERLINK(url, label)`.
-   Supporting it means the formula engine passes a link to the grid along
-   with the value. Proposed: a follow-up, not this change.
+   Done 2026-10-18 as a follow-up (T1: computed on each device, nothing
+   stored). The cell shows the label and links to the address (web, email
+   or `#Sheet2!B4`); a cell that refers to it gets only the text, as in
+   Excel. The card opens it; the formula is where it is changed.
 2. **Links to a range** (`Costs!B4:D9`, selecting the block) or to a
    named range. Proposed: a follow-up; this change goes to the first cell.

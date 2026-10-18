@@ -1,8 +1,8 @@
 // Smoke test part "sheet-links": links in cells
 // (proposals/2026-10-18-sheet-links.md). A web link from the toolbar on an
 // empty cell, a link to a cell from the cell menu, Ctrl+click, the card's
-// Open and Remove, a typed web address drawn as a link, then the .xlsx round
-// trip.
+// Open and Remove, a typed web address drawn as a link, a HYPERLINK formula,
+// then the .xlsx round trip.
 
 const fs = require('node:fs')
 const path = require('node:path')
@@ -72,6 +72,17 @@ module.exports = async function sheetLinks (t) {
   await waitFor('A4 link removed', `!${isLink(4, 1)} && ${cellNode(4, 1)}.textContent === 'temp'`)
   step('typed address and remove')
 
+  // A5: a HYPERLINK formula shows its label and opens from the card, which
+  // has no Edit or Remove (the formula holds the link).
+  await key('Down')
+  await enter('=HYPERLINK("https://pears.com/f", "Pears")', 'Enter', 'Pears')
+  await key('Up')
+  await waitFor('formula link', isLink(5, 1) + ` && !!${card} && !${card}.querySelector('[aria-label="Edit link"]')`)
+  await js(card + ".querySelector('[aria-label=\"Open link\"]').click()")
+  for (const t0 = Date.now(); !opened().includes('https://pears.com/f') && Date.now() - t0 < 5000;) await sleep(100)
+  result.formulaLink = opened().includes('https://pears.com/f')
+  step('HYPERLINK')
+
   // Save as .xlsx and open it again: the links come back.
   await more('Save as an Excel file')
   const files = fs.existsSync(downloads) ? fs.readdirSync(downloads) : []
@@ -96,5 +107,5 @@ module.exports = async function sheetLinks (t) {
   result.roundTrip = true
   step('xlsx round trip')
 
-  return result.webLink && result.innerLink && result.roundTrip
+  return result.webLink && result.innerLink && result.formulaLink && result.roundTrip
 }

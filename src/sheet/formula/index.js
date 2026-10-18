@@ -82,6 +82,8 @@ function evaluateSheet (doc) {
   const deciding = new Set() // anchor keys whose spill is being worked out
   const skipped = new Map() // anchor key -> cell keys looked up while it was in progress
   const probes = [] // depth at which each active probe started
+  const evaluating = [] // formula cell keys, innermost last
+  const links = new Map() // formula cell key -> the address its HYPERLINK gave
   let depth = 0
 
   const keyOf = (tab, row, col) => tab.id + '|' + row + ',' + col
@@ -154,6 +156,7 @@ function evaluateSheet (doc) {
       return new FormulaError(CIRCULAR)
     }
     visiting.set(key, depth++)
+    evaluating.push(key)
     let v
     try {
       const raw = rawAt(tab, row, col)
@@ -179,6 +182,8 @@ function evaluateSheet (doc) {
         throw err instanceof ProbeAbort ? err : err.details
       }
       v = new FormulaError(errorCode(err))
+    } finally {
+      evaluating.pop()
     }
     visiting.delete(key)
     depth--
@@ -416,6 +421,20 @@ function evaluateSheet (doc) {
       if (n >= 14) return plain.AGGREGATE({ value: n }, { value: opt }, valuesOf(context, rest[0], skip), ...rest.slice(1).map((a) => ({ value: scalar(context, a) })))
       return plain.AGGREGATE({ value: n }, { value: opt }, joined(context, rest, skip))
     }
+    // HYPERLINK(address, [label]) shows the label (else the address) and
+    // makes its own cell a link (proposals/2026-10-18-sheet-links.md). A
+    // cell that refers to it gets only the text, as in Excel.
+    const first = (a) => {
+      const v = a && !a.omitted ? a.value : undefined
+      const x = Array.isArray(v) ? (Array.isArray(v[0]) ? v[0][0] : v[0]) : v
+      if (x instanceof FormulaError) throw x
+      return x === undefined || x === null ? '' : x
+    }
+    p.functions.HYPERLINK = (address, label) => {
+      const to = String(first(address))
+      if (evaluating.length) links.set(evaluating[evaluating.length - 1], to)
+      return label && !label.omitted ? first(label) : to
+    }
     parsers.set(pkey, p)
     return p
   }
@@ -443,6 +462,7 @@ function evaluateSheet (doc) {
       const cell = toCell(valueAt(tab, row, col))
       if (isFormula(raw)) {
         if (VOLATILE.test(raw)) cell.volatile = true
+        if (links.has(keyOf(tab, row, col)) && !cell.error) cell.link = links.get(keyOf(tab, row, col))
         const st = spills.get(keyOf(tab, row, col))
         if (st && st.blocked) cell.blocked = st.blocked
         else if (st) cell.spill = { rows: st.rows, cols: st.cols }

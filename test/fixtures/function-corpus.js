@@ -110,6 +110,7 @@ const formulas = [
   '=ADDRESS(2, 3)', '=ADDRESS(2, 3, 4)', '=CHOOSE(2, "a", "b", "c")', '=COLUMN(C5)', '=COLUMNS(A1:D1)',
   '=HLOOKUP(4, K1:L2, 2, FALSE)', '=INDEX(A1:B10, 3, 2)', '=MATCH(7, A1:A10, 0)', '=ROW(B7)', '=ROWS(A1:A10)',
   '=SUM(TRANSPOSE(A1:A3))', '=VLOOKUP("cherry", C1:D6, 2, FALSE)',
+  '=HYPERLINK("https://pears.com", "Pears")', '=HYPERLINK("https://pears.com")', '=HYPERLINK("#Sheet1!B4", C1)',
 
   // Text
   '=CHAR(65)', '=CLEAN("a"&CHAR(7)&"b")', '=CODE("A")', '=CONCAT(C1, "-", C2)', '=CONCATENATE("a", "b")',
