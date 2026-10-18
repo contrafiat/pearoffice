@@ -49,7 +49,8 @@ test('removal moves the sheet to fresh keys', async (t) => {
   await waitFor('owner has the edit', async () => (await grid(owner, oldId))['2,1'] === '=A1*2 -> 200')
 
   // Late is offline while the owner removes someone, and edits while away:
-  // the edit exists only on Late's device.
+  // the edit exists only on Late's device. Late must be able to write first.
+  await waitFor('late writable', async () => late.bases.get(oldId).writable)
   await late.swarm.destroy()
   await call(late, 'sheet:setCell', { sheetId: oldId, row: 5, col: 1, input: 'typed offline' })
   await late.close()
