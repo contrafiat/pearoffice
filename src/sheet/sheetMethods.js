@@ -208,6 +208,14 @@ function createSheetMethods (sheets, { getJoin }) {
       if (base) for await (const { value } of base.view.createReadStream({ gt: 'member/', lt: 'member/~' })) names[value.identity] = value.name
       const nameOf = (author) => names[author] || (String(author).startsWith('xlsx:') ? String(author).slice(5) : '') || 'Someone'
       const noteOf = (t) => [t, ...t.replies].filter((c) => !c.deleted).map((c) => nameOf(c.author) + ': ' + c.text).join('\n')
+      // A link as the files take it: the address, or { tab (its index), row, col }.
+      const order = model.tabIds(doc)
+      const linkOut = (link) => {
+        if (!link) return {}
+        if (link[0] !== '#') return { link }
+        const to = model.linkTarget(doc, link)
+        return to ? { linkTo: { tab: order.indexOf(to.tabId), row: to.row, col: to.col } } : {}
+      }
       const tabs = model.tabIds(doc).map((id) => {
         const t = model.tabMap(doc, id)
         const rows = t.get('rows').toArray()
@@ -222,7 +230,8 @@ function createSheetMethods (sheets, { getJoin }) {
           const col = colIndex.get(colId)
           if (row === undefined || col === undefined) continue
           const val = v.get(row + ',' + col) || { value: null }
-          cells.push({ row, col, input: model.getInput(doc, id, row, col), value: val.error ? null : val.value, error: val.error, fmt: model.getFormat(doc, id, row, col), spill: val.spill })
+          const fmt = model.getFormat(doc, id, row, col)
+          cells.push({ row, col, input: model.getInput(doc, id, row, col), value: val.error ? null : val.value, error: val.error, fmt, spill: val.spill, ...linkOut(fmt.link) })
         }
         // Formatted cells with nothing in them, so their style goes out too.
         const seen = new Set(cells.map((x) => x.row + ',' + x.col))
@@ -269,7 +278,8 @@ function createSheetMethods (sheets, { getJoin }) {
         if (row === undefined || col === undefined) continue
         const v = values.get(row + ',' + col) || { value: null }
         const fmt = model.getFormat(doc, tab, row, col)
-        cells.push({ row, col, input: model.getInput(doc, tab, row, col), ...present(v, fmt), volatile: v.volatile, fmt, spill: v.spill, blocked: v.blocked })
+        const linkTo = fmt.link && fmt.link[0] === '#' ? model.linkTarget(doc, fmt.link) || { gone: true } : undefined
+        cells.push({ row, col, input: model.getInput(doc, tab, row, col), ...present(v, fmt), volatile: v.volatile, fmt, linkTo, spill: v.spill, blocked: v.blocked })
       }
       // Cells a spilling formula fills (proposals/2026-10-04-spilling-formulas.md).
       // They take the anchor's number format unless they have their own.
@@ -319,6 +329,7 @@ function createSheetMethods (sheets, { getJoin }) {
     }),
     'sheet:clearRange': mutate((doc, tab, a) => model.clearRange(doc, tab, a.r1, a.c1, a.r2, a.c2)),
     'sheet:setFormatRange': mutate((doc, tab, a) => model.setFormatRange(doc, tab, a.r1, a.c1, a.r2, a.c2, a.patch || {})),
+    'sheet:setLink': mutate((doc, tab, a) => model.setLink(doc, tab, a.r1, a.c1, a.r2, a.c2, a.link || null)),
     'sheet:insertRows': mutate((doc, tab, a) => model.insertRows(doc, tab, a.at, a.count || 1)),
     'sheet:deleteRows': mutate((doc, tab, a) => model.deleteRows(doc, tab, a.at, a.count || 1)),
     'sheet:insertCols': mutate((doc, tab, a) => model.insertCols(doc, tab, a.at, a.count || 1)),

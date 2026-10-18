@@ -14,6 +14,7 @@ import { CommentPanel, CommentsList } from './CommentPanel.jsx'
 import { ValidationPanel } from './ValidationPanel.jsx'
 import { CondFormatPanel } from './CondFormatPanel.jsx'
 import { NamesPanel } from './NamesPanel.jsx'
+import { LinkBar, LinkCard, linkOf, linkLabel } from './links.jsx'
 import { parseRange } from '../../sheet/charts.js'
 import { evaluate as evaluateColours } from '../../sheet/condFormat.js'
 import { typed, allows, explain, ruleFor } from '../../sheet/validation.js'
@@ -22,7 +23,7 @@ import { ChartPanel } from './ChartPanel.jsx'
 import { ChartView, downloadChart, chartSvg } from './Chart.jsx'
 import { guessChart } from '../../sheet/charts.js'
 import { readPref, writePref } from '../prefs.js'
-import { Minus, ArrowCounterClockwise, ArrowClockwise, TextB, TextItalic, TextAUnderline, PaintBucket, Copy, Scissors, ClipboardText, Eraser, Numpad, FileXls, Plus, MagnifyingGlass, X, ChartBar, PencilSimple, DownloadSimple, Trash, TextUnderline, TextStrikethrough, TextAlignLeft, TextAlignCenter, TextAlignRight, ArrowUDownLeft, FrameCorners, AlignTop, AlignCenterVertical, AlignBottom, ArrowsOutLineHorizontal } from '@phosphor-icons/react'
+import { Minus, ArrowCounterClockwise, ArrowClockwise, TextB, TextItalic, TextAUnderline, PaintBucket, Copy, Scissors, ClipboardText, Eraser, Numpad, FileXls, Plus, MagnifyingGlass, X, ChartBar, PencilSimple, DownloadSimple, Trash, TextUnderline, TextStrikethrough, TextAlignLeft, TextAlignCenter, TextAlignRight, ArrowUDownLeft, FrameCorners, AlignTop, AlignCenterVertical, AlignBottom, ArrowsOutLineHorizontal, LinkSimple } from '@phosphor-icons/react'
 import { FormulaHelp, helpFor, insertFunction, canPoint, refText } from './FormulaHelp.jsx'
 import { exportSheet, exportOds, exportCsv, exportJson, printTab, isMobile } from './xlsx.js'
 import { usePrintKey } from '../printKey.js'
@@ -174,6 +175,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
   const [colouring, setColouring] = useState(false) // the conditional formatting panel
   const [naming, setNaming] = useState(null) // { adding } while the names panel is open
   const [goingTo, setGoingTo] = useState(null) // text typed in the name box
+  const [linking, setLinking] = useState(null) // { initial, hasLink } while the link bar is open
   // A menu opened near an edge (a long press on a phone) moves to fit on screen.
   const menuRef = useRef(null)
   // The tab strip scrolls sideways when tabs do not fit; keep the open one in view.
@@ -356,6 +358,36 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
   }, [sheetId, tabId, onError])
 
   const focusGrid = () => gridRef.current && gridRef.current.focus()
+
+  // Links (proposals/2026-10-18-sheet-links.md). A web link opens in the
+  // browser; one inside the file selects its cell, or the tab's first.
+  const selLink = linkOf(selected)
+  const ownLink = (l) => !!(l && (l.stored || l.to || l.gone))
+  function openLink (row, col) {
+    const l = linkOf(cells.get(row + ',' + col))
+    if (!l || l.gone) return
+    if (l.url) { call('app:openUrl', { url: l.url }).catch(() => {}); return }
+    if (l.to.tabId !== view.tabId) setTabId(l.to.tabId)
+    setSel({ row: l.to.row || 1, col: l.to.col || 1 })
+    setExt({ row: l.to.row || 1, col: l.to.col || 1 })
+  }
+  function startLink () {
+    if (!canEdit) return
+    setLinking({ initial: ownLink(selLink) ? linkLabel(selLink) : '', hasLink: ownLink(selLink) })
+  }
+  async function applyLink (link, text) {
+    const box = { ...range }
+    setLinking(null)
+    afterPanel()
+    // On an empty cell the link is also its text.
+    if (box.r1 === box.r2 && box.c1 === box.c2 && !(selected && selected.input)) await run('sheet:setCell', { row: box.r1, col: box.c1, input: typeof link === 'string' ? link : text })
+    await run('sheet:setLink', { ...box, link })
+  }
+  function removeLink () {
+    setLinking(null)
+    afterPanel()
+    run('sheet:setLink', { ...range, link: null })
+  }
   // After a panel closes: back to the grid on desktop; on phones drop focus
   // instead, so the keyboard the panel opened goes away.
   const afterPanel = () => {
@@ -792,6 +824,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
     if (mod && (k === 'i' || k === 'I')) { e.preventDefault(); toggle('i'); return }
     if (mod && (k === 'u' || k === 'U')) { e.preventDefault(); toggle('u'); return }
     if (mod && k === '5') { e.preventDefault(); toggle('s'); return }
+    if (mod && (k === 'k' || k === 'K')) { e.preventDefault(); startLink(); return }
     if (mod) return
     const moves = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1] }
     if (moves[k]) { e.preventDefault(); moveBy(...moves[k], e.shiftKey); return }
@@ -1075,6 +1108,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
           ><ArrowsOutLineHorizontal size={ICON} />
           </button>
           <button title='Insert a chart of the selection' aria-label='Insert chart' className='insert-chart' onClick={() => insertChart().catch((err) => onError(err.message))}><ChartBar size={ICON} /></button>
+          <button title='Link (Ctrl+K)' aria-label='Link' className={ownLink(selLink) ? 'on' : ''} onClick={startLink}><LinkSimple size={ICON} /></button>
           {phone && (
             <>
               <span className='sep' />
@@ -1125,6 +1159,19 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
           onBlur={() => { if (editing) commit(null) }}
         />
       </div>
+      {linking && (
+        <LinkBar
+          key={sel.row + ',' + sel.col}
+          initial={linking.initial}
+          hasLink={linking.hasLink}
+          tabs={view.tabs}
+          tabId={view.tabId}
+          onApply={applyLink}
+          onRemove={removeLink}
+          onClose={() => { setLinking(null); afterPanel() }}
+          onError={onError}
+        />
+      )}
       {selected && selected.blocked && (
         <div className='spill-note' role='status'>
           {spillReason(selected.blocked)}
@@ -1191,7 +1238,19 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
         onAutoFit={(col) => { const px = fitWidth(view.cells, col); if (px && canEdit) run('sheet:setWidth', { col, px }) }}
         filterHead={filterHead}
         onFilterMenu={(col) => setFiltering(col)}
+        onOpenLink={openLink}
       />
+      {selLink && !editing && !linking && !menu && range.r1 === range.r2 && range.c1 === range.c2 && (
+        <LinkCard
+          row={sel.row}
+          col={sel.col}
+          link={selLink}
+          canEdit={canEdit}
+          onOpen={() => openLink(sel.row, sel.col)}
+          onEdit={startLink}
+          onRemove={removeLink}
+        />
+      )}
 
       {confirmMerge && (
         <div className='panel-backdrop' onMouseDown={(e) => { if (e.target === e.currentTarget) setConfirmMerge(null) }}>
@@ -1430,6 +1489,9 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
               {canEdit && <li role='menuitem' onClick={() => { setMenu(null); setValidating({ ...range }) }}>Validation...</li>}
               {canEdit && <li role='menuitem' onClick={() => { setMenu(null); setColouring(true) }}>Conditional formatting...</li>}
               {canEdit && <li role='menuitem' onClick={() => { setMenu(null); setNaming({ adding: true }) }}>Name this range...</li>}
+              {selLink && !selLink.gone && <li role='menuitem' onClick={() => { setMenu(null); openLink(sel.row, sel.col) }}>Open link</li>}
+              {canEdit && <li role='menuitem' onClick={() => { setMenu(null); startLink() }}>{ownLink(selLink) ? 'Edit link...' : 'Insert link...'}</li>}
+              {canEdit && ownLink(selLink) && <li role='menuitem' onClick={() => { setMenu(null); removeLink() }}>Remove link</li>}
               {(canEdit || threadAt.has(sel.row + ',' + sel.col)) && <li role='menuitem' onClick={() => { setMenu(null); setCommenting({ row: sel.row, col: sel.col }) }}>{threadAt.has(sel.row + ',' + sel.col) ? 'Show comments' : 'Comment'}</li>}
               {canEdit && <li role='menuitem' className='danger' onClick={() => { setMenu(null); run('sheet:clearRange', range) }}>Clear contents</li>}
             </>

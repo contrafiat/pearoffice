@@ -21,6 +21,7 @@ import { isPptxFile, importPresentation } from '../slides/pptxImport.js'
 import { isOdpFile, readOdp } from '../slides/odp.js'
 import { checkZip } from '../slides/importOoxml.js'
 import { borderCss, fontPx, FONTS, BASE_FONT_PX } from './cellStyle.js'
+import { linkOf } from './links.jsx'
 
 // The printed page draws the default text at 11px.
 const PRINT = 11 / BASE_FONT_PX
@@ -216,7 +217,10 @@ export function tabHtml (view, chartSvgs = []) {
         f.bl ? 'border-left:' + borderCss(f.bl) : ''
       ].filter(Boolean).join(';')
       const spanAttrs = m ? (m.c2 > m.c1 ? ' colspan="' + (Math.min(m.c2, cols) - m.c1 + 1) + '"' : '') + (m.r2 > m.r1 ? ' rowspan="' + (Math.min(m.r2, rows) - m.r1 + 1) + '"' : '') : ''
-      body += '<td' + spanAttrs + (style ? ' style="' + style + '"' : '') + '>' + esc(x ? x.display : '') + '</td>'
+      // A web or email link stays clickable in the PDF.
+      const link = linkOf(x)
+      const text = esc(x ? x.display : '')
+      body += '<td' + spanAttrs + (style ? ' style="' + style + '"' : '') + '>' + (link && link.url ? '<a href="' + esc(link.url).replace(/"/g, '&quot;') + '">' + text + '</a>' : text) + '</td>'
     }
     body += '</tr>'
   }
@@ -224,7 +228,7 @@ export function tabHtml (view, chartSvgs = []) {
   return '<!doctype html><html><head><meta charset="utf-8"><title>' + esc(view.title) + '</title><style>' +
     'body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:11px;margin:0}' +
     'h1{font-size:14px;margin:0 0 8px}table{border-collapse:collapse;table-layout:fixed}' +
-    'td{border:1px solid #ccc;padding:2px 4px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}' +
+    'td{border:1px solid #ccc;padding:2px 4px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}td a{color:#44702a}' +
     '.chart{margin-top:16px;break-inside:avoid;page-break-inside:avoid}.chart svg{max-width:100%;height:auto}' +
     '</style></head><body><h1>' + esc(view.title) + (view.tabs.length > 1 ? ' - ' + esc(tab) : '') + '</h1>' +
     '<table><colgroup>' + colgroup + '</colgroup>' + body + '</table>' +

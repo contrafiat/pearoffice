@@ -55,20 +55,21 @@ A format attribute, `link`, stored like the others: `fmt` key
 `<rowId>:<colId>:link`, value the address string. Being its own key means
 one person changing a link and another making the cell bold do not
 overwrite each other. Because it is a format attribute it already moves with
-copy and paste, fill, sort, insert and delete of rows and columns, and tidy
-up. Clearing a cell's contents also removes its link.
+fill, sort, insert and delete of rows and columns, and tidy up. Copy and
+paste carry text only, as for every other format. Clearing a cell's
+contents also removes its link.
 
 ## Files
 
 - **.xlsx:** import reads SheetJS's `cell.l.Target`; export writes it back.
   A link to a place in the workbook (`location`, e.g. `Sheet2!A1`) becomes
-  a link inside the file; one to a defined name or a cell past the tab's
-  size goes to the tab.
+  a link inside the file; one to a workbook-wide name goes to the name's
+  first cell, and one to a cell past the tab's size goes to the tab.
 - **.ods:** a link is a `text:a` around the cell's text; inside the file
-  it is `#Sheet2.A1`. Read and written in
-  our own ODS code if SheetJS gets them wrong, as it does formulas.
+  it is `#Sheet2.A1`. SheetJS reads and writes both kinds correctly
+  (checked against LibreOffice), so no ODS code of our own is needed.
 - **.csv and .json:** only the text, as today.
-- **PDF and printing:** drawn as links, and clickable in the PDF.
+- **PDF and printing:** web and email links are clickable in the PDF.
 
 ## Compat
 
@@ -92,8 +93,9 @@ them.
   with sort, fill, paste and row deletion; clear removes it.
 - .xlsx and .ods round trips in `test/`, with LibreOffice reading our
   export (`scripts/check-ods-view.py` style check for the link target).
-- Smoke (`sheets` or `sheet-files` part): add a link from the toolbar and
-  from the cell menu, the card shows, Remove, reopen, export and import.
+- Smoke, a new `sheet-links` part: add a link from the toolbar and from
+  the cell menu, the card, Open, Ctrl+click, Remove, a typed address, then
+  export and import.
 - Android emulator: long-press menu, the card and opening in the browser.
 - `npm run verify` green.
 

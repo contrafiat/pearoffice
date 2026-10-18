@@ -78,6 +78,8 @@ A first launch shows a welcome, asks your name and gives a short tour
 (`src/ui/Onboarding.jsx`; once per device, `app:onboarding` and
 `app:onboarded`; a device with a file or a name counts as done). Settings
 and About replay the tour.
+Sheet cells can hold links to web pages, email addresses or another tab or
+cell (proposals/2026-10-18-sheet-links.md).
 See `TODO.md`.
 
 ## Layout
@@ -165,7 +167,9 @@ Code that works for any kind of file sits apart from each editor's own
   toolbar keeps to one row (`toolOverflow.jsx`: tools that do not fit get
   `data-tool-hidden`, More tools shows them all; `tool-keep` items stay).
   `src/ui/sheet/` is the spreadsheet editor
-  (grid, toolbar, its panels, charts, `xlsx.js` file handling). Talks only to
+  (grid, toolbar, its panels, charts, `xlsx.js` file handling, `links.jsx`
+  for links in cells: the link bar and the card under a linked cell;
+  proposals/2026-10-18-sheet-links.md). Talks only to
   `window.pearoffice` (`call`, `on`), which the desktop preload and the mobile
   WebView provide. Built to `dist/ui` by `scripts/build-ui.mjs`.
 - `desktop/` - the Electron shell: `main.js` starts the worklet bundle with
@@ -369,7 +373,7 @@ take five scenes: files, sheet, document, slides, sharing.
   bundle must create, edit and read a sheet over stdin/stdout, and the seeder
   bundle must start and print a pairing link.
 - `npm run smoke:desktop`: drives the real UI in Electron with an offscreen
-  window and real key and mouse events, in fourteen parts. Each part is its own
+  window and real key and mouse events, in fifteen parts. Each part is its own
   launch with a throwaway data folder and a 60 s limit, and prints one
   `ok`/`not ok` line, then a summary line. `sheets` is the grid editor
   (typing, formulas, pointing at cells while typing one, spilling, fill,
@@ -377,7 +381,11 @@ take five scenes: files, sheet, document, slides, sharing.
   21 s). `sheet-files` is cell formats, filters, comments, validation, colour
   rules and names, then .xlsx, .ods, .csv, .json and PDF out, tabs, tidy up and
   .json, .csv, .xlsx and .ods in (a chart, the formats, colour rules and
-  validation included) (about 32 s). `docs` is documents, an .odt out and back in included (about 11 s).
+  validation included) (about 32 s). `sheet-links` is links in cells: from
+  the toolbar and the cell menu, the card's Open and Remove, Ctrl+click to
+  a cell, a typed web address and the .xlsx round trip (about 8 s; a smoke
+  run writes what Open would open to `opened.txt` in the data folder).
+  `docs` is documents, an .odt out and back in included (about 11 s).
   `slides` is a deck: two layouts, typing a title, undo and redo, moving,
   resizing and rotating a box with the mouse, nudging, a text box added and
   deleted, someone else's selection, reordering by keys and by drag,
