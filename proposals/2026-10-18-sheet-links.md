@@ -1,10 +1,11 @@
 # Links in sheets
 
-**Status:** draft. Tim asked 2026-10-18: "Sheets needs hyperlink support
+**Status:** approved by Tim 2026-10-18, with links inside the file added. Tim asked 2026-10-18: "Sheets needs hyperlink support
 like docs and slides. Adding hyperlinks manually through menu bar or context
 menu/properties should also be supported."
 
-**Goal:** a cell can hold a link to a web page or an email address, added
+**Goal:** a cell can hold a link to a web page, an email address or
+another tab or cell in the same file, added
 from the toolbar or the cell's menu, opened with a click or tap, and kept
 in .xlsx and .ods files.
 
@@ -20,6 +21,13 @@ membership or the wire format of ops.
   characters. An address typed without a scheme gets `https://`, as in
   documents. Anything else is refused by the model, so no device stores or
   opens a `javascript:` or `file:` link.
+- **Links inside the file** go to a tab, or to a cell on a tab. They are
+  stored by id, `#<tabId>` or `#<tabId>!<rowId>:<colId>`, so renaming the
+  tab or inserting rows and columns keeps them on the same cell. They are
+  shown in A1 form (`'Costs'!B4`), worked out when drawn. If the cell's
+  row or column is deleted the link goes to the tab; if the tab is deleted
+  the card says so and Open does nothing. Opening one switches tab, selects
+  the cell and scrolls to it.
 - A cell whose whole text is a web address is drawn as a link without
   storing anything, as Google Sheets does. Nothing is saved for these.
 
@@ -34,7 +42,9 @@ membership or the wire format of ops.
   browser. On phones the card is the only way, since a tap selects.
 - **Adding:** a Link button on the toolbar (Ctrl+K), and Insert link / Edit
   link / Remove link in the cell's right-click or long-press menu. Both
-  open the same bar as documents: one address box, Apply and Remove. It
+  open the same bar as documents: one address box, Apply and Remove, plus
+  a list of the file's tabs to pick from. Typing `Costs!B4` or `B4` (this
+  tab) also makes a link inside the file. It
   applies to every cell in the selection. On an empty cell, the address is
   also put in as the cell's text.
 - **Viewers** can open links but not add, edit or remove them.
@@ -51,9 +61,11 @@ up. Clearing a cell's contents also removes its link.
 ## Files
 
 - **.xlsx:** import reads SheetJS's `cell.l.Target`; export writes it back.
-  Links to a place inside the workbook (`#Sheet2!A1`) are dropped on import
-  for now and listed in the import notice.
-- **.ods:** a link is a `text:a` around the cell's text. Read and written in
+  A link to a place in the workbook (`location`, e.g. `Sheet2!A1`) becomes
+  a link inside the file; one to a defined name or a cell past the tab's
+  size goes to the tab.
+- **.ods:** a link is a `text:a` around the cell's text; inside the file
+  it is `#Sheet2.A1`. Read and written in
   our own ODS code if SheetJS gets them wrong, as it does formulas.
 - **.csv and .json:** only the text, as today.
 - **PDF and printing:** drawn as links, and clickable in the PDF.
@@ -75,7 +87,8 @@ them.
 
 ## Verify
 
-- Unit tests: the model refuses bad schemes and long addresses; link moves
+- Unit tests: the model refuses bad schemes, bad ids and long addresses;
+  an in-file link keeps its cell through a tab rename and row inserts; link moves
   with sort, fill, paste and row deletion; clear removes it.
 - .xlsx and .ods round trips in `test/`, with LibreOffice reading our
   export (`scripts/check-ods-view.py` style check for the link target).
@@ -94,6 +107,5 @@ an older build sees them. A later build can pick them up again.
 1. **HYPERLINK() formula.** Excel files use `=HYPERLINK(url, label)`.
    Supporting it means the formula engine passes a link to the grid along
    with the value. Proposed: a follow-up, not this change.
-2. **Links to a place in the file** (another tab or cell). Useful for
-   index tabs. Needs tab and cell ids so renames and inserts keep them
-   pointing at the right place. Proposed: a follow-up.
+2. **Links to a range** (`Costs!B4:D9`, selecting the block) or to a
+   named range. Proposed: a follow-up; this change goes to the first cell.
