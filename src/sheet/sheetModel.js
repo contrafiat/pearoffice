@@ -1358,7 +1358,43 @@ function setTitle (doc, value) {
   return capture(doc, () => doc.getMap('meta').set('title', value))
 }
 
+// Templates (proposals/2026-10-18-templates.md), for any kind of file: a
+// mark in meta, and the content a new file made from one starts with.
+function isTemplate (doc) {
+  return doc.getMap('meta').get('template') === true
+}
+
+function setTemplate (doc, on) {
+  return capture(doc, () => {
+    const meta = doc.getMap('meta')
+    if (on) { if (meta.get('template') !== true) meta.set('template', true) } else if (meta.has('template')) meta.delete('template')
+  })
+}
+
+// The template's content as one update, without the mark or comments.
+// Deleted content does not come along (Yjs keeps only its length).
+function templateState (doc) {
+  const scratch = createDoc()
+  try {
+    Y.applyUpdate(scratch, Y.encodeStateAsUpdate(doc))
+    scratch.transact(() => {
+      scratch.getMap('meta').delete('template')
+      for (const name of [...scratch.share.keys()]) {
+        if (!name.startsWith('comments:')) continue
+        const map = scratch.getMap(name)
+        for (const key of [...map.keys()]) map.delete(key)
+      }
+    })
+    return Y.encodeStateAsUpdate(scratch)
+  } finally {
+    scratch.destroy()
+  }
+}
+
 module.exports = {
+  isTemplate,
+  setTemplate,
+  templateState,
   VERSION,
   version,
   KINDS,

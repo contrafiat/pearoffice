@@ -79,7 +79,9 @@ A first launch shows a welcome, asks your name and gives a short tour
 `app:onboarded`; a device with a file or a name counts as done). Settings
 and About replay the tour.
 Sheet cells can hold links to web pages, email addresses or another tab or
-cell (proposals/2026-10-18-sheet-links.md).
+cell (proposals/2026-10-18-sheet-links.md). Any file can be marked as a
+template, private or shared with the people in it, and New makes a file of
+your own from it or from a built-in one (proposals/2026-10-18-templates.md).
 See `TODO.md`.
 
 ## Layout
@@ -126,6 +128,12 @@ Code that works for any kind of file sits apart from each editor's own
   the files; `app:restoreStatus`; `moves.recoverCopy` and `file:recoverCopy`
   for a file nobody else can let you into),
   `profiles.js` (your name and picture in every sheet),
+  templates (proposals/2026-10-18-templates.md): `meta.template` in any
+  file (`sheetModel.setTemplate`, `templateState` drops the mark and
+  comments), `file:setTemplate` and `file:fromTemplate` in
+  `fileMethods.js`, which copies the content into a new file with fresh
+  keys and pictures under its key; `file:list` gives `template` and
+  `myRole`,
   `folders.js` (your folders, yours alone and one level: localDb
   `folder:<id>` and `place:<sheetId>`, later wins; sent to your other
   devices as `folders` on the own-devices channel, kept in the keyring's
@@ -166,6 +174,9 @@ Code that works for any kind of file sits apart from each editor's own
   buzz a warning, `data-haptic` picks another kind). On desktop each editor's
   toolbar keeps to one row (`toolOverflow.jsx`: tools that do not fit get
   `data-tool-hidden`, More tools shows them all; `tool-keep` items stay).
+  New lists templates under the kinds (`Files.jsx`); the built-in ones are
+  `templates.js`, made through `sheet:import`, `doc:import` and
+  `slides:import`.
   `src/ui/sheet/` is the spreadsheet editor
   (grid, toolbar, its panels, charts, `xlsx.js` file handling, `links.jsx`
   for links in cells: the link bar and the card under a linked cell;
@@ -373,7 +384,7 @@ take five scenes: files, sheet, document, slides, sharing.
   bundle must create, edit and read a sheet over stdin/stdout, and the seeder
   bundle must start and print a pairing link.
 - `npm run smoke:desktop`: drives the real UI in Electron with an offscreen
-  window and real key and mouse events, in fifteen parts. Each part is its own
+  window and real key and mouse events, in sixteen parts. Each part is its own
   launch with a throwaway data folder and a 60 s limit, and prints one
   `ok`/`not ok` line, then a summary line. `sheets` is the grid editor
   (typing, formulas, pointing at cells while typing one, spilling, fill,
@@ -385,6 +396,10 @@ take five scenes: files, sheet, document, slides, sharing.
   the toolbar and the cell menu, the card's Open and Remove, Ctrl+click to
   a cell, a typed web address, a HYPERLINK formula and the .xlsx round trip (about 8 s; a smoke
   run writes what Open would open to `opened.txt` in the data folder).
+  `templates` is a sheet marked from its card's menu, New listing it, a
+  file made from it and from the card, unmarking and each built-in template
+  (about 5 s; `PEAROFFICE_SMOKE_TEMPLATES_SHOTS=<folder>` saves New and the
+  built-ins).
   `docs` is documents, an .odt out and back in included (about 11 s).
   `slides` is a deck: two layouts, typing a title, undo and redo, moving,
   resizing and rotating a box with the mouse, nudging, a text box added and

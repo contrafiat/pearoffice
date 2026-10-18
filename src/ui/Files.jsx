@@ -22,8 +22,12 @@ export function KindIcon ({ kind, size = 20 }) {
   return <span className={'kind-icon kind-' + byKind(kind).kind} title={label}><Icon size={size} weight='duotone' aria-hidden='true' /></span>
 }
 
-// New asks which kind of file.
-export function NewPanel ({ onPick, onClose }) {
+// New asks which kind of file, or which template to start from
+// (proposals/2026-10-18-templates.md): yours and the people's you share
+// templates with first, then the built-in ones.
+export function NewPanel ({ onPick, templates = [], builtIn = [], onTemplate, onBuiltIn, onClose }) {
+  const [busy, setBusy] = useState(null)
+  const start = async (key, fn) => { if (busy) return; setBusy(key); try { await fn() } finally { setBusy(null) } }
   return (
     <div className='panel-backdrop' onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
       <section className='panel new-file' role='dialog' aria-label='New file'>
@@ -40,6 +44,32 @@ export function NewPanel ({ onPick, onClose }) {
             </button>
           ))}
         </div>
+        <h3 className='template-heading'>From a template</h3>
+        <ul className='template-list'>
+          {templates.map((f) => (
+            <li key={f.sheetId}>
+              <button className='template-choice' disabled={!!busy} onClick={() => start(f.sheetId, () => onTemplate(f))}>
+                <KindIcon kind={f.kind} size={22} />
+                <span className='template-text'>
+                  <span className='template-title'>{f.title || untitled(f.kind)}</span>
+                  <span className='template-about'>{busy === f.sheetId ? 'Making your copy...' : f.owner && !f.owner.isMe ? 'Shared by ' + (f.owner.name || 'someone') : 'Yours'}</span>
+                </span>
+              </button>
+            </li>
+          ))}
+          {builtIn.map((t) => (
+            <li key={t.id}>
+              <button className='template-choice built-in' disabled={!!busy} onClick={() => start(t.id, () => onBuiltIn(t.id))}>
+                <KindIcon kind={t.kind} size={22} />
+                <span className='template-text'>
+                  <span className='template-title'>{t.title}</span>
+                  <span className='template-about'>{busy === t.id ? 'Making your copy...' : t.about}</span>
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+        {!templates.length && <p className='muted template-hint'>Mark any file as a template from its menu to start from it here.</p>}
       </section>
     </div>
   )
@@ -107,6 +137,7 @@ function FileCard ({ f, onOpen, onWaiting, onRecover, onMenu, desktop, onHold })
               <MemberAvatar sheetId={f.sheetId} member={f.owner} size={20} />
             </span>
           )}
+          {f.template && <span className='badge template-badge'>Template</span>}
           {f.joining && !f.waiting && <span className='badge'>joining</span>}
           {f.recovery === 'waiting' && <span className='badge'>waiting to be let in</span>}
           {f.recovery === 'copy' && <span className='badge view-only'>make your copy</span>}

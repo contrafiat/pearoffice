@@ -1,6 +1,6 @@
 # Templates
 
-**Status:** draft. A user asked: "let's say i have an idea of how to create a
+**Status:** approved by Tim 2026-10-18, with built-in templates added. A user asked: "let's say i have an idea of how to create a
 recipe structure. i build it and save it and from there i add it like a file
 that is marked like 'use this as a template' private or in groups option and
 when i press new its either from a template choice or a blank option".
@@ -94,12 +94,19 @@ so older builds open them. An older build editing a template keeps the mark.
 Revert the PR. The mark stays in files as an ignored value, which older
 builds already ignore. Files made from templates are ordinary files and stay.
 
-## Open questions
+## Built-in templates
 
-1. **Where templates show.** Proposed: in your file list with a badge, and in
-   New. Alternative: a separate Templates folder or section that keeps them
-   out of the main list.
-2. **Built-in templates.** A few that ship with the app (budget, recipe,
-   meeting notes, a plain deck). Proposed: later, as its own change.
-3. **Comments.** Proposed: left out of the copy. Some people use comments as
-   instructions inside a template.
+A starter set ships with the app and shows in New under **From a
+template** after your own: **Budget** (sheet), **Recipe** (document),
+**Meeting notes** (document) and **Simple deck** (slides). They are data
+in the UI, not files on the network: picking one makes a new file through
+the same paths as importing a file (`sheet:import`, `doc:import`,
+`slides:import`), so they need nothing new in the worklet and work offline.
+They cannot be edited or unmarked; to change one, make a file from it and
+mark that file as a template.
+
+## Decided 2026-10-18
+
+1. Templates show in the file list with a badge, and in New.
+2. Comments are left out of a copy.
+3. Built-in templates are part of this change (above).

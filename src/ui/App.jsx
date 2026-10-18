@@ -13,6 +13,7 @@ import { SettingsPanel } from './SettingsPanel.jsx'
 import { UpdateBar } from './UpdateBar.jsx'
 import { applyTheme } from './theme.js'
 import { haptic, hapticTaps } from './haptic.js'
+import { BUILT_IN, makeBuiltIn } from './templates.js'
 import { FileHome, KindIcon, NewPanel, RecoverPanel, dragFile, dropTarget, untitled } from './Files.jsx'
 import { DeleteFolderPanel, FolderNamePanel, MoveToFolderPanel, filesIn, useFolders } from './Folders.jsx'
 import { DeletePanel } from './DeletePanel.jsx'
@@ -337,6 +338,21 @@ export function App () {
     }
   }
 
+  // A new file from a template, yours or shared (worklet file:fromTemplate),
+  // or built in (src/ui/templates.js).
+  async function fromTemplate (make) {
+    try {
+      const { sheetId } = await make()
+      setNewFile(false)
+      await fileHere(sheetId)
+      await refresh()
+      setCurrent(sheetId)
+    } catch (err) {
+      setError(err.message)
+    }
+  }
+  const setTemplate = (file, template) => call('file:setTemplate', { sheetId: file.sheetId, template }).then(refresh).catch((err) => setError(err.message))
+
   // A file dropped on a folder, or on All files for no folder.
   const placeFile = (sheetId, folder) => call('file:place', { sheetId, folder }).catch((err) => setError(err.message))
 
@@ -420,12 +436,23 @@ export function App () {
           <button className='icon-button about-button' aria-label='About PearOffice' title='About PearOffice' onClick={() => setSettings({ mode: 'about' })}><Info size={20} /></button>
         </div>
       </aside>
-      {newFile && <NewPanel onPick={create} onClose={() => setNewFile(false)} />}
+      {newFile && (
+        <NewPanel
+          onPick={create}
+          templates={(sheets || []).filter((f) => f.template && !f.removed && !f.joining)}
+          builtIn={BUILT_IN}
+          onTemplate={(f) => fromTemplate(() => call('file:fromTemplate', { sheetId: f.sheetId }))}
+          onBuiltIn={(id) => fromTemplate(() => makeBuiltIn(id))}
+          onClose={() => setNewFile(false)}
+        />
+      )}
       {cardMenu && (
         <>
           <div className='doc-scrim' onPointerDown={() => setCardMenu(null)} />
           <ul className='menu card-menu' role='menu' style={{ ...(cardMenu.pointer ? { left: Math.max(8, Math.min(cardMenu.x, window.innerWidth - 200)) } : { right: Math.max(8, window.innerWidth - cardMenu.x) }), top: Math.min(cardMenu.y + 4, window.innerHeight - 150) }} onClick={() => setCardMenu(null)}>
+            {cardMenu.file && cardMenu.file.template && !cardMenu.file.removed && <li role='menuitem' onClick={() => fromTemplate(() => call('file:fromTemplate', { sheetId: cardMenu.file.sheetId }))}>New from this template</li>}
             {cardMenu.file && <li role='menuitem' onClick={() => setMoving(cardMenu.file)}>Move to folder...</li>}
+            {cardMenu.file && !cardMenu.file.removed && (cardMenu.file.myRole === 'owner' || cardMenu.file.myRole === 'editor') && <li role='menuitem' onClick={() => setTemplate(cardMenu.file, !cardMenu.file.template)}>{cardMenu.file.template ? 'Stop using as a template' : 'Use as a template'}</li>}
             {cardMenu.file && <li role='menuitem' onClick={() => setDeleting({ file: cardMenu.file, kind: 'local' })}>Remove from this device</li>}
             {cardMenu.file && cardMenu.file.owner && cardMenu.file.owner.isMe && !cardMenu.file.removed && <li role='menuitem' className='danger' onClick={() => setDeleting({ file: cardMenu.file, kind: 'everyone' })}>Delete for everyone</li>}
             {cardMenu.folder && <li role='menuitem' onClick={() => setNaming({ folder: cardMenu.folder })}>Rename</li>}
