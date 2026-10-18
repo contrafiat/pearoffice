@@ -151,19 +151,22 @@ function workbookToTabs (XLSX, wb) {
   return { tabs, names }
 }
 
-// Where a link inside a workbook goes: Sheet2!B4, 'My tab'!B4:C9 (its first
-// cell), a tab's name or a workbook-wide name. Null if nowhere.
-function linkPlace (wb, text, depth = 0) {
+// Where a link inside a workbook goes: Sheet2!B4, 'My tab'!B4:C9, a tab's
+// name or a workbook-wide name ({ name }, kept as a link to the name). Null
+// if nowhere.
+function linkPlace (wb, text) {
   const sheetIndex = (name) => wb.SheetNames.findIndex((x) => x.toUpperCase() === String(name).toUpperCase())
   const box = require('./charts').parseRange(text)
   if (box && box.sheet) {
     const tab = sheetIndex(box.sheet)
-    return tab >= 0 ? { tab, row: box.r1, col: box.c1 } : null
+    if (tab < 0) return null
+    const one = box.r1 === box.r2 && box.c1 === box.c2
+    return one ? { tab, row: box.r1, col: box.c1 } : { tab, row: box.r1, col: box.c1, row2: Math.min(box.r2, MAX_ROWS), col2: Math.min(box.c2, MAX_COLS) }
   }
   const tab = sheetIndex(text.replace(/^'(.*)'$/, '$1').replace(/''/g, "'"))
   if (tab >= 0) return { tab, row: null, col: null }
   const n = ((wb.Workbook && wb.Workbook.Names) || []).find((x) => String(x.Name).toUpperCase() === text.toUpperCase() && (x.Sheet === undefined || x.Sheet === null))
-  return n && depth === 0 ? linkPlace(wb, String(n.Ref || '').replace(/\$/g, ''), 1) : null
+  return n ? { name: String(n.Name) } : null
 }
 
 // Sheet dump (from the worklet's sheet:dump) -> SheetJS workbook.
@@ -177,13 +180,16 @@ function dumpToWorkbook (XLSX, dump) {
     used.add(name.toUpperCase())
     return name
   })
-  // A link: { Target } with the address, or #'Tab'!B4 for a place in the
-  // workbook (the tab's first cell for the tab itself).
+  // A link: { Target } with the address, #'Tab'!B4 or #'Tab'!B4:D9 for a
+  // place in the workbook (the tab's first cell for the tab itself), or
+  // #Name for a named range.
   const linkOut = (cell) => {
     if (cell.link) return { Target: cell.link }
     const to = cell.linkTo
+    if (to && to.rangeName) return { Target: '#' + to.rangeName }
     if (!to || !sheetNames[to.tab]) return null
-    return { Target: "#'" + sheetNames[to.tab].replace(/'/g, "''") + "'!" + numToCol(to.col || 1) + (to.row || 1) }
+    const far = to.row2 ? ':' + numToCol(to.col2) + to.row2 : ''
+    return { Target: "#'" + sheetNames[to.tab].replace(/'/g, "''") + "'!" + numToCol(to.col || 1) + (to.row || 1) + far }
   }
   for (const [tabIndex, tab] of dump.tabs.entries()) {
     const ws = {}

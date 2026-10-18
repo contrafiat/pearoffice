@@ -2,7 +2,7 @@
 // (proposals/2026-10-18-sheet-links.md). A web link from the toolbar on an
 // empty cell, a link to a cell from the cell menu, Ctrl+click, the card's
 // Open and Remove, a typed web address drawn as a link, a HYPERLINK formula,
-// then the .xlsx round trip.
+// a link to a block, then the .xlsx round trip.
 
 const fs = require('node:fs')
 const path = require('node:path')
@@ -83,6 +83,21 @@ module.exports = async function sheetLinks (t) {
   result.formulaLink = opened().includes('https://pears.com/f')
   step('HYPERLINK')
 
+  // A6: a link to a block selects the whole block.
+  await js("document.querySelector('.grid .body').focus()")
+  await key('Down')
+  await enter('Block', 'Enter')
+  await key('Up')
+  await sendMod('K', ['control'])
+  await waitFor('link bar', "!!document.querySelector('.sheet-link-bar input')")
+  await type('C2:D4')
+  await key('Enter')
+  await waitFor('card names the block', `!!${card} && /!C2:D4$/.test(${card}.querySelector('.link-card-address').textContent)`)
+  await js(card + ".querySelector('[aria-label=\"Open link\"]').click()")
+  await waitFor('block selected', "document.querySelector('.formula-bar .address').textContent === 'C2' && !!document.querySelector('.range')")
+  result.blockLink = true
+  step('link to a block')
+
   // Save as .xlsx and open it again: the links come back.
   await more('Save as an Excel file')
   const files = fs.existsSync(downloads) ? fs.readdirSync(downloads) : []
@@ -107,5 +122,5 @@ module.exports = async function sheetLinks (t) {
   result.roundTrip = true
   step('xlsx round trip')
 
-  return result.webLink && result.innerLink && result.formulaLink && result.roundTrip
+  return result.webLink && result.innerLink && result.formulaLink && result.blockLink && result.roundTrip
 }

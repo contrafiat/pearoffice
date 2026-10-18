@@ -31,12 +31,16 @@ const FORMAT_ATTRS = ['b', 'i', 'color', 'fill', 'num', 'align', 'valign', 'wrap
 // A value outside these is refused, so every device draws the same thing.
 const BORDER = /^(thin|medium|thick|dashed|double)(:#[0-9a-f]{6})?$/i
 // A link goes to a web page or an email address, or inside the file to a tab
-// (`#<tabId>`) or a cell on one (`#<tabId>!<rowId>:<colId>`), by id so that
-// renames and inserts keep it on the same cell.
+// (`#<tabId>`), a cell on one (`#<tabId>!<rowId>:<colId>`) or a block of
+// cells (`#<tabId>!<rowId>:<colId>:<rowId>:<colId>`), by id so that renames
+// and inserts keep it on the same cells, or to a named range (`#=<name>`,
+// rewritten when the name is renamed).
 const MAX_LINK = 2048
 const WEB_LINK = /^(https?:\/\/|mailto:)[^\s<>"]+$/i
-const INNER_LINK = /^#([A-Za-z0-9_-]{11})(?:!([A-Za-z0-9_-]{11}):([A-Za-z0-9_-]{11}))?$/
-const isLink = (v) => typeof v === 'string' && v.length <= MAX_LINK && (WEB_LINK.test(v) || INNER_LINK.test(v))
+const ID = '([A-Za-z0-9_-]{11})'
+const INNER_LINK = new RegExp('^#' + ID + '(?:!' + ID + ':' + ID + '(?::' + ID + ':' + ID + ')?)?$')
+const NAME_LINK = /^#=([A-Za-z_\\][A-Za-z0-9_.\\]{0,254})$/
+const isLink = (v) => typeof v === 'string' && v.length <= MAX_LINK && (WEB_LINK.test(v) || INNER_LINK.test(v) || NAME_LINK.test(v))
 const FORMAT_VALUES = {
   align: (v) => ['left', 'center', 'right'].includes(v),
   valign: (v) => ['top', 'middle', 'bottom'].includes(v),
@@ -262,18 +266,29 @@ function clearRange (doc, tabId, r1, c1, r2, c2) {
 }
 
 // Give every cell of a range a link, or none (null). `link` is a web or
-// email address, or { tabId, row, col } for a place in the file (row and col
-// left out for the tab itself).
+// email address, { tabId, row, col, row2, col2 } for a place in the file
+// (row and col left out for the tab itself, row2 and col2 for one cell) or
+// { name } for a named range.
 function setLink (doc, tabId, r1, c1, r2, c2, link) {
   let value = null
-  if (link && typeof link === 'object') {
+  if (link && typeof link === 'object' && link.name) {
+    const n = doc.getMap('names').get(String(link.name).toUpperCase())
+    if (!n) throw new Error('There is no range called ' + link.name)
+    value = '#=' + n.name
+  } else if (link && typeof link === 'object') {
     const to = tabMap(doc, link.tabId)
     value = '#' + link.tabId
-    if (link.row || link.col) {
-      const rowId = to.get('rows').get(Math.max(1, link.row || 1) - 1)
-      const colId = to.get('cols').get(Math.max(1, link.col || 1) - 1)
+    const at = (row, col) => {
+      const rowId = to.get('rows').get(Math.max(1, row || 1) - 1)
+      const colId = to.get('cols').get(Math.max(1, col || 1) - 1)
       if (!rowId || !colId) throw new Error('That cell is past the end of the tab')
-      value += '!' + cellKey(rowId, colId)
+      return cellKey(rowId, colId)
+    }
+    if (link.row || link.col) {
+      value += '!' + at(link.row, link.col)
+      const r2 = Math.max(link.row2 || 0, link.row || 1)
+      const c2 = Math.max(link.col2 || 0, link.col || 1)
+      if (r2 !== (link.row || 1) || c2 !== (link.col || 1)) value += ':' + at(r2, c2)
     }
   } else if (link) {
     value = String(link).trim()
@@ -282,21 +297,36 @@ function setLink (doc, tabId, r1, c1, r2, c2, link) {
   return setFormatRange(doc, tabId, r1, c1, r2, c2, { link: value })
 }
 
-// Where a link inside the file goes now: { tabId, name, row, col }, row and
-// col null for the tab itself or when the cell's row or column was deleted.
-// Null for a web link or a deleted tab.
+// Where a link inside the file goes now: { tabId, name, row, col, row2,
+// col2 }, plus rangeName for a named range. row and col are null for the
+// tab itself or when the cell's row or column was deleted; row2 and col2 are
+// set for a block whose far corner is still there. Null for a web link, a
+// deleted tab or a deleted name.
 function linkTarget (doc, link) {
+  const byName = NAME_LINK.exec(link || '')
+  if (byName) {
+    const n = getNames(doc).find((x) => x.name.toUpperCase() === byName[1].toUpperCase())
+    if (!n || !n.r1) return null
+    const one = n.r1 === n.r2 && n.c1 === n.c2
+    return { tabId: n.tabId, name: n.tab, row: n.r1, col: n.c1, ...(one ? {} : { row2: n.r2, col2: n.c2 }), rangeName: n.name }
+  }
   const m = INNER_LINK.exec(link || '')
   if (!m || !tabIds(doc).includes(m[1])) return null
   const t = doc.getMap('tab:' + m[1])
-  let row = null
-  let col = null
+  const rows = t.get('rows').toArray()
+  const cols = t.get('cols').toArray()
+  const out = { tabId: m[1], name: t.get('name'), row: null, col: null }
   if (m[2]) {
-    const r = t.get('rows').toArray().indexOf(m[2])
-    const c = t.get('cols').toArray().indexOf(m[3])
-    if (r >= 0 && c >= 0) { row = r + 1; col = c + 1 }
+    const r = rows.indexOf(m[2])
+    const c = cols.indexOf(m[3])
+    if (r >= 0 && c >= 0) { out.row = r + 1; out.col = c + 1 }
   }
-  return { tabId: m[1], name: t.get('name'), row, col }
+  if (out.row && m[4]) {
+    const r = rows.indexOf(m[4])
+    const c = cols.indexOf(m[5])
+    if (r >= 0 && c >= 0) { out.row2 = Math.max(out.row, r + 1); out.col2 = Math.max(out.col, c + 1) }
+  }
+  return out
 }
 
 function setFormatRange (doc, tabId, r1, c1, r2, c2, patch) {
@@ -1075,6 +1105,12 @@ function renameName (doc, from, to) {
   return capture(doc, () => {
     map.delete(old.name.toUpperCase())
     map.set(n.toUpperCase(), { ...old, name: n })
+    // Links to the name follow it (proposals/2026-10-18-sheet-links.md).
+    const was = '#=' + old.name
+    for (const tab of tabIds(doc)) {
+      const fmt = doc.getMap('tab:' + tab).get('fmt')
+      for (const [key, v] of [...fmt.entries()]) if (key.endsWith(':link') && typeof v === 'string' && v.toUpperCase() === was.toUpperCase()) fmt.set(key, '#=' + n)
+    }
     for (const tab of tabIds(doc)) {
       const cells = doc.getMap('tab:' + tab).get('cells')
       for (const [key, raw] of [...cells.entries()]) {
@@ -1208,8 +1244,9 @@ function importTabs (doc, payload) {
       }
     })
     // Links (proposals/2026-10-18-sheet-links.md) once every tab has its
-    // rows: an address, or a place in the file with its tab by index. A
-    // cell past the end of its tab links to the tab.
+    // rows: an address, a place in the file with its tab by index (a cell or
+    // a block), or { name } for a named range. A cell past the end of its tab
+    // links to the tab; a block's far corner past the end, to its first cell.
     payload.tabs.forEach((tab, i) => {
       const id = ids[i]
       const t = tabMap(doc, id)
@@ -1217,13 +1254,19 @@ function importTabs (doc, payload) {
         const { rowId, colId } = idsAt(doc, id, row, col)
         if (!rowId || !colId) continue
         let link = to
-        if (to && typeof to === 'object') {
+        if (to && typeof to === 'object' && typeof to.name === 'string') link = '#=' + to.name
+        else if (to && typeof to === 'object') {
           const target = Number.isInteger(to.tab) && ids[to.tab]
           if (!target) continue
           const tt = tabMap(doc, target)
-          const r = Number.isInteger(to.row) && tt.get('rows').get(to.row - 1)
-          const c = Number.isInteger(to.col) && tt.get('cols').get(to.col - 1)
-          link = '#' + target + (r && c ? '!' + cellKey(r, c) : '')
+          const idAt = (row, col) => {
+            const r = Number.isInteger(row) && tt.get('rows').get(row - 1)
+            const c = Number.isInteger(col) && tt.get('cols').get(col - 1)
+            return r && c ? cellKey(r, c) : null
+          }
+          const first = idAt(to.row, to.col)
+          const far = first && (to.row2 > to.row || to.col2 > to.col) ? idAt(Math.max(to.row2 || to.row, to.row), Math.max(to.col2 || to.col, to.col)) : null
+          link = '#' + target + (first ? '!' + first + (far ? ':' + far : '') : '')
         }
         if (isLink(link)) t.get('fmt').set(cellKey(rowId, colId) + ':link', link)
       }

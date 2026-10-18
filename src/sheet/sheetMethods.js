@@ -20,7 +20,8 @@ const hex = (buf) => b4a.toString(buf, 'hex')
 // The text a cell shows, and what kind of value it is (the UI right-aligns
 // numbers). Number formats use Excel format codes through SSF.
 // Where a HYPERLINK formula goes: { url } for a web or email address, { to }
-// for a place in the file (#Sheet2!B4, #'My tab'!B4 or a tab's name), or
+// for a place in the file (#Sheet2!B4, #'My tab'!B4:D9, a tab's name or a
+// named range), or
 // undefined for anything else, which then shows as plain text.
 function formulaLinkOf (doc, link) {
   if (typeof link !== 'string' || link.length > 2048) return undefined
@@ -31,10 +32,15 @@ function formulaLinkOf (doc, link) {
   const byName = (n) => tabs.find((t) => String(t.name).toUpperCase() === String(n).toUpperCase())
   const box = charts.parseRange(text)
   const tab = box && box.sheet ? byName(box.sheet) : byName(text.replace(/^'(.*)'$/, '$1').replace(/''/g, "'"))
-  if (!tab) return undefined
+  if (!tab) {
+    // A named range.
+    const to = model.linkTarget(doc, '#=' + text)
+    return to ? { to } : undefined
+  }
   const t = model.tabMap(doc, tab.id)
   const fits = box && box.r1 <= t.get('rows').length && box.c1 <= t.get('cols').length
-  return { to: { tabId: tab.id, name: tab.name, row: fits ? box.r1 : null, col: fits ? box.c1 : null } }
+  const block = fits && (box.r2 > box.r1 || box.c2 > box.c1)
+  return { to: { tabId: tab.id, name: tab.name, row: fits ? box.r1 : null, col: fits ? box.c1 : null, ...(block ? { row2: Math.min(box.r2, t.get('rows').length), col2: Math.min(box.c2, t.get('cols').length) } : {}) } }
 }
 
 function present (v, fmt) {
@@ -232,7 +238,9 @@ function createSheetMethods (sheets, { getJoin }) {
         if (!link) return {}
         if (link[0] !== '#') return { link }
         const to = model.linkTarget(doc, link)
-        return to ? { linkTo: { tab: order.indexOf(to.tabId), row: to.row, col: to.col } } : {}
+        if (!to) return {}
+        if (to.rangeName) return { linkTo: { rangeName: to.rangeName } }
+        return { linkTo: { tab: order.indexOf(to.tabId), row: to.row, col: to.col, ...(to.row2 ? { row2: to.row2, col2: to.col2 } : {}) } }
       }
       const tabs = model.tabIds(doc).map((id) => {
         const t = model.tabMap(doc, id)

@@ -32,35 +32,41 @@ export function linkLabel (link) {
   if (!link) return ''
   if (link.url) return link.url
   if (link.gone) return 'A deleted tab'
-  const { name, row, col } = link.to
-  return row ? quoted(name) + '!' + colName(col) + row : name
+  const { name, row, col, row2, col2, rangeName } = link.to
+  if (rangeName) return rangeName
+  return row ? quoted(name) + '!' + colName(col) + row + (row2 ? ':' + colName(col2) + row2 : '') : name
 }
 
 // What a person typed into the link bar, as sheet:setLink takes it: a web or
-// email address (https:// added when there is no scheme), or { tabId, row,
-// col } for B4, Costs!B4 or a tab's name.
-export function parseLinkText (text, tabs, tabId) {
+// email address (https:// added when there is no scheme), { tabId, row, col,
+// row2, col2 } for B4, Costs!B4, B4:D9 or a tab's name, or { name } for a
+// named range.
+export function parseLinkText (text, tabs, tabId, names = []) {
   const t = String(text || '').trim()
   if (!t) return null
-  if (/^[a-z][a-z0-9+.-]*:/i.test(t)) return t
+  // B4:D9 looks like a scheme ("B4:"), so cells and ranges come first.
   const unq = t.replace(/^'(.*)'$/, '$1').replace(/''/g, "'")
   const tab = tabs.find((x) => x.name.toLowerCase() === unq.toLowerCase())
   if (tab) return { tabId: tab.id }
+  const named = names.find((n) => n.name.toLowerCase() === t.toLowerCase())
+  if (named) return { name: named.name }
   const box = parseRange(t)
   if (box && !box.spill) {
     const to = box.sheet ? tabs.find((x) => x.name.toLowerCase() === box.sheet.toLowerCase()) : { id: tabId }
     if (!to) throw new Error('There is no tab called ' + box.sheet)
-    return { tabId: to.id, row: box.r1, col: box.c1 }
+    const one = box.r1 === box.r2 && box.c1 === box.c2
+    return { tabId: to.id, row: box.r1, col: box.c1, ...(one ? {} : { row2: box.r2, col2: box.c2 }) }
   }
+  if (/^[a-z][a-z0-9+.-]*:/i.test(t)) return t
   if (/\s/.test(t)) throw new Error('That is not a link or a cell')
   return 'https://' + t
 }
 
-export function LinkBar ({ initial, hasLink, tabs, tabId, onApply, onRemove, onClose, onError }) {
+export function LinkBar ({ initial, hasLink, tabs, tabId, names = [], onApply, onRemove, onClose, onError }) {
   const [text, setText] = useState(initial || '')
   function apply () {
     let link
-    try { link = parseLinkText(text, tabs, tabId) } catch (err) { onError(err.message); return }
+    try { link = parseLinkText(text, tabs, tabId, names) } catch (err) { onError(err.message); return }
     if (!link) { if (hasLink) onRemove(); else onClose(); return }
     onApply(link, text.trim())
   }
@@ -70,15 +76,16 @@ export function LinkBar ({ initial, hasLink, tabs, tabId, onApply, onRemove, onC
       <input
         autoFocus
         aria-label='Link address'
-        placeholder='Paste a link, or type a cell like B4.'
+        placeholder='Paste a link, or type a cell like B4 or a range.'
         value={text}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); apply() } if (e.key === 'Escape') { e.preventDefault(); onClose() } }}
       />
-      {tabs.length > 1 && (
-        <select aria-label='Link to a tab' value='' onChange={(e) => { const t = tabs.find((x) => x.id === e.target.value); if (t) setText(quoted(t.name) + '!A1') }}>
-          <option value=''>Go to a tab...</option>
-          {tabs.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+      {(tabs.length > 1 || names.length > 0) && (
+        <select aria-label='Link to a tab or named range' value='' onChange={(e) => { const v = e.target.value; const t = tabs.find((x) => 'tab:' + x.id === v); if (t) setText(quoted(t.name) + '!A1'); else if (v.startsWith('name:')) setText(v.slice(5)) }}>
+          <option value=''>Go to...</option>
+          {tabs.length > 1 && <optgroup label='Tabs'>{tabs.map((t) => <option key={t.id} value={'tab:' + t.id}>{t.name}</option>)}</optgroup>}
+          {names.length > 0 && <optgroup label='Named ranges'>{names.map((n) => <option key={n.name} value={'name:' + n.name}>{n.name}</option>)}</optgroup>}
         </select>
       )}
       <div className='doc-bar-buttons'>

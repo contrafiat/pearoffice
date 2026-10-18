@@ -112,4 +112,10 @@ an older build sees them. A later build can pick them up again.
    or `#Sheet2!B4`); a cell that refers to it gets only the text, as in
    Excel. The card opens it; the formula is where it is changed.
 2. **Links to a range** (`Costs!B4:D9`, selecting the block) or to a
-   named range. Proposed: a follow-up; this change goes to the first cell.
+   named range. Done 2026-10-18 as a follow-up, before any release carried
+   links: a block is `#<tabId>!<rowId>:<colId>:<rowId>:<colId>` (if the
+   far corner is deleted it goes to the first cell), a named range
+   `#=<name>`, rewritten when the name is renamed and gone when it is
+   deleted. .xlsx keeps both (`location` `'Costs'!B4:D9` or `Totals`);
+   .ods keeps both as `#'Costs'.B4:D9` and `#Totals`, which LibreOffice
+   reads.
