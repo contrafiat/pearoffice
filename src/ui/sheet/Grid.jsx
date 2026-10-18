@@ -1,6 +1,7 @@
 import { ChartFrame } from './ChartFrame.jsx'
 import React, { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { colName } from './a1.js'
+import { linkOf, linkLabel } from './links.jsx'
 import { textStyle, borderCss, hasBorder, neededHeight, inkOn, BASE_FONT_PX } from './cellStyle.js'
 import { Funnel, CaretDown } from '@phosphor-icons/react'
 import { CfIcon } from './cfIcons.jsx'
@@ -18,7 +19,7 @@ export const MAX_ZOOM = 2.5
 // sheets stay fast. Headers are drawn outside the scroll area and moved with
 // the scroll position.
 export const Grid = forwardRef(function Grid (props, ref) {
-  const { view, cells, sel, ext = sel, range, spillBox, editing, onSelect, onEdit, onEditChange, onEditKey, onEditBlur, onEditCaret = () => {}, onKeyDown, onHeaderMenu, onCellMenu = () => {}, onFill = null, charts = [], selectedChart = null, chartActions = null, onResize, onRowResize = () => {}, onCopy, onPaste, zoom = 1, onZoom, inputMode, hiddenRows = null, hiddenCols = null, unhideMarks = null, onUnhide = () => {}, onAutoFit = () => {}, filterHead = null, onFilterMenu = () => {}, commentMarks = null, onComment = () => {}, invalidCells = null, cfStyles = null, dropdownAt = null, onDropdown = () => {}, others = [], onPoint = () => false, pointBox = null } = props
+  const { view, cells, sel, ext = sel, range, spillBox, editing, onSelect, onEdit, onEditChange, onEditKey, onEditBlur, onEditCaret = () => {}, onKeyDown, onHeaderMenu, onCellMenu = () => {}, onFill = null, charts = [], selectedChart = null, chartActions = null, onResize, onRowResize = () => {}, onCopy, onPaste, zoom = 1, onZoom, inputMode, hiddenRows = null, hiddenCols = null, unhideMarks = null, onUnhide = () => {}, onAutoFit = () => {}, filterHead = null, onFilterMenu = () => {}, commentMarks = null, onComment = () => {}, invalidCells = null, cfStyles = null, dropdownAt = null, onDropdown = () => {}, others = [], onPoint = () => false, pointBox = null, onOpenLink = () => {} } = props
   // Row height and column widths scale with the zoom (pinch on a phone);
   // stored widths stay unzoomed.
   const ROW_H = Math.round(BASE_ROW_H * zoom)
@@ -361,17 +362,18 @@ export const Grid = forwardRef(function Grid (props, ref) {
         const cf = cfStyles && cfStyles.get(r + ',' + c)
         const fmt = cf ? { ...((cell && cell.fmt) || {}), ...cf } : (cell && cell.fmt) || {}
         const head = filterHead && r === filterHead.row && c >= filterHead.c1 && c <= filterHead.c2
-        const cls = 'cell' + (cf && cf.icon ? ' has-icon' : '') + (cell ? ' k-' + cell.kind : '') + (fmt.b ? ' b' : '') + (fmt.i ? ' i' : '') + (fmt.wrap ? ' wrap' : '') + (fmt.valign ? ' v-' + fmt.valign : '') + (head ? ' filter-head' : '') + (invalidCells && invalidCells.has(r + ',' + c) ? ' invalid' : '')
+        const link = linkOf(cell)
+        const cls = 'cell' + (link ? ' link' : '') + (cf && cf.icon ? ' has-icon' : '') + (cell ? ' k-' + cell.kind : '') + (fmt.b ? ' b' : '') + (fmt.i ? ' i' : '') + (fmt.wrap ? ' wrap' : '') + (fmt.valign ? ' v-' + fmt.valign : '') + (head ? ' filter-head' : '') + (invalidCells && invalidCells.has(r + ',' + c) ? ' invalid' : '')
         return (
           <div
             key={r + ',' + c}
             className={cls}
-            style={{ top: rowY[r], height: m ? span(m.r1, m.r2) : rowH[r], left: colX[c], width: m ? colX[Math.min(m.c2, view.cols) + 1] - colX[c] : widths[c], color: fmt.color || inkOn(fmt.fill), background: fmt.fill }}
+            style={{ top: rowY[r], height: m ? span(m.r1, m.r2) : rowH[r], left: colX[c], width: m ? colX[Math.min(m.c2, view.cols) + 1] - colX[c] : widths[c], color: fmt.color || (link && !fmt.fill ? 'var(--pear-dark)' : inkOn(fmt.fill)), background: fmt.fill }}
             data-r={r}
             data-c={c}
             // While a formula is typed, the cell goes into it instead and the
             // editor keeps focus.
-            onMouseDown={(e) => { if (onPoint(r, c, e.shiftKey)) { e.preventDefault(); pointing.current = true; return } dragging.current = true; onSelect(r, c, e.shiftKey) }}
+            onMouseDown={(e) => { if (link && (e.ctrlKey || e.metaKey) && !editing) { e.preventDefault(); onSelect(r, c, false); onOpenLink(r, c); return } if (onPoint(r, c, e.shiftKey)) { e.preventDefault(); pointing.current = true; return } dragging.current = true; onSelect(r, c, e.shiftKey) }}
             onMouseEnter={() => { if (pointing.current) onPoint(r, c, true); else if (filling.current) setFillTo({ row: r, col: c }); else if (dragging.current) onSelect(r, c, true) }}
             onDoubleClick={() => onEdit(r, c)}
             onContextMenu={(e) => { e.preventDefault(); onCellMenu(r, c, e.clientX, e.clientY) }}
@@ -382,11 +384,11 @@ export const Grid = forwardRef(function Grid (props, ref) {
               if (endPress()) { e.preventDefault(); return }
               if (tap && !pinched.current && e.touches.length === 0 && onPoint(r, c, false)) { e.preventDefault(); return }
               if (!pinched.current && e.touches.length === 0 && sel.row === r && sel.col === c) { e.preventDefault(); onEdit(r, c) } }}
-            title={cell && cell.volatile ? 'Changes on each device (time or random)' : cell && cell.blocked ? 'This answer cannot fill in. Select the cell to see why.' : undefined}
+            title={link ? linkLabel(link) + ' (' + (/Mac/.test(navigator.platform) ? 'Cmd' : 'Ctrl') + '+click to open)' : cell && cell.volatile ? 'Changes on each device (time or random)' : cell && cell.blocked ? 'This answer cannot fill in. Select the cell to see why.' : undefined}
           >
             {cf && cf.bar && <span className='cf-bar' style={{ left: cf.bar.from * 100 + '%', width: Math.max(0, cf.bar.to - cf.bar.from) * 100 + '%', background: cf.bar.color }} />}
             {cf && cf.icon && <span className='cf-icon'><CfIcon set={cf.icon.set} index={cf.icon.index} size={Math.round(14 * zoom)} /></span>}
-            <span className='cell-text' style={textStyle(fmt, zoom)}>{cell && !(cf && cf.icon && cf.icon.iconOnly) ? cell.display : ''}</span>
+            <span className='cell-text' style={textStyle(link ? { ...fmt, u: true } : fmt, zoom)}>{cell && !(cf && cf.icon && cf.icon.iconOnly) ? cell.display : ''}</span>
             {hasBorder(fmt) && <span className='cell-borders' style={{ borderTop: borderCss(fmt.bt), borderRight: borderCss(fmt.br), borderBottom: borderCss(fmt.bb), borderLeft: borderCss(fmt.bl) }} />}
             {commentMarks && commentMarks.has(r + ',' + c) && (() => {
               const t = commentMarks.get(r + ',' + c)

@@ -296,7 +296,9 @@ ipcMain.handle('worklet:call', async (_e, method, args) => {
   // About: web and email links open outside the app.
   if (method === 'app:openUrl') {
     const url = String((args && args.url) || '')
-    if (/^(https:|mailto:|lightning:)/.test(url)) await shell.openExternal(url)
+    // The smoke test notes what would open instead of starting a browser.
+    if (SMOKE) fs.appendFileSync(path.join(dataDir, 'opened.txt'), url + '\n')
+    else if (/^(https?:|mailto:|lightning:)/.test(url)) await shell.openExternal(url)
     return { ok: true }
   }
   // After a device link or a phrase restore the identity changed: start a

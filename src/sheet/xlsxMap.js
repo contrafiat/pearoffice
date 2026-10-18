@@ -118,11 +118,25 @@ function workbookToTabs (XLSX, wb) {
       const text = ws[ref].c.map((x) => String(x.t || '').trim()).filter(Boolean).join('\n').slice(0, 2000)
       if (text) comments.push({ row: r + 1, col: c + 1, author: 'xlsx:' + (String(ws[ref].c[0].a || '').trim() || 'Imported'), text })
     }
+    // Links (proposals/2026-10-18-sheet-links.md): [row, col, address], or
+    // [row, col, { tab, row, col }] for a place in the workbook (tab by
+    // index; row and col null for the tab itself).
+    const links = []
+    for (const ref of Object.keys(ws)) {
+      const l = ref[0] !== '!' && ws[ref].l
+      if (!l || !l.Target) continue
+      const { r, c } = decodeRef(XLSX, ref)
+      if (r + 1 > MAX_ROWS || c + 1 > MAX_COLS) continue
+      const to = String(l.Target)
+      if (to[0] !== '#') { links.push([r + 1, c + 1, to]); continue }
+      const place = linkPlace(wb, to.slice(1))
+      if (place) links.push([r + 1, c + 1, place])
+    }
     const hidden = { rows: [], cols: [] }
     for (const [i, x] of (ws['!rows'] || []).entries()) if (x && x.hidden && i < MAX_ROWS) hidden.rows.push(i + 1)
     for (const [i, x] of (ws['!cols'] || []).entries()) if (x && x.hidden && i < MAX_COLS) hidden.cols.push(i + 1)
     const merges = (ws['!merges'] || []).map((m) => [m.s.r + 1, m.s.c + 1, m.e.r + 1, m.e.c + 1]).filter(([r1, c1, r2, c2]) => r2 <= MAX_ROWS && c2 <= MAX_COLS && (r1 !== r2 || c1 !== c2))
-    tabs.push({ name: String(name).slice(0, 100), cells, widths, merges, hidden, comments })
+    tabs.push({ name: String(name).slice(0, 100), cells, widths, merges, hidden, comments, links })
   }
   if (!tabs.length) throw new Error('This file has no sheets')
   // Workbook-wide named ranges (names for one sheet only are skipped).
@@ -137,11 +151,41 @@ function workbookToTabs (XLSX, wb) {
   return { tabs, names }
 }
 
+// Where a link inside a workbook goes: Sheet2!B4, 'My tab'!B4:C9 (its first
+// cell), a tab's name or a workbook-wide name. Null if nowhere.
+function linkPlace (wb, text, depth = 0) {
+  const sheetIndex = (name) => wb.SheetNames.findIndex((x) => x.toUpperCase() === String(name).toUpperCase())
+  const box = require('./charts').parseRange(text)
+  if (box && box.sheet) {
+    const tab = sheetIndex(box.sheet)
+    return tab >= 0 ? { tab, row: box.r1, col: box.c1 } : null
+  }
+  const tab = sheetIndex(text.replace(/^'(.*)'$/, '$1').replace(/''/g, "'"))
+  if (tab >= 0) return { tab, row: null, col: null }
+  const n = ((wb.Workbook && wb.Workbook.Names) || []).find((x) => String(x.Name).toUpperCase() === text.toUpperCase() && (x.Sheet === undefined || x.Sheet === null))
+  return n && depth === 0 ? linkPlace(wb, String(n.Ref || '').replace(/\$/g, ''), 1) : null
+}
+
 // Sheet dump (from the worklet's sheet:dump) -> SheetJS workbook.
 function dumpToWorkbook (XLSX, dump) {
   const wb = XLSX.utils.book_new()
+  // Excel sheet names: 31 chars, no []:*?/\ and unique.
   const used = new Set()
-  for (const tab of dump.tabs) {
+  const sheetNames = dump.tabs.map((tab) => {
+    let name = String(tab.name).replace(/[[\]:*?/\\]/g, ' ').slice(0, 31) || 'Sheet'
+    for (let n = 2; used.has(name.toUpperCase()); n++) name = name.slice(0, 28) + ' ' + n
+    used.add(name.toUpperCase())
+    return name
+  })
+  // A link: { Target } with the address, or #'Tab'!B4 for a place in the
+  // workbook (the tab's first cell for the tab itself).
+  const linkOut = (cell) => {
+    if (cell.link) return { Target: cell.link }
+    const to = cell.linkTo
+    if (!to || !sheetNames[to.tab]) return null
+    return { Target: "#'" + sheetNames[to.tab].replace(/'/g, "''") + "'!" + numToCol(to.col || 1) + (to.row || 1) }
+  }
+  for (const [tabIndex, tab] of dump.tabs.entries()) {
     const ws = {}
     let maxR = 0
     let maxC = 0
@@ -160,6 +204,8 @@ function dumpToWorkbook (XLSX, dump) {
         out.D = true
       }
       if (cell.fmt && cell.fmt.num) out.z = cell.fmt.num
+      const l = linkOut(cell)
+      if (l) out.l = l
       ws[ref] = out
       maxR = Math.max(maxR, cell.row)
       maxC = Math.max(maxC, cell.col)
@@ -185,11 +231,7 @@ function dumpToWorkbook (XLSX, dump) {
     for (const col of (tab.hidden && tab.hidden.cols) || []) cols[col - 1] = { ...cols[col - 1], hidden: true }
     if (rows.length) ws['!rows'] = Array.from(rows, (x) => x || {})
     if (cols.length) ws['!cols'] = Array.from(cols, (x) => x || {})
-    // Excel sheet names: 31 chars, no []:*?/\ and unique.
-    let name = String(tab.name).replace(/[[\]:*?/\\]/g, ' ').slice(0, 31) || 'Sheet'
-    for (let n = 2; used.has(name.toUpperCase()); n++) name = name.slice(0, 28) + ' ' + n
-    used.add(name.toUpperCase())
-    XLSX.utils.book_append_sheet(wb, ws, name)
+    XLSX.utils.book_append_sheet(wb, ws, sheetNames[tabIndex])
   }
   // Named ranges: { name, tab (its name in the dump), range }.
   const names = (dump.names || []).map((n) => {
@@ -259,7 +301,7 @@ function odsBytes (XLSX, fflate, dump) {
   const wb = dumpToWorkbook(XLSX, dump)
   const tabs = chartTabs(wb, dump).map((t, i) => {
     const d = dump.tabs[i]
-    const styles = (d.cells || []).filter((c) => c.fmt && Object.keys(c.fmt).some((k) => k !== 'num')).map((c) => [c.row, c.col, c.fmt])
+    const styles = (d.cells || []).filter((c) => c.fmt && Object.keys(c.fmt).some((k) => k !== 'num' && k !== 'link')).map((c) => { const { link, ...fmt } = c.fmt; return [c.row, c.col, fmt] })
     const condFormats = (d.condFormats || []).map((r) => (r.formula ? { ...r, formula: toFile(r.formula) } : r))
     return { ...t, styles, widths: d.widths || {}, heights: d.heights || {}, hidden: d.hidden || { rows: [], cols: [] }, freeze: d.freeze || null, condFormats, validations: d.validations || [] }
   })

@@ -106,7 +106,7 @@ async function shellMethod (method, args) {
   }
   if (method === 'app:openUrl') {
     const url = String(args.url || '')
-    if (/^(https:|mailto:|lightning:)/.test(url)) await Linking.openURL(url)
+    if (/^(https?:|mailto:|lightning:)/.test(url)) await Linking.openURL(url)
     return { ok: true }
   }
   // Is a Lightning wallet installed (the donation sheet offers it)?

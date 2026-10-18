@@ -690,6 +690,13 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 .cell.invalid::after { content: ''; position: absolute; left: 0; top: 0; border-style: solid; border-width: 8px 8px 0 0; border-color: var(--danger, #c0392b) transparent transparent transparent; pointer-events: none; }
 .list-button { position: absolute; z-index: 3; width: 22px; height: 22px; min-height: 0; padding: 0; display: flex; align-items: center; justify-content: center; border: 1px solid var(--line-strong); border-radius: 4px; background: var(--panel); color: var(--ink); cursor: pointer; }
 @media (pointer: coarse) { .list-button { width: 28px; height: 28px; margin-top: -3px; margin-left: -6px; } }
+/* Links in cells (proposals/2026-10-18-sheet-links.md) */
+.link-card { position: fixed; z-index: 12; display: flex; align-items: center; gap: 4px; max-width: 320px; padding: 4px 4px 4px 10px; background: var(--panel); border: 1px solid var(--line-strong); border-radius: 8px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15); }
+.link-card-address { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--pear-dark); font-size: 13px; }
+.link-card .icon-button { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; min-height: 0; padding: 0; border: 0; border-radius: 6px; background: none; color: var(--ink); cursor: pointer; }
+.link-card .icon-button:hover { background: var(--head); }
+@media (pointer: coarse) { .link-card .icon-button { width: 38px; height: 38px; } }
+.sheet-link-bar select { border: 1px solid var(--line-strong); border-radius: 6px; padding: 6px 8px; background: var(--paper); color: var(--ink); font: inherit; }
 .pick-menu { position: fixed; min-width: 200px; max-height: 300px; overflow-y: auto; z-index: 30; }
 .pick-menu li[aria-selected='true'], .pick-list li[aria-selected='true'] { font-weight: 600; color: var(--pear-dark); }
 .pick-list { list-style: none; margin: 0; padding: 0; max-height: 50vh; overflow-y: auto; }

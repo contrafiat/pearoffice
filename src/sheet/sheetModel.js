@@ -4,7 +4,8 @@
 //   tabs          Y.Array  ordered tab ids
 //   tab:<tabId>   Y.Map    name, rows (Y.Array of ids), cols (Y.Array of ids),
 //                          cells (Y.Map "rowId:colId" -> raw input),
-//                          fmt (Y.Map "rowId:colId:attr" -> value),
+//                          fmt (Y.Map "rowId:colId:attr" -> value; `link`
+//                          is a cell's link, proposals/2026-10-18-sheet-links.md),
 //                          widths (Y.Map colId -> px)
 //
 // Formatting is stored one attribute per key so that one person making a
@@ -24,11 +25,18 @@ const { fillLine } = require('./fill')
 const VERSION = 1
 const DEFAULT_ROWS = 100
 const DEFAULT_COLS = 26
-const FORMAT_ATTRS = ['b', 'i', 'color', 'fill', 'num', 'align', 'valign', 'wrap', 'size', 'u', 's', 'font', 'bt', 'br', 'bb', 'bl']
+const FORMAT_ATTRS = ['b', 'i', 'color', 'fill', 'num', 'align', 'valign', 'wrap', 'size', 'u', 's', 'font', 'bt', 'br', 'bb', 'bl', 'link']
 
 // Allowed values for the formats added in proposals/2026-10-04-cell-formats.md.
 // A value outside these is refused, so every device draws the same thing.
 const BORDER = /^(thin|medium|thick|dashed|double)(:#[0-9a-f]{6})?$/i
+// A link goes to a web page or an email address, or inside the file to a tab
+// (`#<tabId>`) or a cell on one (`#<tabId>!<rowId>:<colId>`), by id so that
+// renames and inserts keep it on the same cell.
+const MAX_LINK = 2048
+const WEB_LINK = /^(https?:\/\/|mailto:)[^\s<>"]+$/i
+const INNER_LINK = /^#([A-Za-z0-9_-]{11})(?:!([A-Za-z0-9_-]{11}):([A-Za-z0-9_-]{11}))?$/
+const isLink = (v) => typeof v === 'string' && v.length <= MAX_LINK && (WEB_LINK.test(v) || INNER_LINK.test(v))
 const FORMAT_VALUES = {
   align: (v) => ['left', 'center', 'right'].includes(v),
   valign: (v) => ['top', 'middle', 'bottom'].includes(v),
@@ -40,7 +48,8 @@ const FORMAT_VALUES = {
   bt: (v) => BORDER.test(v),
   br: (v) => BORDER.test(v),
   bb: (v) => BORDER.test(v),
-  bl: (v) => BORDER.test(v)
+  bl: (v) => BORDER.test(v),
+  link: isLink
 }
 function checkFormat (attr, value) {
   if (!FORMAT_ATTRS.includes(attr)) throw new Error('unknown format attribute: ' + attr)
@@ -241,13 +250,53 @@ function clearRange (doc, tabId, r1, c1, r2, c2) {
     const rows = t.get('rows')
     const cols = t.get('cols')
     const cells = t.get('cells')
+    const fmt = t.get('fmt')
     for (let r = r1; r <= Math.min(r2, rows.length); r++) {
       for (let c = c1; c <= Math.min(c2, cols.length); c++) {
         const key = cellKey(rows.get(r - 1), cols.get(c - 1))
         if (cells.has(key)) cells.delete(key)
+        if (fmt.has(key + ':link')) fmt.delete(key + ':link')
       }
     }
   })
+}
+
+// Give every cell of a range a link, or none (null). `link` is a web or
+// email address, or { tabId, row, col } for a place in the file (row and col
+// left out for the tab itself).
+function setLink (doc, tabId, r1, c1, r2, c2, link) {
+  let value = null
+  if (link && typeof link === 'object') {
+    const to = tabMap(doc, link.tabId)
+    value = '#' + link.tabId
+    if (link.row || link.col) {
+      const rowId = to.get('rows').get(Math.max(1, link.row || 1) - 1)
+      const colId = to.get('cols').get(Math.max(1, link.col || 1) - 1)
+      if (!rowId || !colId) throw new Error('That cell is past the end of the tab')
+      value += '!' + cellKey(rowId, colId)
+    }
+  } else if (link) {
+    value = String(link).trim()
+  }
+  if (value !== null && !isLink(value)) throw new Error('Links can go to web pages, email addresses or places in this file')
+  return setFormatRange(doc, tabId, r1, c1, r2, c2, { link: value })
+}
+
+// Where a link inside the file goes now: { tabId, name, row, col }, row and
+// col null for the tab itself or when the cell's row or column was deleted.
+// Null for a web link or a deleted tab.
+function linkTarget (doc, link) {
+  const m = INNER_LINK.exec(link || '')
+  if (!m || !tabIds(doc).includes(m[1])) return null
+  const t = doc.getMap('tab:' + m[1])
+  let row = null
+  let col = null
+  if (m[2]) {
+    const r = t.get('rows').toArray().indexOf(m[2])
+    const c = t.get('cols').toArray().indexOf(m[3])
+    if (r >= 0 && c >= 0) { row = r + 1; col = c + 1 }
+  }
+  return { tabId: m[1], name: t.get('name'), row, col }
 }
 
 function setFormatRange (doc, tabId, r1, c1, r2, c2, patch) {
@@ -1158,6 +1207,27 @@ function importTabs (doc, payload) {
         if (colId) t.get('widths').set(colId, Math.max(24, Math.min(1000, Math.round(px))))
       }
     })
+    // Links (proposals/2026-10-18-sheet-links.md) once every tab has its
+    // rows: an address, or a place in the file with its tab by index. A
+    // cell past the end of its tab links to the tab.
+    payload.tabs.forEach((tab, i) => {
+      const id = ids[i]
+      const t = tabMap(doc, id)
+      for (const [row, col, to] of tab.links || []) {
+        const { rowId, colId } = idsAt(doc, id, row, col)
+        if (!rowId || !colId) continue
+        let link = to
+        if (to && typeof to === 'object') {
+          const target = Number.isInteger(to.tab) && ids[to.tab]
+          if (!target) continue
+          const tt = tabMap(doc, target)
+          const r = Number.isInteger(to.row) && tt.get('rows').get(to.row - 1)
+          const c = Number.isInteger(to.col) && tt.get('cols').get(to.col - 1)
+          link = '#' + target + (r && c ? '!' + cellKey(r, c) : '')
+        }
+        if (isLink(link)) t.get('fmt').set(cellKey(rowId, colId) + ':link', link)
+      }
+    })
     // Named ranges from the file: { name, tab (index), range }.
     for (const n of payload.names || []) {
       try { if (ids[n.tab]) setName(doc, n.name, ids[n.tab], n.range) } catch {}
@@ -1310,6 +1380,9 @@ module.exports = {
   setCells,
   clearRange,
   setFormatRange,
+  setLink,
+  linkTarget,
+  isLink,
   getInput,
   setFormat,
   getFormat,
