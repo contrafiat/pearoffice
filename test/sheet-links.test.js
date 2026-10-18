@@ -115,3 +115,14 @@ test('imported links that are not allowed are dropped', () => {
   const t = model.tabIds(back)[0]
   for (const row of [1, 2, 3]) assert.equal(model.getFormat(back, t, row, 1).link, undefined)
 })
+
+test('HYPERLINK shows its label and links only its own cell', () => {
+  const { evaluateSheet } = require('../src/sheet/formula')
+  const { doc, tab } = sheet()
+  model.setCells(doc, tab, 1, 1, [['=HYPERLINK("https://pears.com", "Pears")'], ['=HYPERLINK("mailto:a@b.c")'], ['=A1'], ['=HYPERLINK(1/0, "x")']])
+  const v = evaluateSheet(doc).get(tab)
+  assert.deepEqual(v.get('1,1'), { value: 'Pears', link: 'https://pears.com' })
+  assert.deepEqual(v.get('2,1'), { value: 'mailto:a@b.c', link: 'mailto:a@b.c' })
+  assert.deepEqual(v.get('3,1'), { value: 'Pears' })
+  assert.deepEqual(v.get('4,1'), { error: '#DIV/0!' })
+})

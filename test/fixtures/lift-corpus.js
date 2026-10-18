@@ -43,10 +43,13 @@ for (const [, f] of functionCases) {
 
 const cases = formulas.map((f, i) => ['AH' + (1 + i * SPACING), f])
 // Excel's answer where LibreOffice's differs: the function corpus's
-// overrides, twice; and YEARFRAC, whose basis LibreOffice does not take as
-// an array (Err:502).
+// overrides, twice; YEARFRAC, whose basis LibreOffice does not take as an
+// array (Err:502); and HYPERLINK, where LibreOffice gives the label only to
+// the first address and Excel to each.
 const EXCEL_OVERRIDES = {}
 for (const f of formulas) if (origin[f] in FUNCTION_OVERRIDES) EXCEL_OVERRIDES[f] = [[FUNCTION_OVERRIDES[origin[f]][0]], [FUNCTION_OVERRIDES[origin[f]][0]]]
 EXCEL_OVERRIDES['=YEARFRAC(E1, E5, {1;1})'] = [[0.9972677595628415], [0.9972677595628415]]
+EXCEL_OVERRIDES['=HYPERLINK({"https://pears.com";"https://pears.com"}, "Pears")'] = [['Pears'], ['Pears']]
+EXCEL_OVERRIDES['=HYPERLINK({"#Sheet1!B4";"#Sheet1!B4"}, C1)'] = [['apple'], ['apple']]
 
 module.exports = { inputs, cases, EXCEL_OVERRIDES, SPACING }

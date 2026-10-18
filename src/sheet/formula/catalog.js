@@ -166,6 +166,7 @@ HEX2OCT|number, [places]|Hexadecimal to octal
 HLOOKUP|lookup_value, table_array, row_index_num, [range_lookup]|Find a value in the top row and return one from below it
 HOUR|time|Hour of a time
 HSTACK|array1, [array2, ...]|Arrays side by side
+HYPERLINK|link_location, [friendly_name]|A link to a web page, an email address or a cell; shows the name
 HYPGEOM.DIST|sample_s, number_sample, population_s, number_pop, cumulative|Hypergeometric distribution
 IF|logical_test, [value_if_true], [value_if_false]|One value if a test is TRUE, another if not
 IFERROR|value, value_if_error|A value, or another if it is an error

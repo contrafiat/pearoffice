@@ -2225,6 +2225,39 @@
    ]
   },
   "AH604": {
+   "formula": "=HYPERLINK({\"https://pears.com\";\"https://pears.com\"}, \"Pears\")",
+   "libreoffice": [
+    [
+     "Pears"
+    ],
+    [
+     "https://pears.com"
+    ]
+   ]
+  },
+  "AH607": {
+   "formula": "=HYPERLINK({\"https://pears.com\";\"https://pears.com\"})",
+   "libreoffice": [
+    [
+     "https://pears.com"
+    ],
+    [
+     "https://pears.com"
+    ]
+   ]
+  },
+  "AH610": {
+   "formula": "=HYPERLINK({\"#Sheet1!B4\";\"#Sheet1!B4\"}, C1)",
+   "libreoffice": [
+    [
+     "apple"
+    ],
+    [
+     "#Sheet1!B4"
+    ]
+   ]
+  },
+  "AH613": {
    "formula": "=CHAR({65;65})",
    "libreoffice": [
     [
@@ -2235,7 +2268,7 @@
     ]
    ]
   },
-  "AH607": {
+  "AH616": {
    "formula": "=CODE({\"A\";\"A\"})",
    "libreoffice": [
     [
@@ -2246,7 +2279,7 @@
     ]
    ]
   },
-  "AH610": {
+  "AH619": {
    "formula": "=DOLLAR({1234.567;1234.567}, 2)",
    "libreoffice": [
     [
@@ -2257,7 +2290,7 @@
     ]
    ]
   },
-  "AH613": {
+  "AH622": {
    "formula": "=EXACT({\"a\";\"a\"}, \"A\")",
    "libreoffice": [
     [
@@ -2268,7 +2301,7 @@
     ]
    ]
   },
-  "AH616": {
+  "AH625": {
    "formula": "=FIND({\"an\";\"an\"}, C2)",
    "libreoffice": [
     [
@@ -2279,7 +2312,7 @@
     ]
    ]
   },
-  "AH619": {
+  "AH628": {
    "formula": "=FINDB({\"an\";\"an\"}, C2)",
    "libreoffice": [
     [
@@ -2290,7 +2323,7 @@
     ]
    ]
   },
-  "AH622": {
+  "AH631": {
    "formula": "=FIXED({1234.567;1234.567}, 1)",
    "libreoffice": [
     [
@@ -2301,7 +2334,7 @@
     ]
    ]
   },
-  "AH625": {
+  "AH634": {
    "formula": "=LEFT(C2, {3;3})",
    "libreoffice": [
     [
@@ -2312,7 +2345,7 @@
     ]
    ]
   },
-  "AH628": {
+  "AH637": {
    "formula": "=LEFTB(C2, {3;3})",
    "libreoffice": [
     [
@@ -2323,7 +2356,7 @@
     ]
    ]
   },
-  "AH631": {
+  "AH640": {
    "formula": "=MID(C3, {2;2}, 3)",
    "libreoffice": [
     [
@@ -2334,7 +2367,7 @@
     ]
    ]
   },
-  "AH634": {
+  "AH643": {
    "formula": "=MIDB(C3, {2;2}, 3)",
    "libreoffice": [
     [
@@ -2345,7 +2378,7 @@
     ]
    ]
   },
-  "AH637": {
+  "AH646": {
    "formula": "=NUMBERVALUE({\"1.234,5\";\"1.234,5\"}, \",\", \".\")",
    "libreoffice": [
     [
@@ -2356,7 +2389,7 @@
     ]
    ]
   },
-  "AH640": {
+  "AH649": {
    "formula": "=PROPER({\"hello wORLD\";\"hello wORLD\"})",
    "libreoffice": [
     [
@@ -2367,7 +2400,7 @@
     ]
    ]
   },
-  "AH643": {
+  "AH652": {
    "formula": "=REPLACE({\"abcdef\";\"abcdef\"}, 2, 3, \"X\")",
    "libreoffice": [
     [
@@ -2378,7 +2411,7 @@
     ]
    ]
   },
-  "AH646": {
+  "AH655": {
    "formula": "=REPLACEB({\"abcdef\";\"abcdef\"}, 2, 3, \"X\")",
    "libreoffice": [
     [
@@ -2389,7 +2422,7 @@
     ]
    ]
   },
-  "AH649": {
+  "AH658": {
    "formula": "=REPT({\"ab\";\"ab\"}, 3)",
    "libreoffice": [
     [
@@ -2400,7 +2433,7 @@
     ]
    ]
   },
-  "AH652": {
+  "AH661": {
    "formula": "=RIGHT(C3, {2;2})",
    "libreoffice": [
     [
@@ -2411,7 +2444,7 @@
     ]
    ]
   },
-  "AH655": {
+  "AH664": {
    "formula": "=RIGHTB(C3, {2;2})",
    "libreoffice": [
     [
@@ -2422,7 +2455,7 @@
     ]
    ]
   },
-  "AH658": {
+  "AH667": {
    "formula": "=SEARCH({\"AN\";\"AN\"}, C2)",
    "libreoffice": [
     [
@@ -2433,7 +2466,7 @@
     ]
    ]
   },
-  "AH661": {
+  "AH670": {
    "formula": "=SEARCHB({\"AN\";\"AN\"}, C2)",
    "libreoffice": [
     [
@@ -2444,7 +2477,7 @@
     ]
    ]
   },
-  "AH664": {
+  "AH673": {
    "formula": "=SUBSTITUTE({\"a-b-c\";\"a-b-c\"}, \"-\", \"+\")",
    "libreoffice": [
     [
@@ -2455,7 +2488,7 @@
     ]
    ]
   },
-  "AH667": {
+  "AH676": {
    "formula": "=TEXT({1234.5;1234.5}, \"#,##0.00\")",
    "libreoffice": [
     [
@@ -2466,7 +2499,7 @@
     ]
    ]
   },
-  "AH670": {
+  "AH679": {
    "formula": "=TRIM({\"  a  b  \";\"  a  b  \"})",
    "libreoffice": [
     [
@@ -2477,7 +2510,7 @@
     ]
    ]
   },
-  "AH673": {
+  "AH682": {
    "formula": "=UNICHAR({9731;9731})",
    "libreoffice": [
     [
@@ -2488,7 +2521,7 @@
     ]
    ]
   },
-  "AH676": {
+  "AH685": {
    "formula": "=UNICODE({\"A\";\"A\"})",
    "libreoffice": [
     [
@@ -2499,7 +2532,7 @@
     ]
    ]
   },
-  "AH679": {
+  "AH688": {
    "formula": "=ENCODEURL({\"a b&c\";\"a b&c\"})",
    "libreoffice": [
     [
@@ -2510,7 +2543,7 @@
     ]
    ]
   },
-  "AH682": {
+  "AH691": {
    "formula": "=ISODD({3;3})",
    "libreoffice": [
     [
@@ -2521,7 +2554,7 @@
     ]
    ]
   },
-  "AH685": {
+  "AH694": {
    "formula": "=VALUE({\"12.5\";\"12.5\"})",
    "libreoffice": [
     [
@@ -2532,7 +2565,7 @@
     ]
    ]
   },
-  "AH688": {
+  "AH697": {
    "formula": "=LOOKUP({7;7}, A1:A10, B1:B10)",
    "libreoffice": [
     [
@@ -2543,7 +2576,7 @@
     ]
    ]
   },
-  "AH691": {
+  "AH700": {
    "formula": "=SLN({10000;10000}, 1000, 5)",
    "libreoffice": [
     [
@@ -2554,7 +2587,7 @@
     ]
    ]
   },
-  "AH694": {
+  "AH703": {
    "formula": "=SYD({10000;10000}, 1000, 5, 2)",
    "libreoffice": [
     [
@@ -2565,7 +2598,7 @@
     ]
    ]
   },
-  "AH697": {
+  "AH706": {
    "formula": "=DB({10000;10000}, 1000, 5, 2)",
    "libreoffice": [
     [
@@ -2576,7 +2609,7 @@
     ]
    ]
   },
-  "AH700": {
+  "AH709": {
    "formula": "=DDB({10000;10000}, 1000, 5, 2)",
    "libreoffice": [
     [
@@ -2587,7 +2620,7 @@
     ]
    ]
   },
-  "AH703": {
+  "AH712": {
    "formula": "=EFFECT({0.05;0.05}, 12)",
    "libreoffice": [
     [
@@ -2598,7 +2631,7 @@
     ]
    ]
   },
-  "AH706": {
+  "AH715": {
    "formula": "=NOMINAL({0.05;0.05}, 12)",
    "libreoffice": [
     [
@@ -2609,7 +2642,7 @@
     ]
    ]
   },
-  "AH709": {
+  "AH718": {
    "formula": "=CUMIPMT(0.05/12, {36;36}, 10000, 1, 12, 0)",
    "libreoffice": [
     [
@@ -2620,7 +2653,7 @@
     ]
    ]
   },
-  "AH712": {
+  "AH721": {
    "formula": "=CUMPRINC(0.05/12, {36;36}, 10000, 1, 12, 0)",
    "libreoffice": [
     [
@@ -2631,7 +2664,7 @@
     ]
    ]
   },
-  "AH715": {
+  "AH724": {
    "formula": "=MIRR(G1:G4, {0.1;0.1}, 0.12)",
    "libreoffice": [
     [
@@ -2642,7 +2675,7 @@
     ]
    ]
   },
-  "AH718": {
+  "AH727": {
    "formula": "=TRIM({\"lead and  inner  spaces \";\"lead and  inner  spaces \"})",
    "libreoffice": [
     [
@@ -2653,7 +2686,7 @@
     ]
    ]
   },
-  "AH721": {
+  "AH730": {
    "formula": "=SEARCH({\"b*n\";\"b*n\"}, C2)",
    "libreoffice": [
     [
@@ -2664,7 +2697,7 @@
     ]
    ]
   },
-  "AH724": {
+  "AH733": {
    "formula": "=TRUNC(PI(), {3;3})",
    "libreoffice": [
     [
@@ -2675,7 +2708,7 @@
     ]
    ]
   },
-  "AH727": {
+  "AH736": {
    "formula": "=T.TEST(A1:A10, B1:B10, {2;2}, 2)",
    "libreoffice": [
     [
@@ -2686,7 +2719,7 @@
     ]
    ]
   },
-  "AH730": {
+  "AH739": {
    "formula": "=T.TEST(A1:A10, B1:B10, {1;1}, 3)",
    "libreoffice": [
     [
@@ -2697,7 +2730,7 @@
     ]
    ]
   },
-  "AH733": {
+  "AH742": {
    "formula": "=IMDIV({\"1+2i\";\"1+2i\"}, \"3-4i\")",
    "libreoffice": [
     [
@@ -2708,7 +2741,7 @@
     ]
    ]
   },
-  "AH736": {
+  "AH745": {
    "formula": "=COMPLEX({0;0}, -1)",
    "libreoffice": [
     [
@@ -2719,7 +2752,7 @@
     ]
    ]
   },
-  "AH739": {
+  "AH748": {
    "formula": "=XLOOKUP({\"cherry\";\"cherry\"}, C1:C6, D1:D6)",
    "libreoffice": [
     [
@@ -2730,7 +2763,7 @@
     ]
    ]
   },
-  "AH742": {
+  "AH751": {
    "formula": "=XLOOKUP({\"fig\";\"fig\"}, C1:C6, D1:D6, \"none\")",
    "libreoffice": [
     [
@@ -2741,7 +2774,7 @@
     ]
    ]
   },
-  "AH745": {
+  "AH754": {
    "formula": "=XLOOKUP({11;11}, A1:A10, B1:B10, , -1)",
    "libreoffice": [
     [
@@ -2752,7 +2785,7 @@
     ]
    ]
   },
-  "AH748": {
+  "AH757": {
    "formula": "=XLOOKUP({11;11}, A1:A10, B1:B10, , 1)",
    "libreoffice": [
     [
@@ -2763,7 +2796,7 @@
     ]
    ]
   },
-  "AH751": {
+  "AH760": {
    "formula": "=XLOOKUP({\"apple\";\"apple\"}, C1:C6, D1:D6, , 0, -1)",
    "libreoffice": [
     [
@@ -2774,7 +2807,7 @@
     ]
    ]
   },
-  "AH754": {
+  "AH763": {
    "formula": "=XLOOKUP({\"b*\";\"b*\"}, C1:C6, D1:D6, , 2)",
    "libreoffice": [
     [
@@ -2785,7 +2818,7 @@
     ]
    ]
   },
-  "AH757": {
+  "AH766": {
    "formula": "=XLOOKUP({7;7}, K1:L1, K2:L2)",
    "libreoffice": [
     [
@@ -2796,7 +2829,7 @@
     ]
    ]
   },
-  "AH760": {
+  "AH769": {
    "formula": "=XMATCH({\"date\";\"date\"}, C1:C6)",
    "libreoffice": [
     [
@@ -2807,7 +2840,7 @@
     ]
    ]
   },
-  "AH763": {
+  "AH772": {
    "formula": "=XMATCH({11;11}, A1:A10, 1)",
    "libreoffice": [
     [
@@ -2818,7 +2851,7 @@
     ]
    ]
   },
-  "AH766": {
+  "AH775": {
    "formula": "=XMATCH({\"apple\";\"apple\"}, C1:C6, 0, -1)",
    "libreoffice": [
     [
@@ -2829,7 +2862,7 @@
     ]
    ]
   },
-  "AH769": {
+  "AH778": {
    "formula": "=TEXTBEFORE(AC1, {\"hood\";\"hood\"})",
    "libreoffice": [
     [
@@ -2840,7 +2873,7 @@
     ]
    ]
   },
-  "AH772": {
+  "AH781": {
    "formula": "=TEXTBEFORE(AC1, {\"HOOD\";\"HOOD\"}, 1, 1)",
    "libreoffice": [
     [
@@ -2851,7 +2884,7 @@
     ]
    ]
   },
-  "AH775": {
+  "AH784": {
    "formula": "=TEXTAFTER(AC1, {\"red \";\"red \"}, -1)",
    "libreoffice": [
     [
@@ -2862,7 +2895,7 @@
     ]
    ]
   },
-  "AH778": {
+  "AH787": {
    "formula": "=TEXTAFTER(AC1, {\",\";\",\"})",
    "libreoffice": [
     [
@@ -2873,7 +2906,7 @@
     ]
    ]
   },
-  "AH781": {
+  "AH790": {
    "formula": "=TEXTBEFORE(AC1, {\"x\";\"x\"}, 1, 0, 0, \"-\")",
    "libreoffice": [
     [
@@ -2884,7 +2917,7 @@
     ]
    ]
   },
-  "AH784": {
+  "AH793": {
    "formula": "=TEXTAFTER(AC1, {\"hood\";\"hood\"}, 2)",
    "libreoffice": [
     [
@@ -2895,7 +2928,7 @@
     ]
    ]
   },
-  "AH787": {
+  "AH796": {
    "formula": "=XNPV({0.09;0.09}, G1:G4, AD1:AD4)",
    "libreoffice": [
     [

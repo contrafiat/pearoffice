@@ -383,7 +383,7 @@ take five scenes: files, sheet, document, slides, sharing.
   .json, .csv, .xlsx and .ods in (a chart, the formats, colour rules and
   validation included) (about 32 s). `sheet-links` is links in cells: from
   the toolbar and the cell menu, the card's Open and Remove, Ctrl+click to
-  a cell, a typed web address and the .xlsx round trip (about 8 s; a smoke
+  a cell, a typed web address, a HYPERLINK formula and the .xlsx round trip (about 8 s; a smoke
   run writes what Open would open to `opened.txt` in the data folder).
   `docs` is documents, an .odt out and back in included (about 11 s).
   `slides` is a deck: two layouts, typing a title, undo and redo, moving,
@@ -450,7 +450,7 @@ take five scenes: files, sheet, document, slides, sharing.
   against an installed app (120 s limit each). Skipped (with a message) when
   there is no display.
 
-`test/functions.test.js` checks 408 cases covering 373 of the engine's 389
+`test/functions.test.js` checks 411 cases covering 374 of the engine's 390
 functions (`test/fixtures/function-corpus.js`) against LibreOffice's answers in
 `test/fixtures/function-expected.json`, with Excel's value recorded by hand
 where the two differ. After adding cases, run `node scripts/function-expectations.js`
@@ -459,6 +459,10 @@ differs. Many upstream fast-formula-parser functions are empty stubs; they are
 filled in `src/sheet/formula/fills.js`; newer Excel functions (XLOOKUP,
 XMATCH, TEXTBEFORE/AFTER, OFFSET, INDIRECT, XNPV, XIRR, DSUM and the other
 database functions) are in `src/sheet/formula/newer.js`.
+
+HYPERLINK is defined in `src/sheet/formula/index.js`: it returns the label
+and records the address for its own cell, which comes out as `link` on the
+cell's value and `formulaLink` in `sheet:view` (proposals/2026-10-18-sheet-links.md).
 
 Formulas spill (proposals/2026-10-04-spilling-formulas.md): any array result
 fills the cells below and to the right, computed on each device and never
@@ -476,7 +480,7 @@ A single-value function given a range runs once per value
 run `node scripts/spill-expectations.js`.
 
 Formula suggestions come from `src/sheet/formula/catalog.js` (name, arguments
-and one line for each of the 399 working functions); `test/catalog.test.js`
+and one line for each of the 400 working functions); `test/catalog.test.js`
 fails if a function is added to the engine without an entry.
 
 After a deliberate formula change, regenerate the golden file with

@@ -1246,398 +1246,410 @@
    "libreoffice": 30
   },
   "H310": {
+   "formula": "=HYPERLINK(\"https://pears.com\", \"Pears\")",
+   "libreoffice": "Pears"
+  },
+  "H311": {
+   "formula": "=HYPERLINK(\"https://pears.com\")",
+   "libreoffice": "https://pears.com"
+  },
+  "H312": {
+   "formula": "=HYPERLINK(\"#Sheet1!B4\", C1)",
+   "libreoffice": "apple"
+  },
+  "H313": {
    "formula": "=CHAR(65)",
    "libreoffice": "A"
   },
-  "H311": {
+  "H314": {
    "formula": "=CLEAN(\"a\"&CHAR(7)&\"b\")",
    "libreoffice": "ab"
   },
-  "H312": {
+  "H315": {
    "formula": "=CODE(\"A\")",
    "libreoffice": 65
   },
-  "H313": {
+  "H316": {
    "formula": "=CONCAT(C1, \"-\", C2)",
    "libreoffice": "apple-Banana"
   },
-  "H314": {
+  "H317": {
    "formula": "=CONCATENATE(\"a\", \"b\")",
    "libreoffice": "ab"
   },
-  "H315": {
+  "H318": {
    "formula": "=DOLLAR(1234.567, 2)",
    "libreoffice": "$1,234.57"
   },
-  "H316": {
+  "H319": {
    "formula": "=EXACT(\"a\", \"A\")",
    "libreoffice": false
   },
-  "H317": {
+  "H320": {
    "formula": "=FIND(\"an\", C2)",
    "libreoffice": 2
   },
-  "H318": {
+  "H321": {
    "formula": "=FINDB(\"an\", C2)",
    "libreoffice": 2
   },
-  "H319": {
+  "H322": {
    "formula": "=FIXED(1234.567, 1)",
    "libreoffice": "1,234.6"
   },
-  "H320": {
+  "H323": {
    "formula": "=LEFT(C2, 3)",
    "libreoffice": "Ban"
   },
-  "H321": {
+  "H324": {
    "formula": "=LEFTB(C2, 3)",
    "libreoffice": "Ban"
   },
-  "H322": {
+  "H325": {
    "formula": "=LEN(C3)",
    "libreoffice": 6
   },
-  "H323": {
+  "H326": {
    "formula": "=LENB(C3)",
    "libreoffice": 6
   },
-  "H324": {
+  "H327": {
    "formula": "=LOWER(C2)",
    "libreoffice": "banana"
   },
-  "H325": {
+  "H328": {
    "formula": "=MID(C3, 2, 3)",
    "libreoffice": "her"
   },
-  "H326": {
+  "H329": {
    "formula": "=MIDB(C3, 2, 3)",
    "libreoffice": "her"
   },
-  "H327": {
+  "H330": {
    "formula": "=NUMBERVALUE(\"1.234,5\", \",\", \".\")",
    "libreoffice": 1234.5
   },
-  "H328": {
+  "H331": {
    "formula": "=PROPER(\"hello wORLD\")",
    "libreoffice": "Hello World"
   },
-  "H329": {
+  "H332": {
    "formula": "=REPLACE(\"abcdef\", 2, 3, \"X\")",
    "libreoffice": "aXef"
   },
-  "H330": {
+  "H333": {
    "formula": "=REPLACEB(\"abcdef\", 2, 3, \"X\")",
    "libreoffice": "aXef"
   },
-  "H331": {
+  "H334": {
    "formula": "=REPT(\"ab\", 3)",
    "libreoffice": "ababab"
   },
-  "H332": {
+  "H335": {
    "formula": "=RIGHT(C3, 2)",
    "libreoffice": "ry"
   },
-  "H333": {
+  "H336": {
    "formula": "=RIGHTB(C3, 2)",
    "libreoffice": "ry"
   },
-  "H334": {
+  "H337": {
    "formula": "=SEARCH(\"AN\", C2)",
    "libreoffice": 2
   },
-  "H335": {
+  "H338": {
    "formula": "=SEARCHB(\"AN\", C2)",
    "libreoffice": 2
   },
-  "H336": {
+  "H339": {
    "formula": "=SUBSTITUTE(\"a-b-c\", \"-\", \"+\")",
    "libreoffice": "a+b+c"
   },
-  "H337": {
+  "H340": {
    "formula": "=T(C1)",
    "libreoffice": "apple"
   },
-  "H338": {
+  "H341": {
    "formula": "=TEXT(1234.5, \"#,##0.00\")",
    "libreoffice": "1,234.50"
   },
-  "H339": {
+  "H342": {
    "formula": "=TEXTJOIN(\", \", TRUE, C1:C3)",
    "libreoffice": "apple, Banana, cherry"
   },
-  "H340": {
+  "H343": {
    "formula": "=TRIM(\"  a  b  \")",
    "libreoffice": "a b"
   },
-  "H341": {
+  "H344": {
    "formula": "=UNICHAR(9731)",
    "libreoffice": "☃"
   },
-  "H342": {
+  "H345": {
    "formula": "=UNICODE(\"A\")",
    "libreoffice": 65
   },
-  "H343": {
+  "H346": {
    "formula": "=UPPER(C1)",
    "libreoffice": "APPLE"
   },
-  "H344": {
+  "H347": {
    "formula": "=ENCODEURL(\"a b&c\")",
    "libreoffice": "a%20b%26c"
   },
-  "H345": {
+  "H348": {
    "formula": "=COUNTA(A1:A12)",
    "libreoffice": 11
   },
-  "H346": {
+  "H349": {
    "formula": "=COUNTBLANK(A1:A12)",
    "libreoffice": 1
   },
-  "H347": {
+  "H350": {
    "formula": "=ISODD(3)",
    "libreoffice": true
   },
-  "H348": {
+  "H351": {
    "formula": "=VALUE(\"12.5\")",
    "libreoffice": 12.5
   },
-  "H349": {
+  "H352": {
    "formula": "=LOOKUP(7, A1:A10, B1:B10)",
    "libreoffice": 6.8
   },
-  "H350": {
+  "H353": {
    "formula": "=SLN(10000, 1000, 5)",
    "libreoffice": 1800
   },
-  "H351": {
+  "H354": {
    "formula": "=SYD(10000, 1000, 5, 2)",
    "libreoffice": 2400
   },
-  "H352": {
+  "H355": {
    "formula": "=DB(10000, 1000, 5, 2)",
    "libreoffice": 2328.39
   },
-  "H353": {
+  "H356": {
    "formula": "=DDB(10000, 1000, 5, 2)",
    "libreoffice": 2400
   },
-  "H354": {
+  "H357": {
    "formula": "=EFFECT(0.05, 12)",
    "libreoffice": 0.051161897881733
   },
-  "H355": {
+  "H358": {
    "formula": "=NOMINAL(0.05, 12)",
    "libreoffice": 0.0488894854037802
   },
-  "H356": {
+  "H359": {
    "formula": "=CUMIPMT(0.05/12, 36, 10000, 1, 12, 0)",
    "libreoffice": -428.043486354402
   },
-  "H357": {
+  "H360": {
    "formula": "=CUMPRINC(0.05/12, 36, 10000, 1, 12, 0)",
    "libreoffice": -3168.46416620545
   },
-  "H358": {
+  "H361": {
    "formula": "=MIRR(G1:G4, 0.1, 0.12)",
    "libreoffice": 0.0981566924463153
   },
-  "H359": {
+  "H362": {
    "formula": "=SUBTOTAL(109, A1:A10)",
    "libreoffice": 88
   },
-  "H360": {
+  "H363": {
    "formula": "=TRIM(\"lead and  inner  spaces \")",
    "libreoffice": "lead and inner spaces"
   },
-  "H361": {
+  "H364": {
    "formula": "=SEARCH(\"b*n\", C2)",
    "libreoffice": 1
   },
-  "H362": {
+  "H365": {
    "formula": "=TRUNC(PI(), 3)",
    "libreoffice": 3.141
   },
-  "H363": {
+  "H366": {
    "formula": "=MDETERM(Q1:T4)",
    "libreoffice": 54
   },
-  "H364": {
+  "H367": {
    "formula": "=INDEX(MINVERSE(Q1:T4), 2, 3)",
    "libreoffice": 0.796296296296297
   },
-  "H365": {
+  "H368": {
    "formula": "=SUMPRODUCT(Q1:T1, Q2:T2)",
    "libreoffice": -7
   },
-  "H366": {
+  "H369": {
    "formula": "=T.TEST(A1:A10, B1:B10, 2, 2)",
    "libreoffice": 0.943967502190639
   },
-  "H367": {
+  "H370": {
    "formula": "=T.TEST(A1:A10, B1:B10, 1, 3)",
    "libreoffice": 0.471983760744395
   },
-  "H368": {
+  "H371": {
    "formula": "=INDEX(LINEST(B1:B10, A1:A10), 1, 2)",
    "libreoffice": -0.205882352941176
   },
-  "H369": {
+  "H372": {
    "formula": "=INDEX(LOGEST(B1:B10, A1:A10), 1, 2)",
    "libreoffice": 2.19997196428044
   },
-  "H370": {
+  "H373": {
    "formula": "=IMDIV(\"1+2i\", \"3-4i\")",
    "libreoffice": "-0.2+0.4i"
   },
-  "H371": {
+  "H374": {
    "formula": "=COMPLEX(0, -1)",
    "libreoffice": "-i"
   },
-  "H372": {
+  "H375": {
    "formula": "=XLOOKUP(\"cherry\", C1:C6, D1:D6)",
    "libreoffice": 30
   },
-  "H373": {
+  "H376": {
    "formula": "=XLOOKUP(\"fig\", C1:C6, D1:D6, \"none\")",
    "libreoffice": "none"
   },
-  "H374": {
+  "H377": {
    "formula": "=XLOOKUP(11, A1:A10, B1:B10, , -1)",
    "libreoffice": 9.9
   },
-  "H375": {
+  "H378": {
    "formula": "=XLOOKUP(11, A1:A10, B1:B10, , 1)",
    "libreoffice": 12.2
   },
-  "H376": {
+  "H379": {
    "formula": "=XLOOKUP(\"apple\", C1:C6, D1:D6, , 0, -1)",
    "libreoffice": 40
   },
-  "H377": {
+  "H380": {
    "formula": "=XLOOKUP(\"b*\", C1:C6, D1:D6, , 2)",
    "libreoffice": 20
   },
-  "H378": {
+  "H381": {
    "formula": "=XLOOKUP(7, K1:L1, K2:L2)",
    "libreoffice": 6
   },
-  "H379": {
+  "H382": {
    "formula": "=XMATCH(\"date\", C1:C6)",
    "libreoffice": 5
   },
-  "H380": {
+  "H383": {
    "formula": "=XMATCH(11, A1:A10, 1)",
    "libreoffice": 8
   },
-  "H381": {
+  "H384": {
    "formula": "=XMATCH(\"apple\", C1:C6, 0, -1)",
    "libreoffice": 4
   },
-  "H382": {
+  "H385": {
    "formula": "=TEXTBEFORE(AC1, \"hood\")",
    "libreoffice": "Red riding "
   },
-  "H383": {
+  "H386": {
    "formula": "=TEXTBEFORE(AC1, \"HOOD\", 1, 1)",
    "libreoffice": "Red riding "
   },
-  "H384": {
+  "H387": {
    "formula": "=TEXTAFTER(AC1, \"red \", -1)",
    "libreoffice": "hood"
   },
-  "H385": {
+  "H388": {
    "formula": "=TEXTAFTER(AC1, \",\")",
    "libreoffice": " red hood"
   },
-  "H386": {
+  "H389": {
    "formula": "=TEXTBEFORE(AC1, \"x\", 1, 0, 0, \"-\")",
    "libreoffice": "-"
   },
-  "H387": {
+  "H390": {
    "formula": "=TEXTAFTER(AC1, \"hood\", 2)",
    "libreoffice": null
   },
-  "H388": {
+  "H391": {
    "formula": "=SUM(OFFSET(A1, 2, 0, 3, 1))",
    "libreoffice": 16
   },
-  "H389": {
+  "H392": {
    "formula": "=OFFSET(C1, 2, 1)",
    "libreoffice": 30
   },
-  "H390": {
+  "H393": {
    "formula": "=SUM(OFFSET(A1:B2, 1, 0))",
    "libreoffice": 15.1
   },
-  "H391": {
+  "H394": {
    "formula": "=INDIRECT(\"C3\")",
    "libreoffice": "cherry"
   },
-  "H392": {
+  "H395": {
    "formula": "=SUM(INDIRECT(\"A1:A\" & A2))",
    "libreoffice": 15
   },
-  "H393": {
+  "H396": {
    "formula": "=INDIRECT(\"R2C4\", FALSE)",
    "libreoffice": 20
   },
-  "H394": {
+  "H397": {
    "formula": "=XNPV(0.09, G1:G4, AD1:AD4)",
    "libreoffice": 146.063048258541
   },
-  "H395": {
+  "H398": {
    "formula": "=XIRR(G1:G4, AD1:AD4)",
    "libreoffice": 0.426107563380255
   },
-  "H396": {
+  "H399": {
    "formula": "=DSUM(V1:X7, \"Profit\", Z1:AA2)",
    "libreoffice": 180
   },
-  "H397": {
+  "H400": {
    "formula": "=DAVERAGE(V1:X7, 3, Z4:Z5)",
    "libreoffice": 86.4
   },
-  "H398": {
+  "H401": {
    "formula": "=DCOUNT(V1:X7, \"Height\", Z1:AA2)",
    "libreoffice": 2
   },
-  "H399": {
+  "H402": {
    "formula": "=DCOUNTA(V1:X7, \"Tree\", Z4:Z6)",
    "libreoffice": 3
   },
-  "H400": {
+  "H403": {
    "formula": "=DGET(V1:X7, \"Profit\", AF1:AF2)",
    "libreoffice": 105
   },
-  "H401": {
+  "H404": {
    "formula": "=DGET(V1:X7, \"Profit\", Z4:Z5)",
    "libreoffice": "Err:502"
   },
-  "H402": {
+  "H405": {
    "formula": "=DMAX(V1:X7, \"Profit\", Z4:Z6)",
    "libreoffice": 105
   },
-  "H403": {
+  "H406": {
    "formula": "=DMIN(V1:X7, \"Height\", Z1:AA2)",
    "libreoffice": 14
   },
-  "H404": {
+  "H407": {
    "formula": "=DPRODUCT(V1:X7, \"Height\", Z4:Z5)",
    "libreoffice": 108
   },
-  "H405": {
+  "H408": {
    "formula": "=DSTDEV(V1:X7, \"Profit\", Z1:Z2)",
    "libreoffice": 30
   },
-  "H406": {
+  "H409": {
    "formula": "=DSTDEVP(V1:X7, \"Profit\", Z1:Z2)",
    "libreoffice": 24.4948974278318
   },
-  "H407": {
+  "H410": {
    "formula": "=DVAR(V1:X7, \"Profit\", Z1:Z2)",
    "libreoffice": 900
   },
-  "H408": {
+  "H411": {
    "formula": "=DVARP(V1:X7, \"Profit\", Z1:Z2)",
    "libreoffice": 600
   }

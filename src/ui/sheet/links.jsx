@@ -13,15 +13,20 @@ const quoted = (name) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(name) ? name : "'" + na
 
 // What a cell's link is: { url } for a web or email link (also a cell whose
 // whole text is a web address), { to } for a place in the file, { gone } when
-// its tab was deleted, or null.
+// its tab was deleted, or null. `formula` marks one from HYPERLINK.
 export function linkOf (cell) {
   if (!cell) return null
   const l = cell.fmt && cell.fmt.link
   if (l && l[0] === '#') return cell.linkTo && !cell.linkTo.gone ? { to: cell.linkTo } : { gone: true }
   if (l) return { url: l, stored: true }
+  // From a HYPERLINK formula: opened from here, changed in the formula.
+  if (cell.formulaLink) return cell.formulaLink === '#' ? (cell.linkTo ? { to: cell.linkTo, formula: true } : null) : { url: cell.formulaLink, formula: true }
   if (cell.kind === 'text' && typeof cell.display === 'string' && WEB.test(cell.display.trim())) return { url: cell.display.trim() }
   return null
 }
+
+// A link the cell itself holds, which the link bar can change or remove.
+export const ownLink = (l) => !!(l && !l.formula && (l.stored || l.to || l.gone))
 
 export function linkLabel (link) {
   if (!link) return ''
@@ -110,8 +115,8 @@ export function LinkCard ({ row, col, link, canEdit, onOpen, onEdit, onRemove })
     <div className='link-card' role='group' aria-label='Link' style={at} onMouseDown={(e) => e.stopPropagation()}>
       <span className='link-card-address' title={label}>{label}</span>
       {!link.gone && <button className='icon-button' title='Open link' aria-label='Open link' onClick={onOpen}><ArrowSquareOut size={16} /></button>}
-      {canEdit && (link.stored || link.to || link.gone) && <button className='icon-button' title='Edit link' aria-label='Edit link' onClick={onEdit}><PencilSimple size={16} /></button>}
-      {canEdit && (link.stored || link.to || link.gone) && <button className='icon-button' title='Remove link' aria-label='Remove link' onClick={onRemove}><Trash size={16} /></button>}
+      {canEdit && ownLink(link) && <button className='icon-button' title='Edit link' aria-label='Edit link' onClick={onEdit}><PencilSimple size={16} /></button>}
+      {canEdit && ownLink(link) && <button className='icon-button' title='Remove link' aria-label='Remove link' onClick={onRemove}><Trash size={16} /></button>}
     </div>
   )
 }

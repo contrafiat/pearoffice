@@ -14,7 +14,7 @@ import { CommentPanel, CommentsList } from './CommentPanel.jsx'
 import { ValidationPanel } from './ValidationPanel.jsx'
 import { CondFormatPanel } from './CondFormatPanel.jsx'
 import { NamesPanel } from './NamesPanel.jsx'
-import { LinkBar, LinkCard, linkOf, linkLabel } from './links.jsx'
+import { LinkBar, LinkCard, linkOf, linkLabel, ownLink } from './links.jsx'
 import { parseRange } from '../../sheet/charts.js'
 import { evaluate as evaluateColours } from '../../sheet/condFormat.js'
 import { typed, allows, explain, ruleFor } from '../../sheet/validation.js'
@@ -362,7 +362,6 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
   // Links (proposals/2026-10-18-sheet-links.md). A web link opens in the
   // browser; one inside the file selects its cell, or the tab's first.
   const selLink = linkOf(selected)
-  const ownLink = (l) => !!(l && (l.stored || l.to || l.gone))
   function openLink (row, col) {
     const l = linkOf(cells.get(row + ',' + col))
     if (!l || l.gone) return
