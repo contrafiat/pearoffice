@@ -33,8 +33,11 @@ a new IPC method. No change to keys, crypto, membership or ops.
 ## New
 
 New shows the kinds as today (sheet, document, slides) plus a **From a
-template** section listing the templates you have, newest first, each with
-its kind's icon and title. With no templates, it shows one line: "Mark any
+template** section listing the templates you have, by name, each with
+its kind's icon and title. With more than six of your own, a search box and
+All, Sheets, Documents and Slides buttons narrow the list, and the built-in
+templates fold into a Built-in group that opens on a tap or while searching
+(added 2026-10-18, Tim asked about long lists). With no templates, it shows one line: "Mark any
 file as a template from its menu to start from it here." Picking a template
 asks for nothing and opens the new file, titled after the template ("Recipe"
 gives "Recipe"; you rename it as usual).

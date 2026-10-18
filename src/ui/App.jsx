@@ -439,7 +439,7 @@ export function App () {
       {newFile && (
         <NewPanel
           onPick={create}
-          templates={(sheets || []).filter((f) => f.template && !f.removed && !f.joining)}
+          templates={(sheets || []).filter((f) => f.template && !f.removed && !f.joining).sort((a, b) => (a.title || untitled(a.kind)).localeCompare(b.title || untitled(b.kind)))}
           builtIn={BUILT_IN}
           onTemplate={(f) => fromTemplate(() => call('file:fromTemplate', { sheetId: f.sheetId }))}
           onBuiltIn={(id) => fromTemplate(() => makeBuiltIn(id))}

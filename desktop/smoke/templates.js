@@ -1,7 +1,8 @@
 // Smoke test part "templates" (proposals/2026-10-18-templates.md): a sheet
 // marked as a template from its card's menu, the badge, New listing it, a
 // file made from it (the content comes along, the badge does not), New from
-// this template on the card, unmarking, then each built-in template. With
+// this template on the card, unmarking, a long list (search, kind buttons,
+// the built-in ones folded), then each built-in template. With
 // PEAROFFICE_SMOKE_TEMPLATES_SHOTS=<folder> it saves New and each built-in.
 
 const fs = require('node:fs')
@@ -40,6 +41,8 @@ module.exports = async function templates (t) {
     await waitFor('New', "!!document.querySelector('.panel.new-file .template-list')")
   }
   const pickTemplate = async (title) => {
+    // The built-in ones may be folded away.
+    await js("(() => { const g = document.querySelector('.template-group'); if (g && g.getAttribute('aria-expanded') === 'false') g.click() })()")
     await waitFor('template ' + title, `[...document.querySelectorAll('.template-choice .template-title')].some((x) => x.textContent === ${JSON.stringify(title)})`)
     await js(`[...document.querySelectorAll('.template-choice')].find((b) => b.querySelector('.template-title').textContent === ${JSON.stringify(title)}).click()`)
   }
@@ -70,6 +73,30 @@ module.exports = async function templates (t) {
   await home()
   await waitFor('two cards, one badge', `${cards('Recipe card')}.length === 2 && ${cards('Recipe card')}.filter((c) => c.querySelector('.template-badge')).length === 1`)
   step('made from it')
+
+  // A long list: six more templates (one a document) bring the search box
+  // and kind buttons, and fold the built-in ones away.
+  await js(`(async () => {
+    for (let i = 1; i <= 6; i++) {
+      const { sheetId } = await window.pearoffice.call(i === 3 ? 'doc:create' : 'sheet:create', { title: 'Plan ' + i })
+      await window.pearoffice.call('file:setTemplate', { sheetId, template: true })
+    }
+  })()`)
+  await waitFor('six more', "[...document.querySelectorAll('.template-badge')].length >= 7")
+  await openNew()
+  const titles = "[...document.querySelectorAll('.template-choice .template-title')].map((x) => x.textContent).join('|')"
+  await waitFor('search and folded built-ins', "!!document.querySelector('.template-search input') && !document.querySelector('.template-choice.built-in') && /Built-in \\(4\\)/.test(document.querySelector('.template-group').textContent)")
+  await js(`(() => { const el = document.querySelector('.template-search input'); const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; set.call(el, 'plan 3'); el.dispatchEvent(new Event('input', { bubbles: true })) })()`)
+  await waitFor('search narrows', titles + " === 'Plan 3'")
+  await js(`(() => { const el = document.querySelector('.template-search input'); const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set; set.call(el, ''); el.dispatchEvent(new Event('input', { bubbles: true })) })()`)
+  await js("[...document.querySelectorAll('.template-kinds button')].find((b) => b.textContent === 'Documents').click()")
+  await waitFor('kind filter', titles + " === 'Plan 3'")
+  await js("[...document.querySelectorAll('.template-kinds button')].find((b) => b.textContent === 'All').click()")
+  await js("document.querySelector('.template-group').click()")
+  await waitFor('built-ins open', "document.querySelectorAll('.template-choice.built-in').length === 4")
+  await snap('new-long')
+  await js("document.querySelector('.panel.new-file .close').click()")
+  step('long list')
 
   // From the card's menu too, then unmark.
   await js(`${cards('Recipe card')}.find((c) => c.querySelector('.template-badge')).querySelector('.card-more').click()`)

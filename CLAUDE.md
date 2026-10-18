@@ -397,7 +397,8 @@ take five scenes: files, sheet, document, slides, sharing.
   a cell, a typed web address, a HYPERLINK formula and the .xlsx round trip (about 8 s; a smoke
   run writes what Open would open to `opened.txt` in the data folder).
   `templates` is a sheet marked from its card's menu, New listing it, a
-  file made from it and from the card, unmarking and each built-in template
+  file made from it and from the card, a long list (search, kind buttons,
+  the built-in ones folded), unmarking and each built-in template
   (about 5 s; `PEAROFFICE_SMOKE_TEMPLATES_SHOTS=<folder>` saves New and the
   built-ins).
   `docs` is documents, an .odt out and back in included (about 11 s).
