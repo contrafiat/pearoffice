@@ -126,3 +126,54 @@ test('HYPERLINK shows its label and links only its own cell', () => {
   assert.deepEqual(v.get('3,1'), { value: 'Pears' })
   assert.deepEqual(v.get('4,1'), { error: '#DIV/0!' })
 })
+
+test('a link to a block keeps its corners; a link to a name follows a rename', () => {
+  const { doc, tab } = sheet()
+  const costs = model.addTab(doc, 'Costs').id
+  model.setLink(doc, tab, 1, 1, 1, 1, { tabId: costs, row: 4, col: 2, row2: 9, col2: 4 })
+  const block = model.getFormat(doc, tab, 1, 1).link
+  assert.deepEqual(model.linkTarget(doc, block), { tabId: costs, name: 'Costs', row: 4, col: 2, row2: 9, col2: 4 })
+  model.insertRows(doc, costs, 1)
+  assert.deepEqual(model.linkTarget(doc, block), { tabId: costs, name: 'Costs', row: 5, col: 2, row2: 10, col2: 4 })
+  // The far corner deleted: the link keeps its first cell.
+  model.deleteRows(doc, costs, 10)
+  assert.deepEqual(model.linkTarget(doc, block), { tabId: costs, name: 'Costs', row: 5, col: 2 })
+
+  model.setName(doc, 'Totals', costs, 'B2:C3')
+  model.setLink(doc, tab, 2, 1, 2, 1, { name: 'totals' })
+  assert.equal(model.getFormat(doc, tab, 2, 1).link, '#=Totals')
+  assert.deepEqual(model.linkTarget(doc, '#=Totals'), { tabId: costs, name: 'Costs', row: 2, col: 2, row2: 3, col2: 3, rangeName: 'Totals' })
+  model.renameName(doc, 'Totals', 'Sums')
+  assert.equal(model.getFormat(doc, tab, 2, 1).link, '#=Sums')
+  assert.equal(model.linkTarget(doc, '#=Sums').rangeName, 'Sums')
+  model.deleteName(doc, 'Sums')
+  assert.equal(model.linkTarget(doc, '#=Sums'), null)
+  assert.throws(() => model.setLink(doc, tab, 3, 1, 3, 1, { name: 'Nope' }), /no range called/)
+})
+
+test('links to a block and to a name go out to .xlsx and .ods and come back', () => {
+  const XLSX = require('xlsx/dist/xlsx.mini.min.js')
+  const fflate = require('fflate')
+  const { workbookBytes, odsBytes, workbookToTabs } = require('../src/sheet/xlsxMap')
+  const dump = {
+    title: 'L',
+    names: [{ name: 'Totals', tab: 'Costs', range: 'B2:C3' }],
+    tabs: [
+      { name: 'Main', cells: [
+        { row: 1, col: 1, input: 'block', value: 'block', fmt: {}, linkTo: { tab: 1, row: 4, col: 2, row2: 9, col2: 4 } },
+        { row: 2, col: 1, input: 'name', value: 'name', fmt: {}, linkTo: { rangeName: 'Totals' } }] },
+      { name: 'Costs', cells: [{ row: 1, col: 1, input: 'x', value: 'x', fmt: {} }] }
+    ]
+  }
+  const xlsx = XLSX.read(workbookBytes(XLSX, fflate, dump), { type: 'array' })
+  const { tabs, names } = workbookToTabs(XLSX, xlsx)
+  assert.deepEqual(tabs[0].links.sort((a, b) => a[0] - b[0]), [[1, 1, { tab: 1, row: 4, col: 2, row2: 9, col2: 4 }], [2, 1, { name: 'Totals' }]])
+  const back = model.createDoc()
+  model.importTabs(back, { tabs, names })
+  const [t0, t1] = model.tabIds(back)
+  assert.deepEqual(model.linkTarget(back, model.getFormat(back, t0, 1, 1).link), { tabId: t1, name: 'Costs', row: 4, col: 2, row2: 9, col2: 4 })
+  assert.equal(model.linkTarget(back, model.getFormat(back, t0, 2, 1).link).rangeName, 'Totals')
+  // .ods keeps the block too.
+  const ods = XLSX.read(odsBytes(XLSX, fflate, dump), { type: 'array' })
+  assert.deepEqual(workbookToTabs(XLSX, ods).tabs[0].links.find((l) => l[0] === 1), [1, 1, { tab: 1, row: 4, col: 2, row2: 9, col2: 4 }])
+})

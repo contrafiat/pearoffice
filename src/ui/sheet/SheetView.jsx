@@ -360,7 +360,8 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
   const focusGrid = () => gridRef.current && gridRef.current.focus()
 
   // Links (proposals/2026-10-18-sheet-links.md). A web link opens in the
-  // browser; one inside the file selects its cell, or the tab's first.
+  // browser; one inside the file selects its cell or block, or the tab's
+  // first cell.
   const selLink = linkOf(selected)
   function openLink (row, col) {
     const l = linkOf(cells.get(row + ',' + col))
@@ -368,7 +369,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
     if (l.url) { call('app:openUrl', { url: l.url }).catch(() => {}); return }
     if (l.to.tabId !== view.tabId) setTabId(l.to.tabId)
     setSel({ row: l.to.row || 1, col: l.to.col || 1 })
-    setExt({ row: l.to.row || 1, col: l.to.col || 1 })
+    setExt({ row: l.to.row2 || l.to.row || 1, col: l.to.col2 || l.to.col || 1 })
   }
   function startLink () {
     if (!canEdit) return
@@ -1165,6 +1166,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
           hasLink={linking.hasLink}
           tabs={view.tabs}
           tabId={view.tabId}
+          names={view.names || []}
           onApply={applyLink}
           onRemove={removeLink}
           onClose={() => { setLinking(null); afterPanel() }}

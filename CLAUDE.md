@@ -394,7 +394,7 @@ take five scenes: files, sheet, document, slides, sharing.
   .json, .csv, .xlsx and .ods in (a chart, the formats, colour rules and
   validation included) (about 32 s). `sheet-links` is links in cells: from
   the toolbar and the cell menu, the card's Open and Remove, Ctrl+click to
-  a cell, a typed web address, a HYPERLINK formula and the .xlsx round trip (about 8 s; a smoke
+  a cell, a typed web address, a HYPERLINK formula, a link to a block and the .xlsx round trip (about 9 s; a smoke
   run writes what Open would open to `opened.txt` in the data folder).
   `templates` is a sheet marked from its card's menu, New listing it, a
   file made from it and from the card, a long list (search, kind buttons,
