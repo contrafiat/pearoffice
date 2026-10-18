@@ -250,7 +250,8 @@ writes the release notes from the merged PRs (or starts from
 vi, builds the desktop apps (seeder packages are released from
 `../peerloom-seeder`), then commits the version, pushes
 the tag and publishes, asking before each step: the GitHub release on
-this repo (a `.sha256` for every file; until
+this repo (made as a draft, each file uploaded with a progress bar, then
+published; a `.sha256` for every file; until
 `OLD_RELEASES_REPO` is removed from `scripts/app.conf`, also
 `peerloomllc/pearoffice-releases`, where installs up to 1.1.1 check),
 Zapstore, Google Play (the API when gcloud is set up, else the
@@ -338,7 +339,8 @@ test (`scripts/smoke-packaged.js`) run against the installed-layout app.
   `pearcircle-seeder-notary`). Checked with codesign, stapler and Gatekeeper,
   then the packaged smoke. Hardened runtime entitlements are in
   `desktop/build/entitlements.mac.plist` (V8 JIT for Electron and Bare, Bare's
-  addons, network). The Intel build is smoke-tested under Rosetta.
+  addons, network). The Intel build is smoke-tested under Rosetta, with four parts
+  (sheet-links, docs, slides, app; `SMOKE_PARTS=all` for every one).
 - `npm run dist:windows` - NSIS installer, built here with Wine (about a
   minute). Staging fails if an addon the bundles load has no Windows file
   (`scripts/check-addons.js`, run for every platform). Before a release,

@@ -13,6 +13,10 @@
 # Application certificate and notarizes with a notarytool profile, both kept
 # in the Mac's build keychain (empty password, so it works over SSH; the same
 # keychain PearCircle's seeder build uses). NOTARY_PROFILE picks the profile.
+#
+# The Intel build runs only a few smoke parts: it runs under Rosetta on the
+# Mac Mini, about three times slower, and all sixteen took about 7 minutes.
+# SMOKE_PARTS=<a,b,...> picks the parts, SMOKE_PARTS=all runs every one.
 set -euo pipefail
 
 ARCH="${1:-arm64}"
@@ -35,7 +39,9 @@ ssh -o BatchMode=yes "$MAC" "zsh -lc 'cd ~/$REMOTE/pearoffice && ARCH=$ARCH BUIL
 
 echo "==> packaged smoke on the Mac"
 APP_DIR=$([ "$ARCH" = "arm64" ] && echo mac-arm64 || echo mac)
-ssh -o BatchMode=yes "$MAC" "zsh -lc 'cd ~/$REMOTE/pearoffice && node scripts/smoke-packaged.js desktop/dist/$APP_DIR/PearOffice.app/Contents/MacOS/PearOffice /tmp/pearoffice-mac-smoke.png'"
+PARTS="${SMOKE_PARTS:-$([ "$ARCH" = "x64" ] && echo sheet-links,docs,slides,app || echo all)}"
+PART_ARG=$([ "$PARTS" = "all" ] || echo "--part $PARTS")
+ssh -o BatchMode=yes "$MAC" "zsh -lc 'cd ~/$REMOTE/pearoffice && node scripts/smoke-packaged.js desktop/dist/$APP_DIR/PearOffice.app/Contents/MacOS/PearOffice $PART_ARG /tmp/pearoffice-mac-smoke.png'"
 
 echo "==> copy installers back"
 mkdir -p "$ROOT/desktop/dist"
