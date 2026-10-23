@@ -96,7 +96,8 @@ sees them.
 
 1. **Links from outside the app.** A `pearoffice://file/...` address
    pasted in a chat or email could open the file when clicked, since the
-   app already handles `pearoffice://` links. Cheap to add once this
-   exists. Leave for later unless wanted now.
+   app already handles `pearoffice://` links. Done 2026-10-23 as a
+   follow-up (T1): Copy link on a file or folder card's menu, and the
+   app opens such a link or says the file is not yours.
 2. **Documents and decks.** Their link boxes could get the same Files
    list. Not asked for; leave for later.

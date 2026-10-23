@@ -165,5 +165,25 @@ module.exports = async function sheetLinks (t) {
   result.fileLinks = true
   step('links to a file and a folder')
 
-  return result.webLink && result.innerLink && result.formulaLink && result.blockLink && result.roundTrip && result.fileLinks
+  // From outside the app: Copy link on the start screen, then the link
+  // arrives as a pearoffice:// link would.
+  const { clipboard } = require('electron')
+  const deeplink = (url) => wc.send('worklet:event', { name: 'app:deeplink', data: { url } })
+  await js("document.querySelector('.all-files').click()")
+  await waitFor('Links back card', "[...document.querySelectorAll('.file-cell')].some((c) => c.querySelector('.file-title').textContent === 'Links back')")
+  await js(`(() => { const c = [...document.querySelectorAll('.file-cell')].find((x) => x.querySelector('.file-title').textContent === 'Links back'); const b = c.getBoundingClientRect(); c.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: b.left + 20, clientY: b.top + 20 })) })()`)
+  await waitFor('card menu', "[...document.querySelectorAll('.card-menu li')].some((l) => l.textContent === 'Copy link')")
+  await js("[...document.querySelectorAll('.card-menu li')].find((l) => l.textContent === 'Copy link').click()")
+  await waitFor('copied', "!!document.querySelector('.toast') && document.querySelector('.toast').textContent === 'Link copied'")
+  const copied = String(await clipboard.readText())
+  deeplink(copied)
+  await waitFor('opened from outside', "!!document.querySelector('.title') && document.querySelector('.title').value === 'Links back'")
+  deeplink('pearoffice://file/' + 'n'.repeat(43))
+  await waitFor('missing file says so', "!!document.querySelector('.panel[role=\"alertdialog\"] h2') && document.querySelector('.panel[role=\"alertdialog\"] h2').textContent === \"You don't have this file\"")
+  await js("document.querySelector('.panel[role=\"alertdialog\"] .primary').click()")
+  await waitFor('dialog closed', "!document.querySelector('.panel')")
+  result.outsideLinks = /^pearoffice:\/\/file\/[A-Za-z0-9_-]{43}$/.test(copied)
+  step('file link from outside')
+
+  return result.webLink && result.innerLink && result.formulaLink && result.blockLink && result.roundTrip && result.fileLinks && result.outsideLinks
 }
