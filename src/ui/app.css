@@ -1399,3 +1399,14 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 .chip-swatches { display: flex; flex-wrap: wrap; gap: 6px; }
 .panel .chip-swatches button { width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--line-strong); padding: 0; cursor: pointer; background: var(--chip-bg); }
 .chip-swatches button.on { outline: 2px solid var(--ink); outline-offset: 1px; }
+
+/* @ chips (proposals/2026-10-23-multi-select-and-smart-chips.md). */
+.smart-chip { --chip-bg: #e8eaed; --chip-ink: #3c4043; --chip-bg-dark: #33383a; --chip-ink-dark: #e8eaed; display: inline-flex; align-items: center; gap: 4px; padding: 0 8px 0 4px; }
+.smart-chip .avatar { flex: none; }
+.smart-chip svg { flex: none; }
+.smart-chip-text { overflow: hidden; text-overflow: ellipsis; }
+.smart-chip.gone { opacity: 0.6; }
+.cell.link .smart-chip { text-decoration: none; }
+.at-menu .at-group { padding: 6px 8px 2px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.at-menu .at-item { display: flex; align-items: center; gap: 8px; }
+.hidden-date { position: fixed; left: 0; bottom: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none; border: 0; padding: 0; }

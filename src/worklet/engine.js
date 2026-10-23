@@ -178,6 +178,9 @@ function createSheetEngine (opts = {}) {
       onUpdate: sheets.onUpdate,
       onMembership: (sheetId, type) => {
         emit('sheet:members', { sheetId })
+        // Again once this apply batch is in the view, so a reader sees it
+        // (a rename showing on a person chip, for one).
+        setTimeout(() => emit('sheet:members', { sheetId }), 200)
         if (presence) setTimeout(() => presence.recheck(sheetId).catch(() => {}), 200)
         // The view shows the change only once this apply batch is done.
         if ((type === 'seeder' || type === 'seederOff') && seeding) setTimeout(() => seeding.sweep().catch(() => {}), 200)
