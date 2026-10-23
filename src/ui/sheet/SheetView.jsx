@@ -24,7 +24,7 @@ import { ChartPanel } from './ChartPanel.jsx'
 import { ChartView, downloadChart, chartSvg } from './Chart.jsx'
 import { guessChart } from '../../sheet/charts.js'
 import { readPref, writePref } from '../prefs.js'
-import { Minus, ArrowCounterClockwise, ArrowClockwise, TextB, TextItalic, TextAUnderline, PaintBucket, Copy, Scissors, ClipboardText, Eraser, Numpad, FileXls, Plus, MagnifyingGlass, X, ChartBar, PencilSimple, DownloadSimple, Trash, TextUnderline, TextStrikethrough, TextAlignLeft, TextAlignCenter, TextAlignRight, ArrowUDownLeft, FrameCorners, AlignTop, AlignCenterVertical, AlignBottom, ArrowsOutLineHorizontal, LinkSimple } from '@phosphor-icons/react'
+import { Minus, ArrowCounterClockwise, ArrowClockwise, TextB, TextItalic, TextAUnderline, PaintBucket, Copy, Scissors, ClipboardText, Eraser, Numpad, FileXls, Plus, MagnifyingGlass, X, ChartBar, PencilSimple, DownloadSimple, Trash, TextUnderline, TextStrikethrough, TextAlignLeft, TextAlignCenter, TextAlignRight, ArrowUDownLeft, FrameCorners, AlignTop, AlignCenterVertical, AlignBottom, ArrowsOutLineHorizontal, LinkSimple, Check } from '@phosphor-icons/react'
 import { FormulaHelp, helpFor, insertFunction, canPoint, refText } from './FormulaHelp.jsx'
 import { exportSheet, exportOds, exportCsv, exportJson, printTab, isMobile } from './xlsx.js'
 import { usePrintKey } from '../printKey.js'
@@ -1466,6 +1466,11 @@ export function SheetView ({ sheetId, files = [], folders = [], onOpenFile, onOp
         const pick = (item) => { setPicking(null); writeEntry(picking.row, picking.col, /^[='"]/.test(item) ? "'" + item : item, null) }
         const items = selRule.items || []
         const choice = (it) => (selRule.chips ? <span className={'chip chip-' + chipColor(selRule, { kind: 'text', display: it })}>{it}</span> : it)
+        // As in Google Sheets: a tick on the current value and a way to the
+        // list's settings (proposals/2026-10-22-dropdown-chips.md).
+        const isOn = (it) => !!selected && String(selected.display).toLowerCase() === String(it).toLowerCase()
+        const option = (it) => <li key={it} role='option' aria-selected={isOn(it)} onClick={() => pick(it)}><span className='pick-tick' aria-hidden='true'>{isOn(it) && <Check size={16} weight='bold' />}</span>{choice(it)}</li>
+        const editChoices = <li className='pick-edit' role='option' aria-selected={false} onClick={() => { setPicking(null); setValidating({ r1: selRule.r1, c1: selRule.c1, r2: selRule.r2, c2: selRule.c2 }) }}><span className='pick-tick' aria-hidden='true'><PencilSimple size={16} /></span>Edit choices...</li>
         return phone
           ? (
             <div className='panel-backdrop' onMouseDown={(e) => { if (e.target === e.currentTarget) setPicking(null) }}>
@@ -1475,14 +1480,16 @@ export function SheetView ({ sheetId, files = [], folders = [], onOpenFile, onOp
                   <button className='close' aria-label='Close' onClick={() => setPicking(null)}><X size={18} /></button>
                 </header>
                 <ul className='pick-list' role='listbox'>
-                  {items.map((it) => <li key={it} role='option' aria-selected={(selected && selected.display) === it} onClick={() => pick(it)}>{choice(it)}</li>)}
+                  {items.map(option)}
+                  {editChoices}
                 </ul>
               </section>
             </div>
             )
           : (
             <ul className='menu pick-menu' role='listbox' style={{ left: Math.max(8, picking.x - 200), top: picking.y + 2 }}>
-              {items.map((it) => <li key={it} role='option' aria-selected={(selected && selected.display) === it} onClick={() => pick(it)}>{choice(it)}</li>)}
+              {items.map(option)}
+              {editChoices}
             </ul>
             )
       })()}
