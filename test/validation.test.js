@@ -88,3 +88,48 @@ test('rules go out to .xlsx and come back', () => {
   const back = model.getValidations(doc, model.tabIds(doc)[0]).map(({ id, n, r1, c1, r2, c2, ...r }) => r)
   assert.deepEqual(back, v)
 })
+
+// Coloured chips (proposals/2026-10-22-dropdown-chips.md).
+const { chipColor, chipColorAt, chipRules, CHIP_NAMES } = require('../src/sheet/validation')
+const { odsBytes } = require('../src/sheet/xlsxMap')
+const { rulesFromOdsBytes } = require('../src/sheet/odsRules')
+const { condFormatsFromXlsx } = require('../src/sheet/xlsxMap')
+
+test('a chip list keeps its colours and refuses bad ones', () => {
+  const r = normalize({ kind: 'list', items: 'Todo\nDoing\nDone', chips: true, dropdown: false, colors: { Todo: 'red', Doing: 'nope', Done: 'green', Gone: 'blue', __proto__: 'red' } })
+  assert.equal(r.chips, true)
+  assert.equal(r.dropdown, true)
+  assert.deepEqual(r.colors, { Todo: 'red', Done: 'green' })
+  assert.equal(chipColor(r, typed('todo')), 'red')
+  assert.equal(chipColor(r, typed('Doing')), 'grey')
+  assert.equal(chipColor(r, typed('Other')), null)
+  assert.equal(chipColor(r, typed('')), null)
+  // A list from a range keeps colours for any item; an old rule has none.
+  assert.deepEqual(normalize({ kind: 'list', source: 'G1:G4', chips: true, colors: { x: 'teal' } }).colors, { x: 'teal' })
+  const old = normalize({ kind: 'list', items: 'a', dropdown: false })
+  assert.equal(old.chips, undefined)
+  assert.equal(old.dropdown, false)
+  assert.equal(chipColor(old, typed('a')), null)
+  const many = {}
+  for (let i = 0; i < 600; i++) many['i' + i] = 'blue'
+  assert.equal(Object.keys(normalize({ kind: 'list', source: 'A1:A2', chips: true, colors: many }).colors).length, 500)
+  assert.notEqual(chipColorAt(0), 'grey')
+  assert.equal(new Set(Array.from({ length: CHIP_NAMES.length - 1 }, (_, i) => chipColorAt(i))).size, CHIP_NAMES.length - 1)
+})
+
+test('chip rules are kept in the sheet and go out to files as colour rules', () => {
+  const doc = model.createDoc()
+  model.initSheet(doc)
+  const tab = model.tabIds(doc)[0]
+  model.setValidation(doc, tab, 'B2:B9', { kind: 'list', items: ['Todo', 'Done'], chips: true, colors: { Todo: 'red', Done: 'green' } })
+  const rules = model.getValidations(doc, tab)
+  assert.deepEqual(rules[0].colors, { Todo: 'red', Done: 'green' })
+  const cf = chipRules(rules)
+  assert.deepEqual(cf.map((r) => [r.kind, r.a, r.range, r.style.fill]), [['eq', 'Todo', 'B2:B9', '#ffcfc9'], ['eq', 'Done', 'B2:B9', '#d4edbc']])
+  const dump = { title: 'T', tabs: [{ name: 'A', cells: [{ row: 2, col: 2, input: 'Todo', value: 'Todo', fmt: {} }], widths: {}, validations: rules, condFormats: cf }] }
+  const fromXlsx = condFormatsFromXlsx(workbookBytes(XLSX, fflate, dump), fflate)[0]
+  assert.deepEqual(fromXlsx.map((r) => [r.kind, r.a, r.range, r.style.fill]), [['eq', 'Todo', 'B2:B9', '#ffcfc9'], ['eq', 'Done', 'B2:B9', '#d4edbc']])
+  const fromOds = rulesFromOdsBytes(odsBytes(XLSX, fflate, dump), fflate, ['A'])[0]
+  assert.deepEqual(fromOds.condFormats.map((r) => [r.kind, r.a, r.style.fill]), [['eq', 'Todo', '#ffcfc9'], ['eq', 'Done', '#d4edbc']])
+  assert.deepEqual(fromOds.validations.map((v) => v.items), [['Todo', 'Done']])
+})

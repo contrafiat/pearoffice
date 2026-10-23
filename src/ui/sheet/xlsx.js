@@ -22,6 +22,7 @@ import { isOdpFile, readOdp } from '../slides/odp.js'
 import { checkZip } from '../slides/importOoxml.js'
 import { borderCss, fontPx, FONTS, BASE_FONT_PX } from './cellStyle.js'
 import { linkOf } from './links.jsx'
+import { chipColor, ruleFor, CHIP_COLORS } from '../../sheet/validation.js'
 
 // The printed page draws the default text at 11px.
 const PRINT = 11 / BASE_FONT_PX
@@ -219,7 +220,9 @@ export function tabHtml (view, chartSvgs = []) {
       const spanAttrs = m ? (m.c2 > m.c1 ? ' colspan="' + (Math.min(m.c2, cols) - m.c1 + 1) + '"' : '') + (m.r2 > m.r1 ? ' rowspan="' + (Math.min(m.r2, rows) - m.r1 + 1) + '"' : '') : ''
       // A web or email link stays clickable in the PDF.
       const link = linkOf(x)
-      const text = esc(x ? x.display : '')
+      // A chip (proposals/2026-10-22-dropdown-chips.md) prints as its pill.
+      const chip = chipColor(ruleFor(view.validations || [], r, c), x)
+      const text = chip ? '<span style="background:' + CHIP_COLORS[chip][0] + ';color:' + CHIP_COLORS[chip][1] + ';border-radius:999px;padding:0 6px">' + esc(x.display) + '</span>' : esc(x ? x.display : '')
       body += '<td' + spanAttrs + (style ? ' style="' + style + '"' : '') + '>' + (link && link.url ? '<a href="' + esc(link.url).replace(/"/g, '&quot;') + '">' + text + '</a>' : text) + '</td>'
     }
     body += '</tr>'

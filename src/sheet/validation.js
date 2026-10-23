@@ -8,6 +8,23 @@ const OPS = ['between', 'notBetween', 'eq', 'ne', 'gt', 'lt', 'ge', 'le']
 const XLSX_TYPE = { list: 'list', whole: 'whole', decimal: 'decimal', date: 'date', time: 'time', length: 'textLength' }
 const XLSX_OP = { between: 'between', notBetween: 'notBetween', eq: 'equal', ne: 'notEqual', gt: 'greaterThan', lt: 'lessThan', ge: 'greaterThanOrEqual', le: 'lessThanOrEqual' }
 const MAX_ITEMS = 500
+// Coloured chips (proposals/2026-10-22-dropdown-chips.md): a list rule's
+// `chips` draws each value as a pill, `colors` maps an item to one of these.
+// Each has a light fill and text for files; the app draws its own shades
+// for each theme.
+const CHIP_COLORS = {
+  grey: ['#e8eaed', '#3c4043'],
+  red: ['#ffcfc9', '#b10202'],
+  orange: ['#ffc8aa', '#753800'],
+  yellow: ['#ffe5a0', '#473821'],
+  green: ['#d4edbc', '#11734b'],
+  teal: ['#c6efe9', '#0a5249'],
+  blue: ['#bfe1f6', '#0a53a8'],
+  purple: ['#e6cff2', '#5a3286'],
+  pink: ['#f9cfe6', '#8a1c5c'],
+  brown: ['#e6d5c9', '#5c3b23']
+}
+const CHIP_NAMES = Object.keys(CHIP_COLORS)
 
 // A typed bound -> number: dates as yyyy-mm-dd or a serial, times as
 // hh:mm[:ss] or a fraction of a day, the rest as numbers. NaN if neither.
@@ -37,6 +54,19 @@ function normalize (rule) {
       out.items = [...new Set(items)].slice(0, MAX_ITEMS)
     }
     out.dropdown = rule.dropdown !== false
+    if (rule.chips === true) { out.chips = true; out.dropdown = true }
+    // A colour for a typed item must be for one of its items; a list from a
+    // range is only known when drawn.
+    if (rule.colors && typeof rule.colors === 'object' && !Array.isArray(rule.colors)) {
+      const colors = {}
+      for (const [item, name] of Object.entries(rule.colors)) {
+        if (Object.keys(colors).length >= MAX_ITEMS) break
+        if (!CHIP_NAMES.includes(name) || item === '__proto__' || item.length > 255) continue
+        if (out.items && !out.items.includes(item)) continue
+        colors[item] = name
+      }
+      if (Object.keys(colors).length) out.colors = colors
+    }
     return out
   }
   out.op = OPS.includes(rule.op) ? rule.op : 'between'
@@ -174,6 +204,37 @@ function fromXlsx (xml) {
   return out
 }
 
+// A cell's chip colour under a rule, or null when it is not drawn as a chip:
+// no chip rule, empty, or a value not in the list. Matched without case, as
+// allows() does. items: the list's items when they come from a range.
+function chipColor (rule, cell, items = rule && rule.items) {
+  if (!rule || rule.kind !== 'list' || !rule.chips || !cell || cell.display === '' || cell.kind === 'empty') return null
+  const want = String(cell.display).toLowerCase()
+  const item = (items || []).find((x) => String(x).toLowerCase() === want)
+  if (item === undefined) return null
+  const name = rule.colors && Object.prototype.hasOwnProperty.call(rule.colors, item) ? rule.colors[item] : null
+  return CHIP_NAMES.includes(name) ? name : 'grey'
+}
+
+// The colour for the n-th item of a fresh list: every colour but grey in
+// turn, so a new list comes out coloured.
+const chipColorAt = (n) => CHIP_NAMES[1 + (n % (CHIP_NAMES.length - 1))]
+
+// Colour rules that show a chip rule's colours in Excel and LibreOffice:
+// one per coloured item, the fill and text when the cell equals it.
+function chipRules (rules) {
+  const out = []
+  for (const r of rules) {
+    if (r.kind !== 'list' || !r.chips) continue
+    for (const item of r.items || []) {
+      const name = (r.colors && Object.prototype.hasOwnProperty.call(r.colors, item) && r.colors[item]) || 'grey'
+      const [fill, color] = CHIP_COLORS[name] || CHIP_COLORS.grey
+      out.push({ kind: 'eq', a: item, style: { fill, color }, range: r.range, r1: r.r1, c1: r.c1, r2: r.r2, c2: r.c2 })
+    }
+  }
+  return out
+}
+
 // The rule for a cell: the newest one whose range holds it.
 function ruleFor (rules, row, col) {
   let found = null
@@ -181,4 +242,4 @@ function ruleFor (rules, row, col) {
   return found
 }
 
-module.exports = { KINDS, OPS, bound, fromSerial, normalize, typed, allows, explain, ruleFor, toXlsx, fromXlsx }
+module.exports = { KINDS, OPS, CHIP_COLORS, CHIP_NAMES, chipColor, chipColorAt, chipRules, bound, fromSerial, normalize, typed, allows, explain, ruleFor, toXlsx, fromXlsx }
