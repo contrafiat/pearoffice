@@ -194,6 +194,14 @@ export function App () {
     if (f && sheetId) await call('file:place', { sheetId, folder: f }).catch(() => {})
   }, [])
   const [restoreHidden, setRestoreHidden] = useState(false)
+  // Opening a file from a link in a sheet, as a tap on its card would.
+  const openFile = (id) => {
+    const f = sheets && sheets.find((x) => x.sheetId === id)
+    if (!f) return
+    if (f.waiting) setWaitingJoin(id)
+    else if (f.recovery === 'copy') setRecovering(f)
+    else setCurrent(id)
+  }
 
   const refresh = useCallback(async () => {
     try {
@@ -599,7 +607,7 @@ export function App () {
             : current && kindOf(sheets, current) === 'slides'
               ? <SlidesView key={current} sheetId={current} onTitleChange={refresh} onError={setError} onGone={async () => { forget(current); await refresh() }} />
               : current
-              ? <SheetView key={current} sheetId={current} onTitleChange={refresh} onError={setError} onGone={async () => { forget(current); await refresh() }} />
+              ? <SheetView key={current} sheetId={current} files={sheets || []} folders={folders} onOpenFile={openFile} onOpenFolder={(id) => { setCurrent(null); setFolder(id) }} onTitleChange={refresh} onError={setError} onGone={async () => { forget(current); await refresh() }} />
               : sheets && (sheets.length || folders.length)
                 ? (
                   <FileHome

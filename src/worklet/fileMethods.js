@@ -162,6 +162,20 @@ function createFileMethods (sheets, { getJoin, getMoves, getProfiles, getPicture
       return out
     },
 
+    // Where a file that may have moved to fresh keys is now, through every
+    // move this device knows of: the id to look for in file:list, or null
+    // when it moved away from this person (proposals/2026-10-22-links-to-files.md).
+    follow: async ({ sheetId } = {}, ctx) => {
+      let id = String(sheetId || '')
+      for (let i = 0; i < 32; i++) {
+        const rec = (await ctx.localDb.get('moves:' + id))?.value
+        if (!rec) break
+        if (!rec.to) return { sheetId: null }
+        id = rec.to
+      }
+      return { sheetId: id }
+    },
+
     // The title lives in the document's meta map, so it needs no tab. The
     // update has the 'local' origin, so it can be undone like any edit.
     setTitle: async ({ sheetId, title }, ctx) => {

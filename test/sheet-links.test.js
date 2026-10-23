@@ -177,3 +177,45 @@ test('links to a block and to a name go out to .xlsx and .ods and come back', ()
   const ods = XLSX.read(odsBytes(XLSX, fflate, dump), { type: 'array' })
   assert.deepEqual(workbookToTabs(XLSX, ods).tabs[0].links.find((l) => l[0] === 1), [1, 1, { tab: 1, row: 4, col: 2, row2: 9, col2: 4 }])
 })
+
+// Links to another file or a folder (proposals/2026-10-22-links-to-files.md).
+const FILE = 'pearoffice://file/' + 'aB3_-'.repeat(8) + 'xyz'
+const FOLDER = 'pearoffice://folder/' + '0123456789abcdef'.repeat(2)
+
+test('a link can go to another file or a folder; near misses are refused', () => {
+  const { doc, tab } = sheet()
+  model.setLink(doc, tab, 1, 1, 1, 1, FILE)
+  model.setLink(doc, tab, 2, 1, 2, 1, FOLDER)
+  assert.equal(model.getFormat(doc, tab, 1, 1).link, FILE)
+  assert.equal(model.getFormat(doc, tab, 2, 1).link, FOLDER)
+  for (const bad of [FILE + 'a', FILE.slice(0, -1), FILE.replace('_', '.'), FOLDER.toUpperCase(), FOLDER.slice(0, -1), 'pearoffice://join/' + 'a'.repeat(43), 'pearoffice://file/', 'pearoffice:file/' + 'a'.repeat(43)]) {
+    assert.throws(() => model.setLink(doc, tab, 3, 1, 3, 1, bad), /Links can go/, bad)
+  }
+})
+
+test('file and folder links go out to .xlsx and .ods and come back', () => {
+  const XLSX = require('xlsx/dist/xlsx.mini.min.js')
+  const fflate = require('fflate')
+  const { workbookBytes, odsBytes, workbookToTabs } = require('../src/sheet/xlsxMap')
+  const dump = { title: 'Links', tabs: [{ name: 'S', cells: [{ row: 1, col: 1, input: 'Plan', value: 'Plan', fmt: { link: FILE }, link: FILE }, { row: 2, col: 1, input: 'Work', value: 'Work', fmt: { link: FOLDER }, link: FOLDER }] }] }
+  for (const bytes of [workbookBytes(XLSX, fflate, dump), odsBytes(XLSX, fflate, dump)]) {
+    const { tabs } = workbookToTabs(XLSX, XLSX.read(bytes, { type: 'array' }))
+    assert.deepEqual(tabs[0].links.sort((a, b) => a[0] - b[0]), [[1, 1, FILE], [2, 1, FOLDER]])
+    const back = model.createDoc()
+    model.importTabs(back, { tabs, names: [] })
+    const t = model.tabIds(back)[0]
+    assert.equal(model.getFormat(back, t, 1, 1).link, FILE)
+    assert.equal(model.getFormat(back, t, 2, 1).link, FOLDER)
+  }
+})
+
+test('file:follow finds where a linked file moved to', async () => {
+  const { createFileMethods } = require('../src/worklet/fileMethods')
+  const follow = createFileMethods({}, { getJoin: () => null, getMoves: () => null, getProfiles: () => null })['file:follow']
+  const db = new Map([['moves:a', { to: 'b' }], ['moves:b', { to: 'c' }], ['moves:x', { to: null, removed: true }]])
+  const ctx = { localDb: { get: async (k) => (db.has(k) ? { value: db.get(k) } : null) } }
+  assert.deepEqual(await follow({ sheetId: 'c' }, ctx), { sheetId: 'c' })
+  assert.deepEqual(await follow({ sheetId: 'b' }, ctx), { sheetId: 'c' })
+  assert.deepEqual(await follow({ sheetId: 'a' }, ctx), { sheetId: 'c' })
+  assert.deepEqual(await follow({ sheetId: 'x' }, ctx), { sheetId: null })
+})

@@ -1,6 +1,6 @@
 # Links from a sheet cell to another file or folder
 
-**Status:** draft, 2026-10-22. A user keeps a task list in a sheet and
+**Status:** approved by Tim 2026-10-22. A user keeps a task list in a sheet and
 wants each row to link to its document or folder (TODO.md, requested
 2026-10-22). Builds on proposals/2026-10-18-sheet-links.md.
 
@@ -26,8 +26,7 @@ written into the sheet, which every member of the sheet can read.
 
 ## Opening one
 
-- **A file you have:** the card under the cell shows its name and kind
-  icon, looked up from your file list when drawn, so a rename shows
+- **A file you have:** the card under the cell shows its name, looked up from your file list when drawn, so a rename shows
   straight away. Open (or Ctrl+click) opens it, as a tap on its card in
   the file list does.
 - **A file that has moved** (someone was removed, or the owner tidied it
@@ -41,19 +40,20 @@ written into the sheet, which every member of the sheet can read.
   one that was deleted.
 - **A folder:** folders are yours alone, so a folder link only works on
   your own devices (all of them, since folders sync between them). Open
-  goes to the start screen inside that folder. Anyone else sees "This
-  folder belongs to someone else." A deleted folder says "This folder was
-  deleted."
+  goes to the start screen inside that folder. Anyone else, or anyone
+  after the folder is deleted, sees "This folder is not one of yours, or
+  it was deleted." A device cannot tell the two apart.
 
 ## Adding one
 
-The link bar (toolbar Link, Ctrl+K, the cell menu) gets a second list
-under the tabs: **Files**, your files and folders, with a search box once
-there are more than a few. Picking one makes the link. On an empty cell
+The link bar (toolbar Link, Ctrl+K, the cell menu) already has a "Go
+to..." list of tabs and named ranges. It gets two more groups, **Files**
+and **Folders**, yours. Picking one puts its name in the box and Apply
+makes the link. On phones the list is the system picker. On an empty cell
 the file's or folder's name goes in as the cell's text, as an address
 does today.
 
-A sheet can link to itself; Open then does nothing new, which is fine.
+The open file is left out of the list.
 
 ## Files
 
