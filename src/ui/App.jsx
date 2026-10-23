@@ -19,7 +19,7 @@ import { DeleteFolderPanel, FolderNamePanel, MoveToFolderPanel, filesIn, useFold
 import { DeletePanel } from './DeletePanel.jsx'
 import { DonationReminder } from './About.jsx'
 import { Onboarding } from './Onboarding.jsx'
-import { CaretRight, CircleNotch, FileArrowUp, FolderSimple, GearSix, House, Info, LinkSimple, List, Plus } from '@phosphor-icons/react'
+import { CaretRight, CircleNotch, FileArrowUp, FolderSimple, GearSix, House, Info, LinkSimple, List, Plus, X } from '@phosphor-icons/react'
 import { PearMark } from './PearMark.jsx'
 
 applyTheme()
@@ -130,6 +130,7 @@ export function App () {
   const [newFile, setNewFile] = useState(false) // the New panel, asking which kind
   // A short note at the bottom ("Joined ..."), gone after a few seconds.
   const [toast, setToast] = useState(null)
+  const [notYours, setNotYours] = useState(null) // { title, text } for a link to a file or folder this person does not have
   useEffect(() => hapticTaps(), [])
   useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(null), 4000); return () => clearTimeout(t) }, [toast])
   const [waitingJoin, setWaitingJoin] = useState(null) // sheetId of the join shown in a progress panel
@@ -328,12 +329,12 @@ export function App () {
       const r = await call('file:follow', { sheetId: file[1] })
       const list = await call('sheet:list')
       const f = r && r.sheetId && list.find((x) => x.sheetId === r.sheetId && !x.removed)
-      if (!f) { setToast("You don't have this file. Ask someone who has it to share it with you."); return }
+      if (!f) { setNotYours({ title: "You don't have this file", text: 'Ask someone who has it to share it with you.' }); return }
       setSheets(list)
       openFile(f.sheetId, list)
     } else if (folder) {
       const r = await call('file:folders')
-      if (!((r && r.folders) || []).some((x) => x.id === folder[1])) { setToast('This folder is not one of yours, or it was deleted.'); return }
+      if (!((r && r.folders) || []).some((x) => x.id === folder[1])) { setNotYours({ title: 'Folder not found', text: 'This folder is not one of yours, or it was deleted. Folders belong to the person who made them.' }); return }
       setCurrent(null)
       setFolder(folder[1])
     }
@@ -510,6 +511,20 @@ export function App () {
             } catch (err) { setError(err.message) }
           }}
         />
+      )}
+      {notYours && (
+        <div className='panel-backdrop' onMouseDown={(e) => { if (e.target === e.currentTarget) setNotYours(null) }}>
+          <section className='panel' role='alertdialog' aria-label={notYours.title}>
+            <header>
+              <h2>{notYours.title}</h2>
+              <button className='close' aria-label='Close' onClick={() => setNotYours(null)}><X size={18} /></button>
+            </header>
+            <p>{notYours.text}</p>
+            <div className='row equal'>
+              <button className='primary' onClick={() => setNotYours(null)}>OK</button>
+            </div>
+          </section>
+        </div>
       )}
       {droppingFolder && (
         <DeleteFolderPanel

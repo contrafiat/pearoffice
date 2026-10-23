@@ -179,7 +179,9 @@ module.exports = async function sheetLinks (t) {
   deeplink(copied)
   await waitFor('opened from outside', "!!document.querySelector('.title') && document.querySelector('.title').value === 'Links back'")
   deeplink('pearoffice://file/' + 'n'.repeat(43))
-  await waitFor('missing file says so', "!!document.querySelector('.toast') && document.querySelector('.toast').textContent.startsWith(\"You don't have this file\")")
+  await waitFor('missing file says so', "!!document.querySelector('.panel[role=\"alertdialog\"] h2') && document.querySelector('.panel[role=\"alertdialog\"] h2').textContent === \"You don't have this file\"")
+  await js("document.querySelector('.panel[role=\"alertdialog\"] .primary').click()")
+  await waitFor('dialog closed', "!document.querySelector('.panel')")
   result.outsideLinks = /^pearoffice:\/\/file\/[A-Za-z0-9_-]{43}$/.test(copied)
   step('file link from outside')
 
