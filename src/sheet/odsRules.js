@@ -140,7 +140,7 @@ function addRulesToOds (files, tabs, names, fflate) {
       const topLeft = numToCol(box.c1) + box.r1
       vals.push('<table:content-validation table:name="' + name + '" table:condition="' + esc(conditionOf(r, names[i])) + '" table:allow-empty-cell="true"' +
         (r.kind === 'list' ? ' table:display-list="' + (r.dropdown === false ? 'no' : 'unsorted') + '"' : '') + ' table:base-cell-address="' + esc(sheetRef(names[i]) + topLeft) + '">' +
-        '<table:error-message table:message-type="' + (r.onBad === 'warn' ? 'warning' : 'stop') + '" table:display="true">' + (r.message ? '<text:p>' + esc(r.message) + '</text:p>' : '') + '</table:error-message></table:content-validation>')
+        '<table:error-message table:message-type="' + (r.multi ? 'information' : r.onBad === 'warn' ? 'warning' : 'stop') + '" table:display="true">' + (r.message ? '<text:p>' + esc(r.message) + '</text:p>' : '') + '</table:error-message></table:content-validation>')
       for (let row = box.r1; row <= Math.min(box.r2, MAX_ROWS); row++) for (let c = box.c1; c <= box.c2; c++) cellVal[i].set((row - 1) + ',' + (c - 1), name)
     }
   })

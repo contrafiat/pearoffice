@@ -101,7 +101,8 @@ Code that works for any kind of file sits apart from each editor's own
   references), `formula/` (evaluator, deterministic maths, formulajs fills,
   vendored fast-formula-parser), charts, fill, filter, validation (a list
   can show as coloured chips: `chips` and `colors` on the rule, exported as
-  colour rules; proposals/2026-10-22-dropdown-chips.md), colour
+  colour rules; `multi` allows more than one choice, joined by ", ";
+  proposals/2026-10-22-dropdown-chips.md and 2026-10-23-multi-select-and-smart-chips.md), colour
   rules, .xlsx/.csv/.json import and export, .ods import and export
   (`odsFormula.js`: SheetJS for the values and tabs, our own formula
   conversion and tab names, since SheetJS gets both wrong; `odsCharts.js`:

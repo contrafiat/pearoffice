@@ -1386,6 +1386,9 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 }
 :root[data-theme="dark"] .chip, :root[data-theme="dark"] .panel .chip-colors button.chip { background: var(--chip-bg-dark); color: var(--chip-ink-dark); }
 .pick-menu .chip, .pick-list .chip { font-weight: normal; }
+.pick-tick.box { width: 18px; height: 18px; margin: 0 8px 0 2px; border: 1.5px solid var(--line-strong); border-radius: 4px; align-items: center; }
+.pick-tick.box svg { width: 14px; height: 14px; }
+.cell-text .chip + .chip { margin-left: 4px; }
 .pick-tick { display: inline-flex; width: 22px; flex: none; justify-content: center; vertical-align: middle; margin-right: 6px; color: var(--ink); }
 .pick-menu li, .pick-list li { display: flex; align-items: center; }
 .pick-list li { justify-content: flex-start; text-align: left; }

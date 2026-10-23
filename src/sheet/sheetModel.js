@@ -967,7 +967,7 @@ function getValidations (doc, tabId) {
     const box = require('./charts').parseRange(range)
     if (!box || box.sheet) continue
     const rule = { id, range: oneCell(box) || range, r1: box.r1, c1: box.c1, r2: box.r2, c2: box.c2, n: v.n || 0 }
-    for (const k of ['kind', 'op', 'a', 'b', 'items', 'dropdown', 'chips', 'colors', 'onBad', 'message']) if (v[k] !== undefined) rule[k] = v[k]
+    for (const k of ['kind', 'op', 'a', 'b', 'items', 'dropdown', 'chips', 'colors', 'multi', 'onBad', 'message']) if (v[k] !== undefined) rule[k] = v[k]
     if (v.source) rule.source = refs.toDisplay(v.source, where)
     out.push(rule)
   }

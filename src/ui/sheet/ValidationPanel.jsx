@@ -40,6 +40,7 @@ export function ValidationPanel ({ range, rule, initialItems = [], onSave, onRem
   const [items, setItems] = useState(rule && rule.items && !rule.source ? rule.items.join('\n') : rule ? '' : initialItems.join('\n'))
   const [source, setSource] = useState((rule && rule.source) || '')
   const [look, setLook] = useState(lookOf(rule))
+  const [multi, setMulti] = useState(!!(rule && rule.multi))
   // An item's colour once picked or saved; the others take chipColorAt in
   // turn, or grey on a chip list saved without one.
   const [colors, setColors] = useState(() => ({ ...((rule && rule.colors) || {}) }))
@@ -60,6 +61,7 @@ export function ValidationPanel ({ range, rule, initialItems = [], onSave, onRem
       if (fromRange) out.source = source
       else out.items = items
       out.dropdown = look !== 'plain'
+      if (multi) out.multi = true
       if (look === 'chips') {
         out.chips = true
         out.colors = Object.fromEntries(chipItems.map((it, i) => [it, colorOf(it, i)]))
@@ -91,6 +93,7 @@ export function ValidationPanel ({ range, rule, initialItems = [], onSave, onRem
             {fromRange
               ? <input aria-label='Range with the items' placeholder='For example D1:D10' value={source} onChange={(e) => setSource(e.target.value)} />
               : <textarea aria-label='Items' rows={4} placeholder='One item per line' value={items} onChange={(e) => setItems(e.target.value)} />}
+            <label className='check'><input type='checkbox' checked={multi} onChange={(e) => setMulti(e.target.checked)} /> Allow more than one choice</label>
             <div className='row'>
               <span className='small'>Show as</span>
               <select aria-label='Show as' value={look} onChange={(e) => setLook(e.target.value)}>
