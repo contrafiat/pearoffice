@@ -277,7 +277,11 @@ function createSheetMethods (sheets, { getJoin }) {
         const widths = {}
         for (const [colId, px] of t.get('widths').entries()) if (colIndex.has(colId)) widths[colIndex.get(colId)] = px
         const tabCharts = model.getCharts(doc, id).map((c) => ({ ...c, resolved: resolveChart(doc, id, c, values) }))
-        return { name: t.get('name'), cells, widths, heights: model.getHeights(doc, id), merges: model.getMerges(doc, id), freeze: model.getFreeze(doc, id), hidden: model.getHidden(doc, id), validations: model.getValidations(doc, id), condFormats: model.getCondFormats(doc, id), comments: model.getComments(doc, id).map((t) => ({ row: t.row, col: t.col, author: nameOf(t.author), text: noteOf(t) })), charts: tabCharts }
+        // Chip colours go out as colour rules after the tab's own
+        // (proposals/2026-10-22-dropdown-chips.md).
+        const valids = model.getValidations(doc, id)
+        const chips = validation.chipRules(valids.map((r) => (r.chips && r.source ? { ...r, items: listFromRange(doc, id, r.source, values) } : r)))
+        return { name: t.get('name'), cells, widths, heights: model.getHeights(doc, id), merges: model.getMerges(doc, id), freeze: model.getFreeze(doc, id), hidden: model.getHidden(doc, id), validations: valids, condFormats: [...model.getCondFormats(doc, id), ...chips], comments: model.getComments(doc, id).map((t) => ({ row: t.row, col: t.col, author: nameOf(t.author), text: noteOf(t) })), charts: tabCharts }
       })
       return { title: model.title(doc), tabs, names: model.getNames(doc).filter((n) => n.r1).map((n) => ({ name: n.name, tab: n.tab, range: n.range })) }
     },

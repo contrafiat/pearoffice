@@ -165,6 +165,34 @@ module.exports = async function sheetFiles (t) {
   await js("[...document.querySelectorAll('.pick-menu li')].find((l) => l.textContent === 'Yes').click()")
   await waitFor('picked', cellNode(5, 16) + ' && ' + cellNode(5, 16) + ".textContent === 'Yes'")
   result.validation = true
+  // Coloured chips (proposals/2026-10-22-dropdown-chips.md): R5:R7 filled,
+  // Dropdown... offers their values, Todo made red, picking from the list.
+  await js("document.querySelector('.grid .body').focus()")
+  await sendMod('Home', ['control'])
+  for (let i = 0; i < 17; i++) await key('Right')
+  for (let i = 0; i < 4; i++) await key('Down')
+  await waitFor('at R5', "document.querySelector('.formula-bar .address').textContent === 'R5'")
+  for (const v of ['Todo', 'Done', 'Todo']) { await type(v); await key('Return') }
+  for (let i = 0; i < 3; i++) await key('Up')
+  await sendMod('Down', ['shift']); await sendMod('Down', ['shift'])
+  await js("document.querySelector('.toolbar .more-button').click()")
+  await js("[...document.querySelectorAll('.more-menu li')].find((l) => l.textContent === 'Dropdown...').click()")
+  await waitFor('items offered', "!!document.querySelector('.panel[aria-label=\"Validation\"] textarea') && document.querySelector('.panel[aria-label=\"Validation\"] textarea').value === 'Todo\\nDone' && document.querySelectorAll('.chip-colors button').length === 2")
+  await js("document.querySelector('.chip-colors button').click()")
+  await waitFor('swatches', "!!document.querySelector('.chip-swatches [aria-label=\"red\"]')")
+  await js("document.querySelector('.chip-swatches [aria-label=\"red\"]').click()")
+  await waitFor('Todo is red', "document.querySelector('.chip-colors button').classList.contains('chip-red')")
+  await js("[...document.querySelectorAll('.panel button')].find((b) => b.textContent.trim() === 'Save').click()")
+  const chipIn = (r, c, color) => `!!${cellNode(r, c)} && !!${cellNode(r, c)}.querySelector('.chip.chip-${color}')`
+  await waitFor('chips drawn', `!document.querySelector('.panel') && ${chipIn(5, 18, 'red')} && ${chipIn(6, 18, 'orange')} && ${chipIn(7, 18, 'red')}`)
+  await js("document.querySelector('.grid .body').focus()")
+  await key('Down')
+  await waitFor('at R6', "document.querySelector('.formula-bar .address').textContent === 'R6' && !!document.querySelector('.list-button')")
+  await js("document.querySelector('.list-button').click()")
+  await waitFor('chips in the list', "[...document.querySelectorAll('.pick-menu li .chip')].length === 2")
+  await js("[...document.querySelectorAll('.pick-menu li')].find((l) => l.textContent === 'Todo').click()")
+  await waitFor('R6 is now Todo', chipIn(6, 18, 'red'))
+  result.chips = true
   await js("document.querySelector('.grid .body').focus()")
   await sendMod('Home', ['control'])
   await key('Right'); for (let i = 0; i < 3; i++) await key('Down')
@@ -228,7 +256,7 @@ module.exports = async function sheetFiles (t) {
   await js("document.querySelector('.grid .body').focus()")
   await sendMod('Home', ['control'])
   await key('Right'); for (let i = 0; i < 3; i++) await key('Down')
-  result.formats = result.frozenStays === true && /^Showing 1 of \d+ rows$/.test(result.filterStatus) && result.skipsHidden && result.comments && result.validation && result.colourRules && result.names
+  result.formats = result.frozenStays === true && /^Showing 1 of \d+ rows$/.test(result.filterStatus) && result.skipsHidden && result.comments && result.validation && result.chips && result.colourRules && result.names
   step('cell formats, row heights, freeze, filter, hiding, comments, validation, colour rules and names')
 
   // Rename the sheet.

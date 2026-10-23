@@ -16,10 +16,10 @@ keys, crypto, membership or the wire format of ops.
 
 A list rule (`valid:<tabId>`, proposals/2026-10-04-sheet-tools.md) gets:
 
-- `look`: `'chip'` (a coloured pill with a small arrow), `'arrow'` (plain
-  text with the arrow, as today) or `'plain'` (no arrow). This replaces
-  `dropdown` for new rules; a rule with only `dropdown` reads as `arrow`
-  or `plain` as before.
+- `chips: true`: draw each value as a coloured pill. It always comes
+  with `dropdown: true`. The panel's "Show as" choice is Coloured chips
+  (`chips`), Text with an arrow (`dropdown`, as today) or Plain text
+  (`dropdown: false`). A rule without `chips` reads as before.
 - `colors`: item text -> one of ten palette names (`grey`, `red`,
   `orange`, `yellow`, `green`, `teal`, `blue`, `purple`, `pink`,
   `brown`). At most one entry per item, 500 items, the same limit as
@@ -35,7 +35,7 @@ someone picks a colour.
 ## Drawing
 
 - A cell under a chip rule shows its value inside a pill of that item's
-  colour, with the arrow at the end of the pill on the selected cell. An
+  colour. The selected cell has the arrow at its right edge, as today. An
   empty cell shows nothing until selected. A value that is not in the list
   shows as plain text with the existing invalid mark.
 - The pill takes the cell's text size and font, ignores its text colour
@@ -45,15 +45,16 @@ someone picks a colour.
 
 ## Setting one up
 
-- **Dropdown** in the cell's right-click or long-press menu and in the
-  Data tools opens the validation panel on the selection with List chosen
-  and the look set to chips.
+- **Dropdown...** in the cell's right-click or long-press menu and in the
+  toolbar's More menu opens the validation panel on the selection with List chosen
+  and "Show as" set to Coloured chips.
 - The panel's items are pre-filled with the distinct values already in
   the selected cells (up to 500), as Google does, so turning an existing
   column into a dropdown is one step.
 - Each item in the panel has a colour button. New items get the next
   palette colour in turn, so a fresh list is already coloured.
-- The look is a three-way choice: Chips, Arrow, Plain.
+- "Show as" is a three-way choice: Coloured chips (the default for a new
+  list), Text with an arrow, Plain text.
 
 ## Files
 
@@ -67,7 +68,7 @@ someone picks a colour.
 
 ## Compat
 
-Older builds read the rule's known fields and ignore `look` and `colors`.
+Older builds read the rule's known fields and ignore `chips` and `colors`.
 They draw a chip cell as plain text with an arrow (or none) and keep the
 check. Editing the rule on an older build writes it again without the new
 fields, so the colours are lost for everyone; a new build shows it as
@@ -75,7 +76,7 @@ Arrow. Rare, and the list itself is kept. Format version stays 1.
 
 ## Verify
 
-- Unit tests: `normalize` keeps good `look` and `colors` and refuses bad
+- Unit tests: `normalize` keeps good `chips` and `colors` and refuses bad
   names, unknown items and too many entries; an old `dropdown` rule reads
   as before; the .xlsx and .ods exports carry one colour rule per coloured
   item and LibreOffice reads them.
@@ -87,8 +88,8 @@ Arrow. Rare, and the list itself is kept. Format version stays 1.
 
 ## Rollback
 
-Revert the PR. Saved rules keep `look` and `colors` as ignored fields and
-draw as Arrow.
+Revert the PR. Saved rules keep `chips` and `colors` as ignored fields and
+draw as Text with an arrow.
 
 ## Open questions
 

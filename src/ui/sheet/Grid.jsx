@@ -19,7 +19,7 @@ export const MAX_ZOOM = 2.5
 // sheets stay fast. Headers are drawn outside the scroll area and moved with
 // the scroll position.
 export const Grid = forwardRef(function Grid (props, ref) {
-  const { view, cells, sel, ext = sel, range, spillBox, editing, onSelect, onEdit, onEditChange, onEditKey, onEditBlur, onEditCaret = () => {}, onKeyDown, onHeaderMenu, onCellMenu = () => {}, onFill = null, charts = [], selectedChart = null, chartActions = null, onResize, onRowResize = () => {}, onCopy, onPaste, zoom = 1, onZoom, inputMode, hiddenRows = null, hiddenCols = null, unhideMarks = null, onUnhide = () => {}, onAutoFit = () => {}, filterHead = null, onFilterMenu = () => {}, commentMarks = null, onComment = () => {}, invalidCells = null, cfStyles = null, dropdownAt = null, onDropdown = () => {}, others = [], onPoint = () => false, pointBox = null, onOpenLink = () => {} } = props
+  const { view, cells, sel, ext = sel, range, spillBox, editing, onSelect, onEdit, onEditChange, onEditKey, onEditBlur, onEditCaret = () => {}, onKeyDown, onHeaderMenu, onCellMenu = () => {}, onFill = null, charts = [], selectedChart = null, chartActions = null, onResize, onRowResize = () => {}, onCopy, onPaste, zoom = 1, onZoom, inputMode, hiddenRows = null, hiddenCols = null, unhideMarks = null, onUnhide = () => {}, onAutoFit = () => {}, filterHead = null, onFilterMenu = () => {}, commentMarks = null, onComment = () => {}, invalidCells = null, chipCells = null, cfStyles = null, dropdownAt = null, onDropdown = () => {}, others = [], onPoint = () => false, pointBox = null, onOpenLink = () => {} } = props
   // Row height and column widths scale with the zoom (pinch on a phone);
   // stored widths stay unzoomed.
   const ROW_H = Math.round(BASE_ROW_H * zoom)
@@ -388,7 +388,9 @@ export const Grid = forwardRef(function Grid (props, ref) {
           >
             {cf && cf.bar && <span className='cf-bar' style={{ left: cf.bar.from * 100 + '%', width: Math.max(0, cf.bar.to - cf.bar.from) * 100 + '%', background: cf.bar.color }} />}
             {cf && cf.icon && <span className='cf-icon'><CfIcon set={cf.icon.set} index={cf.icon.index} size={Math.round(14 * zoom)} /></span>}
-            <span className='cell-text' style={textStyle(link ? { ...fmt, u: true } : fmt, zoom)}>{cell && !(cf && cf.icon && cf.icon.iconOnly) ? cell.display : ''}</span>
+            {chipCells && chipCells.has(r + ',' + c)
+              ? <span className='cell-text' style={textStyle({ ...fmt, color: undefined, u: false, s: false }, zoom)}><span className={'chip chip-' + chipCells.get(r + ',' + c)}>{cell.display}</span></span>
+              : <span className='cell-text' style={textStyle(link ? { ...fmt, u: true } : fmt, zoom)}>{cell && !(cf && cf.icon && cf.icon.iconOnly) ? cell.display : ''}</span>}
             {hasBorder(fmt) && <span className='cell-borders' style={{ borderTop: borderCss(fmt.bt), borderRight: borderCss(fmt.br), borderBottom: borderCss(fmt.bb), borderLeft: borderCss(fmt.bl) }} />}
             {commentMarks && commentMarks.has(r + ',' + c) && (() => {
               const t = commentMarks.get(r + ',' + c)

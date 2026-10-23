@@ -99,7 +99,9 @@ Code that works for any kind of file sits apart from each editor's own
 - `src/sheet/` - the spreadsheet, runs anywhere (Bare, Node, browser):
   `sheetModel.js` (the Yjs document), `refs.js` (A1 <-> id formula
   references), `formula/` (evaluator, deterministic maths, formulajs fills,
-  vendored fast-formula-parser), charts, fill, filter, validation, colour
+  vendored fast-formula-parser), charts, fill, filter, validation (a list
+  can show as coloured chips: `chips` and `colors` on the rule, exported as
+  colour rules; proposals/2026-10-22-dropdown-chips.md), colour
   rules, .xlsx/.csv/.json import and export, .ods import and export
   (`odsFormula.js`: SheetJS for the values and tabs, our own formula
   conversion and tab names, since SheetJS gets both wrong; `odsCharts.js`:
@@ -396,8 +398,8 @@ take five scenes: files, sheet, document, slides, sharing.
   `ok`/`not ok` line, then a summary line. `sheets` is the grid editor
   (typing, formulas, pointing at cells while typing one, spilling, fill,
   charts, copy and paste, undo, zoom; about
-  21 s). `sheet-files` is cell formats, filters, comments, validation, colour
-  rules and names, then .xlsx, .ods, .csv, .json and PDF out, tabs, tidy up and
+  21 s). `sheet-files` is cell formats, filters, comments, validation, dropdown
+  chips, colour rules and names, then .xlsx, .ods, .csv, .json and PDF out, tabs, tidy up and
   .json, .csv, .xlsx and .ods in (a chart, the formats, colour rules and
   validation included) (about 32 s). `sheet-links` is links in cells: from
   the toolbar and the cell menu, the card's Open and Remove, Ctrl+click to

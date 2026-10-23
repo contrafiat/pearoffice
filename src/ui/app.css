@@ -1367,3 +1367,29 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
   mask-image: linear-gradient(to right, transparent, #000 var(--fade-l), #000 calc(100% - var(--fade-r)), transparent);
 }
 .doc-tools .tool-hint { flex: none; color: var(--muted); font-size: 13px; padding: 0 6px; white-space: nowrap; }
+
+/* Coloured dropdown chips (proposals/2026-10-22-dropdown-chips.md). The light
+   shades match CHIP_COLORS in src/sheet/validation.js, which files get. */
+.chip { display: inline-block; max-width: 100%; box-sizing: border-box; padding: 0 8px; border-radius: 999px; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; background: var(--chip-bg); color: var(--chip-ink); }
+.chip-grey { --chip-bg: #e8eaed; --chip-ink: #3c4043; --chip-bg-dark: #3c4043; --chip-ink-dark: #e8eaed; }
+.chip-red { --chip-bg: #ffcfc9; --chip-ink: #b10202; --chip-bg-dark: #5c1a17; --chip-ink-dark: #ffcfc9; }
+.chip-orange { --chip-bg: #ffc8aa; --chip-ink: #753800; --chip-bg-dark: #5a2e12; --chip-ink-dark: #ffc8aa; }
+.chip-yellow { --chip-bg: #ffe5a0; --chip-ink: #473821; --chip-bg-dark: #4a3d12; --chip-ink-dark: #ffe5a0; }
+.chip-green { --chip-bg: #d4edbc; --chip-ink: #11734b; --chip-bg-dark: #1f3d1f; --chip-ink-dark: #d4edbc; }
+.chip-teal { --chip-bg: #c6efe9; --chip-ink: #0a5249; --chip-bg-dark: #123d38; --chip-ink-dark: #c6efe9; }
+.chip-blue { --chip-bg: #bfe1f6; --chip-ink: #0a53a8; --chip-bg-dark: #133a5c; --chip-ink-dark: #bfe1f6; }
+.chip-purple { --chip-bg: #e6cff2; --chip-ink: #5a3286; --chip-bg-dark: #3b2552; --chip-ink-dark: #e6cff2; }
+.chip-pink { --chip-bg: #f9cfe6; --chip-ink: #8a1c5c; --chip-bg-dark: #52203d; --chip-ink-dark: #f9cfe6; }
+.chip-brown { --chip-bg: #e6d5c9; --chip-ink: #5c3b23; --chip-bg-dark: #3d2c1f; --chip-ink-dark: #e6d5c9; }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .chip, :root:not([data-theme="light"]) .panel .chip-colors button.chip { background: var(--chip-bg-dark); color: var(--chip-ink-dark); }
+}
+:root[data-theme="dark"] .chip, :root[data-theme="dark"] .panel .chip-colors button.chip { background: var(--chip-bg-dark); color: var(--chip-ink-dark); }
+.pick-menu .chip, .pick-list .chip { font-weight: normal; }
+.pick-menu li[aria-selected='true'] .chip, .pick-list li[aria-selected='true'] .chip { outline: 2px solid var(--pear); outline-offset: 1px; }
+.chip-colors { display: flex; flex-wrap: wrap; gap: 6px; }
+.panel .chip-colors button.chip { border: none; border-radius: 999px; padding: 2px 10px; background: var(--chip-bg); color: var(--chip-ink); cursor: pointer; font: inherit; line-height: 1.6; }
+.chip-colors button.chip.on { outline: 2px solid var(--ink); outline-offset: 1px; }
+.chip-swatches { display: flex; flex-wrap: wrap; gap: 6px; }
+.panel .chip-swatches button { width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--line-strong); padding: 0; cursor: pointer; background: var(--chip-bg); }
+.chip-swatches button.on { outline: 2px solid var(--ink); outline-offset: 1px; }

@@ -920,8 +920,9 @@ function getComments (doc, tabId) {
 // valid:<tabId>: rule id -> { range, source (stored like formula
 // references, so they follow inserts and deletes), n (order: the newest
 // rule wins where two cover a cell), kind, op, a, b, items, dropdown,
-// onBad, message }. A new rule replaces the ones wholly inside its range;
-// clearing (rule null) removes every rule that touches the range.
+// chips, colors (proposals/2026-10-22-dropdown-chips.md), onBad, message }.
+// A new rule replaces the ones wholly inside its range; clearing (rule null)
+// removes every rule that touches the range.
 const validation = require('./validation')
 // "A3" for a one-cell range, else null.
 const oneCell = (box) => (box.r1 === box.r2 && box.c1 === box.c2 ? numToCol(box.c1) + box.r1 : null)
@@ -966,7 +967,7 @@ function getValidations (doc, tabId) {
     const box = require('./charts').parseRange(range)
     if (!box || box.sheet) continue
     const rule = { id, range: oneCell(box) || range, r1: box.r1, c1: box.c1, r2: box.r2, c2: box.c2, n: v.n || 0 }
-    for (const k of ['kind', 'op', 'a', 'b', 'items', 'dropdown', 'onBad', 'message']) if (v[k] !== undefined) rule[k] = v[k]
+    for (const k of ['kind', 'op', 'a', 'b', 'items', 'dropdown', 'chips', 'colors', 'onBad', 'message']) if (v[k] !== undefined) rule[k] = v[k]
     if (v.source) rule.source = refs.toDisplay(v.source, where)
     out.push(rule)
   }

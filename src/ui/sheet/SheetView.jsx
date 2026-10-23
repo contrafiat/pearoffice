@@ -18,7 +18,7 @@ import { LinkBar, LinkCard, linkOf, linkLabel, ownLink, fileLink, folderLink } f
 import { untitled } from '../Files.jsx'
 import { parseRange } from '../../sheet/charts.js'
 import { evaluate as evaluateColours } from '../../sheet/condFormat.js'
-import { typed, allows, explain, ruleFor } from '../../sheet/validation.js'
+import { typed, allows, explain, ruleFor, chipColor } from '../../sheet/validation.js'
 import { filterRows, columnValues, isActive } from '../../sheet/filter.js'
 import { ChartPanel } from './ChartPanel.jsx'
 import { ChartView, downloadChart, chartSvg } from './Chart.jsx'
@@ -338,6 +338,18 @@ export function SheetView ({ sheetId, files = [], folders = [], onOpenFile, onOp
   const validations = (view && view.validations) || []
   const invalidCells = useMemo(() => (view && view.invalid && view.invalid.length ? new Set(view.invalid.map(([r, c]) => r + ',' + c)) : null), [view])
   const selRule = ruleFor(validations, sel.row, sel.col)
+  // Coloured chips (proposals/2026-10-22-dropdown-chips.md): 'row,col' ->
+  // colour name for each value drawn as a pill.
+  const chipCells = useMemo(() => {
+    if (!validations.some((r) => r.chips)) return null
+    const out = new Map()
+    for (const [key, cell] of cells) {
+      const [row, col] = key.split(',').map(Number)
+      const color = chipColor(ruleFor(validations, row, col), cell)
+      if (color) out.set(key, color)
+    }
+    return out
+  }, [validations, cells])
   // Conditional formatting: worked out here from the merged values.
   const cfStyles = useMemo(() => (view && view.condFormats && view.condFormats.length ? evaluateColours(view.condFormats, cells, todaySerial(), view.cfMatches || {}) : null), [view, cells])
 
@@ -1027,6 +1039,7 @@ export function SheetView ({ sheetId, files = [], folders = [], onOpenFile, onOp
             {canEdit && <li role='menuitem' onClick={openSort}>Sort...</li>}
             {freezeItems(close)}
             {filterItems(close)}
+            {canEdit && <li role='menuitem' onClick={() => setValidating({ ...range, dropdown: true })}>Dropdown...</li>}
             {canEdit && <li role='menuitem' onClick={() => setValidating({ ...range })}>Validation...</li>}
             {(canEdit || (view.condFormats || []).length > 0) && <li role='menuitem' onClick={() => setColouring(true)}>Conditional formatting...</li>}
             {(canEdit || (view.names || []).length > 0) && <li role='menuitem' onClick={() => setNaming({ adding: false })}>Named ranges...</li>}
@@ -1264,6 +1277,7 @@ export function SheetView ({ sheetId, files = [], folders = [], onOpenFile, onOp
         hiddenRows={hidden}
         commentMarks={threadAt.size ? threadAt : null}
         invalidCells={invalidCells}
+        chipCells={chipCells}
         cfStyles={cfStyles}
         dropdownAt={canEdit && selRule && selRule.kind === 'list' && selRule.dropdown !== false && (selRule.items || []).length ? sel : null}
         onDropdown={(x, y) => setPicking({ row: sel.row, col: sel.col, x, y })}
@@ -1407,10 +1421,23 @@ export function SheetView ({ sheetId, files = [], folders = [], onOpenFile, onOp
         const text = colName(validating.c1) + validating.r1 + (validating.r1 === validating.r2 && validating.c1 === validating.c2 ? '' : ':' + colName(validating.c2) + validating.r2)
         const rule = ruleFor(validations, validating.r1, validating.c1)
         const close = () => { setValidating(null); afterPanel() }
+        // Dropdown... offers the values already in the range as the items.
+        const seen = new Set()
+        const initialItems = []
+        if (validating.dropdown && !rule) {
+          for (let r = validating.r1; r <= Math.min(validating.r2, view.rows); r++) {
+            for (let c = validating.c1; c <= Math.min(validating.c2, view.cols); c++) {
+              const d = cells.get(r + ',' + c)
+              const t = d && d.display !== undefined ? String(d.display).trim() : ''
+              if (t && !seen.has(t.toLowerCase()) && initialItems.length < 500) { seen.add(t.toLowerCase()); initialItems.push(t) }
+            }
+          }
+        }
         return (
           <ValidationPanel
             range={text}
             rule={rule}
+            initialItems={initialItems}
             onSave={async (r) => { if (await run('sheet:setValidation', { range: text, rule: r }) !== undefined) close() }}
             onRemove={() => { run('sheet:setValidation', { range: text, rule: null }); close() }}
             onClose={close}
@@ -1438,6 +1465,7 @@ export function SheetView ({ sheetId, files = [], folders = [], onOpenFile, onOp
         // An item that looks like a formula is entered as text.
         const pick = (item) => { setPicking(null); writeEntry(picking.row, picking.col, /^[='"]/.test(item) ? "'" + item : item, null) }
         const items = selRule.items || []
+        const choice = (it) => (selRule.chips ? <span className={'chip chip-' + chipColor(selRule, { kind: 'text', display: it })}>{it}</span> : it)
         return phone
           ? (
             <div className='panel-backdrop' onMouseDown={(e) => { if (e.target === e.currentTarget) setPicking(null) }}>
@@ -1447,14 +1475,14 @@ export function SheetView ({ sheetId, files = [], folders = [], onOpenFile, onOp
                   <button className='close' aria-label='Close' onClick={() => setPicking(null)}><X size={18} /></button>
                 </header>
                 <ul className='pick-list' role='listbox'>
-                  {items.map((it) => <li key={it} role='option' aria-selected={(selected && selected.display) === it} onClick={() => pick(it)}>{it}</li>)}
+                  {items.map((it) => <li key={it} role='option' aria-selected={(selected && selected.display) === it} onClick={() => pick(it)}>{choice(it)}</li>)}
                 </ul>
               </section>
             </div>
             )
           : (
             <ul className='menu pick-menu' role='listbox' style={{ left: Math.max(8, picking.x - 200), top: picking.y + 2 }}>
-              {items.map((it) => <li key={it} role='option' aria-selected={(selected && selected.display) === it} onClick={() => pick(it)}>{it}</li>)}
+              {items.map((it) => <li key={it} role='option' aria-selected={(selected && selected.display) === it} onClick={() => pick(it)}>{choice(it)}</li>)}
             </ul>
             )
       })()}
@@ -1522,6 +1550,7 @@ export function SheetView ({ sheetId, files = [], folders = [], onOpenFile, onOp
               {canEdit && <li role='menuitem' onClick={() => { setMenu(null); openSort() }}>Sort...</li>}
               {freezeItems(() => setMenu(null))}
               {filterItems(() => setMenu(null))}
+              {canEdit && <li role='menuitem' onClick={() => { setMenu(null); setValidating({ ...range, dropdown: true }) }}>Dropdown...</li>}
               {canEdit && <li role='menuitem' onClick={() => { setMenu(null); setValidating({ ...range }) }}>Validation...</li>}
               {canEdit && <li role='menuitem' onClick={() => { setMenu(null); setColouring(true) }}>Conditional formatting...</li>}
               {canEdit && <li role='menuitem' onClick={() => { setMenu(null); setNaming({ adding: true }) }}>Name this range...</li>}
