@@ -185,7 +185,8 @@ Code that works for any kind of file sits apart from each editor's own
   proposals/2026-10-18-sheet-links.md; links to another file or a folder,
   `pearoffice://file/<id>` and `pearoffice://folder/<id>`, named from the
   file list and followed through moves with `file:follow`,
-  proposals/2026-10-22-links-to-files.md). Talks only to
+  proposals/2026-10-22-links-to-files.md; the same links from outside the
+  app open the file or folder, and a card's menu has Copy link). Talks only to
   `window.pearoffice` (`call`, `on`), which the desktop preload and the mobile
   WebView provide. Built to `dist/ui` by `scripts/build-ui.mjs`.
 - `desktop/` - the Electron shell: `main.js` starts the worklet bundle with

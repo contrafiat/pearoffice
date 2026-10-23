@@ -195,8 +195,8 @@ export function App () {
   }, [])
   const [restoreHidden, setRestoreHidden] = useState(false)
   // Opening a file from a link in a sheet, as a tap on its card would.
-  const openFile = (id) => {
-    const f = sheets && sheets.find((x) => x.sheetId === id)
+  const openFile = (id, list = sheets) => {
+    const f = list && list.find((x) => x.sheetId === id)
     if (!f) return
     if (f.waiting) setWaitingJoin(id)
     else if (f.recovery === 'copy') setRecovering(f)
@@ -316,6 +316,32 @@ export function App () {
     if (/^pearoffice:\/\/join\?/.test(url)) setJoining(url)
     else if (/^pearoffice:\/\/seeder\?/.test(url)) setSeeder(url)
     else if (/^pearoffice:\/\/link\?/.test(url)) setDevices({ link: url })
+    else openPlace(url).catch(() => {})
+  }
+
+  // A file or folder link from outside the app, as a sheet cell holds one
+  // (proposals/2026-10-22-links-to-files.md): open it if this person has it.
+  async function openPlace (url) {
+    const file = /^pearoffice:\/\/file\/([A-Za-z0-9_-]{43})$/.exec(url)
+    const folder = /^pearoffice:\/\/folder\/([0-9a-f]{32})$/.exec(url)
+    if (file) {
+      const r = await call('file:follow', { sheetId: file[1] })
+      const list = await call('sheet:list')
+      const f = r && r.sheetId && list.find((x) => x.sheetId === r.sheetId && !x.removed)
+      if (!f) { setToast("You don't have this file. Ask someone who has it to share it with you."); return }
+      setSheets(list)
+      openFile(f.sheetId, list)
+    } else if (folder) {
+      const r = await call('file:folders')
+      if (!((r && r.folders) || []).some((x) => x.id === folder[1])) { setToast('This folder is not one of yours, or it was deleted.'); return }
+      setCurrent(null)
+      setFolder(folder[1])
+    }
+  }
+
+  async function copyLink (text) {
+    try { await navigator.clipboard.writeText(text) } catch { await call('app:setClipboard', { text }) }
+    setToast('Link copied')
   }
 
   // The two-week donation nudge: asked once the file list is loaded, shown
@@ -459,10 +485,12 @@ export function App () {
           <div className='doc-scrim' onPointerDown={() => setCardMenu(null)} />
           <ul className='menu card-menu' role='menu' style={{ ...(cardMenu.pointer ? { left: Math.max(8, Math.min(cardMenu.x, window.innerWidth - 200)) } : { right: Math.max(8, window.innerWidth - cardMenu.x) }), top: Math.min(cardMenu.y + 4, window.innerHeight - 150) }} onClick={() => setCardMenu(null)}>
             {cardMenu.file && cardMenu.file.template && !cardMenu.file.removed && <li role='menuitem' onClick={() => fromTemplate(() => call('file:fromTemplate', { sheetId: cardMenu.file.sheetId }))}>New from this template</li>}
+            {cardMenu.file && !cardMenu.file.removed && !cardMenu.file.waiting && <li role='menuitem' onClick={() => copyLink('pearoffice://file/' + cardMenu.file.sheetId).catch(() => {})}>Copy link</li>}
             {cardMenu.file && <li role='menuitem' onClick={() => setMoving(cardMenu.file)}>Move to folder...</li>}
             {cardMenu.file && !cardMenu.file.removed && (cardMenu.file.myRole === 'owner' || cardMenu.file.myRole === 'editor') && <li role='menuitem' onClick={() => setTemplate(cardMenu.file, !cardMenu.file.template)}>{cardMenu.file.template ? 'Stop using as a template' : 'Use as a template'}</li>}
             {cardMenu.file && <li role='menuitem' onClick={() => setDeleting({ file: cardMenu.file, kind: 'local' })}>Remove from this device</li>}
             {cardMenu.file && cardMenu.file.owner && cardMenu.file.owner.isMe && !cardMenu.file.removed && <li role='menuitem' className='danger' onClick={() => setDeleting({ file: cardMenu.file, kind: 'everyone' })}>Delete for everyone</li>}
+            {cardMenu.folder && <li role='menuitem' onClick={() => copyLink('pearoffice://folder/' + cardMenu.folder.id).catch(() => {})}>Copy link</li>}
             {cardMenu.folder && <li role='menuitem' onClick={() => setNaming({ folder: cardMenu.folder })}>Rename</li>}
             {cardMenu.folder && <li role='menuitem' className='danger' onClick={() => setDroppingFolder(cardMenu.folder)}>Delete folder</li>}
           </ul>
