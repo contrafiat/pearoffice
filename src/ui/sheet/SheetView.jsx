@@ -14,7 +14,8 @@ import { CommentPanel, CommentsList } from './CommentPanel.jsx'
 import { ValidationPanel } from './ValidationPanel.jsx'
 import { CondFormatPanel } from './CondFormatPanel.jsx'
 import { NamesPanel } from './NamesPanel.jsx'
-import { LinkBar, LinkCard, linkOf, linkLabel, ownLink } from './links.jsx'
+import { LinkBar, LinkCard, linkOf, linkLabel, ownLink, fileLink, folderLink } from './links.jsx'
+import { untitled } from '../Files.jsx'
 import { parseRange } from '../../sheet/charts.js'
 import { evaluate as evaluateColours } from '../../sheet/condFormat.js'
 import { typed, allows, explain, ruleFor } from '../../sheet/validation.js'
@@ -80,7 +81,7 @@ function spillReason (b) {
   return 'The answer would cover a cell it depends on.'
 }
 
-export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
+export function SheetView ({ sheetId, files = [], folders = [], onOpenFile, onOpenFolder, onTitleChange, onError, onGone }) {
   const [view, setView] = useState(null)
   const [tabId, setTabId] = useState(null)
   const [sel, setSel] = useState({ row: 1, col: 1 }) // the active cell
@@ -362,25 +363,56 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
   // Links (proposals/2026-10-18-sheet-links.md). A web link opens in the
   // browser; one inside the file selects its cell or block, or the tab's
   // first cell.
-  const selLink = linkOf(selected)
-  function openLink (row, col) {
-    const l = linkOf(cells.get(row + ',' + col))
+  // A link to another file or a folder (proposals/2026-10-22-links-to-files.md)
+  // gets its name here, or `missing` when this person does not have it. A
+  // file that moved to fresh keys is found through file:follow.
+  const [followed, setFollowed] = useState({}) // a file's old id -> its id now, or null
+  const usable = files.filter((f) => !f.removed && !f.waiting)
+  function placeOf (l, moved = followed) {
+    if (!l || !(l.file || l.folder)) return l
+    if (l.folder) {
+      const d = folders.find((x) => x.id === l.folder)
+      return d ? { ...l, name: d.name } : { ...l, missing: 'This folder is not one of yours, or it was deleted.' }
+    }
+    const f = usable.find((x) => x.sheetId === l.file) || usable.find((x) => x.sheetId === moved[l.file])
+    return f ? { ...l, at: f.sheetId, name: f.title || untitled(f.kind) } : { ...l, missing: "You don't have this file. Ask someone who has it to share it with you." }
+  }
+  async function follow (id) {
+    if (id in followed || usable.some((x) => x.sheetId === id)) return followed
+    const r = await call('file:follow', { sheetId: id }).catch(() => null)
+    const next = { ...followed, [id]: (r && r.sheetId) || null }
+    setFollowed(next)
+    return next
+  }
+  const selLink = placeOf(linkOf(selected))
+  const selFile = selLink && selLink.file
+  useEffect(() => { if (selFile) follow(selFile) }, [selFile]) // eslint-disable-line react-hooks/exhaustive-deps
+  async function openLink (row, col) {
+    let l = linkOf(cells.get(row + ',' + col))
     if (!l || l.gone) return
     if (l.url) { call('app:openUrl', { url: l.url }).catch(() => {}); return }
+    if (l.folder) { if (!placeOf(l).missing && onOpenFolder) onOpenFolder(l.folder); return }
+    if (l.file) {
+      l = placeOf(l, await follow(l.file))
+      if (!l.missing && onOpenFile) onOpenFile(l.at)
+      return
+    }
     if (l.to.tabId !== view.tabId) setTabId(l.to.tabId)
     setSel({ row: l.to.row || 1, col: l.to.col || 1 })
     setExt({ row: l.to.row2 || l.to.row || 1, col: l.to.col2 || l.to.col || 1 })
   }
   function startLink () {
     if (!canEdit) return
-    setLinking({ initial: ownLink(selLink) ? linkLabel(selLink) : '', hasLink: ownLink(selLink) })
+    const own = ownLink(selLink)
+    const pear = own && (selLink.file || selLink.folder) && !selLink.missing
+    setLinking({ initial: own && !selLink.missing ? linkLabel(selLink) : '', initialPick: pear ? { text: linkLabel(selLink), link: selLink.file ? fileLink(selLink.at) : folderLink(selLink.folder) } : null, hasLink: own })
   }
   async function applyLink (link, text) {
     const box = { ...range }
     setLinking(null)
     afterPanel()
     // On an empty cell the link is also its text.
-    if (box.r1 === box.r2 && box.c1 === box.c2 && !(selected && selected.input)) await run('sheet:setCell', { row: box.r1, col: box.c1, input: typeof link === 'string' ? link : text })
+    if (box.r1 === box.r2 && box.c1 === box.c2 && !(selected && selected.input)) await run('sheet:setCell', { row: box.r1, col: box.c1, input: typeof link === 'string' && !link.startsWith('pearoffice://') ? link : text })
     await run('sheet:setLink', { ...box, link })
   }
   function removeLink () {
@@ -1164,9 +1196,12 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
           key={sel.row + ',' + sel.col}
           initial={linking.initial}
           hasLink={linking.hasLink}
+          initialPick={linking.initialPick}
           tabs={view.tabs}
           tabId={view.tabId}
           names={view.names || []}
+          files={usable.filter((f) => f.sheetId !== sheetId)}
+          folders={folders}
           onApply={applyLink}
           onRemove={removeLink}
           onClose={() => { setLinking(null); afterPanel() }}
@@ -1490,7 +1525,7 @@ export function SheetView ({ sheetId, onTitleChange, onError, onGone }) {
               {canEdit && <li role='menuitem' onClick={() => { setMenu(null); setValidating({ ...range }) }}>Validation...</li>}
               {canEdit && <li role='menuitem' onClick={() => { setMenu(null); setColouring(true) }}>Conditional formatting...</li>}
               {canEdit && <li role='menuitem' onClick={() => { setMenu(null); setNaming({ adding: true }) }}>Name this range...</li>}
-              {selLink && !selLink.gone && <li role='menuitem' onClick={() => { setMenu(null); openLink(sel.row, sel.col) }}>Open link</li>}
+              {selLink && !selLink.gone && !selLink.missing && <li role='menuitem' onClick={() => { setMenu(null); openLink(sel.row, sel.col) }}>Open link</li>}
               {canEdit && <li role='menuitem' onClick={() => { setMenu(null); startLink() }}>{ownLink(selLink) ? 'Edit link...' : 'Insert link...'}</li>}
               {canEdit && ownLink(selLink) && <li role='menuitem' onClick={() => { setMenu(null); removeLink() }}>Remove link</li>}
               {(canEdit || threadAt.has(sel.row + ',' + sel.col)) && <li role='menuitem' onClick={() => { setMenu(null); setCommenting({ row: sel.row, col: sel.col }) }}>{threadAt.has(sel.row + ',' + sel.col) ? 'Show comments' : 'Comment'}</li>}

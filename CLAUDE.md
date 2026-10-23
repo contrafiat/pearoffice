@@ -180,7 +180,10 @@ Code that works for any kind of file sits apart from each editor's own
   `src/ui/sheet/` is the spreadsheet editor
   (grid, toolbar, its panels, charts, `xlsx.js` file handling, `links.jsx`
   for links in cells: the link bar and the card under a linked cell;
-  proposals/2026-10-18-sheet-links.md). Talks only to
+  proposals/2026-10-18-sheet-links.md; links to another file or a folder,
+  `pearoffice://file/<id>` and `pearoffice://folder/<id>`, named from the
+  file list and followed through moves with `file:follow`,
+  proposals/2026-10-22-links-to-files.md). Talks only to
   `window.pearoffice` (`call`, `on`), which the desktop preload and the mobile
   WebView provide. Built to `dist/ui` by `scripts/build-ui.mjs`.
 - `desktop/` - the Electron shell: `main.js` starts the worklet bundle with

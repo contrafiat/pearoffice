@@ -34,13 +34,15 @@ const BORDER = /^(thin|medium|thick|dashed|double)(:#[0-9a-f]{6})?$/i
 // (`#<tabId>`), a cell on one (`#<tabId>!<rowId>:<colId>`) or a block of
 // cells (`#<tabId>!<rowId>:<colId>:<rowId>:<colId>`), by id so that renames
 // and inserts keep it on the same cells, or to a named range (`#=<name>`,
-// rewritten when the name is renamed).
+// rewritten when the name is renamed). It can also go to another PearOffice
+// file or one of your folders, by id (proposals/2026-10-22-links-to-files.md).
 const MAX_LINK = 2048
 const WEB_LINK = /^(https?:\/\/|mailto:)[^\s<>"]+$/i
 const ID = '([A-Za-z0-9_-]{11})'
 const INNER_LINK = new RegExp('^#' + ID + '(?:!' + ID + ':' + ID + '(?::' + ID + ':' + ID + ')?)?$')
 const NAME_LINK = /^#=([A-Za-z_\\][A-Za-z0-9_.\\]{0,254})$/
-const isLink = (v) => typeof v === 'string' && v.length <= MAX_LINK && (WEB_LINK.test(v) || INNER_LINK.test(v) || NAME_LINK.test(v))
+const FILE_LINK = /^pearoffice:\/\/(file\/[A-Za-z0-9_-]{43}|folder\/[0-9a-f]{32})$/
+const isLink = (v) => typeof v === 'string' && v.length <= MAX_LINK && (WEB_LINK.test(v) || INNER_LINK.test(v) || NAME_LINK.test(v) || FILE_LINK.test(v))
 const FORMAT_VALUES = {
   align: (v) => ['left', 'center', 'right'].includes(v),
   valign: (v) => ['top', 'middle', 'bottom'].includes(v),
@@ -293,7 +295,7 @@ function setLink (doc, tabId, r1, c1, r2, c2, link) {
   } else if (link) {
     value = String(link).trim()
   }
-  if (value !== null && !isLink(value)) throw new Error('Links can go to web pages, email addresses or places in this file')
+  if (value !== null && !isLink(value)) throw new Error('Links can go to web pages, email addresses, places in this file, other files or folders')
   return setFormatRange(doc, tabId, r1, c1, r2, c2, { link: value })
 }
 

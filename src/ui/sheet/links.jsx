@@ -5,19 +5,27 @@ import React, { useLayoutEffect, useState } from 'react'
 import { LinkSimple, ArrowSquareOut, PencilSimple, Trash, X } from '@phosphor-icons/react'
 import { colName } from './a1.js'
 import { parseRange } from '../../sheet/charts.js'
+import { untitled } from '../Files.jsx'
 
 const WEB = /^https?:\/\/\S+$/i
+// Another file or one of your folders (proposals/2026-10-22-links-to-files.md).
+const PEAR = /^pearoffice:\/\/(file|folder)\/([A-Za-z0-9_-]+)$/
+export const fileLink = (id) => 'pearoffice://file/' + id
+export const folderLink = (id) => 'pearoffice://folder/' + id
 
 // 'Costs'!B4, or the tab's name alone.
 const quoted = (name) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(name) ? name : "'" + name.replace(/'/g, "''") + "'"
 
 // What a cell's link is: { url } for a web or email link (also a cell whose
 // whole text is a web address), { to } for a place in the file, { gone } when
-// its tab was deleted, or null. `formula` marks one from HYPERLINK.
+// its tab was deleted, { file } or { folder } with the id for another file or
+// a folder, or null. `formula` marks one from HYPERLINK.
 export function linkOf (cell) {
   if (!cell) return null
   const l = cell.fmt && cell.fmt.link
   if (l && l[0] === '#') return cell.linkTo && !cell.linkTo.gone ? { to: cell.linkTo } : { gone: true }
+  const pear = PEAR.exec(l || '')
+  if (pear) return { [pear[1]]: pear[2], stored: true }
   if (l) return { url: l, stored: true }
   // From a HYPERLINK formula: opened from here, changed in the formula.
   if (cell.formulaLink) return cell.formulaLink === '#' ? (cell.linkTo ? { to: cell.linkTo, formula: true } : null) : { url: cell.formulaLink, formula: true }
@@ -31,6 +39,7 @@ export const ownLink = (l) => !!(l && !l.formula && (l.stored || l.to || l.gone)
 export function linkLabel (link) {
   if (!link) return ''
   if (link.url) return link.url
+  if (link.file || link.folder) return link.missing || link.name || (link.file ? 'A PearOffice file' : 'A folder')
   if (link.gone) return 'A deleted tab'
   const { name, row, col, row2, col2, rangeName } = link.to
   if (rangeName) return rangeName
@@ -62,9 +71,25 @@ export function parseLinkText (text, tabs, tabId, names = []) {
   return 'https://' + t
 }
 
-export function LinkBar ({ initial, hasLink, tabs, tabId, names = [], onApply, onRemove, onClose, onError }) {
+// `pick` is a file or folder link in the bar: { text, link }, kept while
+// the box still shows its name.
+export function LinkBar ({ initial, initialPick, hasLink, tabs, tabId, names = [], files = [], folders = [], onApply, onRemove, onClose, onError }) {
   const [text, setText] = useState(initial || '')
+  const [pick, setPick] = useState(initialPick || null)
+  function choose (v) {
+    const t = tabs.find((x) => 'tab:' + x.id === v)
+    const f = files.find((x) => 'file:' + x.sheetId === v)
+    const d = folders.find((x) => 'folder:' + x.id === v)
+    if (t) setText(quoted(t.name) + '!A1')
+    else if (v.startsWith('name:')) setText(v.slice(5))
+    else if (f || d) {
+      const name = f ? f.title || untitled(f.kind) : d.name
+      setText(name)
+      setPick({ text: name, link: f ? fileLink(f.sheetId) : folderLink(d.id) })
+    }
+  }
   function apply () {
+    if (pick && text.trim() === pick.text) { onApply(pick.link, pick.text); return }
     let link
     try { link = parseLinkText(text, tabs, tabId, names) } catch (err) { onError(err.message); return }
     if (!link) { if (hasLink) onRemove(); else onClose(); return }
@@ -81,11 +106,13 @@ export function LinkBar ({ initial, hasLink, tabs, tabId, names = [], onApply, o
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); apply() } if (e.key === 'Escape') { e.preventDefault(); onClose() } }}
       />
-      {(tabs.length > 1 || names.length > 0) && (
-        <select aria-label='Link to a tab or named range' value='' onChange={(e) => { const v = e.target.value; const t = tabs.find((x) => 'tab:' + x.id === v); if (t) setText(quoted(t.name) + '!A1'); else if (v.startsWith('name:')) setText(v.slice(5)) }}>
+      {(tabs.length > 1 || names.length > 0 || files.length > 0 || folders.length > 0) && (
+        <select aria-label='Link to a tab, named range, file or folder' value='' onChange={(e) => choose(e.target.value)}>
           <option value=''>Go to...</option>
           {tabs.length > 1 && <optgroup label='Tabs'>{tabs.map((t) => <option key={t.id} value={'tab:' + t.id}>{t.name}</option>)}</optgroup>}
           {names.length > 0 && <optgroup label='Named ranges'>{names.map((n) => <option key={n.name} value={'name:' + n.name}>{n.name}</option>)}</optgroup>}
+          {files.length > 0 && <optgroup label='Files'>{files.map((f) => <option key={f.sheetId} value={'file:' + f.sheetId}>{f.title || untitled(f.kind)}</option>)}</optgroup>}
+          {folders.length > 0 && <optgroup label='Folders'>{folders.map((d) => <option key={d.id} value={'folder:' + d.id}>{d.name}</option>)}</optgroup>}
         </select>
       )}
       <div className='doc-bar-buttons'>
@@ -121,7 +148,7 @@ export function LinkCard ({ row, col, link, canEdit, onOpen, onEdit, onRemove })
   return (
     <div className='link-card' role='group' aria-label='Link' style={at} onMouseDown={(e) => e.stopPropagation()}>
       <span className='link-card-address' title={label}>{label}</span>
-      {!link.gone && <button className='icon-button' title='Open link' aria-label='Open link' onClick={onOpen}><ArrowSquareOut size={16} /></button>}
+      {!link.gone && !link.missing && <button className='icon-button' title='Open link' aria-label='Open link' onClick={onOpen}><ArrowSquareOut size={16} /></button>}
       {canEdit && ownLink(link) && <button className='icon-button' title='Edit link' aria-label='Edit link' onClick={onEdit}><PencilSimple size={16} /></button>}
       {canEdit && ownLink(link) && <button className='icon-button' title='Remove link' aria-label='Remove link' onClick={onRemove}><Trash size={16} /></button>}
     </div>

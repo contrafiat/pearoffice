@@ -2,7 +2,8 @@
 // (proposals/2026-10-18-sheet-links.md). A web link from the toolbar on an
 // empty cell, a link to a cell from the cell menu, Ctrl+click, the card's
 // Open and Remove, a typed web address drawn as a link, a HYPERLINK formula,
-// a link to a block, then the .xlsx round trip.
+// a link to a block, the .xlsx round trip, then links to another file and a
+// folder.
 
 const fs = require('node:fs')
 const path = require('node:path')
@@ -122,5 +123,47 @@ module.exports = async function sheetLinks (t) {
   result.roundTrip = true
   step('xlsx round trip')
 
-  return result.webLink && result.innerLink && result.formulaLink && result.blockLink && result.roundTrip
+  // Links to another file and a folder (proposals/2026-10-22-links-to-files.md),
+  // picked from the bar's list, and one to a file this person does not have.
+  await js("window.pearoffice.call('file:newFolder', { name: 'Work' })")
+  const linkTo = async (row, group, name) => {
+    await js("document.querySelector('.grid .body').focus()")
+    await sendMod('Home', ['control'])
+    for (let i = 1; i < row; i++) await key('Down')
+    await sendMod('K', ['control'])
+    await waitFor('link bar', "!!document.querySelector('.sheet-link-bar input')")
+    if (!group) { await type(name); await key('Enter'); return }
+    await waitFor(name + ' listed', `!![...document.querySelectorAll('.sheet-link-bar optgroup[label="${group}"] option')].find((o) => o.textContent === ${JSON.stringify(name)})`)
+    await js(`(() => {
+      const s = document.querySelector('.sheet-link-bar select')
+      const o = [...s.querySelectorAll('optgroup[label="${group}"] option')].find((x) => x.textContent === ${JSON.stringify(name)})
+      Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(s, o.value)
+      s.dispatchEvent(new Event('change', { bubbles: true }))
+    })()`)
+    await waitFor('name in the box', `document.querySelector('.sheet-link-bar input').value === ${JSON.stringify(name)}`)
+    await key('Enter')
+  }
+  const cardSays = (text) => `!!${card} && ${card}.querySelector('.link-card-address').textContent === ${JSON.stringify(text)}`
+  await linkTo(8, 'Files', 'Untitled sheet')
+  await waitFor('A8 links to the file', isLink(8, 1) + ' && ' + cellNode(8, 1) + ".textContent === 'Untitled sheet' && " + cardSays('Untitled sheet'))
+  await linkTo(9, 'Folders', 'Work')
+  await waitFor('A9 links to the folder', isLink(9, 1) + ' && ' + cardSays('Work'))
+  await linkTo(10, null, 'pearoffice://file/' + 'n'.repeat(43))
+  await waitFor('A10 is a file nobody shared', isLink(10, 1) + ` && !!${card} && ${card}.textContent.includes("You don't have this file") && !${card}.querySelector('[aria-label="Open link"]')`)
+  await key('Up')
+  await waitFor('A9 card', cardSays('Work'))
+  await js(card + ".querySelector('[aria-label=\"Open link\"]').click()")
+  await waitFor('folder opened', "!!document.querySelector('.in-folder .folder-head h1') && document.querySelector('.in-folder .folder-head h1').textContent.includes('Work')")
+  await js("[...document.querySelectorAll('.sheet-link')].find((b) => b.textContent.includes('Links back')).click()")
+  await waitFor('back in Links back', "!!document.querySelector('.title') && document.querySelector('.title').value === 'Links back'")
+  await js("document.querySelector('.grid .body').focus()")
+  await sendMod('Home', ['control'])
+  for (let i = 1; i < 8; i++) await key('Down')
+  await waitFor('A8 card', cardSays('Untitled sheet'))
+  await js(card + ".querySelector('[aria-label=\"Open link\"]').click()")
+  await waitFor('file opened', "!!document.querySelector('.title') && document.querySelector('.title').value === 'Untitled sheet'")
+  result.fileLinks = true
+  step('links to a file and a folder')
+
+  return result.webLink && result.innerLink && result.formulaLink && result.blockLink && result.roundTrip && result.fileLinks
 }
