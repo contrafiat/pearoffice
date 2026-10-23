@@ -16,6 +16,7 @@ import { CondFormatPanel } from './CondFormatPanel.jsx'
 import { NamesPanel } from './NamesPanel.jsx'
 import { LinkBar, LinkCard, linkOf, linkLabel, ownLink, fileLink, folderLink } from './links.jsx'
 import { untitled } from '../Files.jsx'
+import { AtMenu, atItems, smartChip } from './chips.jsx'
 import { parseRange } from '../../sheet/charts.js'
 import { evaluate as evaluateColours } from '../../sheet/condFormat.js'
 import { typed, allows, explain, ruleFor, chipColor, chipsOf, choicesOf, joinChoices } from '../../sheet/validation.js'
@@ -122,6 +123,9 @@ export function SheetView ({ sheetId, files = [], folders = [], onOpenFile, onOp
   const [caret, setCaret] = useState(null)
   const [helpSel, setHelpSel] = useState(0)
   const [helpOff, setHelpOff] = useState(null) // the partial name Escape hid
+  const [atSel, setAtSel] = useState(0) // the highlighted item in the @ menu
+  const [atOff, setAtOff] = useState(false) // Escape hid the @ menu
+  const dateInput = useRef(null) // the hidden date field the calendar button opens
   const nextCaret = useRef(null)
   const pointRef = useRef(null) // { start, end, anchor, to }: see point()
   // Refresh the sidebar when the title changes from anywhere: a rename on
@@ -350,6 +354,11 @@ export function SheetView ({ sheetId, files = [], folders = [], onOpenFile, onOp
     }
     return out
   }, [validations, cells])
+  const smartChips = useMemo(() => {
+    const out = new Map()
+    for (const [key, cell] of cells) { const c = smartChip(cell, { members, files }); if (c) out.set(key, c) }
+    return out.size ? out : null
+  }, [cells, members, files])
   // Conditional formatting: worked out here from the merged values.
   const cfStyles = useMemo(() => (view && view.condFormats && view.condFormats.length ? evaluateColours(view.condFormats, cells, todaySerial(), view.cfMatches || {}) : null), [view, cells])
 
@@ -453,6 +462,9 @@ export function SheetView ({ sheetId, files = [], folders = [], onOpenFile, onOp
   async function writeEntry (row, col, value, move) {
     const before = cells.get(row + ',' + col)
     if ((before ? before.input : '') !== value) {
+      // Typing over a person or date chip makes it plain text again.
+      const f = (before && before.fmt) || {}
+      if (f.person || f.datechip) run('sheet:setFormat', { row, col, patch: { person: null, datechip: null } })
       // Show what was typed until the worklet sends the computed value.
       setView((v) => v && {
         ...v,
@@ -900,7 +912,52 @@ export function SheetView ({ sheetId, files = [], folders = [], onOpenFile, onOp
   const help = editing && canEdit ? helpFor(editValue, caretAt, nameHelp) : null
   const shownHelp = help && help.list && helpOff === help.partial ? null : help
   useEffect(() => { setHelpSel(0) }, [help && help.partial])
-  useEffect(() => { if (!editing) { setCaret(null); setHelpOff(null); pointRef.current = null } }, [!!editing])
+  useEffect(() => { if (!editing) { setCaret(null); setHelpOff(null); setAtOff(false); pointRef.current = null } }, [!!editing])
+  // @ chips (proposals/2026-10-23-multi-select-and-smart-chips.md): typing @
+  // first in a cell offers people, files, folders and dates.
+  const atQuery = editing && canEdit && typeof editValue === 'string' && editValue[0] === '@' && !atOff ? editValue.slice(1) : null
+  const atList = useMemo(() => (atQuery === null ? [] : atItems(atQuery, { members, files: usable.filter((f) => f.sheetId !== sheetId), folders })), [atQuery, members, files, folders]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setAtSel(0) }, [atQuery])
+  async function pickAt (it) {
+    const ed = editingRef.current
+    if (!ed) return
+    const { row, col } = ed
+    setEditing(null)
+    const was = (cells.get(row + ',' + col) || {}).fmt || {}
+    const plain = { person: null, datechip: null, link: null }
+    const text = (t) => (/^[='"@+-]/.test(t) || /^[\d.]+$/.test(t) ? "'" + t : t)
+    if (it.kind === 'person') {
+      await run('sheet:setCell', { row, col, input: text(it.label) })
+      await run('sheet:setFormat', { row, col, patch: { ...plain, person: it.member.identity } })
+    } else if (it.kind === 'file' || it.kind === 'folder') {
+      await run('sheet:setCell', { row, col, input: text(it.label) })
+      await run('sheet:setFormat', { row, col, patch: { ...plain, link: it.kind === 'file' ? fileLink(it.file.sheetId) : folderLink(it.folder.id) } })
+    } else {
+      const num = was.num && /[dmy]/i.test(was.num) ? was.num : 'd mmm yyyy'
+      await run('sheet:setCell', { row, col, input: String(todaySerial() + (it.days || 0)) })
+      await run('sheet:setFormat', { row, col, patch: { ...plain, datechip: true, num } })
+      if (it.pick) pickDate(row, col)
+    }
+    focusGrid()
+  }
+  // The calendar button on a date chip: the system date picker, then the
+  // date as a serial, keeping the chip.
+  function pickDate (row, col) {
+    const el = dateInput.current
+    if (!el) return
+    const cell = cells.get(row + ',' + col)
+    const serial = cell && typeof cell.num === 'number' ? cell.num : todaySerial()
+    el.value = new Date(Date.UTC(1899, 11, 30) + Math.round(serial) * 86400000).toISOString().slice(0, 10)
+    el.dataset.at = row + ',' + col
+    try { el.showPicker() } catch { el.click() }
+  }
+  function datePicked (e) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(e.target.value || '')
+    const [row, col] = String(e.target.dataset.at || '').split(',').map(Number)
+    if (!m || !row) return
+    const serial = Math.round((Date.UTC(+m[1], +m[2] - 1, +m[3]) - Date.UTC(1899, 11, 30)) / 86400000)
+    run('sheet:setCell', { row, col, input: String(serial) })
+  }
   // Put the caret where an inserted function name ended.
   useLayoutEffect(() => {
     if (nextCaret.current === null) return
@@ -947,6 +1004,13 @@ export function SheetView ({ sheetId, files = [], folders = [], onOpenFile, onOp
     : null
 
   function onEditKey (e) {
+    if (atList.length) {
+      const n = atList.length
+      if (e.key === 'ArrowDown') { e.preventDefault(); setAtSel((i) => (i + 1) % n); return }
+      if (e.key === 'ArrowUp') { e.preventDefault(); setAtSel((i) => (i - 1 + n) % n); return }
+      if (e.key === 'Tab' || e.key === 'Enter') { e.preventDefault(); pickAt(atList[Math.min(atSel, n - 1)]); return }
+      if (e.key === 'Escape') { e.preventDefault(); setAtOff(true); return }
+    }
     if (shownHelp && shownHelp.list) {
       const n = shownHelp.list.length
       if (e.key === 'ArrowDown') { e.preventDefault(); setHelpSel((i) => (i + 1) % n); return }
@@ -1278,6 +1342,10 @@ export function SheetView ({ sheetId, files = [], folders = [], onOpenFile, onOp
         commentMarks={threadAt.size ? threadAt : null}
         invalidCells={invalidCells}
         chipCells={chipCells}
+        smartChips={smartChips}
+        sheetId={sheetId}
+        dateAt={canEdit && selected && selected.fmt && selected.fmt.datechip && range.r1 === range.r2 && range.c1 === range.c2 ? sel : null}
+        onDatePick={() => pickDate(sel.row, sel.col)}
         cfStyles={cfStyles}
         dropdownAt={canEdit && selRule && selRule.kind === 'list' && selRule.dropdown !== false && (selRule.items || []).length ? sel : null}
         onDropdown={(x, y) => setPicking({ row: sel.row, col: sel.col, x, y })}
@@ -1536,6 +1604,8 @@ export function SheetView ({ sheetId, files = [], folders = [], onOpenFile, onOp
           onClose={() => { setFiltering(null); afterPanel() }}
         />
       )}
+      {atList.length > 0 && <AtMenu items={atList} selected={atSel} sheetId={sheetId} onPick={pickAt} anchor={document.activeElement && document.activeElement.tagName === 'INPUT' ? document.activeElement : null} />}
+      <input ref={dateInput} type='date' className='hidden-date' tabIndex={-1} aria-hidden='true' onChange={datePicked} />
       {shownHelp && <FormulaHelp help={shownHelp} selected={helpSel} onPick={pickFunction} anchor={document.activeElement && document.activeElement.tagName === 'INPUT' ? document.activeElement : null} />}
 
       {menu && (

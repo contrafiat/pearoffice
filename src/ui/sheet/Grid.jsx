@@ -3,7 +3,8 @@ import React, { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, use
 import { colName } from './a1.js'
 import { linkOf, linkLabel } from './links.jsx'
 import { textStyle, borderCss, hasBorder, neededHeight, inkOn, BASE_FONT_PX } from './cellStyle.js'
-import { Funnel, CaretDown } from '@phosphor-icons/react'
+import { Funnel, CaretDown, CalendarBlank } from '@phosphor-icons/react'
+import { SmartChip } from './chips.jsx'
 import { CfIcon } from './cfIcons.jsx'
 import { haptic } from '../haptic.js'
 
@@ -19,7 +20,7 @@ export const MAX_ZOOM = 2.5
 // sheets stay fast. Headers are drawn outside the scroll area and moved with
 // the scroll position.
 export const Grid = forwardRef(function Grid (props, ref) {
-  const { view, cells, sel, ext = sel, range, spillBox, editing, onSelect, onEdit, onEditChange, onEditKey, onEditBlur, onEditCaret = () => {}, onKeyDown, onHeaderMenu, onCellMenu = () => {}, onFill = null, charts = [], selectedChart = null, chartActions = null, onResize, onRowResize = () => {}, onCopy, onPaste, zoom = 1, onZoom, inputMode, hiddenRows = null, hiddenCols = null, unhideMarks = null, onUnhide = () => {}, onAutoFit = () => {}, filterHead = null, onFilterMenu = () => {}, commentMarks = null, onComment = () => {}, invalidCells = null, chipCells = null, cfStyles = null, dropdownAt = null, onDropdown = () => {}, others = [], onPoint = () => false, pointBox = null, onOpenLink = () => {} } = props
+  const { view, cells, sel, ext = sel, range, spillBox, editing, onSelect, onEdit, onEditChange, onEditKey, onEditBlur, onEditCaret = () => {}, onKeyDown, onHeaderMenu, onCellMenu = () => {}, onFill = null, charts = [], selectedChart = null, chartActions = null, onResize, onRowResize = () => {}, onCopy, onPaste, zoom = 1, onZoom, inputMode, hiddenRows = null, hiddenCols = null, unhideMarks = null, onUnhide = () => {}, onAutoFit = () => {}, filterHead = null, onFilterMenu = () => {}, commentMarks = null, onComment = () => {}, invalidCells = null, chipCells = null, smartChips = null, sheetId = null, dateAt = null, onDatePick = () => {}, cfStyles = null, dropdownAt = null, onDropdown = () => {}, others = [], onPoint = () => false, pointBox = null, onOpenLink = () => {} } = props
   // Row height and column widths scale with the zoom (pinch on a phone);
   // stored widths stay unzoomed.
   const ROW_H = Math.round(BASE_ROW_H * zoom)
@@ -388,7 +389,9 @@ export const Grid = forwardRef(function Grid (props, ref) {
           >
             {cf && cf.bar && <span className='cf-bar' style={{ left: cf.bar.from * 100 + '%', width: Math.max(0, cf.bar.to - cf.bar.from) * 100 + '%', background: cf.bar.color }} />}
             {cf && cf.icon && <span className='cf-icon'><CfIcon set={cf.icon.set} index={cf.icon.index} size={Math.round(14 * zoom)} /></span>}
-            {chipCells && chipCells.has(r + ',' + c)
+            {smartChips && smartChips.has(r + ',' + c)
+              ? <span className='cell-text' style={textStyle({ ...fmt, color: undefined, u: false, s: false }, zoom)}><SmartChip chip={smartChips.get(r + ',' + c)} sheetId={sheetId} /></span>
+              : chipCells && chipCells.has(r + ',' + c)
               ? <span className='cell-text' style={textStyle({ ...fmt, color: undefined, u: false, s: false }, zoom)}>{chipCells.get(r + ',' + c).map((x, i) => <span key={i} className={'chip chip-' + x.color}>{x.text}</span>)}</span>
               : <span className='cell-text' style={textStyle(link ? { ...fmt, u: true } : fmt, zoom)}>{cell && !(cf && cf.icon && cf.icon.iconOnly) ? cell.display : ''}</span>}
             {hasBorder(fmt) && <span className='cell-borders' style={{ borderTop: borderCss(fmt.bt), borderRight: borderCss(fmt.br), borderBottom: borderCss(fmt.bb), borderLeft: borderCss(fmt.bl) }} />}
@@ -611,6 +614,18 @@ export const Grid = forwardRef(function Grid (props, ref) {
             </>
           )}
           {isEditingHere && !inFrozen(editing.row, editing.col) && editorAt()}
+          {dateAt && !editing && !inFrozen(dateAt.row, dateAt.col) && rowH[dateAt.row] > 0 && (
+            <button
+              className='list-button'
+              aria-label='Pick a date'
+              style={{ top: rowY[dateAt.row] + (rowH[dateAt.row] - 22) / 2, left: colX[dateAt.col] + widths[dateAt.col] - 26 }}
+              onMouseDown={(e) => e.stopPropagation()}
+              onTouchEnd={(e) => e.stopPropagation()}
+              onClick={(e) => { e.stopPropagation(); onDatePick() }}
+            >
+              <CalendarBlank size={13} />
+            </button>
+          )}
           {dropdownAt && !editing && !inFrozen(dropdownAt.row, dropdownAt.col) && rowH[dropdownAt.row] > 0 && (
             <button
               className='list-button'

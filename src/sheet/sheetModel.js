@@ -25,7 +25,8 @@ const { fillLine } = require('./fill')
 const VERSION = 1
 const DEFAULT_ROWS = 100
 const DEFAULT_COLS = 26
-const FORMAT_ATTRS = ['b', 'i', 'color', 'fill', 'num', 'align', 'valign', 'wrap', 'size', 'u', 's', 'font', 'bt', 'br', 'bb', 'bl', 'link']
+// person and datechip: @ chips (proposals/2026-10-23-multi-select-and-smart-chips.md).
+const FORMAT_ATTRS = ['b', 'i', 'color', 'fill', 'num', 'align', 'valign', 'wrap', 'size', 'u', 's', 'font', 'bt', 'br', 'bb', 'bl', 'link', 'person', 'datechip']
 
 // Allowed values for the formats added in proposals/2026-10-04-cell-formats.md.
 // A value outside these is refused, so every device draws the same thing.
@@ -55,7 +56,9 @@ const FORMAT_VALUES = {
   br: (v) => BORDER.test(v),
   bb: (v) => BORDER.test(v),
   bl: (v) => BORDER.test(v),
-  link: isLink
+  link: isLink,
+  person: (v) => typeof v === 'string' && /^[0-9a-f]{64}$/.test(v),
+  datechip: (v) => v === true
 }
 function checkFormat (attr, value) {
   if (!FORMAT_ATTRS.includes(attr)) throw new Error('unknown format attribute: ' + attr)
@@ -261,7 +264,7 @@ function clearRange (doc, tabId, r1, c1, r2, c2) {
       for (let c = c1; c <= Math.min(c2, cols.length); c++) {
         const key = cellKey(rows.get(r - 1), cols.get(c - 1))
         if (cells.has(key)) cells.delete(key)
-        if (fmt.has(key + ':link')) fmt.delete(key + ':link')
+        for (const a of ['link', 'person', 'datechip']) if (fmt.has(key + ':' + a)) fmt.delete(key + ':' + a)
       }
     }
   })

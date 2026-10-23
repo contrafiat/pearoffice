@@ -219,3 +219,20 @@ test('file:follow finds where a linked file moved to', async () => {
   assert.deepEqual(await follow({ sheetId: 'a' }, ctx), { sheetId: 'c' })
   assert.deepEqual(await follow({ sheetId: 'x' }, ctx), { sheetId: null })
 })
+
+// @ chips (proposals/2026-10-23-multi-select-and-smart-chips.md).
+test('person and date chips are checked, and clearing a cell removes them', () => {
+  const { doc, tab } = sheet()
+  const who = 'ab'.repeat(32)
+  model.setCells(doc, tab, 1, 1, [['Ada'], ['46318']])
+  model.setFormat(doc, tab, 1, 1, { person: who })
+  model.setFormat(doc, tab, 2, 1, { datechip: true, num: 'd mmm yyyy' })
+  assert.equal(model.getFormat(doc, tab, 1, 1).person, who)
+  assert.equal(model.getFormat(doc, tab, 2, 1).datechip, true)
+  for (const bad of ['AB'.repeat(32), 'ab'.repeat(31), 'zz'.repeat(32), 7]) assert.throws(() => model.setFormat(doc, tab, 1, 1, { person: bad }), /bad value/)
+  assert.throws(() => model.setFormat(doc, tab, 1, 1, { datechip: 'yes' }), /bad value/)
+  model.clearRange(doc, tab, 1, 1, 2, 1)
+  assert.equal(model.getFormat(doc, tab, 1, 1).person, undefined)
+  assert.equal(model.getFormat(doc, tab, 2, 1).datechip, undefined)
+  assert.equal(model.getFormat(doc, tab, 2, 1).num, 'd mmm yyyy')
+})

@@ -54,8 +54,8 @@ changes it.
 ## Part 2: @ chips
 
 Typing @ as the first character in a cell opens a menu under it with
-three groups. Typing more narrows it. Enter or a tap picks; Esc or a
-space types a plain @.
+three groups. Typing more narrows it. Enter or a tap picks; Esc hides
+the menu and leaves a plain @. The menu hides when nothing matches.
 
 - **People:** the people in this file, with their pictures. The cell gets
   the person's name as text and a new format attribute `person`: their

@@ -222,7 +222,9 @@ export function tabHtml (view, chartSvgs = []) {
       const link = linkOf(x)
       // A chip (proposals/2026-10-22-dropdown-chips.md) prints as its pill.
       const chips = chipsOf(ruleFor(view.validations || [], r, c), x)
-      const text = chips ? chips.map((p) => '<span style="background:' + CHIP_COLORS[p.color][0] + ';color:' + CHIP_COLORS[p.color][1] + ';border-radius:999px;padding:0 6px;margin-right:2px">' + esc(p.text) + '</span>').join('') : esc(x ? x.display : '')
+      // @ chips print as a grey pill with their text.
+      const smart = !chips && x && x.display !== '' && x.fmt && (x.fmt.person || x.fmt.datechip || /^pearoffice:\/\//.test(x.fmt.link || ''))
+      const text = smart ? '<span style="background:#e8eaed;color:#3c4043;border-radius:999px;padding:0 6px">' + esc(x.display) + '</span>' : chips ? chips.map((p) => '<span style="background:' + CHIP_COLORS[p.color][0] + ';color:' + CHIP_COLORS[p.color][1] + ';border-radius:999px;padding:0 6px;margin-right:2px">' + esc(p.text) + '</span>').join('') : esc(x ? x.display : '')
       body += '<td' + spanAttrs + (style ? ' style="' + style + '"' : '') + '>' + (link && link.url ? '<a href="' + esc(link.url).replace(/"/g, '&quot;') + '">' + text + '</a>' : text) + '</td>'
     }
     body += '</tr>'

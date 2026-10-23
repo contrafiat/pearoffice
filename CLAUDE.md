@@ -183,6 +183,8 @@ Code that works for any kind of file sits apart from each editor's own
   `src/ui/sheet/` is the spreadsheet editor
   (grid, toolbar, its panels, charts, `xlsx.js` file handling, `links.jsx`
   for links in cells: the link bar and the card under a linked cell;
+  `chips.jsx` for @ chips: the @ menu and the person, file and date pills,
+  format attributes `person` and `datechip`;
   proposals/2026-10-18-sheet-links.md; links to another file or a folder,
   `pearoffice://file/<id>` and `pearoffice://folder/<id>`, named from the
   file list and followed through moves with `file:follow`,
@@ -395,7 +397,7 @@ take five scenes: files, sheet, document, slides, sharing.
   bundle must create, edit and read a sheet over stdin/stdout, and the seeder
   bundle must start and print a pairing link.
 - `npm run smoke:desktop`: drives the real UI in Electron with an offscreen
-  window and real key and mouse events, in sixteen parts. Each part is its own
+  window and real key and mouse events, in seventeen parts. Each part is its own
   launch with a throwaway data folder and a 60 s limit, and prints one
   `ok`/`not ok` line, then a summary line. `sheets` is the grid editor
   (typing, formulas, pointing at cells while typing one, spilling, fill,
@@ -407,6 +409,9 @@ take five scenes: files, sheet, document, slides, sharing.
   the toolbar and the cell menu, the card's Open and Remove, Ctrl+click to
   a cell, a typed web address, a HYPERLINK formula, a link to a block and the .xlsx round trip (about 9 s; a smoke
   run writes what Open would open to `opened.txt` in the data folder).
+  `sheet-chips` is @ chips: a person whose pill follows a rename, a
+  document, Tomorrow with the calendar button, Esc and typing over (about
+  5 s).
   `templates` is a sheet marked from its card's menu, New listing it, a
   file made from it and from the card, a long list (search, kind buttons,
   the built-in ones folded), unmarking and each built-in template
