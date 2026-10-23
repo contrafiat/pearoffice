@@ -54,6 +54,8 @@ function normalize (rule) {
       out.items = [...new Set(items)].slice(0, MAX_ITEMS)
     }
     out.dropdown = rule.dropdown !== false
+    // More than one choice per cell, joined by ", " (proposals/2026-10-23-multi-select-and-smart-chips.md).
+    if (rule.multi === true) out.multi = true
     if (rule.chips === true) { out.chips = true; out.dropdown = true }
     // A colour for a typed item must be for one of its items; a list from a
     // range is only known when drawn.
@@ -111,8 +113,9 @@ function typed (raw) {
 function allows (rule, cell, items = rule.items) {
   if (!cell || cell.kind === 'empty' || cell.display === '') return true
   if (rule.kind === 'list') {
-    const want = String(cell.display).toLowerCase()
-    return (items || []).some((x) => String(x).toLowerCase() === want)
+    const has = (t) => (items || []).some((x) => String(x).toLowerCase() === t.toLowerCase())
+    if (rule.multi) return choicesOf(cell.display).every(has)
+    return has(String(cell.display))
   }
   if (rule.kind === 'length') return compare(rule.op, String(cell.display).length, bound('length', rule.a), bound('length', rule.b))
   if (cell.kind !== 'number' || typeof cell.num !== 'number') return false
@@ -142,7 +145,9 @@ function toXlsx (rules) {
   const parts = rules.map((r) => {
     const attrs = ['type="' + XLSX_TYPE[r.kind] + '"']
     if (r.kind !== 'list' && r.op !== 'between') attrs.push('operator="' + XLSX_OP[r.op] + '"')
-    if (r.onBad === 'warn') attrs.push('errorStyle="warning"')
+    // Excel holds one choice per cell, so a multi-select list only informs.
+    if (r.multi) attrs.push('errorStyle="information"')
+    else if (r.onBad === 'warn') attrs.push('errorStyle="warning"')
     attrs.push('allowBlank="1"')
     if (r.kind === 'list' && r.dropdown === false) attrs.push('showDropDown="1"') // Excel's flag means "hide"
     attrs.push('showErrorMessage="1"')
@@ -204,6 +209,25 @@ function fromXlsx (xml) {
   return out
 }
 
+// The choices in a multi-select cell's text: "Design, Testing" -> two.
+function choicesOf (text) {
+  return String(text).split(',').map((x) => x.trim()).filter(Boolean)
+}
+
+// A value for a multi-select cell: the chosen items in list order.
+function joinChoices (items, chosen) {
+  const on = new Set(chosen.map((x) => String(x).toLowerCase()))
+  return items.filter((x) => on.has(String(x).toLowerCase())).join(', ')
+}
+
+// A cell's chips under a rule: [{ text, color }], one per choice, or null
+// when it is not drawn as chips (see chipColor).
+function chipsOf (rule, cell, items = rule && rule.items) {
+  if (!rule || !rule.multi) { const color = chipColor(rule, cell, items); return color ? [{ text: String(cell.display), color }] : null }
+  if (!rule.chips || !cell || cell.display === '' || cell.kind === 'empty' || !allows(rule, cell, items)) return null
+  return choicesOf(cell.display).map((text) => ({ text, color: chipColor({ ...rule, multi: false }, { kind: 'text', display: text }, items) }))
+}
+
 // A cell's chip colour under a rule, or null when it is not drawn as a chip:
 // no chip rule, empty, or a value not in the list. Matched without case, as
 // allows() does. items: the list's items when they come from a range.
@@ -225,7 +249,9 @@ const chipColorAt = (n) => CHIP_NAMES[1 + (n % (CHIP_NAMES.length - 1))]
 function chipRules (rules) {
   const out = []
   for (const r of rules) {
-    if (r.kind !== 'list' || !r.chips) continue
+    // A multi-select cell holds several items; "contains" would colour
+    // Done for an item called Do, so those lists go out uncoloured.
+    if (r.kind !== 'list' || !r.chips || r.multi) continue
     for (const item of r.items || []) {
       const name = (r.colors && Object.prototype.hasOwnProperty.call(r.colors, item) && r.colors[item]) || 'grey'
       const [fill, color] = CHIP_COLORS[name] || CHIP_COLORS.grey
@@ -242,4 +268,4 @@ function ruleFor (rules, row, col) {
   return found
 }
 
-module.exports = { KINDS, OPS, CHIP_COLORS, CHIP_NAMES, chipColor, chipColorAt, chipRules, bound, fromSerial, normalize, typed, allows, explain, ruleFor, toXlsx, fromXlsx }
+module.exports = { KINDS, OPS, CHIP_COLORS, CHIP_NAMES, chipColor, chipColorAt, chipRules, chipsOf, choicesOf, joinChoices, bound, fromSerial, normalize, typed, allows, explain, ruleFor, toXlsx, fromXlsx }

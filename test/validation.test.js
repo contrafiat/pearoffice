@@ -133,3 +133,28 @@ test('chip rules are kept in the sheet and go out to files as colour rules', () 
   assert.deepEqual(fromOds.condFormats.map((r) => [r.kind, r.a, r.style.fill]), [['eq', 'Todo', '#ffcfc9'], ['eq', 'Done', '#d4edbc']])
   assert.deepEqual(fromOds.validations.map((v) => v.items), [['Todo', 'Done']])
 })
+
+// More than one choice (proposals/2026-10-23-multi-select-and-smart-chips.md).
+const { chipsOf, choicesOf, joinChoices, toXlsx } = require('../src/sheet/validation')
+
+test('a multi-select list accepts several items and draws a chip for each', () => {
+  const r = normalize({ kind: 'list', items: 'Design\nBuild\nTesting', multi: true, chips: true, colors: { Design: 'blue', Testing: 'green' } })
+  assert.equal(r.multi, true)
+  assert.equal(allows(r, typed('Design, Testing')), true)
+  assert.equal(allows(r, typed('testing,design')), true)
+  assert.equal(allows(r, typed('Design, Other')), false)
+  assert.equal(allows(normalize({ kind: 'list', items: 'Design\nTesting' }), typed('Design, Testing')), false)
+  assert.deepEqual(chipsOf(r, typed('Design, Testing')), [{ text: 'Design', color: 'blue' }, { text: 'Testing', color: 'green' }])
+  assert.equal(chipsOf(r, typed('Design, Other')), null)
+  assert.deepEqual(choicesOf(' a , b,, c '), ['a', 'b', 'c'])
+  assert.equal(joinChoices(['Design', 'Build', 'Testing'], ['testing', 'Design']), 'Design, Testing')
+})
+
+test('a multi-select list goes out as information only and without colours', () => {
+  const rules = [{ range: 'A1:A5', r1: 1, c1: 1, r2: 5, c2: 1, ...normalize({ kind: 'list', items: 'a\nb', multi: true, chips: true }) }]
+  assert.match(toXlsx(rules), /errorStyle="information"/)
+  assert.deepEqual(chipRules(rules), [])
+  const dump = { title: 'T', tabs: [{ name: 'A', cells: [{ row: 1, col: 1, input: 'a, b', value: 'a, b', fmt: {} }], widths: {}, validations: rules, condFormats: [] }] }
+  const back = rulesFromOdsBytes(odsBytes(XLSX, fflate, dump), fflate, ['A'])[0]
+  assert.deepEqual(back.validations.map((v) => [v.items, v.onBad]), [[['a', 'b'], 'warn']])
+})

@@ -200,6 +200,34 @@ module.exports = async function sheetFiles (t) {
   await js("[...document.querySelectorAll('.panel button')].find((b) => b.textContent.trim() === 'Cancel').click()")
   await waitFor('panel closed', "!document.querySelector('.panel')")
   result.chips = true
+  // More than one choice (proposals/2026-10-23-multi-select-and-smart-chips.md):
+  // T5 picks Design and Testing, then drops Design; Done closes the list.
+  await js("document.querySelector('.grid .body').focus()")
+  await sendMod('Home', ['control'])
+  for (let i = 0; i < 19; i++) await key('Right')
+  for (let i = 0; i < 4; i++) await key('Down')
+  await waitFor('at T5', "document.querySelector('.formula-bar .address').textContent === 'T5'")
+  await js("document.querySelector('.toolbar .more-button').click()")
+  await js("[...document.querySelectorAll('.more-menu li')].find((l) => l.textContent === 'Dropdown...').click()")
+  await waitFor('dropdown panel', "!!document.querySelector('.panel[aria-label=\"Validation\"] textarea')")
+  await typeInto('.panel[aria-label="Validation"] textarea', 'Design\nBuild\nTesting')
+  await js("[...document.querySelectorAll('.panel label.check')].find((l) => l.textContent.includes('more than one')).querySelector('input').click()")
+  await js("[...document.querySelectorAll('.panel button')].find((b) => b.textContent.trim() === 'Save').click()")
+  await waitFor('list button on T5', "!document.querySelector('.panel') && !!document.querySelector('.list-button')")
+  await js("document.querySelector('.list-button').click()")
+  const pickItem = (t) => js(`[...document.querySelectorAll('.pick-menu li')].find((l) => l.textContent === ${JSON.stringify(t)}).click()`)
+  const chipsAt = `[...(${cellNode(5, 20)} ? ${cellNode(5, 20)}.querySelectorAll('.chip') : [])].map((x) => x.textContent).join('|')`
+  await waitFor('multi list open', "!!document.querySelector('.pick-menu .pick-tick.box')")
+  await pickItem('Design')
+  await waitFor('Design picked', chipsAt + " === 'Design'")
+  await pickItem('Testing')
+  await waitFor('two chips', chipsAt + " === 'Design|Testing'")
+  await waitFor('list still open, two ticked', "document.querySelectorAll('.pick-menu li[aria-selected=\"true\"]').length === 2")
+  await pickItem('Design')
+  await waitFor('Design dropped', chipsAt + " === 'Testing'")
+  await pickItem('Done')
+  await waitFor('list closed', "!document.querySelector('.pick-menu')")
+  result.multi = true
   await js("document.querySelector('.grid .body').focus()")
   await sendMod('Home', ['control'])
   await key('Right'); for (let i = 0; i < 3; i++) await key('Down')
@@ -263,7 +291,7 @@ module.exports = async function sheetFiles (t) {
   await js("document.querySelector('.grid .body').focus()")
   await sendMod('Home', ['control'])
   await key('Right'); for (let i = 0; i < 3; i++) await key('Down')
-  result.formats = result.frozenStays === true && /^Showing 1 of \d+ rows$/.test(result.filterStatus) && result.skipsHidden && result.comments && result.validation && result.chips && result.colourRules && result.names
+  result.formats = result.frozenStays === true && /^Showing 1 of \d+ rows$/.test(result.filterStatus) && result.skipsHidden && result.comments && result.validation && result.chips && result.multi && result.colourRules && result.names
   step('cell formats, row heights, freeze, filter, hiding, comments, validation, colour rules and names')
 
   // Rename the sheet.

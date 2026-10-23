@@ -389,7 +389,7 @@ export const Grid = forwardRef(function Grid (props, ref) {
             {cf && cf.bar && <span className='cf-bar' style={{ left: cf.bar.from * 100 + '%', width: Math.max(0, cf.bar.to - cf.bar.from) * 100 + '%', background: cf.bar.color }} />}
             {cf && cf.icon && <span className='cf-icon'><CfIcon set={cf.icon.set} index={cf.icon.index} size={Math.round(14 * zoom)} /></span>}
             {chipCells && chipCells.has(r + ',' + c)
-              ? <span className='cell-text' style={textStyle({ ...fmt, color: undefined, u: false, s: false }, zoom)}><span className={'chip chip-' + chipCells.get(r + ',' + c)}>{cell.display}</span></span>
+              ? <span className='cell-text' style={textStyle({ ...fmt, color: undefined, u: false, s: false }, zoom)}>{chipCells.get(r + ',' + c).map((x, i) => <span key={i} className={'chip chip-' + x.color}>{x.text}</span>)}</span>
               : <span className='cell-text' style={textStyle(link ? { ...fmt, u: true } : fmt, zoom)}>{cell && !(cf && cf.icon && cf.icon.iconOnly) ? cell.display : ''}</span>}
             {hasBorder(fmt) && <span className='cell-borders' style={{ borderTop: borderCss(fmt.bt), borderRight: borderCss(fmt.br), borderBottom: borderCss(fmt.bb), borderLeft: borderCss(fmt.bl) }} />}
             {commentMarks && commentMarks.has(r + ',' + c) && (() => {

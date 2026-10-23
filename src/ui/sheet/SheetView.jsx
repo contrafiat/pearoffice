@@ -18,7 +18,7 @@ import { LinkBar, LinkCard, linkOf, linkLabel, ownLink, fileLink, folderLink } f
 import { untitled } from '../Files.jsx'
 import { parseRange } from '../../sheet/charts.js'
 import { evaluate as evaluateColours } from '../../sheet/condFormat.js'
-import { typed, allows, explain, ruleFor, chipColor } from '../../sheet/validation.js'
+import { typed, allows, explain, ruleFor, chipColor, chipsOf, choicesOf, joinChoices } from '../../sheet/validation.js'
 import { filterRows, columnValues, isActive } from '../../sheet/filter.js'
 import { ChartPanel } from './ChartPanel.jsx'
 import { ChartView, downloadChart, chartSvg } from './Chart.jsx'
@@ -339,14 +339,14 @@ export function SheetView ({ sheetId, files = [], folders = [], onOpenFile, onOp
   const invalidCells = useMemo(() => (view && view.invalid && view.invalid.length ? new Set(view.invalid.map(([r, c]) => r + ',' + c)) : null), [view])
   const selRule = ruleFor(validations, sel.row, sel.col)
   // Coloured chips (proposals/2026-10-22-dropdown-chips.md): 'row,col' ->
-  // colour name for each value drawn as a pill.
+  // [{ text, color }], one pill per choice.
   const chipCells = useMemo(() => {
     if (!validations.some((r) => r.chips)) return null
     const out = new Map()
     for (const [key, cell] of cells) {
       const [row, col] = key.split(',').map(Number)
-      const color = chipColor(ruleFor(validations, row, col), cell)
-      if (color) out.set(key, color)
+      const chips = chipsOf(ruleFor(validations, row, col), cell)
+      if (chips) out.set(key, chips)
     }
     return out
   }, [validations, cells])
@@ -1464,12 +1464,20 @@ export function SheetView ({ sheetId, files = [], folders = [], onOpenFile, onOp
       {picking && selRule && (() => {
         // An item that looks like a formula is entered as text.
         const pick = (item) => { setPicking(null); writeEntry(picking.row, picking.col, /^[='"]/.test(item) ? "'" + item : item, null) }
-        const items = selRule.items || []
+        const items = (selRule.items || []).filter((it) => !selRule.multi || !String(it).includes(','))
         const choice = (it) => (selRule.chips ? <span className={'chip chip-' + chipColor(selRule, { kind: 'text', display: it })}>{it}</span> : it)
         // As in Google Sheets: a tick on the current value and a way to the
         // list's settings (proposals/2026-10-22-dropdown-chips.md).
-        const isOn = (it) => !!selected && String(selected.display).toLowerCase() === String(it).toLowerCase()
-        const option = (it) => <li key={it} role='option' aria-selected={isOn(it)} onClick={() => pick(it)}><span className='pick-tick' aria-hidden='true'>{isOn(it) && <Check size={16} weight='bold' />}</span>{choice(it)}</li>
+        // A multi-select list (proposals/2026-10-23-multi-select-and-smart-chips.md)
+        // stays open: each tap adds or removes that item.
+        const multi = !!selRule.multi
+        const now = selected && selected.display !== undefined && selected.display !== '' ? (multi ? choicesOf(selected.display) : [String(selected.display)]) : []
+        const isOn = (it) => now.some((x) => x.toLowerCase() === String(it).toLowerCase())
+        const toggle = (it) => {
+          const next = isOn(it) ? now.filter((x) => x.toLowerCase() !== String(it).toLowerCase()) : [...now, it]
+          writeEntry(picking.row, picking.col, joinChoices(items, next), null)
+        }
+        const option = (it) => <li key={it} role='option' aria-selected={isOn(it)} onClick={(e) => { if (!multi) { pick(it); return } e.stopPropagation(); toggle(it) }}><span className={'pick-tick' + (multi ? ' box' : '')} aria-hidden='true'>{isOn(it) && <Check size={16} weight='bold' />}</span>{choice(it)}</li>
         const editChoices = <li className='pick-edit' role='option' aria-selected={false} onClick={() => { setPicking(null); setValidating({ r1: selRule.r1, c1: selRule.c1, r2: selRule.r2, c2: selRule.c2 }) }}><span className='pick-tick' aria-hidden='true'><PencilSimple size={16} /></span>Edit choices...</li>
         return phone
           ? (
@@ -1483,6 +1491,7 @@ export function SheetView ({ sheetId, files = [], folders = [], onOpenFile, onOp
                   {items.map(option)}
                   {editChoices}
                 </ul>
+                {multi && <div className='row equal'><button className='primary' onClick={() => setPicking(null)}>Done</button></div>}
               </section>
             </div>
             )
@@ -1490,6 +1499,7 @@ export function SheetView ({ sheetId, files = [], folders = [], onOpenFile, onOp
             <ul className='menu pick-menu' role='listbox' style={{ left: Math.max(8, picking.x - 200), top: picking.y + 2 }}>
               {items.map(option)}
               {editChoices}
+              {multi && <li className='pick-edit' role='option' aria-selected={false} onClick={() => setPicking(null)}><span className='pick-tick' aria-hidden='true' />Done</li>}
             </ul>
             )
       })()}
