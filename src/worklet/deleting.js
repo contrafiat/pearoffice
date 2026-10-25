@@ -72,6 +72,9 @@ function createDeleting ({ engine, sheets, getSeeding, getPictures = () => null,
     if (!base) throw new Error('unknown file: ' + sheetId)
     const sheet = await viewGet(base, 'sheet')
     if (!sheet || sheet.owner !== hex(engine.identity.publicKey)) throw new Error('Only the owner can delete a file for everyone')
+    // A newly linked device can write only once another of the owner's
+    // devices has admitted it (moves.followDevice).
+    if (!base.writable) throw new Error('This device is still getting edit access to this file. Open PearOffice on your other device, then try again.')
     await engine.append(sheetId, m.deleteOp({ sheetId, owner: engine.identity }))
     // onDeleted runs when apply records it (the engine's onMembership hook).
     return { ok: true }
