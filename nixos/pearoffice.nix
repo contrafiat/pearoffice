@@ -1,57 +1,102 @@
-{ lib
-, stdenv
-, fetchurl
-, dpkg
-, autoPatchelfHook
-, makeWrapper
-, wrapGAppsHook3
-, alsa-lib
-, at-spi2-atk
-, at-spi2-core
-, atk
-, cairo
-, cups
-, dbus
-, expat
-, glib
-, gtk3
-, libdrm
-, libGL
-, libnotify
-, libsecret
-, libuuid
-, libxkbcommon
-, mesa
-, nspr
-, nss
-, pango
-, systemd
-, xdg-utils
-, pkgs
-, libappindicator-gtk3
+{
+  lib,
+  alsa-lib,
+  at-spi2-atk,
+  at-spi2-core,
+  atk,
+  autoPatchelfHook,
+  cairo,
+  cups,
+  dbus,
+  dpkg,
+  expat,
+  fetchurl,
+  glib,
+  gtk3,
+  libGL,
+  libappindicator-gtk3,
+  libdrm,
+  libnotify,
+  libsecret,
+  libuuid,
+  libx11,
+  libxcb,
+  libxcomposite,
+  libxdamage,
+  libxext,
+  libxfixes,
+  libxkbcommon,
+  libxrandr,
+  libxscrnsaver,
+  libxtst,
+  makeWrapper,
+  mesa,
+  nspr,
+  nss,
+  pango,
+  stdenv,
+  systemd,
+  wrapGAppsHook3,
+  xdg-utils,
 }:
 
 stdenv.mkDerivation rec {
   pname = "pearoffice";
-  version = "1.1.2";
+  version = "1.1.3";
 
   src = fetchurl {
     url = "https://github.com/peerloomllc/pearoffice/releases/download/v${version}/pearoffice-${version}-linux-amd64.deb";
-    hash = "sha256-kU+LwJw0PEYDaAvL2dEBpBC82k1lZQI/3rfxbejIKCo=";
+    hash = "sha256-9ydW4jrpGTWa+2J0DhEh6yZSLdcePrLaWCWTQDgsjAE=";
   };
 
-  nativeBuildInputs = [ dpkg autoPatchelfHook makeWrapper wrapGAppsHook3 ];
+  nativeBuildInputs = [
+    dpkg
+    autoPatchelfHook
+    makeWrapper
+    wrapGAppsHook3
+  ];
 
   buildInputs = [
-    alsa-lib at-spi2-atk at-spi2-core atk cairo cups dbus expat glib gtk3
-    libdrm libnotify libsecret libuuid libxkbcommon mesa nspr nss pango
-    stdenv.cc.cc.lib systemd
-    pkgs.libx11 pkgs.libxcomposite pkgs.libxdamage pkgs.libxext
-    pkgs.libxfixes pkgs.libxrandr pkgs.libxcb pkgs.libxscrnsaver pkgs.libxtst
+    alsa-lib
+    at-spi2-atk
+    at-spi2-core
+    atk
+    cairo
+    cups
+    dbus
+    expat
+    glib
+    gtk3
+    libdrm
+    libnotify
+    libsecret
+    libuuid
+    libxkbcommon
+    mesa
+    nspr
+    nss
+    pango
+    stdenv.cc.cc.lib
+    systemd
+    libx11
+    libxcomposite
+    libxdamage
+    libxext
+    libxfixes
+    libxrandr
+    libxcb
+    libxscrnsaver
+    libxtst
   ];
 
   # dlopen'd at runtime
-  runtimeDependencies = [ libGL libnotify libsecret libappindicator-gtk3 systemd ];
+  runtimeDependencies = [
+    libGL
+    libnotify
+    libsecret
+    libappindicator-gtk3
+    systemd
+  ];
 
   unpackPhase = "dpkg-deb -x $src .";
 
