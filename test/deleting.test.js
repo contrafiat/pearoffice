@@ -138,3 +138,14 @@ test('deleting sheets', async (t) => {
     assert.equal((await seeder.drops()).some((d) => d.sheet === bootstrap), false)
   })
 })
+
+test('a linked device not yet admitted cannot delete for everyone', async () => {
+  const { createDeleting } = require('../src/worklet/deleting')
+  const identity = { publicKey: b4a.alloc(32, 1) }
+  const view = { get: async (key) => key === 'sheet' ? { value: { owner: hex(identity.publicKey) } } : null }
+  let appended = false
+  const engine = { identity, bases: new Map([['s1', { writable: false, view }]]), append: async () => { appended = true } }
+  const deleting = createDeleting({ engine, sheets: {}, getSeeding: () => null, emit: () => {} })
+  await assert.rejects(deleting.deleteForEveryone('s1'), /still getting edit access/)
+  assert.equal(appended, false)
+})
