@@ -468,18 +468,7 @@ fi
 # ---------------------------------------------------------------------------
 # 4e. Generate .sha256 sidecars for the mobile artifacts
 # ---------------------------------------------------------------------------
-for _artifact in "$APK_NAME" "$AAB_NAME"; do
-  [ -z "$_artifact" ] && continue
-  [ -f "$_artifact" ] || continue
-  ( cd "$(dirname "$_artifact")" && sha256sum "$(basename "$_artifact")" > "$(basename "$_artifact").sha256" )
-  echo "    sha256  $(cut -d' ' -f1 < "${_artifact}.sha256")  $(basename "$_artifact")"
-done
-
-echo ""
-_BUILD_SUMMARY=""
-[ -n "$APK_NAME" ] && _BUILD_SUMMARY="APK ($APK_SIZE), AAB ($AAB_SIZE)"
-[ -z "$_BUILD_SUMMARY" ] && _BUILD_SUMMARY="desktop only (no mobile artifacts)"
-_confirm "$_BUILD_SUMMARY look correct — proceed with release notes?"
+release_write_checksums
 
 fi # end NEEDS_BUILD
 
@@ -705,25 +694,7 @@ fi
 # ---------------------------------------------------------------------------
 # 6b. Push branch and tag
 # ---------------------------------------------------------------------------
-echo ""
-echo "    Remote : $GIT_REMOTE"
-echo "    Tag    : $RELEASE_TAG"
-echo "    Branch : $(git rev-parse --abbrev-ref HEAD)"
-echo "    Commit : $(git rev-parse --short HEAD)  $(git log -1 --format='%s')"
-_confirm "Push branch $(git rev-parse --abbrev-ref HEAD) + tag $RELEASE_TAG to $GIT_REMOTE? (This cannot be undone without a force-delete)"
-
-_branch="$(git rev-parse --abbrev-ref HEAD)"
-git push "$GIT_REMOTE" "$_branch" \
-  && echo "    Pushed $_branch to $GIT_REMOTE" \
-  || echo "    WARNING: branch push failed - push $_branch manually so the tag resolves." >&2
-
-echo "==> Tagging and pushing $RELEASE_TAG..."
-git tag "$RELEASE_TAG" 2>/dev/null \
-  && echo "    Created local tag" \
-  || echo "    Tag already exists locally"
-git push "$GIT_REMOTE" "$RELEASE_TAG" \
-  && echo "    Pushed tag to $GIT_REMOTE" \
-  || echo "    Tag already on remote"
+release_push_and_tag
 
 fi # end NEEDS_BUILD (commit and tag)
 
@@ -927,20 +898,8 @@ release_post_nostr "$MOBILE_NOTES"
 # ---------------------------------------------------------------------------
 # 13. Close-out summary and deferred-action reminders
 # ---------------------------------------------------------------------------
-echo ""
-echo "==> $APP_NAME $RELEASE_TAG"
-$PUBLISH_GITHUB    && _report "GitHub"      "published" || _report "GitHub"      "skipped"
-$PUBLISH_ZAPSTORE  && _report "Zapstore"    "published" || _report "Zapstore"    "skipped"
-if $PUBLISH_PLAY; then _report "Google Play" "uploaded"
-elif [ -f "$PLAY_AAB" ] && ! $SKIP_PLAY; then _report "Google Play" "by hand (steps above)"
-else _report "Google Play" "skipped"; fi
-$PUBLISH_APP_STORE && _report "App Store"   "uploaded"  || _report "App Store"   "skipped"
-$PUBLISH_NOSTR     && _report "Nostr"       "announced" || _report "Nostr"       "skipped"
-if $PUBLISH_FAILED; then
-  echo ""
-  echo "    WARNING: at least one publish step failed. Scroll up for which."
-  echo "    Re-run with ./scripts/release.sh $RELEASE_TAG --retag once fixed."
-fi
+release_summary
+release_summary_end
 
 # ---------------------------------------------------------------------------
 # 13b. Deferred-action reminders
