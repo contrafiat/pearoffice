@@ -8,7 +8,7 @@ asked to open documents in a new window (TODO.md, tester feedback
 main window and on another screen.
 
 **Tier:** T1. The desktop shell and the UI only. No change to the worklet,
-stored data or the wire format.
+the files or the wire format.
 
 ## Opening one
 
