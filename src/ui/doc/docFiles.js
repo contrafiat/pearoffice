@@ -17,7 +17,7 @@ import JSZip from 'jszip'
 import { marked } from 'marked'
 import { checkZip } from '../slides/importOoxml.js'
 import * as D from 'docx'
-import { documentExtensions, SIZES, LINE_HEIGHTS, MAX_INDENT } from './extensions.js'
+import { documentExtensions, flattenChips, SIZES, LINE_HEIGHTS, MAX_INDENT } from './extensions.js'
 import { okLink } from '../../shared/links.js'
 import { call } from '../bridge.js'
 import { fileName, saveFile, isMobile } from '../save.js'
@@ -65,6 +65,9 @@ function tidy (html, styles, paste = false) {
   if (styles) applyStyles(body, styles)
   // Pictures given as data: URLs (and .docx pictures, which mammoth turns
   // into them), on import only. A picture at a web address is never fetched.
+  // @ chips come only from this app's own copy and paste, never an import
+  // or another app (proposals/2026-10-26-document-chips.md).
+  for (const el of [...body.querySelectorAll('[data-chip]')]) el.removeAttribute('data-chip')
   const pictures = []
   const kept = new Set()
   if (!paste) {
@@ -744,6 +747,7 @@ function inlineText (nodes) {
 
 // Blank lines between paragraphs; list items one to a line, "- " for bullets.
 export function toText (json) {
+  json = flattenChips(json) // @ chips go out as text (extensions.js)
   return blocksText(json.content, '').join('\n\n').replace(/\n{3,}/g, '\n\n') + '\n'
 }
 
@@ -775,6 +779,7 @@ function blocksText (nodes, pad) {
 // font, underline, alignment and the rest) is left out. Pictures go in the
 // file as data: URLs (`pictures`: ref -> { bytes, mime }).
 export function toMarkdown (json, pictures = new Map()) {
+  json = flattenChips(json) // @ chips go out as text (extensions.js)
   return mdBlocks(json.content, pictures).join('\n\n').replace(/\n{3,}/g, '\n\n').trim() + '\n'
 }
 
@@ -1070,6 +1075,7 @@ function levels (kind) {
 // The document as .docx bytes. `pictures`: ref -> { bytes, mime }, in a type
 // Word reads (wordPicture).
 export async function toDocx (json, title = '', pictures = new Map()) {
+  json = flattenChips(json) // @ chips go out as text (extensions.js)
   const counter = { n: 0 }
   const children = docxBlocks(json.content, { counter, run: {}, pictures })
   const heading = (size, extra = {}) => ({ run: { size, bold: true, font: FONT, color: '1F2420', ...extra }, paragraph: { spacing: { before: 360, after: 120 } } })
@@ -1123,6 +1129,7 @@ const PRINT_CSS = [
 
 // The printable page, each picture in it as a data: URL.
 export function toHtml (json, title = '', pictures = new Map()) {
+  json = flattenChips(json) // @ chips go out as text (extensions.js)
   let body = generateHTML(json, documentExtensions())
   if (/<img/.test(body)) {
     const doc = new window.DOMParser().parseFromString('<body>' + body + '</body>', 'text/html')

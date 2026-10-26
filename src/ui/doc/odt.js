@@ -8,6 +8,7 @@
 
 import * as fflate from 'fflate'
 import { okLink } from '../../shared/links.js'
+import { flattenChips } from './extensions.js'
 
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 const FONT = 'Arial'
@@ -245,6 +246,7 @@ const STYLES = '<?xml version="1.0" encoding="UTF-8"?>\n<office:document-styles 
 
 // The document as .odt bytes. pictures: ref -> { bytes, mime }.
 export function toOdt (json, title = '', pictures = new Map()) {
+  json = flattenChips(json) // @ chips go out as text (extensions.js)
   const w = createWriter(pictures)
   const body = w.blocks(json.content) || '<text:p text:style-name="Standard"/>'
   const content = '<?xml version="1.0" encoding="UTF-8"?>\n<office:document-content ' + NS + ' office:version="1.3">' +

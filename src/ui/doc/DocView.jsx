@@ -17,11 +17,13 @@ import { isMobile } from '../sheet/xlsx.js'
 import { exportDocument, tidyPaste } from './docFiles.js'
 import { usePrintKey } from '../printKey.js'
 import { usePearLinks, pearLink, fileLink, folderLink } from '../pearLinks.js'
+import { AtMenu, atItems } from '../sheet/chips.jsx'
+import { ChipView, ChipContext, atTrigger, chipFor, addsChip } from './ChipView.jsx'
 import { okLink } from '../../shared/links.js'
 import { untitled } from '../Files.jsx'
 import { useToolOverflow } from '../toolOverflow.jsx'
 import { Outline } from './Outline.jsx'
-import { documentExtensions, FindReplace, findKey, changeCaseCommand, LINE_HEIGHTS, SIZES } from './extensions.js'
+import { documentExtensions, FindReplace, findKey, changeCaseCommand, LINE_HEIGHTS, SIZES, CHIPS_VERSION } from './extensions.js'
 import { PictureView, pictureCache, preparePicture, isPicture, toB64, fromB64, noteCopied, pictureClipboard, foreignPictures, adoptPictures } from './pictures.js'
 import {
   ArrowCounterClockwise, ArrowClockwise, TextB, TextItalic, TextUnderline, TextStrikethrough, TextAUnderline, Highlighter,
@@ -262,12 +264,12 @@ export function DocView ({ sheetId, files = [], folders = [], onOpenFile, onOpen
         {!phone && <button className='find-button icon-button title-action' title='Find and replace (Ctrl+F)' aria-label='Find' onClick={() => setFinding(!finding)}><MagnifyingGlass size={18} /></button>}
       </FileBar>
       {note && <div className='banner info'>{note}</div>}
-      <DocEditor files={files} folders={folders} onOpenFile={onOpenFile} onOpenFolder={onOpenFolder} sheetId={sheetId} pictures={pictures} ydoc={ydoc} canEdit={canEdit} phone={phone} finding={finding} setFinding={setFinding} outline={outline} toggleOutline={toggleOutline} editorRef={editorRef} onBlur={() => flushRef.current()} cursors={cursors} onCursor={onCursor} />
+      <DocEditor files={files} folders={folders} members={members} onOpenFile={onOpenFile} onOpenFolder={onOpenFolder} sheetId={sheetId} pictures={pictures} ydoc={ydoc} canEdit={canEdit} phone={phone} finding={finding} setFinding={setFinding} outline={outline} toggleOutline={toggleOutline} editorRef={editorRef} onBlur={() => flushRef.current()} cursors={cursors} onCursor={onCursor} />
     </div>
   )
 }
 
-function DocEditor ({ sheetId, files, folders, onOpenFile, onOpenFolder, pictures, ydoc, canEdit, phone, finding, setFinding, outline, toggleOutline, editorRef, onBlur, cursors, onCursor }) {
+function DocEditor ({ sheetId, files, folders, members, onOpenFile, onOpenFolder, pictures, ydoc, canEdit, phone, finding, setFinding, outline, toggleOutline, editorRef, onBlur, cursors, onCursor }) {
   const toolRow = useToolOverflow(!phone)
   const canEditRef = useRef(canEdit)
   canEditRef.current = canEdit
@@ -282,6 +284,7 @@ function DocEditor ({ sheetId, files, folders, onOpenFile, onOpenFolder, picture
     toastTimer.current = setTimeout(() => setToast(null), TOAST_MS)
   }
   const others = useMemo(() => remoteCursors(), [ydoc])
+  const atKeyRef = useRef(null)
   // Pictures from a file, the clipboard or a drop: shrunk, stored, then put
   // in at `at` (or the cursor).
   const addRef = useRef(null)
@@ -326,8 +329,9 @@ function DocEditor ({ sheetId, files, folders, onOpenFile, onOpenFolder, picture
   const editor = useEditor({
     editable: canEdit,
     extensions: [
-      ...documentExtensions().filter((x) => x.name !== 'image'),
+      ...documentExtensions().filter((x) => x.name !== 'image' && x.name !== 'chip'),
       PictureView.configure({ cache: pictures }),
+      ChipView,
       Collaboration.configure({ document: ydoc, field: 'body' }),
       Typography,
       Placeholder.configure({ placeholder: () => (canEditRef.current ? 'Type here to start your document.' : 'This document is empty.') }),
@@ -337,6 +341,8 @@ function DocEditor ({ sheetId, files, folders, onOpenFile, onOpenFolder, picture
     ],
     editorProps: {
       attributes: { class: 'doc-body', 'aria-label': 'Document', spellcheck: 'true' },
+      // Up, Down, Enter, Tab and Esc while the @ menu is open.
+      handleKeyDown: (view, e) => (atKeyRef.current ? atKeyRef.current(e) : false),
       // Word, Google Docs, LibreOffice and web pages, tidied as an import is.
       // A copy from a document here is already in the editor's terms.
       transformPastedHTML: (html) => {
@@ -407,6 +413,27 @@ function DocEditor ({ sheetId, files, folders, onOpenFile, onOpenFolder, picture
     return () => { clearTimeout(redraw); editor.off('transaction', report) }
   }, [editor, others])
 
+  // @ chips (proposals/2026-10-26-document-chips.md): the menu while an @
+  // is typed, and the document's move to the schema version with chips.
+  const [at, setAt] = useState(null) // { from, to, query }
+  const atOff = useRef(null) // the @ that Esc closed the menu on
+  const [atSel, setAtSel] = useState(0)
+  useEffect(() => {
+    if (!editor) return
+    const look = ({ transaction }) => {
+      const t = canEditRef.current ? atTrigger(editor.state) : null
+      if (!t || t.from !== atOff.current) atOff.current = null
+      setAt((was) => {
+        const next = t && t.from !== atOff.current ? t : null
+        return was && next && was.from === next.from && was.to === next.to && was.query === next.query ? was : next
+      })
+      if (transaction && canEditRef.current && addsChip(transaction) && (ydoc.getMap('meta').get('version') || 1) < CHIPS_VERSION) call('doc:useChips', { sheetId }).catch(() => {})
+    }
+    editor.on('transaction', look)
+    return () => editor.off('transaction', look)
+  }, [editor, ydoc, sheetId])
+  useEffect(() => setAtSel(0), [at && at.query])
+
   const s = useEditorState({
     editor,
     selector: ({ editor: ed }) => {
@@ -456,6 +483,27 @@ function DocEditor ({ sheetId, files, folders, onOpenFile, onOpenFolder, picture
   const [picLinking, setPicLinking] = useState(null) // the picture whose link is being typed, or null
   // Links to web pages, files and folders (pearLinks.js).
   const links = usePearLinks({ files, folders, onOpenFile, onOpenFolder })
+  const atList = useMemo(() => (at ? atItems(at.query, { members, files: links.usable.filter((f) => f.sheetId !== sheetId), folders }) : []), [at, members, files, folders]) // eslint-disable-line react-hooks/exhaustive-deps
+  function pickAt (it) {
+    if (!at || !it) return
+    editor.chain().focus().insertContentAt({ from: at.from, to: at.to }, [{ type: 'chip', attrs: chipFor(it) }, { type: 'text', text: ' ' }]).run()
+    // Pick a date: today, then the calendar.
+    if (it.pick) {
+      const pos = at.from
+      requestAnimationFrame(() => { const dom = editor.view.nodeDOM(pos); const b = dom && dom.querySelector && dom.querySelector('.chip-calendar'); if (b) b.click() })
+    }
+  }
+  atKeyRef.current = atList.length
+    ? (e) => {
+        const n = atList.length
+        if (e.key === 'ArrowDown') { setAtSel((i) => (i + 1) % n); return true }
+        if (e.key === 'ArrowUp') { setAtSel((i) => (i - 1 + n) % n); return true }
+        if (e.key === 'Enter' || e.key === 'Tab') { pickAt(atList[Math.min(atSel, n - 1)]); return true }
+        if (e.key === 'Escape') { atOff.current = at.from; setAt(null); return true }
+        return false
+      }
+    : null
+  const chipCtx = useMemo(() => ({ sheetId, members, placeOf: links.placeOf, canEdit }), [sheetId, members, files, folders, canEdit]) // eslint-disable-line react-hooks/exhaustive-deps
   const openHref = (href) => { const p = pearLink(href); links.open(p || { url: href }) }
   const atLink = s && s.link && s.href ? textLink(s.href, links.placeOf) : null
   const atFile = atLink && atLink.file
@@ -604,12 +652,15 @@ function DocEditor ({ sheetId, files, folders, onOpenFile, onOpenFolder, picture
       {picLinking !== null && canEdit && s.picture && <LinkBar editor={editor} initial={s.picture.href} files={links.usable.filter((f) => f.sheetId !== sheetId)} folders={folders} placeOf={links.placeOf} onSet={(href) => editor.chain().focus().setNodeSelection(picLinking).updateAttributes('image', { href }).setNodeSelection(picLinking).run()} onClose={() => setPicLinking(null)} />}
       {linking !== null && canEdit && <LinkBar editor={editor} initial={linking} files={links.usable.filter((f) => f.sheetId !== sheetId)} folders={folders} placeOf={links.placeOf} onClose={() => setLinking(null)} />}
       {atLink && linking === null && !menu && !s.picture && <TextLinkCard editor={editor} link={atLink} canEdit={canEdit} onOpen={() => openHref(s.href)} onEdit={() => setLinking(s.href)} />}
+      {atList.length > 0 && <AtMenu items={atList} selected={atSel} sheetId={sheetId} onPick={pickAt} anchor={{ getBoundingClientRect: () => editor.view.coordsAtPos(at.from) }} />}
       {finding && <FindBar editor={editor} canEdit={canEdit} onClose={() => { editor.commands.setFind({ query: '' }); setFinding(false) }} />}
       <div className='doc-row'>
         {outline && <Outline editor={editor} phone={phone} onClose={toggleOutline} />}
         <div className='doc-scroll' onScroll={() => { if (s.picture) rescrolled((n) => n + 1) }} onMouseDown={(e) => { if (e.target === e.currentTarget) editor.commands.focus('end') }}>
           <div className='doc-page' onClick={(e) => linkClick(e, canEdit, openHref)}>
-            <EditorContent editor={editor} />
+            <ChipContext.Provider value={chipCtx}>
+              <EditorContent editor={editor} />
+            </ChipContext.Provider>
           </div>
         </div>
       </div>

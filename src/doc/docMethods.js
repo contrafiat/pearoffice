@@ -40,6 +40,18 @@ function createDocMethods (sheets, { getJoin, getPictures }) {
     // An edit from the editor, as a Yjs update (replicaUpdate).
     'doc:update': ({ sheetId, update }, ctx) => replicaUpdate(ctx, sheetId, update, 'doc', 'a document'),
 
+    // The editor put an @ chip in the document
+    // (proposals/2026-10-26-document-chips.md): it moves to the schema
+    // version with chips, so older builds open it read-only.
+    'doc:useChips': async ({ sheetId } = {}, ctx) => {
+      await requireEdit(ctx, sheetId)
+      const { doc } = await docFor(sheetId)
+      if (model.kind(doc) !== 'doc') throw new Error('Not a document')
+      if (docModel.version(doc) >= docModel.CHIPS_VERSION) return { version: docModel.version(doc) }
+      await commit(ctx, sheetId, docModel.capture(doc, () => docModel.raiseVersion(doc, docModel.CHIPS_VERSION)))
+      return { version: docModel.CHIPS_VERSION }
+    },
+
     // A picture for the document (proposals/2026-10-06-document-images.md):
     // stored in this device's picture core for the file, and the document
     // moves to the schema version with pictures. Returns the image node's
