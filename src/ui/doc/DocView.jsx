@@ -19,6 +19,7 @@ import { exportDocument, tidyPaste } from './docFiles.js'
 import { usePrintKey } from '../printKey.js'
 import { usePearLinks, pearLink, fileLink, folderLink } from '../pearLinks.js'
 import { AtMenu, atItems } from '../sheet/chips.jsx'
+import { History } from './History.jsx'
 import { ChipView, ChipContext, atTrigger, chipFor, addsChip } from './ChipView.jsx'
 import { okLink } from '../../shared/links.js'
 import { untitled } from '../Files.jsx'
@@ -61,6 +62,8 @@ export function DocView ({ sheetId, files = [], folders = [], onOpenFile, onOpen
   const [title, setTitle] = useState('')
   const [arrived, setArrived] = useState(false) // the content is here
   const [finding, setFinding] = useState(false)
+  const [history, setHistory] = useState(false) // version history open (History.jsx)
+  const [restored, setRestored] = useState(null)
   const members = useMembers(sheetId)
   const phone = isMobile()
   usePrintKey(() => exportDocument(ydoc, title, 'print', sheetId).catch((err) => onError(err.message)))
@@ -244,6 +247,7 @@ export function DocView ({ sheetId, files = [], folders = [], onOpenFile, onOpen
           const save = (format) => exportDocument(ydoc, title, format, sheetId).catch((err) => onError(err.message))
           return (
             <>
+              <li role='menuitem' className='version-history' onClick={() => setHistory(true)}>Version history</li>
               <li role='menuitem' onClick={() => setFinding(true)}>Find and replace</li>
               <li role='menuitem' onClick={toggleOutline}>{outline ? 'Hide the outline' : 'Show the outline'}</li>
               {canEdit && <li role='menuitem' onClick={() => editorRef.current && pastePlain(editorRef.current).catch((err) => onError(err.message))}>Paste as plain text</li>}
@@ -260,7 +264,12 @@ export function DocView ({ sheetId, files = [], folders = [], onOpenFile, onOpen
         {!phone && <button className='find-button icon-button title-action' title='Find and replace (Ctrl+F)' aria-label='Find' onClick={() => setFinding(!finding)}><MagnifyingGlass size={18} /></button>}
       </FileBar>
       {note && <div className='banner info'>{note}</div>}
+      {restored && <div className='toast' role='status'>{restored}</div>}
+      {history && <History sheetId={sheetId} members={members} canEdit={canEdit} editor={editorRef.current} phone={phone} onError={onError} onClose={(msg) => { setHistory(false); if (msg) { setRestored(msg); setTimeout(() => setRestored(null), 4000) } }} />}
+      {/* The editor stays while version history is open, hidden. */}
+      <div className={'doc-live' + (history ? ' hidden' : '')}>
       <DocEditor files={files} folders={folders} members={members} onOpenFile={onOpenFile} onOpenFolder={onOpenFolder} sheetId={sheetId} pictures={pictures} ydoc={ydoc} canEdit={canEdit} phone={phone} finding={finding} setFinding={setFinding} outline={outline} toggleOutline={toggleOutline} editorRef={editorRef} onBlur={() => flushRef.current()} cursors={cursors} onCursor={onCursor} />
+      </div>
     </div>
   )
 }

@@ -98,7 +98,7 @@ function createMoves ({ engine, sheets, getJoin, getDeleting = () => null, getPi
   async function moveSheet (oldId, remaining, reason) {
     const old = await sheets.load(oldId)
     const title = model.title(old.guarded.doc)
-    const { newId, created } = await foundCopy(oldId, old, remaining)
+    const { newId, created } = await foundCopy(oldId, old, remaining, reason)
 
     // 4. Freeze the old sheet and hand each remaining person the new keys.
     const target = { sheetId: newId, groupKey: created.groupKey, encryptionKey: created.encryptionKey, bootstrap: created.bootstrap, name: title }
@@ -113,7 +113,7 @@ function createMoves ({ engine, sheets, getJoin, getDeleting = () => null, getPi
 
   // Steps 1 to 3 of a move: a new file founded by this device with the old
   // one's content, pictures and seeders, and `remaining` as its members.
-  async function foundCopy (oldId, old, remaining) {
+  async function foundCopy (oldId, old, remaining, reason) {
     const me = hex(engine.identity.publicKey)
     const title = model.title(old.guarded.doc)
     const pictures = hasPictures(old.guarded.doc) ? getPictures() : null
@@ -153,7 +153,9 @@ function createMoves ({ engine, sheets, getJoin, getDeleting = () => null, getPi
     // 3. The current content, then the seeders, re-signed by the owner.
     model.applyUpdate(entry.guarded.doc, state)
     sheets.noteLocal(newId, state)
-    for (const op of yOps(state)) await engine.append(newId, op)
+    // `start` marks where version history begins, and why
+    // (proposals/2026-10-26-version-history.md).
+    for (const op of yOps(state)) await engine.append(newId, { ...op, start: reason || 'remove' })
     for (const seederKey of await seedersOf(oldId)) {
       await engine.append(newId, m.seederOp({ sheetId: newId, identity: engine.identity, seederKey }))
     }
@@ -178,7 +180,7 @@ function createMoves ({ engine, sheets, getJoin, getDeleting = () => null, getPi
     if (!mine) throw new Error('This file has not fully arrived yet. Try again in a moment.')
     if (members.some((x) => x.identity !== me && (x.role === 'owner' || x.role === 'editor'))) throw new Error('Someone else in this file can let this device in')
     const old = await sheets.load(oldId)
-    const { newId } = await foundCopy(oldId, old, [{ ...mine, role: 'owner' }])
+    const { newId } = await foundCopy(oldId, old, [{ ...mine, role: 'owner' }], 'recovered')
     await engine.localDb.put('moves:' + oldId, { to: newId, removed: false, reason: 'recovered', carried: true, at: Date.now() })
     await engine.localDb.del('recovered:' + oldId)
     emit('sheet:moved', { from: oldId, to: newId, reason: 'recovered' })

@@ -1445,3 +1445,29 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 .file-tab-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
 .file-tab-close { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; min-height: 0; padding: 0; border: 0; border-radius: 6px; background: none; color: inherit; cursor: pointer; opacity: 0.6; }
 .file-tab-close:hover { opacity: 1; background: var(--line); }
+/* Version history in a document (proposals/2026-10-26-version-history.md). */
+.doc-live { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.doc-live.hidden { display: none; }
+.history { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.history-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 6px 12px; border-bottom: 1px solid var(--line); background: var(--panel); }
+.history-bar h2 { flex: 1; margin: 0; font-size: 15px; font-weight: 600; }
+.history-bar .primary { display: inline-flex; align-items: center; gap: 6px; }
+.history-ask { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; }
+.history-row { flex: 1; min-height: 0; display: flex; }
+.history-scroll { flex: 1; min-width: 0; }
+.history-side { flex: none; width: 260px; overflow-y: auto; border-left: 1px solid var(--line); background: var(--panel); }
+.history.phone .history-side { width: auto; flex: 1; border-left: 0; }
+.history-list { list-style: none; margin: 0; padding: 6px; }
+.history-item { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; width: 100%; padding: 8px 10px; border: 0; border-radius: 8px; background: none; color: var(--ink); text-align: left; cursor: pointer; font: inherit; }
+.history-item:hover { background: var(--head); }
+.history-item.on { background: var(--pear-soft); }
+.history-when { font-weight: 600; font-size: 13px; }
+.history-sub { font-size: 12px; color: var(--muted); }
+.history-people { display: flex; align-items: center; gap: 4px; font-size: 12px; color: var(--muted); }
+.history-text ins { background: #d6f5d0; color: #14532d; text-decoration: none; border-radius: 2px; }
+.history-text del { background: #fde2e1; color: #9b1c1c; border-radius: 2px; }
+.history-text .v-li { margin-left: 1.5em; list-style: disc; display: list-item; }
+.history-text pre { white-space: pre-wrap; font-family: ui-monospace, monospace; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .history-text ins { background: #1f4d2a; color: #c8f2cf; } :root:not([data-theme="light"]) .history-text del { background: #5a2323; color: #f6caca; } }
+:root[data-theme="dark"] .history-text ins { background: #1f4d2a; color: #c8f2cf; }
+:root[data-theme="dark"] .history-text del { background: #5a2323; color: #f6caca; }

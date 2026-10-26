@@ -14,7 +14,7 @@ const { tmpDir, cleanup, waitFor, call, grid } = require('./helpers')
 const big = (seed) => Array.from({ length: 300000 }, (_, i) => String.fromCharCode(97 + ((i * 7 + seed) % 26))).join('')
 
 test('yOps splits only what is over the limit', () => {
-  assert.deepEqual(yOps(Buffer.from('small')), [{ type: 'y', data: Buffer.from('small').toString('base64') }])
+  assert.deepEqual(yOps(Buffer.from('small'), 1234), [{ type: 'y', data: Buffer.from('small').toString('base64'), at: 1234 }])
   const update = Buffer.alloc(PART_CHARS * 2, 1)
   const ops = yOps(update)
   assert.ok(ops.length > 2)
