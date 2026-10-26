@@ -1159,7 +1159,7 @@ fi
 if ! $PUBLISH_NOSTR; then
   echo ""
   echo "==> Skipping Nostr announcement (not selected)."
-elif $PUBLISH_FAILED; then
+elif $PUBLISH_FAILED && ! release_nostr_after_failure; then
   echo ""
   echo "==> Skipping Nostr announcement — one or more publish steps failed."
 elif ! command -v nak &>/dev/null; then
