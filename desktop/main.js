@@ -12,6 +12,7 @@ const { createLoginItem } = require('./login')
 const { startUpdates } = require('./updates')
 const { installMenuEntry } = require('./appimage')
 const { createFileWindows } = require('./file-windows')
+const { urlKind, openUrl } = require('./open-url')
 
 const SMOKE = !!process.env.PEAROFFICE_SMOKE
 
@@ -345,9 +346,16 @@ ipcMain.handle('worklet:call', async (e, method, args) => {
   if (method === 'app:openUrl') {
     const url = String((args && args.url) || '')
     // The smoke test notes what would open instead of starting a browser.
-    if (SMOKE) fs.appendFileSync(path.join(dataDir, 'opened.txt'), url + '\n')
-    else if (/^(https?:|mailto:|lightning:)/.test(url)) await shell.openExternal(url)
-    return { ok: true }
+    if (SMOKE) {
+      fs.appendFileSync(path.join(dataDir, 'opened.txt'), url + '\n')
+      // A smoke run can ask for the "PearCal isn't installed" answer.
+      if (urlKind(url) === 'pearcal' && process.env.PEAROFFICE_SMOKE_NO_PEARCAL === '1') return { ok: false, notInstalled: true }
+      return { ok: true }
+    }
+    // macOS and Windows say which app handles a scheme; Linux's xdg-open
+    // fails instead when nothing does.
+    const hasApp = (u) => process.platform === 'linux' || !!app.getApplicationNameForProtocol(u)
+    return openUrl(url, { open: (u) => shell.openExternal(u), hasApp })
   }
   // After a device link or a phrase restore the identity changed: start a
   // fresh worklet and reload the UI.

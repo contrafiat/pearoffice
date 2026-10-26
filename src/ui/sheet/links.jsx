@@ -7,7 +7,7 @@ import { colName } from './a1.js'
 import { parseRange } from '../../sheet/charts.js'
 import { untitled } from '../Files.jsx'
 
-import { pearLink, fileLink, folderLink } from '../pearLinks.js'
+import { pearLink, fileLink, folderLink, pearcalLabel } from '../pearLinks.js'
 
 const WEB = /^https?:\/\/\S+$/i
 export { fileLink, folderLink }
@@ -37,7 +37,8 @@ export const ownLink = (l) => !!(l && !l.formula && (l.stored || l.to || l.gone)
 
 export function linkLabel (link) {
   if (!link) return ''
-  if (link.url) return link.url
+  if (link.dayChip) return 'Open in PearCal'
+  if (link.url) return pearcalLabel(link.url) || link.url
   if (link.file || link.folder) return link.missing || link.name || (link.file ? 'A PearOffice file' : 'A folder')
   if (link.gone) return 'A deleted tab'
   const { name, row, col, row2, col2, rangeName } = link.to
@@ -147,7 +148,9 @@ export function LinkCard ({ row, col, link, canEdit, onOpen, onEdit, onRemove })
   const label = linkLabel(link)
   return (
     <div className='link-card' role='group' aria-label='Link' style={at} onMouseDown={(e) => e.stopPropagation()}>
-      <span className='link-card-address' title={label}>{label}</span>
+      {link.dayChip
+        ? <button className='link-button link-card-address' onClick={onOpen}>{label}</button>
+        : <span className='link-card-address' title={label}>{label}</span>}
       {!link.gone && !link.missing && <button className='icon-button' title='Open link' aria-label='Open link' onClick={onOpen}><ArrowSquareOut size={16} /></button>}
       {canEdit && ownLink(link) && <button className='icon-button' title='Edit link' aria-label='Edit link' onClick={onEdit}><PencilSimple size={16} /></button>}
       {canEdit && ownLink(link) && <button className='icon-button' title='Remove link' aria-label='Remove link' onClick={onRemove}><Trash size={16} /></button>}

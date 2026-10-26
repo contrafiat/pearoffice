@@ -17,7 +17,7 @@ import { readPref, writePref } from '../prefs.js'
 import { isMobile } from '../sheet/xlsx.js'
 import { exportDocument, tidyPaste } from './docFiles.js'
 import { usePrintKey } from '../printKey.js'
-import { usePearLinks, pearLink, fileLink, folderLink } from '../pearLinks.js'
+import { usePearLinks, pearLink, fileLink, folderLink, pearcalLabel } from '../pearLinks.js'
 import { AtMenu, atItems } from '../sheet/chips.jsx'
 import { History } from '../History.jsx'
 import { ChipView, ChipContext, atTrigger, chipFor, addsChip } from './ChipView.jsx'
@@ -832,7 +832,7 @@ export function LinkBar ({ editor, initial, files = [], folders = [], placeOf, o
     if (!url) c.unsetLink().run()
     else {
       const link = full(url)
-      if (editor.state.selection.empty && !editor.isActive('link')) c.insertContent({ type: 'text', text: url, marks: [{ type: 'link', attrs: { href: link } }] }).run()
+      if (editor.state.selection.empty && !editor.isActive('link')) c.insertContent({ type: 'text', text: pearcalLabel(link) || url, marks: [{ type: 'link', attrs: { href: link } }] }).run()
       else c.setLink({ href: link }).run()
     }
     onClose()
@@ -864,9 +864,10 @@ export function LinkBar ({ editor, initial, files = [], folders = [], placeOf, o
   )
 }
 
-// What a link in text points at: { url } for a web or email address, else
-// { file } or { folder }, named by `placeOf`.
-export const textLink = (href, placeOf) => placeOf(pearLink(href) || { url: href })
+// What a link in text points at: { url } for a web or email address (with
+// `label` for a PearCal event or day), else { file } or { folder }, named by
+// `placeOf`.
+export const textLink = (href, placeOf) => placeOf(pearLink(href) || { url: href, label: pearcalLabel(href) })
 
 // The card under the caret when it is in a link, as under a linked cell:
 // where it goes, Open, Copy link, and for editors Edit and Remove.
@@ -891,7 +892,7 @@ export function TextLinkCard ({ editor, link, canEdit, onOpen, onEdit }) {
   })
   useEffect(() => setCopied(false), [href])
   if (!at) return null
-  const label = link.url || link.missing || link.name
+  const label = link.label || link.url || link.missing || link.name
   async function copy () {
     try { await navigator.clipboard.writeText(href) } catch { await call('app:setClipboard', { text: href }).catch(() => {}) }
     setCopied(true)

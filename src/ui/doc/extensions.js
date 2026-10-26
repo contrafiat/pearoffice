@@ -4,6 +4,7 @@
 
 import { Extension, Node, mergeAttributes } from '@tiptap/core'
 import { okLink } from '../../shared/links.js'
+import { isPearcalLink } from '../../shared/pearcal.js'
 import { Plugin, PluginKey, TextSelection } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import StarterKit from '@tiptap/starter-kit'
@@ -287,14 +288,20 @@ export function notesExtensions () {
   ]
 }
 
+// A link the editor keeps: TipTap's own check, and a pearcal: link only in
+// one of its two exact forms.
+export const linkAllowed = (url, ctx) => (/^\s*pearcal:/i.test(url || '') ? isPearcalLink(url) : ctx.defaultValidate(url))
+
 // Documents and slides share these, in this order.
 function textExtensions ({ starter = {}, tables = false, pictures = false, chips = false }) {
   return [
     StarterKit.configure({
       undoRedo: false, // Collaboration's undo only undoes this person's edits
       trailingNode: false, // it would add a paragraph on every device at once
-      // pearoffice:// links to a file or folder (TipTap refuses unknown schemes).
-      link: { openOnClick: false, autolink: true, defaultProtocol: 'https', protocols: ['pearoffice'] },
+      // pearoffice:// links to a file or folder (TipTap refuses unknown
+      // schemes), and pearcal:// links to an event or a day, which must fit
+      // their exact pattern (shared/pearcal.js).
+      link: { openOnClick: false, autolink: true, defaultProtocol: 'https', protocols: ['pearoffice', 'pearcal'], isAllowedUri: linkAllowed, shouldAutoLink: (url) => !/^pearcal:/i.test(url) || isPearcalLink(url) },
       ...starter
     }),
     TextStyle,

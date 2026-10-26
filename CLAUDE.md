@@ -92,8 +92,14 @@ Code that works for any kind of file sits apart from each editor's own
 `src/ui/slides/`.
 
 - `src/shared/` - runs anywhere, for any file: `ids.js`, `links.js`
-  (`okLink`: what a link on a picture or shape may be, web, email, file or
-  folder; proposals/2026-10-26-picture-links.md), `phrase.js`
+  (`okLink`: what a link on a picture or shape may be, web, email, file,
+  folder or PearCal; proposals/2026-10-26-picture-links.md), `pearcal.js`
+  (links to a PearCal event, `pearcal://event/<calendarId>/<eventId>`, or
+  day, `pearcal://day/<YYYY-MM-DD>`, checked with exact patterns; a copy is in
+  `desktop/open-url.js`, which `app:openUrl` uses; when PearCal is not
+  installed `app:openUrl` returns `notInstalled` and `src/ui/AppMissing.jsx`
+  says so; date chips have Open in PearCal;
+  ../proposals/2026-10-26-pearcal-pearoffice-links.md), `phrase.js`
   (12-word recovery phrase: a 16-byte root, `phrase:root` in localDb, the
   identity seed a keyed hash of it), `qr.js`, Bare shims.
 - `src/doc/` and `src/ui/doc/` - documents (proposals/2026-10-06-documents.md): `docModel.js` (the Yjs doc: `meta`, `body`), `docMethods.js` (`doc:create`, `doc:state`, `doc:update`), `DocView.jsx` (TipTap 3 editor), `docFiles.js` (import .docx/.odt/.md/.txt/.html, export .docx/.odt/.md/.txt/PDF, pictures included; `odt.js` writes .odt from the editor's JSON and turns an .odt into HTML for the same import path; `node scripts/check-doc-export.js [dir]` has LibreOffice read an exported .docx), `pictures.js` (shrinking before upload, the per-document picture cache, the picture node view). Pictures are `image` nodes (`extensions.js`, `Picture`) and move a document to schema version 2 (`docModel.js`); @ chips are `chip` nodes (`extensions.js`, `Chip`; the pill, the @ menu's trigger and picking in `ChipView.jsx`, using the sheet's `AtMenu` and `SmartChip`), move a document to version 3 through `doc:useChips` and go out as text (`flattenChips`) (proposals/2026-10-26-document-chips.md); version history (proposals/2026-10-26-version-history.md): each `y` op carries `at` and the view keeps it (`yOps.js`, `sheetWire.js`; a moved file's first edit carries `start`), `src/doc/history.js` groups edits into versions and replays one (`file:versions`, `file:version`), `src/ui/History.jsx` shows them (documents with the changes from `versionDiff.js`, Restore by `setContent` in the editor; sheets as a grid from `sheet:versionCells` and decks as slides, Restore by `file:restore`, which uses `history.restoreInto`; `src/worklet/historyMethods.js`); `doc:addPicture` and `doc:picture` are in `docMethods.js`. The editor keeps a Yjs replica and sends batched updates; `doc:updated` brings others' edits.

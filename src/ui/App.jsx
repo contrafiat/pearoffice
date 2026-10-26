@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { call, on } from './bridge.js'
+import { AppMissing } from './AppMissing.jsx'
 import { readPref, writePref } from './prefs.js'
 import { SheetView } from './sheet/SheetView.jsx'
 import { DocView } from './doc/DocView.jsx'
@@ -769,6 +770,7 @@ export function App () {
       )}
       {!waitingJoin && joining === null && sheets && <JoinPill entries={sheets.filter((x) => x.joining)} onOpen={setWaitingJoin} />}
       {toast && <div className='toast' role='status'>{toast}</div>}
+      <AppMissing />
       {devices && <DevicesPanel initialLink={devices.link || ''} startWith={devices.startWith || null} onBack={devices.fromSettings ? () => { setDevices(null); setSettings(true) } : null} onClose={() => { setDevices(null); loadMe() }} onError={setError} />}
       {seeder && <SeederPanel initialLink={typeof seeder === 'string' && seeder !== 'fromSettings' ? seeder : ''} onBack={seeder === 'fromSettings' ? () => { setSeeder(false); setSettings(true) } : null} onClose={() => setSeeder(false)} onError={setError} />}
       {onboarding && (

@@ -3,6 +3,7 @@ import * as Y from 'yjs'
 import { CaretLeft, CaretRight, X, Pause, Play, ArrowCounterClockwise, Square } from '@phosphor-icons/react'
 import { call, on } from '../bridge.js'
 import { haptic } from '../haptic.js'
+import { openOutside } from '../pearLinks.js'
 import { fromB64 } from '../doc/pictures.js'
 import slidesModel from '../../slides/slidesModel.js'
 import { StaticSlide } from './StaticSlide.jsx'
@@ -115,7 +116,7 @@ function useTaps (nav) {
       // (proposals/2026-10-26-picture-links.md), opens in the browser.
       const a = e.target.closest && e.target.closest('a[href], [data-link]')
       const href = a && (a.getAttribute('href') || a.dataset.link)
-      if (href && Math.abs(dx) <= SWIPE_PX && /^(https?:|mailto:)/i.test(href)) { call('app:openUrl', { url: href }).catch(() => {}); return }
+      if (href && Math.abs(dx) <= SWIPE_PX && /^(https?:|mailto:|pearcal:)/i.test(href)) { openOutside(href); return }
       if (s.type === 'touch') haptic('select')
       if (Math.abs(dx) > SWIPE_PX && Math.abs(dx) > Math.abs(dy)) { if (dx < 0) n.next(); else n.prev(); return }
       if (s.type === 'touch') {

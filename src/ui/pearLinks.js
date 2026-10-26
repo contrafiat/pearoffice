@@ -4,6 +4,21 @@
 import { useState } from 'react'
 import { call } from './bridge.js'
 import { untitled } from './Files.jsx'
+import { pearcalLabel, isPearcalLink, PEARCAL_PAGE, NOT_INSTALLED } from '../shared/pearcal.js'
+import { APP_MISSING } from './AppMissing.jsx'
+
+export { pearcalLabel, isPearcalLink }
+export { dayLink } from '../shared/pearcal.js'
+
+// Open a web, email or PearCal link outside the app. When PearCal is not
+// installed, app:openUrl says so and the AppMissing notice shows.
+export async function openOutside (url) {
+  const r = await call('app:openUrl', { url }).catch(() => null)
+  if (r && r.notInstalled && isPearcalLink(url)) {
+    window.dispatchEvent(new window.CustomEvent(APP_MISSING, { detail: { text: NOT_INSTALLED, page: PEARCAL_PAGE } }))
+  }
+  return r
+}
 
 const PEAR = /^pearoffice:\/\/(file|folder)\/([A-Za-z0-9_-]+)$/
 export const fileLink = (id) => 'pearoffice://file/' + id
@@ -40,7 +55,7 @@ export function usePearLinks ({ files = [], folders = [], onOpenFile, onOpenFold
   }
   async function open (l) {
     if (!l) return
-    if (l.url) { call('app:openUrl', { url: l.url }).catch(() => {}); return }
+    if (l.url) { openOutside(l.url); return }
     if (l.folder) { if (!placeOf(l).missing && onOpenFolder) onOpenFolder(l.folder); return }
     if (l.file) {
       const p = placeOf(l, await follow(l.file))

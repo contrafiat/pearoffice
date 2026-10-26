@@ -41,6 +41,9 @@ export function jumpTarget (filled, rows, cols, from, dr, dc) {
   return { row: r, col: c }
 }
 
+// A date serial as YYYY-MM-DD.
+export const serialDay = (serial) => new Date(Date.UTC(1899, 11, 30) + Math.round(serial) * 86400000).toISOString().slice(0, 10)
+
 // Today as a spreadsheet date serial (days since 1899-12-30), in this
 // device's own calendar.
 export function todaySerial () {

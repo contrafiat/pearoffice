@@ -18,6 +18,7 @@
 
 const Y = require('yjs')
 const { newId } = require('../shared/ids')
+const { isPearcalLink } = require('../shared/pearcal')
 const refs = require('./refs')
 const { numToCol } = require('./a1')
 const { fillLine } = require('./fill')
@@ -36,14 +37,15 @@ const BORDER = /^(thin|medium|thick|dashed|double)(:#[0-9a-f]{6})?$/i
 // cells (`#<tabId>!<rowId>:<colId>:<rowId>:<colId>`), by id so that renames
 // and inserts keep it on the same cells, or to a named range (`#=<name>`,
 // rewritten when the name is renamed). It can also go to another PearOffice
-// file or one of your folders, by id (proposals/2026-10-22-links-to-files.md).
+// file or one of your folders, by id (proposals/2026-10-22-links-to-files.md),
+// or to a PearCal event or day (shared/pearcal.js).
 const MAX_LINK = 2048
 const WEB_LINK = /^(https?:\/\/|mailto:)[^\s<>"]+$/i
 const ID = '([A-Za-z0-9_-]{11})'
 const INNER_LINK = new RegExp('^#' + ID + '(?:!' + ID + ':' + ID + '(?::' + ID + ':' + ID + ')?)?$')
 const NAME_LINK = /^#=([A-Za-z_\\][A-Za-z0-9_.\\]{0,254})$/
 const FILE_LINK = /^pearoffice:\/\/(file\/[A-Za-z0-9_-]{43}|folder\/[0-9a-f]{32})$/
-const isLink = (v) => typeof v === 'string' && v.length <= MAX_LINK && (WEB_LINK.test(v) || INNER_LINK.test(v) || NAME_LINK.test(v) || FILE_LINK.test(v))
+const isLink = (v) => typeof v === 'string' && v.length <= MAX_LINK && (WEB_LINK.test(v) || INNER_LINK.test(v) || NAME_LINK.test(v) || FILE_LINK.test(v) || isPearcalLink(v))
 const FORMAT_VALUES = {
   align: (v) => ['left', 'center', 'right'].includes(v),
   valign: (v) => ['top', 'middle', 'bottom'].includes(v),
@@ -298,7 +300,7 @@ function setLink (doc, tabId, r1, c1, r2, c2, link) {
   } else if (link) {
     value = String(link).trim()
   }
-  if (value !== null && !isLink(value)) throw new Error('Links can go to web pages, email addresses, places in this file, other files or folders')
+  if (value !== null && !isLink(value)) throw new Error('Links can go to web pages, email addresses, places in this file, other files, folders or PearCal')
   return setFormatRange(doc, tabId, r1, c1, r2, c2, { link: value })
 }
 

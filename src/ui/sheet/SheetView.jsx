@@ -5,7 +5,7 @@ import { History } from '../History.jsx'
 import { Menu, menuItems } from '../Menu.jsx'
 import { Grid, MIN_ZOOM, MAX_ZOOM } from './Grid.jsx'
 import { colName } from './a1.js'
-import { changeDecimals, jumpTarget, todaySerial } from './cellTools.js'
+import { changeDecimals, jumpTarget, todaySerial, serialDay } from './cellTools.js'
 import { SIZES, DEFAULT_SIZE, borderCss, fitWidth } from './cellStyle.js'
 import { shiftA1 } from '../../sheet/refs.js'
 import { colourFor } from '../Avatar.jsx'
@@ -18,7 +18,7 @@ import { ValidationPanel } from './ValidationPanel.jsx'
 import { CondFormatPanel } from './CondFormatPanel.jsx'
 import { NamesPanel } from './NamesPanel.jsx'
 import { LinkBar, LinkCard, linkOf, linkLabel, ownLink, fileLink, folderLink } from './links.jsx'
-import { usePearLinks } from '../pearLinks.js'
+import { usePearLinks, dayLink, pearcalLabel } from '../pearLinks.js'
 import { AtMenu, atItems, smartChip } from './chips.jsx'
 import { parseRange } from '../../sheet/charts.js'
 import { evaluate as evaluateColours } from '../../sheet/condFormat.js'
@@ -381,6 +381,9 @@ export function SheetView ({ sheetId, files = [], folders = [], onOpenFile, onOp
   const { usable, placeOf, follow, open: openPear } = usePearLinks({ files, folders, onOpenFile, onOpenFolder })
   const selLink = placeOf(linkOf(selected))
   const selFile = selLink && selLink.file
+  // A date chip with no link of its own: its card opens the day in PearCal
+  // (/home/tim/peerloomllc/proposals/2026-10-26-pearcal-pearoffice-links.md).
+  const selDay = !selLink && selected && selected.fmt && selected.fmt.datechip && typeof selected.num === 'number' ? { url: dayLink(serialDay(selected.num)), dayChip: true } : null
   useEffect(() => { if (selFile) follow(selFile) }, [selFile]) // eslint-disable-line react-hooks/exhaustive-deps
   async function openLink (row, col) {
     let l = linkOf(cells.get(row + ',' + col))
@@ -401,7 +404,7 @@ export function SheetView ({ sheetId, files = [], folders = [], onOpenFile, onOp
     setLinking(null)
     afterPanel()
     // On an empty cell the link is also its text.
-    if (box.r1 === box.r2 && box.c1 === box.c2 && !(selected && selected.input)) await run('sheet:setCell', { row: box.r1, col: box.c1, input: typeof link === 'string' && !link.startsWith('pearoffice://') ? link : text })
+    if (box.r1 === box.r2 && box.c1 === box.c2 && !(selected && selected.input)) await run('sheet:setCell', { row: box.r1, col: box.c1, input: typeof link === 'string' && !link.startsWith('pearoffice://') ? pearcalLabel(link) || link : text })
     await run('sheet:setLink', { ...box, link })
   }
   function removeLink () {
@@ -693,6 +696,7 @@ export function SheetView ({ sheetId, files = [], folders = [], onOpenFile, onOp
       },
       '-',
       selLink && !selLink.gone && !selLink.missing && { label: 'Open link', onSelect: () => openLink(sel.row, sel.col) },
+      selDay && { label: 'Open in PearCal', onSelect: () => openPear(selDay) },
       canEdit && { label: ownLink(selLink) ? 'Edit link...' : 'Insert link...', onSelect: startLink },
       canEdit && ownLink(selLink) && { label: 'Remove link', onSelect: removeLink },
       (canEdit || threadAt.has(here)) && { label: threadAt.has(here) ? 'Show comments' : 'Comment', onSelect: () => setCommenting({ row: sel.row, col: sel.col }) },
@@ -1409,13 +1413,13 @@ export function SheetView ({ sheetId, files = [], folders = [], onOpenFile, onOp
         onFilterMenu={(col) => setFiltering(col)}
         onOpenLink={openLink}
       />
-      {selLink && !editing && !linking && !menu && range.r1 === range.r2 && range.c1 === range.c2 && (
+      {(selLink || selDay) && !editing && !linking && !menu && range.r1 === range.r2 && range.c1 === range.c2 && (
         <LinkCard
           row={sel.row}
           col={sel.col}
-          link={selLink}
+          link={selLink || selDay}
           canEdit={canEdit}
-          onOpen={() => openLink(sel.row, sel.col)}
+          onOpen={() => (selLink ? openLink(sel.row, sel.col) : openPear(selDay))}
           onEdit={startLink}
           onRemove={removeLink}
         />

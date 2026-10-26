@@ -19,6 +19,7 @@ import * as Clipboard from 'expo-clipboard'
 import * as Haptics from 'expo-haptics'
 import b4a from 'b4a'
 import { requestLocalNetworkPermission } from '../modules/local-network'
+import { isPearcalLink } from '../src/shared/pearcal'
 
 const ALLOWED = /^(sheet|file|doc|slides|app|seeder|link|donation):[A-Za-z]+$/
 // The UI's own page. The WebView must never show anything else: any page it
@@ -107,6 +108,12 @@ async function shellMethod (method, args) {
   if (method === 'app:openUrl') {
     const url = String(args.url || '')
     if (/^(https?:|mailto:|lightning:)/.test(url)) await Linking.openURL(url)
+    // A PearCal event or day (proposals/2026-10-26-pearcal-pearoffice-links.md
+    // in the suite folder). openURL rejects when no app takes it: Android has
+    // no activity for the scheme, iOS's open reports false.
+    else if (isPearcalLink(url)) {
+      try { await Linking.openURL(url) } catch { return { ok: false, notInstalled: true } }
+    }
     return { ok: true }
   }
   // Is a Lightning wallet installed (the donation sheet offers it)?
