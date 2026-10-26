@@ -269,7 +269,8 @@ function createSheetEngine (opts = {}) {
         getFolders: () => folders,
         emit,
         log,
-        ...(opts.keyringGapMs ? { gapMs: opts.keyringGapMs, checkMs: opts.keyringGapMs, settleMs: Math.min(3000, opts.keyringGapMs) } : {})
+        ...(opts.keyringGapMs ? { gapMs: opts.keyringGapMs, checkMs: opts.keyringGapMs, settleMs: Math.min(3000, opts.keyringGapMs) } : {}),
+        ...(opts.keyringNow ? { now: opts.keyringNow } : {}) // tests: a frozen clock
       })
       setTimeout(() => keyring.start(), 5000).unref?.()
       // After a restore from the phrase: bring the files back.

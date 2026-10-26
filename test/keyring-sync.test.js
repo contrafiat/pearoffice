@@ -18,8 +18,8 @@ test('devices keep their keyring on their seeders', async (t) => {
   const testnet = await createTestnet(3)
   const mkSwarm = ({ keyPair }) => new Hyperswarm({ keyPair, bootstrap: testnet.bootstrap })
   const engines = []
-  const mk = async (dir = tmpDir()) => {
-    const e = createSheetEngine({ corestore: new Corestore(dir), createSwarm: mkSwarm, keyringGapMs: 200 })
+  const mk = async (dir = tmpDir(), more = {}) => {
+    const e = createSheetEngine({ corestore: new Corestore(dir), createSwarm: mkSwarm, keyringGapMs: 200, ...more })
     engines.push(e)
     await e.init({})
     return e
@@ -85,5 +85,22 @@ test('devices keep their keyring on their seeders', async (t) => {
       const h = await held(A)
       return h[w] === 'W' && h[z] === 'Z' && h[y] === 'removed'
     })
+  })
+
+  // A rename in the same millisecond as the last write still wins, with the
+  // clock frozen: the old name sorts later, so a tie would keep it.
+  await t.test('a change in the same millisecond as the last write is kept', async () => {
+    const B = await mk(tmpDir(), { keyringNow: () => 1700000000000 })
+    const bKeys = deriveKeys(b4a.from(B.identity.secretKey.subarray(0, 32)))
+    const name = async (id) => {
+      const rec = await B.seeding.keyringGet(sk, hex(bKeys.locator)).catch(() => null)
+      const k = rec && open(rec, bKeys)
+      return k && k.files[id] && k.files[id].entry ? k.files[id].entry.name : null
+    }
+    await call(B, 'seeder:pair', { link: seeder.openPairing().link })
+    const id = (await call(B, 'sheet:create', { title: 'Zeta' })).sheetId
+    await waitFor('Zeta written', async () => { await B.keyring.run(); return (await name(id)) === 'Zeta' })
+    await call(B, 'file:setTitle', { sheetId: id, title: 'Alpha' })
+    await waitFor('Alpha written', async () => { await B.keyring.run(); return (await name(id)) === 'Alpha' })
   })
 })
