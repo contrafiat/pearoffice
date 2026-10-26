@@ -159,7 +159,7 @@ module.exports = async function folders (t) {
   // Right-click a file card: its menu, with both deletes for the owner;
   // Remove from this device takes it off the list.
   await js(`(() => { const r = ${cardOf('Tools')}.getBoundingClientRect(); ${cardOf('Tools')}.querySelector('.file-card').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: r.left + 20, clientY: r.top + 20 })) })()`)
-  await waitFor('right-click menu', "[...document.querySelectorAll('.card-menu li')].map((l) => l.textContent).join('|') === 'Open in new window|Copy link|Move to folder...|Use as a template|Remove from this device|Delete for everyone'")
+  await waitFor('right-click menu', "[...document.querySelectorAll('.card-menu li:not(.menu-sep)')].map((l) => l.textContent).join('|') === 'Open in new window|Copy link|Move to folder...|Use as a template|Remove from this device|Delete for everyone'")
   await snap('context-menu')
   await js("[...document.querySelectorAll('.card-menu li')].find((l) => l.textContent === 'Remove from this device').click()")
   await waitFor('remove panel', "!!document.querySelector('.panel .primary')")

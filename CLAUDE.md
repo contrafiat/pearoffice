@@ -186,6 +186,12 @@ Code that works for any kind of file sits apart from each editor's own
   New lists templates under the kinds (`Files.jsx`); the built-in ones are
   `templates.js`, made through `sheet:import`, `doc:import` and
   `slides:import`.
+  Menus (`Menu.jsx`: the ⋯ menu, the grid's right-click menus, a file
+  card's and a tab's menu) take a list of items, `items` making a submenu
+  (Save as ▸, Data ▸, File ▸); a menu fits inside the window (flips up,
+  scrolls) and on a phone a submenu opens in place with a way back. The
+  smoke helpers `more(label)` and `menuPick(label)` open the submenu an
+  item is in.
   `src/ui/sheet/` is the spreadsheet editor
   (grid, toolbar, its panels, charts, `xlsx.js` file handling, `links.jsx`
   for links in cells: the link bar and the card under a linked cell;

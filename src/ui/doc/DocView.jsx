@@ -245,20 +245,25 @@ export function DocView ({ sheetId, files = [], folders = [], onOpenFile, onOpen
         onGone={onGone}
         menuItems={() => {
           const save = (format) => exportDocument(ydoc, title, format, sheetId).catch((err) => onError(err.message))
-          return (
-            <>
-              <li role='menuitem' className='version-history' onClick={() => setHistory(true)}>Version history</li>
-              <li role='menuitem' onClick={() => setFinding(true)}>Find and replace</li>
-              <li role='menuitem' onClick={toggleOutline}>{outline ? 'Hide the outline' : 'Show the outline'}</li>
-              {canEdit && <li role='menuitem' onClick={() => editorRef.current && pastePlain(editorRef.current).catch((err) => onError(err.message))}>Paste as plain text</li>}
-              <li role='menuitem' onClick={() => save('docx')}>Save as a Word file</li>
-              <li role='menuitem' onClick={() => save('odt')}>Save as an OpenDocument file (.odt)</li>
-              <li role='menuitem' onClick={() => save('md')}>Save as Markdown</li>
-              <li role='menuitem' onClick={() => save('txt')}>Save as plain text</li>
-              <li role='menuitem' onClick={() => save('pdf')}>Save as PDF</li>
-              {!phone && <li role='menuitem' onClick={() => save('print')}>Print...</li>}
-            </>
-          )
+          return [
+            { label: 'Find and replace', onSelect: () => setFinding(true) },
+            { label: 'Version history', className: 'version-history', onSelect: () => setHistory(true) },
+            { label: outline ? 'Hide the outline' : 'Show the outline', onSelect: toggleOutline },
+            '-',
+            {
+              label: 'Save as',
+              className: 'save-sub',
+              items: [
+                { label: 'Word (.docx)', onSelect: () => save('docx') },
+                { label: 'OpenDocument (.odt)', onSelect: () => save('odt') },
+                { label: 'Markdown (.md)', onSelect: () => save('md') },
+                { label: 'Plain text (.txt)', onSelect: () => save('txt') },
+                { label: 'PDF', onSelect: () => save('pdf') }
+              ]
+            },
+            !phone && { label: 'Print...', onSelect: () => save('print') },
+            canEdit && { label: 'Paste as plain text', onSelect: () => editorRef.current && pastePlain(editorRef.current).catch((err) => onError(err.message)) }
+          ]
         }}
       >
         {!phone && <button className='find-button icon-button title-action' title='Find and replace (Ctrl+F)' aria-label='Find' onClick={() => setFinding(!finding)}><MagnifyingGlass size={18} /></button>}

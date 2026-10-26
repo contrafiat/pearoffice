@@ -160,7 +160,7 @@ module.exports = async function docs (t) {
   result.docPicture = await js("(() => { let a = null; document.querySelector('.doc-body').editor.state.doc.descendants((n) => { if (n.type.name === 'image') a = n.attrs }); return !!a && /^[0-9a-f]{64}:/.test(a.ref) && a.w === 320 && a.h === 160 && a.align === 'left' })()")
   await sleep(600) // the editor sends its edits a moment later
   step('document picture')
-  await more('Save as a Word file')
+  await more('Word (.docx)')
   const docxOut = await waitFile(path.join(downloads, 'Smoke import.docx'))
   let docXml = ''
   let docMedia = 0
@@ -174,9 +174,9 @@ module.exports = async function docs (t) {
   const docxOk = fflate
     ? docXml.includes('Imported heading') && docXml.includes('w:val="Heading1"') && docXml.includes('Tent') && docMedia === 1
     : docxOut.length > 1000 && docxOut.slice(0, 2).toString() === 'PK'
-  await more('Save as Markdown')
+  await more('Markdown (.md)')
   const mdOut = (await waitFile(path.join(downloads, 'Smoke import.md'))).toString('utf8')
-  await more('Save as PDF')
+  await more('PDF')
   const docPdf = await waitFile(path.join(dataDir, 'Smoke import.pdf'))
   result.docExport = docxOk &&
     mdOut.startsWith('# Imported heading\n') && mdOut.includes('- [x] Packed') && mdOut.includes('| Tent | 80 |') && /!\[\]\(data:image\/(webp|jpeg|png);base64,/.test(mdOut) &&
@@ -191,7 +191,7 @@ module.exports = async function docs (t) {
 
   // OpenDocument (src/ui/doc/odt.js): saved as .odt with its picture, then
   // that file imported back as a new document.
-  await more('Save as an OpenDocument file (.odt)')
+  await more('OpenDocument (.odt)')
   const odtOut = await waitFile(path.join(downloads, 'Smoke import.odt'))
   let odtXml = ''
   let odtPictures = 0

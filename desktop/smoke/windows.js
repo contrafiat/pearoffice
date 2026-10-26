@@ -70,6 +70,8 @@ module.exports = async function windows (t) {
   await js("[...document.querySelectorAll('.sheet-link')].find((b) => b.textContent.includes('Notes')).click()")
   await waitFor('Notes open here', "!!document.querySelector('.doc-body')")
   await js("document.querySelector('.more-button').click()")
+  await waitFor('File submenu', "!!document.querySelector('.more-menu li.file-sub')")
+  await js("document.querySelector('.more-menu li.file-sub').click()")
   await waitFor('file menu', "!!document.querySelector('.more-menu .open-window')")
   await js("document.querySelector('.more-menu .open-window').click()")
   await until('Notes window', async () => !!windowFor(notes))

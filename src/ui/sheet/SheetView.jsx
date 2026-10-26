@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useSta
 import { call, on } from '../bridge.js'
 import { useOnScreen, useActiveRef } from '../tabs.jsx'
 import { History } from '../History.jsx'
+import { Menu, menuItems } from '../Menu.jsx'
 import { Grid, MIN_ZOOM, MAX_ZOOM } from './Grid.jsx'
 import { colName } from './a1.js'
 import { changeDecimals, jumpTarget, todaySerial } from './cellTools.js'
@@ -186,23 +187,12 @@ export function SheetView ({ sheetId, files = [], folders = [], onOpenFile, onOp
   const [naming, setNaming] = useState(null) // { adding } while the names panel is open
   const [goingTo, setGoingTo] = useState(null) // text typed in the name box
   const [linking, setLinking] = useState(null) // { initial, hasLink } while the link bar is open
-  // A menu opened near an edge (a long press on a phone) moves to fit on screen.
-  const menuRef = useRef(null)
   // The tab strip scrolls sideways when tabs do not fit; keep the open one in view.
   const tabStrip = useRef(null)
   useEffect(() => {
     const el = tabStrip.current && tabStrip.current.querySelector('.tab.active')
     if (el) el.scrollIntoView({ block: 'nearest', inline: 'nearest' })
   }, [view && view.tabId, view && view.tabs.length])
-  useLayoutEffect(() => {
-    const el = menuRef.current
-    if (!el) return
-    const r = el.getBoundingClientRect()
-    const vw = window.innerWidth
-    const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight
-    if (r.right > vw - 4) el.style.left = Math.max(4, vw - r.width - 4) + 'px'
-    if (r.bottom > vh - 4 && !el.style.bottom) el.style.top = Math.max(4, vh - r.height - 4) + 'px'
-  }, [menu])
   const [selectedChart, setSelectedChart] = useState(null) // chart id (desktop)
   const [editingChart, setEditingChart] = useState(null) // chart id in the editor
   const [viewingChart, setViewingChart] = useState(null) // chart id full screen (phones)
@@ -657,14 +647,86 @@ export function SheetView ({ sheetId, files = [], folders = [], onOpenFile, onOp
 
   // Freeze panes (proposals/2026-10-04-freeze-filter.md), shared by everyone.
   const frozen = (view && view.freeze) || { rows: 0, cols: 0 }
-  const freezeItems = (close) => canEdit && (
-    <>
-      <li role='menuitem' onClick={() => { close(); run('sheet:setFreeze', { rows: 1, cols: frozen.cols }) }}>Freeze top row</li>
-      <li role='menuitem' onClick={() => { close(); run('sheet:setFreeze', { rows: frozen.rows, cols: 1 }) }}>Freeze first column</li>
-      {(sel.row > 1 || sel.col > 1) && <li role='menuitem' onClick={() => { close(); run('sheet:setFreeze', { rows: sel.row - 1, cols: sel.col - 1 }) }}>Freeze above and left of {colName(sel.col) + sel.row}</li>}
-      {(frozen.rows > 0 || frozen.cols > 0) && <li role='menuitem' onClick={() => { close(); run('sheet:setFreeze', { rows: 0, cols: 0 }) }}>Unfreeze</li>}
-    </>
-  )
+  // The grid's right-click menus (Menu.jsx): a cell, a tab, a row or a column.
+  function gridMenu () {
+    if (menu.kind === 'tab') {
+      const i = view.tabs.findIndex((x) => x.id === menu.tabId)
+      const tab = view.tabs[i]
+      if (!tab) return []
+      return [
+        { label: 'Rename', onSelect: () => setRenaming({ id: tab.id, value: tab.name }) },
+        { label: 'Duplicate', onSelect: async () => { const r = await run('sheet:duplicateTab', { tabId: tab.id }); if (r) { setTabId(r.tabId); select(1, 1) } } },
+        i > 0 && { label: 'Move left', onSelect: () => run('sheet:moveTab', { tabId: tab.id, to: i - 1 }) },
+        i < view.tabs.length - 1 && { label: 'Move right', onSelect: () => run('sheet:moveTab', { tabId: tab.id, to: i + 1 }) },
+        view.tabs.length > 1 && '-',
+        view.tabs.length > 1 && { label: 'Delete tab', danger: true, onSelect: () => setDroppingTab(tab) }
+      ]
+    }
+    if (menu.kind === 'row' || menu.kind === 'col') {
+      const [from, to] = headerSpan(menu.kind, menu.index)
+      const row = menu.kind === 'row'
+      const noun = row ? (from === to ? 'row ' + from : 'rows ' + from + ' to ' + to) : (from === to ? 'column ' + colName(from) : 'columns ' + colName(from) + ' to ' + colName(to))
+      const set = row ? manual.rows : manual.cols
+      let anyHidden = false
+      for (let n = from; n <= to; n++) if (set.has(n)) anyHidden = true
+      return [
+        { label: 'Insert ' + (row ? 'row above' : 'column left'), onSelect: () => lineAction('before') },
+        { label: 'Insert ' + (row ? 'row below' : 'column right'), onSelect: () => lineAction('after') },
+        { label: 'Hide ' + noun, onSelect: () => setLinesHidden(menu.kind, true) },
+        anyHidden && { label: 'Show hidden ' + (row ? 'rows' : 'columns'), onSelect: () => setLinesHidden(menu.kind, false) },
+        '-',
+        { label: 'Delete ' + (row ? 'row ' + menu.index : 'column ' + colName(menu.index)), danger: true, onSelect: () => lineAction('delete') }
+      ]
+    }
+    const here = sel.row + ',' + sel.col
+    const fail = (err) => onError(err.message)
+    return [
+      canEdit && { label: 'Cut', onSelect: () => menuCopy(true).catch(fail) },
+      { label: 'Copy', onSelect: () => menuCopy(false).catch(fail) },
+      canEdit && { label: 'Paste', onSelect: () => menuPaste(null).catch(fail) },
+      canEdit && {
+        label: 'Paste special',
+        items: [
+          { label: 'Paste values only', onSelect: () => menuPaste('values').catch(fail) },
+          { label: 'Paste transposed', onSelect: () => menuPaste('transpose').catch(fail) }
+        ]
+      },
+      '-',
+      selLink && !selLink.gone && !selLink.missing && { label: 'Open link', onSelect: () => openLink(sel.row, sel.col) },
+      canEdit && { label: ownLink(selLink) ? 'Edit link...' : 'Insert link...', onSelect: startLink },
+      canEdit && ownLink(selLink) && { label: 'Remove link', onSelect: removeLink },
+      (canEdit || threadAt.has(here)) && { label: threadAt.has(here) ? 'Show comments' : 'Comment', onSelect: () => setCommenting({ row: sel.row, col: sel.col }) },
+      '-',
+      canEdit && {
+        label: 'Sort',
+        items: [
+          { label: 'Sort A to Z', onSelect: () => quickSort(false) },
+          { label: 'Sort Z to A', onSelect: () => quickSort(true) },
+          { label: 'Sort...', onSelect: openSort }
+        ]
+      },
+      canEdit && { label: 'Freeze', items: freezeItems() },
+      {
+        label: 'Data',
+        items: [
+          filterItem(),
+          canEdit && { label: 'Dropdown...', onSelect: () => setValidating({ ...range, dropdown: true }) },
+          canEdit && { label: 'Validation...', onSelect: () => setValidating({ ...range }) },
+          canEdit && { label: 'Conditional formatting...', onSelect: () => setColouring(true) },
+          canEdit && { label: 'Name this range...', onSelect: () => setNaming({ adding: true }) }
+        ]
+      },
+      canEdit && '-',
+      canEdit && { label: 'Clear contents', danger: true, onSelect: () => run('sheet:clearRange', range) }
+    ]
+  }
+
+  const freezeItems = () => [
+    { label: 'Freeze top row', onSelect: () => run('sheet:setFreeze', { rows: 1, cols: frozen.cols }) },
+    { label: 'Freeze first column', onSelect: () => run('sheet:setFreeze', { rows: frozen.rows, cols: 1 }) },
+    (sel.row > 1 || sel.col > 1) && { label: 'Freeze above and left of ' + colName(sel.col) + sel.row, onSelect: () => run('sheet:setFreeze', { rows: sel.row - 1, cols: sel.col - 1 }) },
+    (frozen.rows > 0 || frozen.cols > 0) && { label: 'Unfreeze', onSelect: () => run('sheet:setFreeze', { rows: 0, cols: 0 }) }
+  ]
 
   // Filter the table around the selection (its first row is the header),
   // or turn the filter off.
@@ -672,11 +734,7 @@ export function SheetView ({ sheetId, files = [], folders = [], onOpenFile, onOp
     const box = sortBox()
     setFilter({ r1: box.r1, c1: box.c1, c2: box.c2, cols: {} })
   }
-  const filterItems = (close) => (
-    filter
-      ? <li role='menuitem' onClick={() => { close(); setFilter(null) }}>Turn off filter</li>
-      : <li role='menuitem' onClick={() => { close(); startFilter() }}>Filter</li>
-  )
+  const filterItem = () => (filter ? { label: 'Turn off filter', onSelect: () => setFilter(null) } : { label: 'Filter', onSelect: startFilter })
   function setColumnRule (col, rule) {
     const cols = { ...filter.cols }
     if (rule) cols[col] = rule
@@ -1071,28 +1129,40 @@ export function SheetView ({ sheetId, files = [], folders = [], onOpenFile, onOp
         onTitleChange={onTitleChange}
         onError={onError}
         onGone={onGone}
-        menuItems={(close) => (
-          <>
-            <li role='menuitem' className='version-history' onClick={() => setHistory(true)}>Version history</li>
-            <li role='menuitem' onClick={() => setFinding({ replace: canEdit })}>Find and replace</li>
-            {window.pearoffice && <li role='menuitem' onClick={() => exportSheet(sheetId).catch((err) => onError(err.message))}>Save as an Excel file</li>}
-            {window.pearoffice && <li role='menuitem' onClick={() => exportOds(sheetId).catch((err) => onError(err.message))}>Save as an OpenDocument file (.ods)</li>}
-            <li role='menuitem' onClick={() => exportCsv(view).catch((err) => onError(err.message))}>Download this tab as CSV</li>
-            <li role='menuitem' onClick={() => exportJson(sheetId).catch((err) => onError(err.message))}>Save as JSON</li>
-            <li role='menuitem' onClick={() => printTab(view, 'pdf', printCharts()).catch((err) => onError(err.message))}>Save this tab as PDF</li>
-            {!phone && <li role='menuitem' onClick={() => printTab(view, 'print', printCharts()).catch((err) => onError(err.message))}>Print this tab...</li>}
-            {canEdit && <li role='menuitem' onClick={openSort}>Sort...</li>}
-            {freezeItems(close)}
-            {filterItems(close)}
-            {canEdit && <li role='menuitem' onClick={() => setValidating({ ...range, dropdown: true })}>Dropdown...</li>}
-            {canEdit && <li role='menuitem' onClick={() => setValidating({ ...range })}>Validation...</li>}
-            {(canEdit || (view.condFormats || []).length > 0) && <li role='menuitem' onClick={() => setColouring(true)}>Conditional formatting...</li>}
-            {(canEdit || (view.names || []).length > 0) && <li role='menuitem' onClick={() => setNaming({ adding: false })}>Named ranges...</li>}
-            {threads.length > 0 && <li role='menuitem' onClick={() => setListingComments(true)}>Comments{openThreads ? ' (' + openThreads + ' open)' : ''}</li>}
-            {canEdit && phone && <li role='menuitem' onClick={() => fillSelection('down')}>Fill down</li>}
-            {canEdit && phone && <li role='menuitem' onClick={() => fillSelection('right')}>Fill right</li>}
-          </>
-        )}
+        menuItems={() => [
+          { label: 'Find and replace', onSelect: () => setFinding({ replace: canEdit }) },
+          { label: 'Version history', className: 'version-history', onSelect: () => setHistory(true) },
+          threads.length > 0 && { label: 'Comments' + (openThreads ? ' (' + openThreads + ' open)' : ''), onSelect: () => setListingComments(true) },
+          '-',
+          canEdit && { label: 'Freeze', className: 'freeze-sub', items: freezeItems() },
+          {
+            label: 'Data',
+            className: 'data-sub',
+            items: [
+              canEdit && { label: 'Sort...', onSelect: openSort },
+              filterItem(),
+              canEdit && { label: 'Dropdown...', onSelect: () => setValidating({ ...range, dropdown: true }) },
+              canEdit && { label: 'Validation...', onSelect: () => setValidating({ ...range }) },
+              (canEdit || (view.condFormats || []).length > 0) && { label: 'Conditional formatting...', onSelect: () => setColouring(true) },
+              (canEdit || (view.names || []).length > 0) && { label: 'Named ranges...', onSelect: () => setNaming({ adding: false }) },
+              canEdit && phone && { label: 'Fill down', onSelect: () => fillSelection('down') },
+              canEdit && phone && { label: 'Fill right', onSelect: () => fillSelection('right') }
+            ]
+          },
+          '-',
+          {
+            label: 'Save as',
+            className: 'save-sub',
+            items: [
+              window.pearoffice && { label: 'Excel (.xlsx)', onSelect: () => exportSheet(sheetId).catch((err) => onError(err.message)) },
+              window.pearoffice && { label: 'OpenDocument (.ods)', onSelect: () => exportOds(sheetId).catch((err) => onError(err.message)) },
+              { label: 'CSV, this tab', onSelect: () => exportCsv(view).catch((err) => onError(err.message)) },
+              { label: 'JSON', onSelect: () => exportJson(sheetId).catch((err) => onError(err.message)) },
+              { label: 'PDF, this tab', onSelect: () => printTab(view, 'pdf', printCharts()).catch((err) => onError(err.message)) }
+            ]
+          },
+          !phone && { label: 'Print this tab...', onSelect: () => printTab(view, 'print', printCharts()).catch((err) => onError(err.message)) }
+        ]}
       >
         <div ref={toolRow.ref} className={'tools' + (phone ? ' phone-row' : '')} role='toolbar' aria-label='Formatting' hidden={!canEdit}>
           <button title='Undo (Ctrl+Z)' aria-label='Undo' disabled={!view.canUndo} onClick={() => run('sheet:undo')}><ArrowCounterClockwise size={ICON} /></button>
@@ -1589,64 +1659,7 @@ export function SheetView ({ sheetId, files = [], folders = [], onOpenFile, onOp
       <input ref={dateInput} type='date' className='hidden-date' tabIndex={-1} aria-hidden='true' onChange={datePicked} />
       {shownHelp && <FormulaHelp help={shownHelp} selected={helpSel} onPick={pickFunction} anchor={document.activeElement && document.activeElement.tagName === 'INPUT' ? document.activeElement : null} />}
 
-      {menu && (
-        <ul className='menu' ref={menuRef} style={menu.kind === 'tab' ? { left: menu.x, bottom: window.innerHeight - menu.y } : { left: menu.x, top: menu.y }} role='menu'>
-          {menu.kind === 'tab' && (() => {
-            const i = view.tabs.findIndex((x) => x.id === menu.tabId)
-            const tab = view.tabs[i]
-            if (!tab) return null
-            const act = (fn) => () => { setMenu(null); fn() }
-            return (
-              <>
-                <li role='menuitem' onClick={act(() => setRenaming({ id: tab.id, value: tab.name }))}>Rename</li>
-                <li role='menuitem' onClick={act(async () => { const r = await run('sheet:duplicateTab', { tabId: tab.id }); if (r) { setTabId(r.tabId); select(1, 1) } })}>Duplicate</li>
-                {i > 0 && <li role='menuitem' onClick={act(() => run('sheet:moveTab', { tabId: tab.id, to: i - 1 }))}>Move left</li>}
-                {i < view.tabs.length - 1 && <li role='menuitem' onClick={act(() => run('sheet:moveTab', { tabId: tab.id, to: i + 1 }))}>Move right</li>}
-                {view.tabs.length > 1 && <li role='menuitem' className='danger' onClick={act(() => setDroppingTab(tab))}>Delete tab</li>}
-              </>
-            )
-          })()}
-          {menu.kind === 'cell' && (
-            <>
-              {canEdit && <li role='menuitem' onClick={() => { setMenu(null); menuCopy(true).catch((err) => onError(err.message)) }}>Cut</li>}
-              <li role='menuitem' onClick={() => { setMenu(null); menuCopy(false).catch((err) => onError(err.message)) }}>Copy</li>
-              {canEdit && <li role='menuitem' onClick={() => { setMenu(null); menuPaste(null).catch((err) => onError(err.message)) }}>Paste</li>}
-              {canEdit && <li role='menuitem' onClick={() => { setMenu(null); menuPaste('values').catch((err) => onError(err.message)) }}>Paste values only</li>}
-              {canEdit && <li role='menuitem' onClick={() => { setMenu(null); menuPaste('transpose').catch((err) => onError(err.message)) }}>Paste transposed</li>}
-              {canEdit && <li role='menuitem' onClick={() => { setMenu(null); quickSort(false) }}>Sort A to Z</li>}
-              {canEdit && <li role='menuitem' onClick={() => { setMenu(null); quickSort(true) }}>Sort Z to A</li>}
-              {canEdit && <li role='menuitem' onClick={() => { setMenu(null); openSort() }}>Sort...</li>}
-              {freezeItems(() => setMenu(null))}
-              {filterItems(() => setMenu(null))}
-              {canEdit && <li role='menuitem' onClick={() => { setMenu(null); setValidating({ ...range, dropdown: true }) }}>Dropdown...</li>}
-              {canEdit && <li role='menuitem' onClick={() => { setMenu(null); setValidating({ ...range }) }}>Validation...</li>}
-              {canEdit && <li role='menuitem' onClick={() => { setMenu(null); setColouring(true) }}>Conditional formatting...</li>}
-              {canEdit && <li role='menuitem' onClick={() => { setMenu(null); setNaming({ adding: true }) }}>Name this range...</li>}
-              {selLink && !selLink.gone && !selLink.missing && <li role='menuitem' onClick={() => { setMenu(null); openLink(sel.row, sel.col) }}>Open link</li>}
-              {canEdit && <li role='menuitem' onClick={() => { setMenu(null); startLink() }}>{ownLink(selLink) ? 'Edit link...' : 'Insert link...'}</li>}
-              {canEdit && ownLink(selLink) && <li role='menuitem' onClick={() => { setMenu(null); removeLink() }}>Remove link</li>}
-              {(canEdit || threadAt.has(sel.row + ',' + sel.col)) && <li role='menuitem' onClick={() => { setMenu(null); setCommenting({ row: sel.row, col: sel.col }) }}>{threadAt.has(sel.row + ',' + sel.col) ? 'Show comments' : 'Comment'}</li>}
-              {canEdit && <li role='menuitem' className='danger' onClick={() => { setMenu(null); run('sheet:clearRange', range) }}>Clear contents</li>}
-            </>
-          )}
-          {(menu.kind === 'row' || menu.kind === 'col') && <li role='menuitem' onClick={() => lineAction('before')}>Insert {menu.kind === 'row' ? 'row above' : 'column left'}</li>}
-          {(menu.kind === 'row' || menu.kind === 'col') && <li role='menuitem' onClick={() => lineAction('after')}>Insert {menu.kind === 'row' ? 'row below' : 'column right'}</li>}
-          {(menu.kind === 'row' || menu.kind === 'col') && (() => {
-            const [from, to] = headerSpan(menu.kind, menu.index)
-            const noun = menu.kind === 'row' ? (from === to ? 'row ' + from : 'rows ' + from + ' to ' + to) : (from === to ? 'column ' + colName(from) : 'columns ' + colName(from) + ' to ' + colName(to))
-            const set = menu.kind === 'row' ? manual.rows : manual.cols
-            let anyHidden = false
-            for (let n = from; n <= to; n++) if (set.has(n)) anyHidden = true
-            return (
-              <>
-                <li role='menuitem' onClick={() => setLinesHidden(menu.kind, true)}>Hide {noun}</li>
-                {anyHidden && <li role='menuitem' onClick={() => setLinesHidden(menu.kind, false)}>Show hidden {menu.kind === 'row' ? 'rows' : 'columns'}</li>}
-              </>
-            )
-          })()}
-          {(menu.kind === 'row' || menu.kind === 'col') && <li role='menuitem' className='danger' onClick={() => lineAction('delete')}>Delete {menu.kind === 'row' ? 'row ' + menu.index : 'column ' + colName(menu.index)}</li>}
-        </ul>
-      )}
+      {menu && <Menu label='Cell' where={{ x: menu.x, y: menu.y }} onClose={() => setMenu(null)} items={menuItems(gridMenu())} />}
 
       <footer className='tabbar'>
         <div className='tab-strip' ref={tabStrip} onWheel={(e) => { if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) e.currentTarget.scrollLeft += e.deltaY }}>

@@ -42,6 +42,26 @@ module.exports = async function app (t) {
   await js("document.activeElement && document.activeElement.blur()")
   step('more menu closes')
 
+  // In a short window the menu stays inside it (scrolling when it must; the
+  // window cannot get short enough here to need it); a submenu opens beside
+  // its item, inside the window too (src/ui/Menu.jsx).
+  const [w0, h0] = t.win.getContentSize()
+  t.win.setContentSize(w0, 300)
+  await sleep(300)
+  await js("document.querySelector('.toolbar .more-button').click()")
+  await waitFor('more menu in a short window', moreOpen)
+  const fits = (sel) => `(() => { const m = document.querySelector('${sel}'); if (!m) return false; const r = m.getBoundingClientRect(); return r.top >= 0 && r.bottom <= window.innerHeight && r.left >= 0 && r.right <= window.innerWidth })()`
+  await waitFor('menu inside the window', fits('.more-menu:not(.submenu)'))
+  await js("document.querySelector('.more-menu li.save-sub').click()")
+  // Beside its item: to the right, or to the left when there is no room.
+  await waitFor('submenu inside the window, beside its item', fits('.more-menu.submenu') + " && (() => { const sub = document.querySelector('.more-menu.submenu').getBoundingClientRect(); const it = document.querySelector('.more-menu li.save-sub').getBoundingClientRect(); return sub.left >= it.right - 4 || sub.right <= it.left + 4 })()")
+  await t.shot('PEAROFFICE_SMOKE_MENU_SHOT', 200) // the menu and Save as, in a short window
+  t.wc.sendInputEvent({ type: 'keyDown', keyCode: 'Escape' }); t.wc.sendInputEvent({ type: 'keyUp', keyCode: 'Escape' })
+  await waitFor('closed', '!' + moreOpen)
+  t.win.setContentSize(w0, h0)
+  await sleep(300)
+  step('menus fit the window')
+
   // With a file worth recovering, a dot on Settings (and on Devices inside
   // it) asks for the phrase to be written down, until it is shown below.
   // PEAROFFICE_SMOKE_NUDGE_SHOT=<file> saves the side menu and Settings.
@@ -273,6 +293,8 @@ module.exports = async function app (t) {
   await js("document.querySelector('.panel .close').click()")
   result.sheetsBefore = await js("document.querySelectorAll('.sheet-link:not(.all-files)').length")
   await js("document.querySelector('.toolbar .more-button').click()")
+  await waitFor('File submenu', "!!document.querySelector('.more-menu li.file-sub')")
+  await js("document.querySelector('.more-menu li.file-sub').click()")
   await waitFor('more menu', "[...document.querySelectorAll('.more-menu li')].some((l) => l.textContent.trim() === 'Delete for everyone')")
   await js("[...document.querySelectorAll('.more-menu li')].find((l) => l.textContent.trim() === 'Remove from this device').click()")
   await waitFor('confirm', "[...document.querySelectorAll('.panel button')].some((b) => b.textContent.trim() === 'Remove')")

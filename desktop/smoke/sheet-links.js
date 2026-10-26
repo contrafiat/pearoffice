@@ -100,7 +100,7 @@ module.exports = async function sheetLinks (t) {
   step('link to a block')
 
   // Save as .xlsx and open it again: the links come back.
-  await more('Save as an Excel file')
+  await more('Excel (.xlsx)')
   const files = fs.existsSync(downloads) ? fs.readdirSync(downloads) : []
   let file = files.find((f) => f.endsWith('.xlsx'))
   for (const t0 = Date.now(); !file && Date.now() - t0 < 15000;) { await sleep(200); file = (fs.existsSync(downloads) ? fs.readdirSync(downloads) : []).find((f) => f.endsWith('.xlsx')) }
