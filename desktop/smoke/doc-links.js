@@ -58,8 +58,8 @@ module.exports = async function docLinks (t) {
 
   // Links to a file and a folder, picked from the list.
   const linkTo = async (group, name) => {
-    await js("document.querySelector('.doc-body').focus()")
-    await sendMod('End', ['control'])
+    // To the end of the document (Ctrl+End is not a Mac key: Cmd+Down is).
+    await js("document.querySelector('.doc-body').editor.commands.focus('end')")
     await type(' and ')
     await sleep(200)
     await sendMod('K', ['control'])
