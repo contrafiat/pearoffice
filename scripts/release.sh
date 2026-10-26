@@ -713,7 +713,7 @@ _publish_release() {
          --notes-file release_notes.md --draft >/dev/null; then
     _new=true
   else
-    PUBLISH_FAILED=true
+    PUBLISH_FAILED=true; GITHUB_FAILED=true
     echo "ERROR: creating the GitHub release on $repo failed. The tag is pushed; re-run with ./scripts/release.sh $RELEASE_TAG --retag"
     return
   fi
@@ -733,7 +733,7 @@ _publish_release() {
   if $_ok; then
     echo "==> All $_of assets uploaded to $repo."
   else
-    PUBLISH_FAILED=true
+    PUBLISH_FAILED=true; GITHUB_FAILED=true
     if $_new; then
       echo "ERROR: uploading to $repo failed. The release is still a draft there; re-run with ./scripts/release.sh $RELEASE_TAG --retag"
     else
@@ -819,7 +819,7 @@ if $PUBLISH_APP_STORE; then
       | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['id'])" 2>/dev/null || echo "")
   fi
   if [ -z "$_vid" ]; then
-    PUBLISH_FAILED=true
+    PUBLISH_FAILED=true; APP_STORE_FAILED=true
     echo "    ERROR: could not find or create App Store version $APP_VERSION."
   else
     echo "    Version record: $_vid"
@@ -842,7 +842,7 @@ if $PUBLISH_APP_STORE; then
              && asc review submissions-submit --id "$_sid" --confirm >/dev/null; then
             echo "    Submitted. Watch with: asc review status --app $ASC_APP_ID"
           else
-            PUBLISH_FAILED=true
+            PUBLISH_FAILED=true; APP_STORE_FAILED=true
             echo "    ERROR: the review submission failed; submit in App Store Connect."
           fi
         fi
@@ -851,7 +851,7 @@ if $PUBLISH_APP_STORE; then
         echo "    Build is ${_state:-not processed yet}; the submission is deferred (see the reminder at the end)."
       fi
     else
-      PUBLISH_FAILED=true
+      PUBLISH_FAILED=true; APP_STORE_FAILED=true
       echo "    ERROR: the iOS build or upload failed."
     fi
   fi
