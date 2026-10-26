@@ -116,7 +116,12 @@ async function run (t) {
   result.chartsData = result.chartsGrid
   step('data edited')
 
-  // Title, stacked and values on the chart.
+  // Title, stacked and values on the chart. In a narrow window (the Windows
+  // VM's screen is 1024 wide) some of the chart's tools are under More tools.
+  if (await js("!!document.querySelector('.slides-tools [data-tool-hidden]')")) {
+    await js("document.querySelector('.slides-tools .tool-more').click()")
+    await waitFor('every tool shown', "!document.querySelector('.slides-tools [data-tool-hidden]')")
+  }
   await js("(() => { const i = document.querySelector('.slides-tools .chart-title-input'); i.focus(); i.select() })()")
   await type('Fruit sales', 30)
   await key('Return')
