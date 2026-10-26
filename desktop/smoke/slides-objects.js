@@ -2,7 +2,8 @@
 // with real mouse events, a shape's fill, outline and width changed, text
 // typed in a rectangle, a picture inserted from a generated PNG, resized
 // (keeping its shape), moved and given alt text, the slide duplicated with
-// its picture, the four themes, the show drawing shapes and the picture,
+// its picture, a link on the picture, the four themes, the show drawing
+// shapes and the picture (a click on the linked picture opens it),
 // then the deck reopened.
 //
 // PEAROFFICE_SMOKE_OBJECTS_SHOTS=<folder> saves a screenshot per theme and
@@ -204,6 +205,21 @@ async function run (t) {
   await waitFor('alt saved', `document.querySelector('${elSel(pic)} img').alt === 'Green box' && !document.querySelector('.alt-edit')`)
   step('picture resized, moved, alt text')
 
+  // A link on the picture (proposals/2026-10-26-picture-links.md), from the
+  // toolbar's Link button.
+  const opened = () => { try { return fs.readFileSync(path.join(t.dataDir, 'opened.txt'), 'utf8') } catch { return '' } }
+  wc.sendInputEvent({ type: 'mouseDown', x: pc.x, y: pc.y, button: 'left', clickCount: 1 })
+  wc.sendInputEvent({ type: 'mouseUp', x: pc.x, y: pc.y, button: 'left', clickCount: 1 })
+  await waitFor('Link button', "!!document.querySelector('.slides-tools .object-link')")
+  await js("document.querySelector('.slides-tools .object-link').click()")
+  await waitFor('object link bar', "!!document.querySelector('.slides-link .link-bar input')")
+  await js("document.querySelector('.slides-link .link-bar input').focus()")
+  await type('example.org/slide', 20)
+  await key('Return')
+  await waitFor('picture linked', `document.querySelector('${elSel(pic)}').dataset.href === 'https://example.org/slide' && !!document.querySelector('${elSel(pic)} > .slide-link-mark') && !!document.querySelector('.slides-tools .object-open-link')`)
+  result.objectsLink = true
+  step('picture link')
+
   // Thumbnails draw shapes and the picture.
   await waitFor('thumbnail objects', "!!document.querySelector('.slide-thumb .thumb svg[data-shape=arrow]') && (() => { const i = document.querySelector('.slide-thumb .thumb img.slide-picture'); return !!i && i.complete && i.naturalWidth === 320 })()")
   const firstSlide = await js("document.querySelector('.slide-thumb.current').dataset.id")
@@ -234,6 +250,14 @@ async function run (t) {
   await js("document.querySelector('.present-button').click()")
   await waitFor('show', "!!document.querySelector('.show .slide svg[data-shape=rect]') && (() => { const i = document.querySelector('.show .slide img.slide-picture'); return !!i && i.complete && i.naturalWidth === 320 })()")
   result.objectsShow = await js("getComputedStyle(document.querySelector('.show .slide')).backgroundColor === " + JSON.stringify(THEMES.vivid))
+  // A click on the linked picture opens the link and stays on the slide.
+  const shown = await js("document.querySelector('.show .slide').dataset.id")
+  const sp = await centre('.show .slide-el[data-link]')
+  wc.sendInputEvent({ type: 'mouseDown', x: sp.x, y: sp.y, button: 'left', clickCount: 1 })
+  wc.sendInputEvent({ type: 'mouseUp', x: sp.x, y: sp.y, button: 'left', clickCount: 1 })
+  for (let i = 0; i < 30 && !opened().includes('https://example.org/slide'); i++) await sleep(100)
+  result.objectsShowLink = opened().includes('https://example.org/slide') && (await js("document.querySelector('.show .slide').dataset.id")) === shown
+  if (!result.objectsShowLink) throw new Error('the linked picture did not open in the show: ' + opened())
   await key('Escape')
   await waitFor('show ended', "!document.querySelector('.show')")
   step('show')
@@ -258,5 +282,5 @@ async function run (t) {
   if (!result.objectsPersisted) throw new Error('not kept after reopening')
   step('deck reopened')
 
-  return result.objectsThemePicker && result.objectsShapes && result.objectsStyle && result.objectsPictureBytes && result.objectsPictureAspect && result.objectsPictureMoved && result.objectsThemes && result.objectsDuplicate && result.objectsShow && result.objectsPersisted
+  return result.objectsThemePicker && result.objectsShapes && result.objectsStyle && result.objectsPictureBytes && result.objectsPictureAspect && result.objectsPictureMoved && result.objectsThemes && result.objectsDuplicate && result.objectsShow && result.objectsShowLink && result.objectsLink && result.objectsPersisted
 }

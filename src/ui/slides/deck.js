@@ -27,7 +27,8 @@ export function useDeckVersion (ydoc) {
 // Each element as drawn: { id, type, role, frame, text }, plus `style` for
 // shapes (slidesModel.style), `layout` for text boxes and shapes
 // (slidesModel.textLayout), `pic` and `crop` for pictures and `chart` for
-// charts (slidesModel.chartOf: { chart, data }).
+// charts (slidesModel.chartOf: { chart, data }), and `link` (a picture's or
+// shape's link, or null).
 export function boxesOf (ydoc, slideId) {
   return slidesModel.elements(ydoc, slideId).map((e) => {
     const role = e.map.get('role')
@@ -41,6 +42,7 @@ export function boxesOf (ydoc, slideId) {
       el.pic = { ref: str('ref'), hash: str('hash'), mime: str('mime'), w: e.map.get('pw') || 1, h: e.map.get('ph') || 1, alt: str('alt').slice(0, 500) }
       el.text = null
     }
+    el.link = slidesModel.linkOf(e.map) // proposals/2026-10-26-picture-links.md
     if (type === 'chart') {
       el.chart = slidesModel.chartOf(e.map)
       el.text = null

@@ -32,8 +32,10 @@ change to keys, crypto, membership or the wire format.
   on a linked object opens the link (web and email in the browser) instead
   of moving to the next slide, as PowerPoint does. Files and folders are not
   opened during a show; that would end it.
-- Phones: viewers and editors can open links (tap the picture, then Open).
-  Phones do not add them on slides, since phones do not edit objects there.
+- Phones: in a document, viewers open a linked picture with a tap and
+  editors from the picture's bubble. On a slide, a tap on a linked picture
+  opens it; a linked shape opens in the show. Phones do not add links on
+  slides, since phones do not edit objects there.
 
 ## Files
 

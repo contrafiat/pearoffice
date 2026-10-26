@@ -17,6 +17,7 @@ import { isMobile } from '../sheet/xlsx.js'
 import { exportDocument, tidyPaste } from './docFiles.js'
 import { usePrintKey } from '../printKey.js'
 import { usePearLinks, pearLink, fileLink, folderLink } from '../pearLinks.js'
+import { okLink } from '../../shared/links.js'
 import { untitled } from '../Files.jsx'
 import { useToolOverflow } from '../toolOverflow.jsx'
 import { Outline } from './Outline.jsx'
@@ -439,7 +440,7 @@ function DocEditor ({ sheetId, files, folders, onOpenFile, onOpenFolder, picture
         quote: ed.isActive('blockquote'),
         code: ed.isActive('codeBlock'),
         table: ed.isActive('table'),
-        picture: ed.state.selection instanceof NodeSelection && ed.state.selection.node.type.name === 'image' ? { pos: ed.state.selection.from, align: ed.state.selection.node.attrs.align || 'center', alt: ed.state.selection.node.attrs.alt || '' } : null,
+        picture: ed.state.selection instanceof NodeSelection && ed.state.selection.node.type.name === 'image' ? { pos: ed.state.selection.from, align: ed.state.selection.node.attrs.align || 'center', alt: ed.state.selection.node.attrs.alt || '', href: ed.state.selection.node.attrs.href || '' } : null,
         empty: ed.state.selection.empty,
         words: ed.storage.characterCount.words(),
         chars: ed.storage.characterCount.characters(),
@@ -452,6 +453,7 @@ function DocEditor ({ sheetId, files, folders, onOpenFile, onOpenFolder, picture
   // (a row that scrolls sideways would clip it).
   const [menu, setMenu] = useState(null) // { kind, top, left }
   const [linking, setLinking] = useState(null) // the link being typed, or null
+  const [picLinking, setPicLinking] = useState(null) // the picture whose link is being typed, or null
   // Links to web pages, files and folders (pearLinks.js).
   const links = usePearLinks({ files, folders, onOpenFile, onOpenFolder })
   const openHref = (href) => { const p = pearLink(href); links.open(p || { url: href }) }
@@ -598,7 +600,8 @@ function DocEditor ({ sheetId, files, folders, onOpenFile, onOpenFolder, picture
           <li role='menuitem' onClick={() => run((c) => c.command(changeCaseCommand('title')))}>Title Case</li>
         </ul>
       )}
-      {s.picture && canEdit && !menu && <PictureBubble editor={editor} picture={s.picture} />}
+      {s.picture && canEdit && !menu && picLinking === null && <PictureBubble editor={editor} picture={s.picture} link={s.picture.href ? textLink(s.picture.href, links.placeOf) : null} onLink={() => setPicLinking(s.picture.pos)} onOpen={() => openHref(s.picture.href)} />}
+      {picLinking !== null && canEdit && s.picture && <LinkBar editor={editor} initial={s.picture.href} files={links.usable.filter((f) => f.sheetId !== sheetId)} folders={folders} placeOf={links.placeOf} onSet={(href) => editor.chain().focus().setNodeSelection(picLinking).updateAttributes('image', { href }).setNodeSelection(picLinking).run()} onClose={() => setPicLinking(null)} />}
       {linking !== null && canEdit && <LinkBar editor={editor} initial={linking} files={links.usable.filter((f) => f.sheetId !== sheetId)} folders={folders} placeOf={links.placeOf} onClose={() => setLinking(null)} />}
       {atLink && linking === null && !menu && !s.picture && <TextLinkCard editor={editor} link={atLink} canEdit={canEdit} onOpen={() => openHref(s.href)} onEdit={() => setLinking(s.href)} />}
       {finding && <FindBar editor={editor} canEdit={canEdit} onClose={() => { editor.commands.setFind({ query: '' }); setFinding(false) }} />}
@@ -683,7 +686,8 @@ export const RemoteCursors = Extension.create({
 })
 
 // Alignment, alt text and delete for the selected picture, just above it.
-function PictureBubble ({ editor, picture }) {
+// `link` is the picture's link as textLink gives it, or null.
+function PictureBubble ({ editor, picture, link, onLink, onOpen }) {
   const [alt, setAlt] = useState(picture.alt)
   useEffect(() => setAlt(picture.alt), [picture.pos, picture.alt])
   const dom = editor.view.nodeDOM(picture.pos)
@@ -707,6 +711,8 @@ function PictureBubble ({ editor, picture }) {
         onBlur={saveAlt}
         onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); saveAlt() } if (e.key === 'Escape') { e.preventDefault(); setAlt(picture.alt); editor.commands.focus() } }}
       />
+      <button title={link ? 'Edit link: ' + (link.url || link.missing || link.name) : 'Link'} aria-label={link ? 'Edit link' : 'Link'} aria-pressed={!!link} className={link ? 'on' : ''} onMouseDown={keep} onClick={onLink}><LinkSimple size={18} /></button>
+      {link && !link.missing && <button title='Open link' aria-label='Open link' onMouseDown={keep} onClick={onOpen}><ArrowSquareOut size={18} /></button>}
       <button title='Delete the picture' aria-label='Delete the picture' onMouseDown={keep} onClick={() => editor.chain().focus().setNodeSelection(picture.pos).deleteSelection().run()}><Trash size={18} /></button>
     </div>
   )
@@ -740,7 +746,8 @@ function outdent (editor) {
 // a web or email address, or another file or a folder picked from the list
 // (proposals/2026-10-22-links-to-files.md). `placeOf` names a file or folder
 // link (pearLinks.js).
-export function LinkBar ({ editor, initial, files = [], folders = [], placeOf, onClose }) {
+// With `onSet` it sets a picture's link instead (proposals/2026-10-26-picture-links.md).
+export function LinkBar ({ editor, initial, files = [], folders = [], placeOf, onClose, onSet }) {
   // `pick` is a file or folder link, kept while the box still shows its name.
   const [pick, setPick] = useState(() => {
     const l = pearLink(initial) && placeOf ? placeOf(pearLink(initial)) : null
@@ -755,14 +762,17 @@ export function LinkBar ({ editor, initial, files = [], folders = [], placeOf, o
     setHref(name)
     setPick({ text: name, link: f ? fileLink(f.sheetId) : folderLink(d.id) })
   }
+  const has = onSet ? !!initial : editor.isActive('link')
+  const full = (url) => pick && url === pick.text ? pick.link : /^[a-z][a-z0-9+.-]*:/i.test(url) ? url : 'https://' + url
   function apply () {
     const url = href.trim()
+    if (onSet) { onSet(url ? okLink(full(url)) : null); onClose(); return }
     const c = editor.chain().focus().extendMarkRange('link')
     if (!url) c.unsetLink().run()
     else {
-      const full = pick && url === pick.text ? pick.link : /^[a-z][a-z0-9+.-]*:/i.test(url) ? url : 'https://' + url
-      if (editor.state.selection.empty && !editor.isActive('link')) c.insertContent({ type: 'text', text: url, marks: [{ type: 'link', attrs: { href: full } }] }).run()
-      else c.setLink({ href: full }).run()
+      const link = full(url)
+      if (editor.state.selection.empty && !editor.isActive('link')) c.insertContent({ type: 'text', text: url, marks: [{ type: 'link', attrs: { href: link } }] }).run()
+      else c.setLink({ href: link }).run()
     }
     onClose()
   }
@@ -775,7 +785,7 @@ export function LinkBar ({ editor, initial, files = [], folders = [], placeOf, o
         placeholder='Paste or type a link.'
         value={href}
         onChange={(e) => setHref(e.target.value)}
-        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); apply() } if (e.key === 'Escape') { e.preventDefault(); onClose(); editor.commands.focus() } }}
+        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); apply() } if (e.key === 'Escape') { e.preventDefault(); onClose(); if (editor) editor.commands.focus() } }}
       />
       {(files.length > 0 || folders.length > 0) && (
         <select aria-label='Link to a file or folder' value='' onChange={(e) => choose(e.target.value)}>
@@ -786,7 +796,7 @@ export function LinkBar ({ editor, initial, files = [], folders = [], placeOf, o
       )}
       <div className='doc-bar-buttons'>
         <button className='primary' onClick={apply}>Apply</button>
-        {editor.isActive('link') && <button onClick={() => { editor.chain().focus().extendMarkRange('link').unsetLink().run(); onClose() }}>Remove</button>}
+        {has && <button onClick={() => { if (onSet) onSet(null); else editor.chain().focus().extendMarkRange('link').unsetLink().run(); onClose() }}>Remove</button>}
       </div>
       <button className='icon-button close' aria-label='Close' title='Close' onClick={onClose}><X size={16} /></button>
     </div>
@@ -837,12 +847,13 @@ export function TextLinkCard ({ editor, link, canEdit, onOpen, onEdit }) {
   )
 }
 
-// A click on a link opens it for a viewer, or with Ctrl (Cmd) held.
+// A click on a link (or a linked picture) opens it for a viewer, or with
+// Ctrl (Cmd) held.
 export function linkClick (e, canEdit, open) {
-  const a = e.target.closest && e.target.closest('a[href]')
+  const a = e.target.closest && e.target.closest('a[href], [data-href]')
   if (!a || (canEdit && !e.ctrlKey && !e.metaKey)) return
   e.preventDefault()
-  open(a.getAttribute('href'))
+  open(a.getAttribute('href') || a.dataset.href)
 }
 
 function FindBar ({ editor, canEdit, onClose }) {

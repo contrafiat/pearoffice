@@ -18,6 +18,7 @@ import { marked } from 'marked'
 import { checkZip } from '../slides/importOoxml.js'
 import * as D from 'docx'
 import { documentExtensions, SIZES, LINE_HEIGHTS, MAX_INDENT } from './extensions.js'
+import { okLink } from '../../shared/links.js'
 import { call } from '../bridge.js'
 import { fileName, saveFile, isMobile } from '../save.js'
 import { preparePicture, wordPicture, toB64, fromB64 } from './pictures.js'
@@ -81,6 +82,11 @@ function tidy (html, styles, paste = false) {
       if (img.getAttribute('alt')) next.setAttribute('alt', img.getAttribute('alt'))
       // A width as a share of the page (.odt import gives one).
       if (/^\d+$/.test(img.getAttribute('data-width') || '')) next.setAttribute('data-width', img.getAttribute('data-width'))
+      // A link round the picture (.docx and .odt), kept on the picture.
+      const a = img.closest('a')
+      const href = a && okLink(a.getAttribute('href'))
+      if (href) next.setAttribute('data-href', href)
+      if (a && a.textContent.trim() === '' && a.querySelectorAll('img').length === 1) a.replaceWith(img)
       // The editor's parser puts it on its own line.
       img.replaceWith(next)
       kept.add(next)
@@ -829,7 +835,10 @@ function mdBlocks (nodes, pics = new Map()) {
     } else if (n.type === 'horizontalRule') out.push('---')
     else if (n.type === 'image') {
       const p = pics.get(a.ref)
-      if (p) out.push('![' + mdEscape(a.alt || '').replace(/\n/g, ' ') + '](' + dataUrl(p) + ')')
+      if (p) {
+        const img = '![' + mdEscape(a.alt || '').replace(/\n/g, ' ') + '](' + dataUrl(p) + ')'
+        out.push(okLink(a.href) ? '[' + img + '](' + a.href + ')' : img)
+      }
     } else if (n.type === 'blockquote') out.push(mdBlocks(n.content, pics).join('\n\n').split('\n').map((l) => (l ? '> ' + l : '>')).join('\n'))
     else if (n.type === 'bulletList' || n.type === 'orderedList' || n.type === 'taskList') {
       const start = a.start || 1
@@ -971,6 +980,9 @@ function paragraph (n, ctx, extra = {}) {
 const PAGE_PX = 602
 const WORD_TYPES = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/gif': 'gif', 'image/bmp': 'bmp' }
 
+// A picture with a link goes inside a Word hyperlink.
+const linked = (href, run) => (okLink(href) ? new D.ExternalHyperlink({ link: href, children: [run] }) : run)
+
 function picture (n, ctx) {
   const a = n.attrs || {}
   const p = ctx.pictures && ctx.pictures.get(a.ref)
@@ -978,7 +990,7 @@ function picture (n, ctx) {
   const width = Math.round(a.width ? PAGE_PX * a.width / 100 : Math.min(a.w, PAGE_PX))
   return new D.Paragraph({
     alignment: ALIGN[a.align] || D.AlignmentType.CENTER,
-    children: [new D.ImageRun({ type: WORD_TYPES[p.mime], data: p.bytes, transformation: { width, height: Math.round(width * a.h / a.w) }, altText: { name: 'Picture', description: a.alt || '', title: a.alt || '' } })]
+    children: [linked(a.href, new D.ImageRun({ type: WORD_TYPES[p.mime], data: p.bytes, transformation: { width, height: Math.round(width * a.h / a.w) }, altText: { name: 'Picture', description: a.alt || '', title: a.alt || '' } }))]
   })
 }
 
@@ -1121,6 +1133,9 @@ export function toHtml (json, title = '', pictures = new Map()) {
       const pct = Number(img.getAttribute('data-width'))
       const w = Number(img.getAttribute('data-w'))
       img.setAttribute('style', pct ? 'width:' + pct + '%' : w ? 'width:' + w + 'px' : '')
+      // A linked picture stays a link in the PDF.
+      const href = okLink(img.getAttribute('data-href'))
+      if (href) { const a = doc.createElement('a'); a.setAttribute('href', href); img.replaceWith(a); a.appendChild(img) }
     }
     body = doc.body.innerHTML
   }

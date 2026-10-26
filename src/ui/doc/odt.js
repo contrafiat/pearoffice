@@ -7,6 +7,7 @@
 // any other, so the same rules decide what is kept.
 
 import * as fflate from 'fflate'
+import { okLink } from '../../shared/links.js'
 
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 const FONT = 'Arial'
@@ -122,9 +123,12 @@ function createWriter (pictures) {
     const h = w * a.h / a.w
     const align = { left: 'start', right: 'end' }[a.align] || 'center'
     const ps = style('P', 'paragraph', '<style:paragraph-properties fo:text-align="' + align + '"/>', 'Standard')
-    return '<text:p text:style-name="' + ps + '"><draw:frame draw:name="Picture ' + pictureNo + '" text:anchor-type="as-char" svg:width="' + cm(w) + '" svg:height="' + cm(h) + '" draw:z-index="0">' +
+    const frame = '<draw:frame draw:name="Picture ' + pictureNo + '" text:anchor-type="as-char" svg:width="' + cm(w) + '" svg:height="' + cm(h) + '" draw:z-index="0">' +
       '<draw:image xlink:href="' + name + '" xlink:type="simple" xlink:show="embed" xlink:actuate="onLoad"/>' +
-      (a.alt ? '<svg:title>' + esc(a.alt) + '</svg:title>' : '') + '</draw:frame></text:p>'
+      (a.alt ? '<svg:title>' + esc(a.alt) + '</svg:title>' : '') + '</draw:frame>'
+    // A link on the picture (proposals/2026-10-26-picture-links.md).
+    const href = okLink(a.href)
+    return '<text:p text:style-name="' + ps + '">' + (href ? '<draw:a xlink:type="simple" xlink:href="' + esc(href) + '">' + frame + '</draw:a>' : frame) + '</text:p>'
   }
 
   function blocks (nodes, ctx = {}) {
@@ -389,7 +393,7 @@ export function odtToHtml (files) {
   }
 
   let dropped = false
-  const picture = (frame) => {
+  const picture = (frame, link) => {
     const img = frame.getElementsByTagName('draw:image')[0]
     const href = img && (img.getAttribute('xlink:href') || '').replace(/^\.\//, '')
     const bytes = href && files[href]
@@ -400,7 +404,8 @@ export function odtToHtml (files) {
     const alt = titleEl ? titleEl.textContent : ''
     const w = len(frame.getAttribute('svg:width'))
     const pct = w ? Math.max(10, Math.min(100, Math.round(w / PAGE_CM * 100))) : null
-    return '<img src="data:' + mime + ';base64,' + toB64(bytes) + '"' + (alt ? ' alt="' + esc(alt) + '"' : '') + (pct && pct < 100 ? ' data-width="' + pct + '"' : '') + '>'
+    const tag = '<img src="data:' + mime + ';base64,' + toB64(bytes) + '"' + (alt ? ' alt="' + esc(alt) + '"' : '') + (pct && pct < 100 ? ' data-width="' + pct + '"' : '') + '>'
+    return link ? '<a href="' + esc(link) + '">' + tag + '</a>' : tag
   }
 
   // Inline content -> HTML; pictures found are returned apart (block level).
@@ -418,7 +423,13 @@ export function odtToHtml (files) {
         case 'text:span': out += wrap(textStyleCss(c.getAttribute('text:style-name')), inline(c, pics)); break
         case 'text:a': out += '<a href="' + esc(c.getAttribute('xlink:href') || '') + '">' + inline(c, pics) + '</a>'; break
         case 'draw:frame': pics.push(picture(c)); break
-        case 'draw:a': out += inline(c, pics); break
+        // A linked picture: the link goes on the picture (docFiles.js).
+        case 'draw:a': {
+          const f = [...c.childNodes].find((x) => x.nodeName === 'draw:frame')
+          if (f) pics.push(picture(f, okLink(c.getAttribute('xlink:href'))))
+          else out += inline(c, pics)
+          break
+        }
         case 'text:note': case 'office:annotation': case 'office:annotation-end': dropped = dropped || c.nodeName === 'text:note'; break
         case 'text:bookmark': case 'text:bookmark-start': case 'text:bookmark-end': case 'text:soft-page-break': break
         default: out += inline(c, pics)

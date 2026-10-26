@@ -361,6 +361,17 @@ const PICTURE_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/bmp', 'ima
 
 // The deck as .pptx bytes. `pictures`: ref -> { bytes, mime }, in a type
 // PowerPoint reads (png, jpeg, gif); a picture missing from it is left out.
+// pptxgenjs writes a shape's link (cNvPr hlinkClick) for addText as for
+// addShape, but only registers its relationship for addShape; this does it
+// the same way (getNewRelId, createHyperlinkRels in pptxgenjs).
+function shapeLinkRel (slide, url) {
+  const made = slide._slideObjects[slide._slideObjects.length - 1]
+  const h = made && made.options && made.options.hyperlink
+  if (!h || h._rId) return
+  h._rId = slide._rels.length + slide._relsChart.length + slide._relsMedia.length + 1
+  slide._rels.push({ type: 'hyperlink', data: 'dummy', rId: h._rId, Target: url.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;') })
+}
+
 export async function deckToPptx (doc, { title = '', pictures = new Map() } = {}) {
   const [sw, sh] = slidesModel.size(doc)
   const theme = themeFor(slidesModel.theme(doc))
@@ -382,6 +393,9 @@ export async function deckToPptx (doc, { title = '', pictures = new Map() } = {}
       const type = e.map.get('type')
       const f = slidesModel.frame(e.map)
       const box = { x: inch(f.x), y: inch(f.y), w: inch(f.w), h: inch(f.h), rotate: f.rot || undefined, objectName: type + ' ' + e.id }
+      // A picture's or shape's link (proposals/2026-10-26-picture-links.md).
+      const link = slidesModel.linkOf(e.map)
+      if (link) box.hyperlink = { url: link }
       if (type === 'chart') {
         const value = slidesModel.chartOf(e.map)
         const c = pptxChart(value, theme)
@@ -456,7 +470,10 @@ export async function deckToPptx (doc, { title = '', pictures = new Map() } = {}
         arrows.set(shape.objectName, '<a:gd name="adj1" fmla="val 40000"/><a:gd name="adj2" fmla="val ' + Math.round(head / Math.min(iw, ih) * 100000) + '"/>')
       }
       if (isEmpty(json)) slide.addShape(shape.shape, shape)
-      else slide.addText(textRuns(json, base, theme), { ...shape, ...textOpts })
+      else {
+        slide.addText(textRuns(json, base, theme), { ...shape, ...textOpts })
+        if (link) shapeLinkRel(slide, link)
+      }
     }
     const notes = notesText(s.map.get('notes'))
     if (notes) slide.addNotes(notes)

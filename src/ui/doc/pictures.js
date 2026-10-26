@@ -228,6 +228,9 @@ export async function adoptPictures (found, { sheetId, call: send = call, clip =
 // The picture node with its view: a grey box with "Picture loading" until the
 // bytes arrive (fetched when near the screen), "This picture is not available
 // yet" if they do not and a corner handle to resize it while editing.
+// Phosphor's LinkSimple.
+const LINK_SVG = '<svg viewBox="0 0 256 256" width="14" height="14" fill="currentColor"><path d="M165.66,90.34a8,8,0,0,1,0,11.32l-64,64a8,8,0,0,1-11.32-11.32l64-64A8,8,0,0,1,165.66,90.34ZM215.6,40.4a56,56,0,0,0-79.2,0L106.34,70.45a8,8,0,0,0,11.32,11.32l30.06-30a40,40,0,0,1,56.57,56.56l-30.07,30.06a8,8,0,0,0,11.31,11.32L215.6,119.6a56,56,0,0,0,0-79.2ZM138.34,174.22l-30.06,30.06a40,40,0,1,1-56.56-56.57l30.05-30.05a8,8,0,0,0-11.32-11.32L40.4,136.4a56,56,0,0,0,79.2,79.2l30.06-30.07a8,8,0,0,0-11.32-11.31Z"/></svg>'
+
 export const PictureView = Picture.extend({
   addOptions () {
     return { cache: null }
@@ -248,7 +251,13 @@ export const PictureView = Picture.extend({
       const handle = document.createElement('span')
       handle.className = 'doc-picture-handle'
       handle.setAttribute('aria-hidden', 'true')
-      frame.append(wait, img, handle)
+      // A linked picture's mark, shown on hover and when selected
+      // (proposals/2026-10-26-picture-links.md).
+      const mark = document.createElement('span')
+      mark.className = 'doc-picture-link'
+      mark.setAttribute('aria-hidden', 'true')
+      mark.innerHTML = LINK_SVG
+      frame.append(wait, img, handle, mark)
       dom.append(frame)
 
       let shownRef = null
@@ -283,6 +292,10 @@ export const PictureView = Picture.extend({
         dom.dataset.align = a.align || 'center'
         img.alt = a.alt || ''
         frame.title = a.alt || ''
+        // DocView's click handler opens it (linkClick).
+        if (a.href) frame.dataset.href = a.href
+        else delete frame.dataset.href
+        mark.hidden = !a.href
         frame.style.aspectRatio = a.w && a.h ? a.w + ' / ' + a.h : ''
         frame.style.width = a.width ? a.width + '%' : (a.w ? a.w + 'px' : '100%')
         load()

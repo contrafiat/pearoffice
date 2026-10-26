@@ -123,10 +123,11 @@ function makeDeck (m) {
     for (const [shape, f] of Object.entries(spots)) {
       const id = S.addShape(doc, s2, shape, f)
       if (shape === 'rect') fill(S.element(doc, s2, id), { type: 'doc', content: [p([t('Box text')])] })
+      if (shape === 'rect') S.setLink(doc, s2, id, 'https://example.com/box')
       if (shape === 'roundRect') S.setStyle(doc, s2, id, { fill: '#fef08a', line: '#2f7d8c', lineW: 8, radius: 0.25 })
       if (shape === 'line') S.setStyle(doc, s2, id, { lineW: 8 })
     }
-    S.addPicture(doc, s2, { ref: PIC_REF, hash: 'h', mime: 'image/png', w: 320, h: 160, alt: 'Green box' }, { x: 100, y: 640, w: 400, h: 200, rot: 0 })
+    S.setLink(doc, s2, S.addPicture(doc, s2, { ref: PIC_REF, hash: 'h', mime: 'image/png', w: 320, h: 160, alt: 'Green box' }, { x: 100, y: 640, w: 400, h: 200, rot: 0 }), 'https://example.com/pic')
 
     const s3 = S.addSlide(doc, { after: s2, layout: 'blank' })
     const see = S.addShape(doc, s3, 'rect', { x: 80, y: 80, w: 300, h: 200, rot: 0 })
@@ -257,6 +258,28 @@ test('a deck goes out to .odp and comes back', async () => {
   sameDeck(summary(m, doc), summary(m, back), { label: 'ours' })
   assert.equal(built.theme, 'paper')
   assert.deepEqual(m.slidesModel.slides(back).map((s) => s.map.get('layout')), ['title', 'blank', 'blank', 'blank'])
+})
+
+// Links on pictures and shapes (proposals/2026-10-26-picture-links.md).
+test('links on a picture and a shape go out to .odp and .pptx and come back', async () => {
+  const m = await load()
+  const S = m.slidesModel
+  const doc = new m.Y.Doc()
+  doc.transact(() => {
+    const s1 = S.initDeck(doc, { title: 'Links' })
+    const pic = S.addPicture(doc, s1, { ref: PIC_REF, hash: 'h', mime: 'image/png', w: 320, h: 160, alt: 'Green box' }, { x: 100, y: 600, w: 400, h: 200, rot: 0 })
+    const rect = S.addShape(doc, s1, 'rect', { x: 600, y: 600, w: 300, h: 200, rot: 0 })
+    m.prosemirrorJSONToYXmlFragment(m.slideSchema(), { type: 'doc', content: [p([t('Open the folder')])] }, S.element(doc, s1, rect).get('text'))
+    S.addShape(doc, s1, 'ellipse', { x: 1000, y: 600, w: 300, h: 200, rot: 0 })
+    assert.equal(S.setLink(doc, s1, pic, 'https://example.com/pic'), true)
+    assert.equal(S.setLink(doc, s1, rect, 'pearoffice://folder/abc123'), true)
+    assert.equal(S.setLink(doc, s1, rect, 'javascript:alert(1)'), false)
+  })
+  const links = (d) => S.elements(d, S.slideIds(d)[0]).filter((e) => e.map.get('type') !== 'text').map((e) => e.map.get('type') + ' ' + (S.linkOf(e.map) || '-'))
+  const want = ['picture https://example.com/pic', 'shape pearoffice://folder/abc123', 'shape -']
+  assert.deepEqual(links(doc), want)
+  assert.deepEqual(links((await readBack(m, m.deckToOdp(doc, { title: 'Links', pictures: pictures() }), m.readOdp)).doc), want)
+  assert.deepEqual(links((await readBack(m, await m.deckToPptx(doc, { title: 'Links', pictures: pictures() }), m.readPresentation)).doc), want)
 })
 
 test('LibreOffice reads our .odp, and we read the .odp it makes', { skip: !soffice && 'needs soffice' }, async () => {
