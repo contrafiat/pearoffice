@@ -27,7 +27,7 @@ export function AtMenu ({ items, selected, sheetId, onPick, anchor }) {
   const [pos, setPos] = useState(null)
   useLayoutEffect(() => {
     // Typing @ can open this before the cell's editor has focus.
-    const el = anchor || document.querySelector('input.editor')
+    const el = anchor || [...document.querySelectorAll('input.editor')].find((x) => x.offsetParent !== null)
     if (!el) return setPos(null)
     const r = el.getBoundingClientRect()
     const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight

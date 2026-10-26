@@ -72,6 +72,7 @@ module.exports = async function docChips (t) {
 
   // Reopened: the pills are kept; Ctrl+click on the file opens it.
   await sleep(500)
+  await t.sendMod('W', ['control']) // close its tab, so it loads again (src/ui/tabs.jsx)
   await js("[...document.querySelectorAll('.sheet-link')].find((b) => b.textContent.includes('Budget')).click()")
   await waitFor('Budget open', "!!document.querySelector('.title') && document.querySelector('.title').value === 'Budget'")
   await js("[...document.querySelectorAll('.sheet-link')].find((b) => b.textContent.includes('Untitled document')).click()")

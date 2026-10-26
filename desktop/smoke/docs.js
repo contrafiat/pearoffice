@@ -61,6 +61,7 @@ module.exports = async function docs (t) {
   })()`)
   await waitFor('doc title in list', "[...document.querySelectorAll('.sheet-link .sheet-title')].some((b) => b.textContent.trim() === 'Smoke notes')")
   await sleep(600) // the editor sends its edits a moment after typing
+  await t.sendMod('W', ['control']) // close its tab, so it loads again (src/ui/tabs.jsx)
   await js("document.querySelector('.sheet-link.all-files').click()")
   await waitFor('doc in all files', "[...document.querySelectorAll('.file-card')].some((c) => !!c.querySelector('.kind-icon.kind-doc') && c.querySelector('.file-title').textContent === 'Smoke notes')")
   result.docCard = true

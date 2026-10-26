@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { call, on } from '../bridge.js'
+import { useOnScreen, useActiveRef } from '../tabs.jsx'
 import { Grid, MIN_ZOOM, MAX_ZOOM } from './Grid.jsx'
 import { colName } from './a1.js'
 import { changeDecimals, jumpTarget, todaySerial } from './cellTools.js'
@@ -156,8 +157,9 @@ export function SheetView ({ sheetId, files = [], folders = [], onOpenFile, onOp
     else return
     e.preventDefault()
   }
+  const activeRef = useActiveRef()
   useEffect(() => {
-    const keys = (e) => zoomKeys.current(e)
+    const keys = (e) => { if (activeRef.current) zoomKeys.current(e) }
     window.addEventListener('keydown', keys, true)
     return () => window.removeEventListener('keydown', keys, true)
   }, [])
@@ -211,13 +213,11 @@ export function SheetView ({ sheetId, files = [], folders = [], onOpenFile, onOp
   // Settings turned that off; then it sees nobody either.
   const [present, setPresent] = useState([])
   const [sharePresence, setSharePresence] = useState(() => readPref('pearoffice:presence') !== '0')
-  const [onScreen, setOnScreen] = useState(() => document.visibilityState !== 'hidden')
+  const onScreen = useOnScreen() // the page is visible and this file's tab is shown (tabs.jsx)
   useEffect(() => {
-    const vis = () => setOnScreen(document.visibilityState !== 'hidden')
     const pref = (e) => { if (e.detail && e.detail.key === 'pearoffice:presence') setSharePresence(e.detail.value !== '0') }
-    document.addEventListener('visibilitychange', vis)
     window.addEventListener('pearoffice:pref', pref)
-    return () => { document.removeEventListener('visibilitychange', vis); window.removeEventListener('pearoffice:pref', pref) }
+    return () => window.removeEventListener('pearoffice:pref', pref)
   }, [])
   // On screen: the worklet looks again for the sheet's other devices while
   // nobody is connected (src/worklet/rediscover.js), whatever the presence setting.

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as Y from 'yjs'
 import { ArrowCounterClockwise, ArrowClockwise, LinkSimple, ArrowSquareOut, Textbox, SelectionForeground, SelectionBackground, Trash, ArrowUUpLeft, Play, Shapes, Crop, Image as ImageIcon, ChartBar } from '@phosphor-icons/react'
 import { call, on } from '../bridge.js'
+import { useOnScreen, useActiveRef } from '../tabs.jsx'
 import { FileBar, useMembers } from '../FileBar.jsx'
 import { colourFor } from '../Avatar.jsx'
 import { readPref } from '../prefs.js'
@@ -127,12 +128,7 @@ export function SlidesView ({ sheetId, files = [], folders = [], onOpenFile, onO
     return () => clearInterval(t)
   }, [info, arrived, hasEditRole, loadInfo])
 
-  const [onScreen, setOnScreen] = useState(() => document.visibilityState !== 'hidden')
-  useEffect(() => {
-    const vis = () => setOnScreen(document.visibilityState !== 'hidden')
-    document.addEventListener('visibilitychange', vis)
-    return () => document.removeEventListener('visibilitychange', vis)
-  }, [])
+  const onScreen = useOnScreen() // the page is visible and this file's tab is shown (tabs.jsx)
   useEffect(() => {
     call('file:visible', { sheetId, visible: onScreen }).catch(() => {})
     return () => { call('file:visible', { sheetId, visible: false }).catch(() => {}) }
@@ -405,9 +401,10 @@ export function SlidesView ({ sheetId, files = [], folders = [], onOpenFile, onO
   // PowerPoint.
   const startRef = useRef(startShow)
   startRef.current = startShow
+  const activeRef = useActiveRef()
   useEffect(() => {
     const down = (e) => {
-      if (e.key !== 'F5' || e.ctrlKey || e.metaKey || e.altKey) return
+      if (e.key !== 'F5' || e.ctrlKey || e.metaKey || e.altKey || !activeRef.current) return
       e.preventDefault()
       startRef.current(e.shiftKey)
     }

@@ -173,7 +173,11 @@ Code that works for any kind of file sits apart from each editor's own
   devices and settings panels, About and donations (`About.jsx`), the phrase entry
   (`PhraseInput.jsx`: one word at a time on phones, 12 boxes on desktop,
   suggestions from the word list), the first-run welcome and tour (`Onboarding.jsx`), Ctrl+P (Cmd+P on a Mac)
-  printing the open file on desktop (`printKey.js`; in a smoke run `app:print`
+  printing the open file on desktop (`printKey.js`; only the tab on screen); tabs on desktop
+  (`tabs.jsx`: every open file keeps its editor, hidden when not shown;
+  `useOnScreen` and `useActiveRef` limit presence and window-wide keys to
+  the shown tab; the list comes back after a restart from `pearoffice:tabs`;
+  proposals/2026-10-26-tabs.md; in a smoke run `app:print`
   writes `printed.html` to the data folder). On phones a tap on any button or menu item buzzes
   (`haptic.js`, the shell's `app:haptic` with expo-haptics; `danger` controls
   buzz a warning, `data-haptic` picks another kind). On desktop each editor's
@@ -405,7 +409,7 @@ take five scenes: files, sheet, document, slides, sharing.
   bundle must create, edit and read a sheet over stdin/stdout, and the seeder
   bundle must start and print a pairing link.
 - `npm run smoke:desktop`: drives the real UI in Electron with an offscreen
-  window and real key and mouse events, in twenty parts. Each part is its own
+  window and real key and mouse events, in twenty-one parts. Each part is its own
   launch with a throwaway data folder and a 60 s limit, and prints one
   `ok`/`not ok` line, then a summary line. `sheets` is the grid editor
   (typing, formulas, pointing at cells while typing one, spilling, fill,
@@ -483,6 +487,12 @@ take five scenes: files, sheet, document, slides, sharing.
   window, closing one and a restart reopening the rest where they were
   (`app:smokeReopenWindows`; about 5 s; `PEAROFFICE_SMOKE_WINDOWS_SHOT=<png>`
   saves the file window).
+  `tabs` is files in tabs: three opened, switching by click, Ctrl+Tab and
+  Ctrl+number, a sheet keeping its cell and undo while hidden, Ctrl+W and a
+  middle click, All files and back, a tab to its own window, a removed
+  file's tab closing and the tabs back after a reload (about 4 s;
+  `PEAROFFICE_SMOKE_TABS_SHOT=<png>`). The smoke helpers' lookups skip
+  hidden tabs (`desktop/smoke/common.js`), as a person would.
   `app` is the shell: the New picker, theme, Seeder and Devices panels
   (Linked devices: this device's default name, renaming, kept after
   reopening and a reload; `PEAROFFICE_SMOKE_DEVICES_SHOT=<png>` saves the

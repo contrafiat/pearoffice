@@ -129,7 +129,8 @@ export function LinkCard ({ row, col, link, canEdit, onOpen, onEdit, onRemove })
   const [at, setAt] = useState(null)
   useLayoutEffect(() => {
     function place () {
-      const el = document.querySelector('.grid .cell[data-r="' + row + '"][data-c="' + col + '"]')
+      // The shown grid's cell: other tabs keep theirs hidden (tabs.jsx).
+      const el = [...document.querySelectorAll('.grid .cell[data-r="' + row + '"][data-c="' + col + '"]')].find((x) => x.offsetParent !== null)
       const box = el && el.closest('.grid .body').getBoundingClientRect()
       const r = el && el.getBoundingClientRect()
       const next = !r || r.bottom < box.top || r.top > box.bottom - 20 || r.right < box.left || r.left > box.right

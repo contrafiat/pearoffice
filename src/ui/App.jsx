@@ -21,6 +21,7 @@ import { DonationReminder } from './About.jsx'
 import { Onboarding } from './Onboarding.jsx'
 import { CaretRight, CircleNotch, FileArrowUp, FolderSimple, GearSix, House, Info, LinkSimple, List, Plus, X } from '@phosphor-icons/react'
 import { PearMark } from './PearMark.jsx'
+import { TabBar, TabContext, withTab, withoutTab } from './tabs.jsx'
 
 applyTheme()
 
@@ -111,15 +112,37 @@ function RestoreCard ({ restore, hidden, onHide, onDone }) {
   )
 }
 
+const DESKTOP = !!(typeof window !== 'undefined' && window.pearoffice && window.pearoffice.platform === 'desktop')
+// What an editor in a tab is told (tabs.jsx): one object each, so a tab
+// that stays shown or hidden does not redraw for it.
+const SHOWN = { active: true }
+const HIDDEN = { active: false }
+const TABS_PREF = 'pearoffice:tabs'
+
 export function App () {
   const [sheets, setSheets] = useState(null)
   const [current, setCurrentNow] = useState(null)
   // Files in their own windows (desktop, proposals/2026-10-26-file-windows.md):
   // one of those is brought forward instead of opening here.
   const windowIds = useRef([])
+  // Tabs (desktop, proposals/2026-10-26-tabs.md): the open files in order,
+  // and those whose editor has been shown (each loads the first time).
+  const [tabs, setTabs] = useState([])
+  const tabsRef = useRef(tabs)
+  tabsRef.current = tabs
+  const [loaded, setLoaded] = useState([])
+  const used = useRef({ n: 0 }) // id -> when its tab was last shown
   const setCurrent = useCallback((v) => {
     if (typeof v === 'string' && windowIds.current.includes(v)) { call('app:windowFor', { sheetId: v }).catch(() => {}); return }
+    if (typeof v === 'string' && DESKTOP) setTabs((t) => withTab(t, v, used.current))
     setCurrentNow(v)
+  }, [])
+  // Closing a tab shows its neighbour, or the file list.
+  const closeTab = useCallback((id) => {
+    const r = withoutTab(tabsRef.current, id, currentRef.current)
+    setTabs(r.tabs)
+    setLoaded((l) => l.filter((x) => x !== id))
+    setCurrentNow(r.current)
   }, [])
   const currentRef = useRef(null)
   currentRef.current = current
@@ -205,8 +228,10 @@ export function App () {
   // Which files have windows; a file that just got one leaves this window.
   useEffect(() => {
     if (!desktop) return
+    // A file that got a window leaves its tab.
     const take = (ids) => {
       windowIds.current = Array.isArray(ids) ? ids : []
+      for (const id of windowIds.current) if (tabsRef.current.includes(id)) closeTab(id)
       setCurrentNow((c) => (c && windowIds.current.includes(c) ? null : c))
     }
     call('app:windows').then((r) => take(r && r.ids)).catch(() => {})
@@ -247,8 +272,9 @@ export function App () {
   // screen, go back to the file list.
   const forget = useCallback((sheetId) => {
     setSheets((list) => (list ? list.filter((x) => x.sheetId !== sheetId) : list))
-    setCurrent((c) => (c === sheetId ? null : c))
-  }, [])
+    if (DESKTOP) closeTab(sheetId)
+    else setCurrent((c) => (c === sheetId ? null : c))
+  }, [closeTab])
 
   const opened = useCallback(async (sheetId, r) => {
     await fileHere(sheetId)
@@ -272,9 +298,59 @@ export function App () {
   const reopen = useRef(window.__pearReloaded ? readPref('pearoffice:open') : null)
   useEffect(() => { writePref('pearoffice:open', current || '') }, [current])
 
+  // The tabs come back after a restart (desktop): those still on this
+  // device and not in a window of their own.
+  const tabsReady = useRef(false)
+  function restoreTabs (list) {
+    let saved = {}
+    try { saved = JSON.parse(readPref(TABS_PREF) || '{}') || {} } catch {}
+    const ok = (x) => list && list.some((f) => f.sheetId === x && !f.removed && !f.waiting && !f.recovery) && !windowIds.current.includes(x)
+    const ids = (Array.isArray(saved.tabs) ? saved.tabs : []).filter((x) => typeof x === 'string' && ok(x))
+    setTabs(ids)
+    if (ids.includes(saved.current)) setCurrentNow(saved.current)
+    tabsReady.current = true
+  }
+  useEffect(() => {
+    if (DESKTOP && tabsReady.current) writePref(TABS_PREF, JSON.stringify({ tabs, current: tabs.includes(current) ? current : null }))
+  }, [tabs, current])
+  // The shown tab loads (once) and is the newest used; the editors measure
+  // their size again after being hidden.
+  useEffect(() => {
+    if (!current) return
+    used.current[current] = ++used.current.n
+    setLoaded((l) => (l.includes(current) ? l : [...l, current]))
+    const raf = requestAnimationFrame(() => window.dispatchEvent(new window.Event('resize')))
+    return () => cancelAnimationFrame(raf)
+  }, [current])
+  // Ctrl+Tab, Ctrl+Shift+Tab, Ctrl+1 to 9 and Ctrl+W (Cmd on a Mac).
+  useEffect(() => {
+    if (!DESKTOP) return
+    const down = (e) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey) return
+      const t = tabsRef.current
+      const c = currentRef.current
+      const at = t.indexOf(c)
+      let next = null
+      if (e.key === 'Tab' && t.length > 1) next = t[((at < 0 ? 0 : at) + (e.shiftKey ? -1 : 1) + t.length) % t.length]
+      else if (!e.shiftKey && /^[1-9]$/.test(e.key) && t.length) next = e.key === '9' ? t[t.length - 1] : t[Number(e.key) - 1] || null
+      else if (!e.shiftKey && e.key.toLowerCase() === 'w' && at >= 0) { e.preventDefault(); e.stopPropagation(); closeTab(c); return }
+      if (!next) return
+      e.preventDefault()
+      e.stopPropagation()
+      setCurrentNow(next)
+    }
+    window.addEventListener('keydown', down, true)
+    return () => window.removeEventListener('keydown', down, true)
+  }, [closeTab])
+  const [tabMenu, setTabMenu] = useState(null) // { id, x, y }
+  const moveTab = (from, to) => setTabs((t) => { const n = t.filter((x) => x !== from); n.splice(n.indexOf(to) + (t.indexOf(from) < t.indexOf(to) ? 1 : 0), 0, from); return n })
+
   useEffect(() => {
     const id = reopen.current
-    refresh().then((list) => { if (id && list && list.some((x) => x.sheetId === id)) setCurrent(id) })
+    refresh().then((list) => {
+      if (DESKTOP) restoreTabs(list)
+      else if (id && list && list.some((x) => x.sheetId === id)) setCurrent(id)
+    })
     loadMe()
     call('app:onboarding').then((r) => { if (r && !r.done) setOnboarding({ tourOnly: false }) }).catch(() => {})
     call('app:welcomeBack').then((r) => setWelcomeBack(!!(r && r.show))).catch(() => {})
@@ -318,7 +394,12 @@ export function App () {
         setToast('Joined ' + (s && s.title ? '"' + s.title + '"' : 'the file'))
       }),
       // A sheet moved to fresh keys: follow it if it is the one on screen.
-      on('sheet:moved', async ({ from, to }) => { await refresh(); setCurrent((c) => (c === from ? to : c)) }),
+      on('sheet:moved', async ({ from, to }) => {
+        await refresh()
+        setTabs((t) => t.map((x) => (x === from ? to : x)))
+        setLoaded((l) => l.map((x) => (x === from ? to : x)))
+        setCurrent((c) => (c === from ? to : c))
+      }),
       on('sheet:removed', refresh),
       on('sheet:tidied', () => setToast('Tidied up a long file')),
       // Any edit or membership change anywhere: titles, roles and people in
@@ -448,6 +529,23 @@ export function App () {
     </button>
   )
 
+  // An open file's editor; on desktop each tab keeps one (tabs.jsx).
+  const editorFor = (id) => {
+    if (!opensHere(sheets, id)) {
+      return (
+        <div className='empty'>
+          <h1>Update PearOffice to open this file.</h1>
+          <p>It was made with a newer version that has file types this one does not know.</p>
+          <div className='empty-actions'><button className='join-sheet big' onClick={() => setCurrent(null)}><House size={18} /> All files</button></div>
+        </div>
+      )
+    }
+    const props = { sheetId: id, files: sheets || [], folders, onOpenFile: openFile, onOpenFolder: (fd) => { setCurrent(null); setFolder(fd) }, onTitleChange: refresh, onError: setError, onGone: async () => { forget(id); await refresh() } }
+    const kind = kindOf(sheets, id)
+    return kind === 'doc' ? <DocView {...props} /> : kind === 'slides' ? <SlidesView {...props} /> : <SheetView {...props} />
+  }
+  const panes = desktop ? tabs.filter((id) => loaded.includes(id) || id === current) : current ? [current] : []
+
   return (
     <div className={'app' + (navOpen ? ' nav-open' : '')}>
       <button className='nav-toggle' aria-label='Your files' aria-expanded={navOpen} onClick={() => setNavOpen(true)}><List size={20} aria-hidden='true' /></button>
@@ -523,6 +621,16 @@ export function App () {
             {cardMenu.folder && <li role='menuitem' onClick={() => copyLink('pearoffice://folder/' + cardMenu.folder.id).catch(() => {})}>Copy link</li>}
             {cardMenu.folder && <li role='menuitem' onClick={() => setNaming({ folder: cardMenu.folder })}>Rename</li>}
             {cardMenu.folder && <li role='menuitem' className='danger' onClick={() => setDroppingFolder(cardMenu.folder)}>Delete folder</li>}
+          </ul>
+        </>
+      )}
+      {tabMenu && (
+        <>
+          <div className='doc-scrim' onPointerDown={() => setTabMenu(null)} />
+          <ul className='menu card-menu tab-menu' role='menu' style={{ left: Math.max(8, Math.min(tabMenu.x, window.innerWidth - 200)), top: Math.min(tabMenu.y + 4, window.innerHeight - 120) }} onClick={() => setTabMenu(null)}>
+            <li role='menuitem' onClick={() => closeTab(tabMenu.id)}>Close</li>
+            {tabs.length > 1 && <li role='menuitem' onClick={() => { for (const id of tabs) if (id !== tabMenu.id) closeTab(id); setCurrentNow(tabMenu.id) }}>Close other tabs</li>}
+            <li role='menuitem' className='open-window' onClick={() => openWindow(tabMenu.id)}>Open in new window</li>
           </ul>
         </>
       )}
@@ -656,6 +764,18 @@ export function App () {
       )}
       <main className='main'>
         {desktop && <UpdateBar />}
+        {desktop && (
+          <TabBar
+            tabs={tabs}
+            current={current}
+            files={sheets}
+            onPick={setCurrentNow}
+            onClose={closeTab}
+            onMenu={(id, at) => setTabMenu({ id, ...at })}
+            onMove={moveTab}
+            onDragOut={openWindow}
+          />
+        )}
         {notice && <div className='banner info'>{notice} <button className='link-button' onClick={() => setNotice(null)}>OK</button></div>}
         {welcomeBack && !onboarding && !(restore && restore.state === 'done' && restore.files > 0) && !(restore && restore.state === 'none' && sheets && sheets.length > 0) && (
           <RestoreCard
@@ -666,20 +786,13 @@ export function App () {
           />
         )}
         {error && <div className='banner' role='alert'>{error} <button className='link-button' onClick={() => setError(null)}>Dismiss</button></div>}
-        {current && !opensHere(sheets, current)
-          ? (
-            <div className='empty'>
-              <h1>Update PearOffice to open this file.</h1>
-              <p>It was made with a newer version that has file types this one does not know.</p>
-              <div className='empty-actions'><button className='join-sheet big' onClick={() => setCurrent(null)}><House size={18} /> All files</button></div>
-            </div>
-            )
-          : current && kindOf(sheets, current) === 'doc'
-            ? <DocView key={current} sheetId={current} files={sheets || []} folders={folders} onOpenFile={openFile} onOpenFolder={(id) => { setCurrent(null); setFolder(id) }} onTitleChange={refresh} onError={setError} onGone={async () => { forget(current); await refresh() }} />
-            : current && kindOf(sheets, current) === 'slides'
-              ? <SlidesView key={current} sheetId={current} files={sheets || []} folders={folders} onOpenFile={openFile} onOpenFolder={(id) => { setCurrent(null); setFolder(id) }} onTitleChange={refresh} onError={setError} onGone={async () => { forget(current); await refresh() }} />
-              : current
-              ? <SheetView key={current} sheetId={current} files={sheets || []} folders={folders} onOpenFile={openFile} onOpenFolder={(id) => { setCurrent(null); setFolder(id) }} onTitleChange={refresh} onError={setError} onGone={async () => { forget(current); await refresh() }} />
+        {panes.map((id) => (
+          <div key={id} className={'tab-pane' + (id === current ? '' : ' hidden')}>
+            <TabContext.Provider value={id === current ? SHOWN : HIDDEN}>{editorFor(id)}</TabContext.Provider>
+          </div>
+        ))}
+        {current
+          ? null
               : sheets && (sheets.length || folders.length)
                 ? (
                   <FileHome

@@ -7,7 +7,21 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
 function helpers ({ win, dataDir, result, log }) {
   const wc = win.webContents
-  const js = (code) => wc.executeJavaScript(code, true)
+  // The parts look at the page as a person does: what is in a hidden tab
+  // (src/ui/tabs.jsx) is not found. Put in before each call, since the page
+  // can reload.
+  const SHOWN_ONLY = `if (!window.__shownOnly) {
+    window.__shownOnly = true
+    const hidden = (el) => !!(el && el.closest && el.closest('.tab-pane.hidden'))
+    for (const P of [Document.prototype, Element.prototype]) {
+      const one = P.querySelector
+      const all = P.querySelectorAll
+      // A look from inside a hidden tab (its own editor) is left alone.
+      P.querySelectorAll = function (sel) { if (hidden(this)) return all.call(this, sel); const list = [...all.call(this, sel)].filter((el) => !hidden(el)); list.item = (i) => list[i] || null; return list }
+      P.querySelector = function (sel) { const first = one.call(this, sel); if (hidden(this) || !hidden(first)) return first; return this.querySelectorAll(sel)[0] || null }
+    }
+  }`
+  const js = (code) => wc.executeJavaScript(SHOWN_ONLY + ';\n' + code, true)
   const step = (name, data) => { result.steps.push(data === undefined ? name : { [name]: data }); log('smoke:', name) }
   const downloads = path.join(dataDir, 'downloads')
 

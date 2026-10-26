@@ -10,6 +10,7 @@ import { Extension } from '@tiptap/core'
 import { NodeSelection } from '@tiptap/pm/state'
 import { yCursorPlugin, ySyncPluginKey, absolutePositionToRelativePosition } from '@tiptap/y-tiptap'
 import { call, on } from '../bridge.js'
+import { useOnScreen } from '../tabs.jsx'
 import { FileBar, useMembers } from '../FileBar.jsx'
 import { colourFor } from '../Avatar.jsx'
 import { readPref, writePref } from '../prefs.js'
@@ -123,12 +124,7 @@ export function DocView ({ sheetId, files = [], folders = [], onOpenFile, onOpen
 
   // On screen: the worklet looks again for the document's other devices
   // while nobody is connected (src/worklet/rediscover.js).
-  const [onScreen, setOnScreen] = useState(() => document.visibilityState !== 'hidden')
-  useEffect(() => {
-    const vis = () => setOnScreen(document.visibilityState !== 'hidden')
-    document.addEventListener('visibilitychange', vis)
-    return () => document.removeEventListener('visibilitychange', vis)
-  }, [])
+  const onScreen = useOnScreen() // the page is visible and this file's tab is shown (tabs.jsx)
   useEffect(() => {
     call('file:visible', { sheetId, visible: onScreen }).catch(() => {})
     return () => { call('file:visible', { sheetId, visible: false }).catch(() => {}) }
