@@ -11,13 +11,51 @@ const docModel = require('./docModel')
 const m = require('../worklet/membership')
 const { createFileHelpers } = require('../worklet/fileMethods')
 const { MIMES, TOO_BIG, MAX_BYTES } = require('../worklet/pictures')
+const history = require('./history')
+const { Y_PREFIX } = require('../worklet/sheets')
 
 const hex = (buf) => b4a.toString(buf, 'hex')
 
 function createDocMethods (sheets, { getJoin, getPictures }) {
   const { profileName, requireEdit, commit, docFor, replicaState, replicaUpdate } = createFileHelpers(sheets)
 
+  // Every edit in the file's view, with who wrote it (version history,
+  // proposals/2026-10-26-version-history.md).
+  async function editsOf (ctx, sheetId) {
+    const base = ctx.bases.get(sheetId)
+    if (!base) throw new Error('unknown file: ' + sheetId)
+    await base.ready()
+    const view = base.view
+    const writers = new Map()
+    for await (const { value } of view.createReadStream({ gt: 'device/', lt: 'device/~' })) {
+      if (value && typeof value.writerKey === 'string') writers.set(value.writerKey, value.identity || null)
+    }
+    const edits = []
+    for await (const { key, value } of view.createReadStream({ gt: Y_PREFIX, lt: Y_PREFIX + '~' })) {
+      if (!value || typeof value.data !== 'string') continue
+      const writer = key.slice(Y_PREFIX.length).split('/')[0]
+      edits.push({ key, data: value.data, at: typeof value.at === 'number' ? value.at : null, start: value.start || null, identity: writers.get(writer) || null })
+    }
+    return edits
+  }
+
   const methods = {
+    // The document's versions, newest first (history.js). Anyone in the file.
+    'doc:versions': async ({ sheetId, pauseMs } = {}, ctx) => {
+      const { doc } = await docFor(sheetId)
+      if (model.kind(doc) !== 'doc') throw new Error('Not a document')
+      const opts = Number.isFinite(pauseMs) && pauseMs >= 100 ? { pauseMs } : {}
+      return { versions: history.versions(await editsOf(ctx, sheetId), opts) }
+    },
+
+    // The document as it was at the end of a version: a Yjs update.
+    'doc:version': async ({ sheetId, end } = {}, ctx) => {
+      const { doc } = await docFor(sheetId)
+      if (model.kind(doc) !== 'doc') throw new Error('Not a document')
+      if (!end || typeof end.key !== 'string' || !(end.at === null || Number.isFinite(end.at))) throw new Error('Not a version')
+      return { state: b4a.toString(history.stateAt(await editsOf(ctx, sheetId), end), 'base64') }
+    },
+
     'doc:create': async ({ title = 'Untitled document' } = {}, ctx) => {
       const { groupId } = await ctx.createGroup({ name: title })
       const base = ctx.bases.get(groupId)

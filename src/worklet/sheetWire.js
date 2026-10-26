@@ -26,6 +26,13 @@ function partOf (op) {
   return p
 }
 
+// When an edit was written (yOps.js), kept beside it for version history,
+// or undefined. Only the op's own value, so every device keeps the same.
+const atOf = (op) => (typeof op.at === 'number' && Number.isFinite(op.at) && op.at > 1.5e12 && op.at < 1e13 ? Math.round(op.at) : undefined)
+
+// The first edit of a moved file says why its history starts there.
+const startOf = (op) => (['compact', 'remove', 'recovered'].includes(op.start) ? op.start : undefined)
+
 function createApplyOps ({ onUpdate, onMembership, log }) {
   return async function applySheetOp (op, ctx) {
     const { view, groupId, node } = ctx
@@ -48,7 +55,7 @@ function createApplyOps ({ onUpdate, onMembership, log }) {
       const data = parts.map((x) => x.value.data).join('')
       const update = b4a.from(data, 'base64')
       if (update.byteLength === 0) return
-      await view.put(yKey(node), { data })
+      await view.put(yKey(node), { data, at: atOf(op), start: startOf(op) })
       onUpdate(groupId, update)
       return
     }
@@ -58,7 +65,7 @@ function createApplyOps ({ onUpdate, onMembership, log }) {
       if (!(await mayEdit(view, node))) return
       const update = b4a.from(op.data, 'base64')
       if (update.byteLength === 0) return
-      await view.put(yKey(node), { data: op.data })
+      await view.put(yKey(node), { data: op.data, at: atOf(op), start: startOf(op) })
       onUpdate(groupId, update)
       return
     }

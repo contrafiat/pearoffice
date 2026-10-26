@@ -33,8 +33,9 @@ Two things are missing:
 
 - A version is a run of edits: it ends when nobody edits for 5 minutes,
   or after an hour of continuous editing. Each shows its time (or
-  "Earlier" with no time), the people who edited in it (pictures and
-  names) and how many words changed.
+  "Earlier" with no time) and the people who edited in it (pictures and
+  names). (Built without a count of changed words: it would mean
+  rebuilding every version to list them.)
 - After a move, the list ends with "Versions before [date] were cleared
   when this document was tidied up" (or "when someone was removed").
 
@@ -42,9 +43,11 @@ Two things are missing:
 
 - File menu: **Version history**. A panel lists the versions, newest first.
   Picking one shows the document as it was, read-only, in place of the
-  editor, with text added since then and text removed since then marked
-  (green and struck through), so you can see what changed. Close returns
-  to the live document.
+  editor, with the text that version added and removed marked (green and
+  struck through, against the version before it), so you can see what
+  changed. It shows the text and the kinds of block (headings, list items,
+  table rows); bold and the like are left out, and pictures show as
+  [Picture]. Close returns to the live document.
 - **Restore this version** (owners and editors): one edit that makes the
   document match that version. Others' later edits are replaced too; it is
   an ordinary change, so it shows up in history and can itself be undone
