@@ -939,53 +939,11 @@ release_install_zsp
 # ---------------------------------------------------------------------------
 # 9. Publish to Zapstore
 #
-# scripts/publish-zapstore.sh links the signing key to the Nostr identity,
-# adds the notes and the local APK to zapstore.yaml for the run and runs
-# `zsp publish`. A Zapstore-only run (GitHub already has this version) takes
-# the APK from that release.
+# release_publish_zapstore (peerloom-release) checks the APK's version, links the
+# signing key to the Nostr identity and runs `zsp publish`. A Zapstore-only run
+# (GitHub already has this version) takes the APK from that release.
 # ---------------------------------------------------------------------------
-if $PUBLISH_ZAPSTORE; then
-  echo "==> Publishing to Zapstore..."
-  _ZSP_APK="$REPO_ROOT/dist/android/${ARTIFACT_PREFIX}-${APP_VERSION}.apk"
-  if [ ! -f "$_ZSP_APK" ] && $ZAPSTORE_ONLY; then
-    echo "    Downloading ${ARTIFACT_PREFIX}-${APP_VERSION}.apk from the GitHub release..."
-    mkdir -p dist/android
-    gh release download "$RELEASE_TAG" -R "$RELEASES_REPO" -p "${ARTIFACT_PREFIX}-${APP_VERSION}.apk" -D dist/android --clobber || true
-  fi
-  # Refuse to publish an artifact that is not the version being announced.
-  _ZSP_OK=true
-  if [ ! -f "$_ZSP_APK" ]; then
-    echo "ERROR: no $_ZSP_APK to publish."
-    _ZSP_OK=false
-  else
-    _ZSP_APK_VERSION=$(_apk_version_name "$_ZSP_APK")
-    if [ -z "$_ZSP_APK_VERSION" ]; then
-      echo "    Warning: could not read the APK's versionName (no aapt/aapt2) — publishing it unverified."
-    elif [ "$_ZSP_APK_VERSION" != "$APP_VERSION" ]; then
-      echo "ERROR: artifact/version mismatch — refusing to publish."
-      echo "    About to announce : $APP_VERSION"
-      echo "    APK actually is   : $_ZSP_APK_VERSION"
-      exit 1
-    else
-      echo "    Artifact : $(basename "$_ZSP_APK") (versionName $_ZSP_APK_VERSION ✓)"
-    fi
-  fi
-  if $_ZSP_OK; then
-    echo "    Version  : $APP_VERSION"
-    _confirm "Publish $RELEASE_TAG to Zapstore?"
-    if scripts/publish-zapstore.sh "$MOBILE_NOTES"; then
-      echo "==> Zapstore: published."
-    else
-      PUBLISH_FAILED=true
-      echo "ERROR: Zapstore publish failed. Retry with: scripts/publish-zapstore.sh $MOBILE_NOTES"
-    fi
-  else
-    PUBLISH_FAILED=true
-  fi
-else
-  echo ""
-  echo "==> Skipping Zapstore publish (not selected)."
-fi
+release_publish_zapstore "$REPO_ROOT/dist/android/${ARTIFACT_PREFIX}-${APP_VERSION}.apk" "$MOBILE_NOTES"
 
 # ---------------------------------------------------------------------------
 # 10. Upload to Google Play Store
