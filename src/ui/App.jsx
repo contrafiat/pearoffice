@@ -22,6 +22,7 @@ import { Onboarding } from './Onboarding.jsx'
 import { CaretRight, CircleNotch, FileArrowUp, FolderSimple, GearSix, House, Info, LinkSimple, List, Plus, X } from '@phosphor-icons/react'
 import { PearMark } from './PearMark.jsx'
 import { TabBar, TabContext, withTab, withoutTab } from './tabs.jsx'
+import { Menu, menuItems } from './Menu.jsx'
 
 applyTheme()
 
@@ -610,28 +611,50 @@ export function App () {
       {cardMenu && (
         <>
           <div className='doc-scrim' onPointerDown={() => setCardMenu(null)} />
-          <ul className='menu card-menu' role='menu' style={{ ...(cardMenu.pointer ? { left: Math.max(8, Math.min(cardMenu.x, window.innerWidth - 200)) } : { right: Math.max(8, window.innerWidth - cardMenu.x) }), top: Math.min(cardMenu.y + 4, window.innerHeight - 150) }} onClick={() => setCardMenu(null)}>
-            {desktop && cardMenu.file && !cardMenu.file.removed && !cardMenu.file.waiting && !cardMenu.file.recovery && <li role='menuitem' className='open-window' onClick={() => openWindow(cardMenu.file.sheetId)}>Open in new window</li>}
-            {cardMenu.file && cardMenu.file.template && !cardMenu.file.removed && <li role='menuitem' onClick={() => fromTemplate(() => call('file:fromTemplate', { sheetId: cardMenu.file.sheetId }))}>New from this template</li>}
-            {cardMenu.file && !cardMenu.file.removed && !cardMenu.file.waiting && <li role='menuitem' onClick={() => copyLink('pearoffice://file/' + cardMenu.file.sheetId).catch(() => {})}>Copy link</li>}
-            {cardMenu.file && <li role='menuitem' onClick={() => setMoving(cardMenu.file)}>Move to folder...</li>}
-            {cardMenu.file && !cardMenu.file.removed && (cardMenu.file.myRole === 'owner' || cardMenu.file.myRole === 'editor') && <li role='menuitem' onClick={() => setTemplate(cardMenu.file, !cardMenu.file.template)}>{cardMenu.file.template ? 'Stop using as a template' : 'Use as a template'}</li>}
-            {cardMenu.file && <li role='menuitem' onClick={() => setDeleting({ file: cardMenu.file, kind: 'local' })}>Remove from this device</li>}
-            {cardMenu.file && cardMenu.file.owner && cardMenu.file.owner.isMe && !cardMenu.file.removed && <li role='menuitem' className='danger' onClick={() => setDeleting({ file: cardMenu.file, kind: 'everyone' })}>Delete for everyone</li>}
-            {cardMenu.folder && <li role='menuitem' onClick={() => copyLink('pearoffice://folder/' + cardMenu.folder.id).catch(() => {})}>Copy link</li>}
-            {cardMenu.folder && <li role='menuitem' onClick={() => setNaming({ folder: cardMenu.folder })}>Rename</li>}
-            {cardMenu.folder && <li role='menuitem' className='danger' onClick={() => setDroppingFolder(cardMenu.folder)}>Delete folder</li>}
-          </ul>
+          <Menu
+            className='card-menu'
+            label={cardMenu.file ? 'File' : 'Folder'}
+            where={cardMenu.pointer ? { x: cardMenu.x, y: cardMenu.y } : { anchor: { left: cardMenu.x, right: cardMenu.x, top: cardMenu.y, bottom: cardMenu.y } }}
+            onClose={() => setCardMenu(null)}
+            items={menuItems(cardMenu.file
+              ? (() => {
+                  const f = cardMenu.file
+                  return [
+                    desktop && !f.removed && !f.waiting && !f.recovery && { label: 'Open in new window', className: 'open-window', onSelect: () => openWindow(f.sheetId) },
+                    f.template && !f.removed && { label: 'New from this template', onSelect: () => fromTemplate(() => call('file:fromTemplate', { sheetId: f.sheetId })) },
+                    '-',
+                    !f.removed && !f.waiting && { label: 'Copy link', onSelect: () => copyLink('pearoffice://file/' + f.sheetId).catch(() => {}) },
+                    { label: 'Move to folder...', onSelect: () => setMoving(f) },
+                    !f.removed && (f.myRole === 'owner' || f.myRole === 'editor') && { label: f.template ? 'Stop using as a template' : 'Use as a template', onSelect: () => setTemplate(f, !f.template) },
+                    '-',
+                    { label: 'Remove from this device', onSelect: () => setDeleting({ file: f, kind: 'local' }) },
+                    f.owner && f.owner.isMe && !f.removed && { label: 'Delete for everyone', danger: true, onSelect: () => setDeleting({ file: f, kind: 'everyone' }) }
+                  ]
+                })()
+              : [
+                  { label: 'Copy link', onSelect: () => copyLink('pearoffice://folder/' + cardMenu.folder.id).catch(() => {}) },
+                  { label: 'Rename', onSelect: () => setNaming({ folder: cardMenu.folder }) },
+                  '-',
+                  { label: 'Delete folder', danger: true, onSelect: () => setDroppingFolder(cardMenu.folder) }
+                ])}
+          />
         </>
       )}
       {tabMenu && (
         <>
           <div className='doc-scrim' onPointerDown={() => setTabMenu(null)} />
-          <ul className='menu card-menu tab-menu' role='menu' style={{ left: Math.max(8, Math.min(tabMenu.x, window.innerWidth - 200)), top: Math.min(tabMenu.y + 4, window.innerHeight - 120) }} onClick={() => setTabMenu(null)}>
-            <li role='menuitem' onClick={() => closeTab(tabMenu.id)}>Close</li>
-            {tabs.length > 1 && <li role='menuitem' onClick={() => { for (const id of tabs) if (id !== tabMenu.id) closeTab(id); setCurrentNow(tabMenu.id) }}>Close other tabs</li>}
-            <li role='menuitem' className='open-window' onClick={() => openWindow(tabMenu.id)}>Open in new window</li>
-          </ul>
+          <Menu
+            className='card-menu tab-menu'
+            label='Tab'
+            where={{ x: tabMenu.x, y: tabMenu.y }}
+            onClose={() => setTabMenu(null)}
+            items={menuItems([
+              { label: 'Close', onSelect: () => closeTab(tabMenu.id) },
+              tabs.length > 1 && { label: 'Close other tabs', onSelect: () => { for (const id of tabs) if (id !== tabMenu.id) closeTab(id); setCurrentNow(tabMenu.id) } },
+              '-',
+              { label: 'Open in new window', className: 'open-window', onSelect: () => openWindow(tabMenu.id) }
+            ])}
+          />
         </>
       )}
       {naming && (

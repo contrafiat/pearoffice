@@ -115,16 +115,18 @@ async function run (t) {
 
   // The menu names the three ways out.
   await js("document.querySelector('.toolbar .more-button').click()")
-  await waitFor('more menu', "!!document.querySelector('.more-menu li')")
+  await waitFor('more menu', "!!document.querySelector('.more-menu li.save-sub')")
+  await js("document.querySelector('.more-menu li.save-sub').click()")
+  await waitFor('Save as submenu', "!!document.querySelector('.more-menu.submenu li')")
   const items = await js("[...document.querySelectorAll('.more-menu li')].map((l) => l.textContent).join('|')")
   await js("document.querySelector('.toolbar .more-button').click()")
-  result.exportMenu = ['Save as a PowerPoint file', 'Save as an OpenDocument file (.odp)', 'Save as PDF', 'Print...'].every((s) => items.split('|').includes(s))
+  result.exportMenu = ['PowerPoint (.pptx)', 'OpenDocument (.odp)', 'PDF', 'Print...'].every((s) => items.split('|').includes(s))
   if (!result.exportMenu) throw new Error('more menu: ' + items)
 
   // PDF: saved without a dialog in the data folder.
   const pdfBefore = fs.readdirSync(dataDir)
   const t0 = Date.now()
-  await more('Save as PDF')
+  await more('PDF')
   const pdf = await newFile(dataDir, '.pdf', pdfBefore, sleep)
   if (!pdf) throw new Error('no PDF saved')
   const pdfMs = Date.now() - t0
@@ -145,7 +147,7 @@ async function run (t) {
   // PowerPoint: a download.
   const pptBefore = fs.existsSync(downloads) ? fs.readdirSync(downloads) : []
   const t1 = Date.now()
-  await more('Save as a PowerPoint file')
+  await more('PowerPoint (.pptx)')
   const pptx = await newFile(downloads, '.pptx', pptBefore, sleep)
   if (!pptx) throw new Error('no .pptx saved')
   const pptMs = Date.now() - t1
@@ -173,7 +175,7 @@ async function run (t) {
   // OpenDocument (src/ui/slides/odp.js): saved from the menu, then that file
   // imported back as a new deck.
   const odpBefore = fs.existsSync(downloads) ? fs.readdirSync(downloads) : []
-  await more('Save as an OpenDocument file (.odp)')
+  await more('OpenDocument (.odp)')
   const odp = await newFile(downloads, '.odp', odpBefore, sleep)
   if (!odp) throw new Error('no .odp saved')
   const odpBytes = fs.readFileSync(odp)

@@ -64,9 +64,34 @@ function helpers ({ win, dataDir, result, log }) {
     await sleep(60)
   }
 
+  // Picks an item of the open menu, opening the submenu it is in first
+  // when needed (src/ui/Menu.jsx).
+  const menuPick = async (label) => {
+    const has = "[...document.querySelectorAll('.menu li')].some((l) => l.textContent === " + JSON.stringify(label) + ')'
+    await waitFor('a menu', "!!document.querySelector('.menu:not(.submenu) li')")
+    const subs = await js("[...document.querySelectorAll('.menu:not(.submenu) li.has-sub')].map((l) => l.textContent)")
+    for (const sub of subs) {
+      if (await js(has)) break
+      await js("[...document.querySelectorAll('.menu:not(.submenu) li.has-sub')].find((l) => l.textContent === " + JSON.stringify(sub) + ').click()')
+      await sleep(50)
+    }
+    await waitFor('menu item ' + label, has)
+    await js("[...document.querySelectorAll('.menu li')].find((l) => l.textContent === " + JSON.stringify(label) + ').click()')
+  }
+
+  // Picks an item of the ⋯ menu, opening the submenu it is in (Save as ▸,
+  // Data ▸, File ▸; src/ui/Menu.jsx) when it is not in the menu itself.
   const more = async (label) => {
     await js("document.querySelector('.toolbar .more-button').click()")
-    await waitFor('more menu: ' + label, "[...document.querySelectorAll('.more-menu li')].some((l) => l.textContent === " + JSON.stringify(label) + ')')
+    await waitFor('more menu', "!!document.querySelector('.more-menu')")
+    const has = "[...document.querySelectorAll('.more-menu li')].some((l) => l.textContent === " + JSON.stringify(label) + ')'
+    const subs = await js("[...document.querySelectorAll('.more-menu:not(.submenu) li.has-sub')].map((l) => l.textContent)")
+    for (const sub of subs) {
+      if (await js(has)) break
+      await js("[...document.querySelectorAll('.more-menu:not(.submenu) li.has-sub')].find((l) => l.textContent === " + JSON.stringify(sub) + ').click()')
+      await sleep(50)
+    }
+    await waitFor('more menu: ' + label, has)
     await js("[...document.querySelectorAll('.more-menu li')].find((l) => l.textContent === " + JSON.stringify(label) + ').click()')
   }
 
@@ -100,7 +125,7 @@ function helpers ({ win, dataDir, result, log }) {
     fs.writeFileSync(file, (await wc.capturePage()).toPNG())
   }
 
-  return { wc, js, step, waitFor, openSettings, type, key, sendMod, more, waitFile, newSheet, shot, downloads, dataDir, result, win, sleep }
+  return { wc, js, step, waitFor, openSettings, type, key, sendMod, more, menuPick, waitFile, newSheet, shot, downloads, dataDir, result, win, sleep }
 }
 
 module.exports = { helpers, sleep }

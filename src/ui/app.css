@@ -280,7 +280,14 @@ button, input, select { font: inherit; color: inherit; }
   overflow-y: auto;
 }
 .menu li { padding: 7px 10px; border-radius: 5px; cursor: pointer; }
-.menu li:hover { background: var(--head); }
+.menu li:hover, .menu li.has-sub.on { background: var(--head); }
+/* Menu.jsx: submenus, lines, the way back on a phone. */
+.menu li.has-sub { display: flex; align-items: center; gap: 12px; }
+.menu-caret { margin-left: auto; color: var(--muted); flex: none; }
+.menu li.menu-sep { height: 1px; padding: 0; margin: 4px 6px; background: var(--line); cursor: default; }
+.menu li.menu-sep:hover { background: var(--line); }
+.menu li.menu-back { display: flex; align-items: center; gap: 6px; font-weight: 600; color: var(--muted); }
+.menu.submenu { z-index: 11; }
 .menu li.danger { color: var(--danger); }
 
 .tabbar { display: flex; align-items: stretch; gap: 2px; padding: 0 10px; background: var(--head); border-top: 1px solid var(--line-strong); height: 34px; }
@@ -512,7 +519,6 @@ button, input, select { font: inherit; color: inherit; }
 
 .more { position: relative; }
 .toolbar .more-button { border: 1px solid var(--line); background: var(--panel); border-radius: 8px; padding: 4px 10px; cursor: pointer; font-size: 16px; line-height: 1; }
-.more-menu { position: absolute; right: 0; top: 36px; left: auto; }
 .panel .small { font-size: 13px; }
 .seeder-row { flex-wrap: wrap; }
 .stop-using { flex-basis: 100%; display: flex; flex-direction: column; gap: 6px; }

@@ -491,15 +491,20 @@ export function SlidesView ({ sheetId, files = [], folders = [], onOpenFile, onO
           onGone={onGone}
           menuItems={() => {
             const save = (format) => exportDeck(ydoc, title, format, sheetId).catch((err) => onError(err.message))
-            return (
-              <>
-                <li role='menuitem' className='version-history' onClick={() => setHistory(true)}>Version history</li>
-                <li role='menuitem' onClick={() => save('pptx')}>Save as a PowerPoint file</li>
-                <li role='menuitem' onClick={() => save('odp')}>Save as an OpenDocument file (.odp)</li>
-                <li role='menuitem' onClick={() => save('pdf')}>Save as PDF</li>
-                {!touch && <li role='menuitem' onClick={() => save('print')}>Print...</li>}
-              </>
-            )
+            return [
+              { label: 'Version history', className: 'version-history', onSelect: () => setHistory(true) },
+              '-',
+              {
+                label: 'Save as',
+                className: 'save-sub',
+                items: [
+                  { label: 'PowerPoint (.pptx)', onSelect: () => save('pptx') },
+                  { label: 'OpenDocument (.odp)', onSelect: () => save('odp') },
+                  { label: 'PDF', onSelect: () => save('pdf') }
+                ]
+              },
+              !touch && { label: 'Print...', onSelect: () => save('print') }
+            ]
           }}
         >
           {!phone && <button className='present-button title-action' title='Present (F5, or Shift+F5 from this slide)' onMouseDown={(e) => e.preventDefault()} onClick={() => startShow(true)} disabled={!deck.slides.length}><Play size={18} weight='fill' /> Present</button>}

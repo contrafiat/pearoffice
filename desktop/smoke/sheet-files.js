@@ -83,14 +83,12 @@ module.exports = async function sheetFiles (t) {
   await key('Right'); for (let i = 0; i < 3; i++) await key('Down')
   // Freeze the top row from the More menu: it stays at the top while the
   // grid scrolls; then unfreeze.
-  await js("document.querySelector('.toolbar .more-button').click()")
-  await js("[...document.querySelectorAll('.more-menu li')].find((l) => l.textContent === 'Freeze top row').click()")
+  await more('Freeze top row')
   await waitFor('frozen', "!!document.querySelector('.frozen-top')")
   await js("document.querySelector('.grid .body').scrollTop = 400")
   await sleep(300)
   result.frozenStays = await js("(() => { const b = document.querySelector('.grid .body').getBoundingClientRect(); const c = document.querySelector('.frozen-top .cell[data-r=\"1\"][data-c=\"1\"]'); return !!c && Math.abs(c.getBoundingClientRect().top - b.top) < 2 && c.textContent === 'Rent' })()")
-  await js("document.querySelector('.toolbar .more-button').click()")
-  await js("[...document.querySelectorAll('.more-menu li')].find((l) => l.textContent === 'Unfreeze').click()")
+  await more('Unfreeze')
   await waitFor('unfrozen', "!document.querySelector('.frozen-top')")
   await js("document.querySelector('.grid .body').scrollTop = 0")
   await js("document.querySelector('.grid .body').focus()")
@@ -149,8 +147,7 @@ module.exports = async function sheetFiles (t) {
   for (let i = 0; i < 15; i++) await key('Right')
   for (let i = 0; i < 4; i++) await key('Down')
   await waitFor('at P5', "document.querySelector('.formula-bar .address').textContent === 'P5'")
-  await js("document.querySelector('.toolbar .more-button').click()")
-  await js("[...document.querySelectorAll('.more-menu li')].find((l) => l.textContent === 'Validation...').click()")
+  await more('Validation...')
   await waitFor('validation panel', "!!document.querySelector('.panel[aria-label=\"Validation\"] textarea')")
   await typeInto('.panel[aria-label="Validation"] textarea', 'Yes\nNo')
   await js("[...document.querySelectorAll('.panel button')].find((b) => b.textContent.trim() === 'Save').click()")
@@ -175,8 +172,7 @@ module.exports = async function sheetFiles (t) {
   for (const v of ['Todo', 'Done', 'Todo']) { await type(v); await key('Return') }
   for (let i = 0; i < 3; i++) await key('Up')
   await sendMod('Down', ['shift']); await sendMod('Down', ['shift'])
-  await js("document.querySelector('.toolbar .more-button').click()")
-  await js("[...document.querySelectorAll('.more-menu li')].find((l) => l.textContent === 'Dropdown...').click()")
+  await more('Dropdown...')
   await waitFor('items offered', "!!document.querySelector('.panel[aria-label=\"Validation\"] textarea') && document.querySelector('.panel[aria-label=\"Validation\"] textarea').value === 'Todo\\nDone' && document.querySelectorAll('.chip-colors button').length === 2")
   await js("document.querySelector('.chip-colors button').click()")
   await waitFor('swatches', "!!document.querySelector('.chip-swatches [aria-label=\"red\"]')")
@@ -207,8 +203,7 @@ module.exports = async function sheetFiles (t) {
   for (let i = 0; i < 19; i++) await key('Right')
   for (let i = 0; i < 4; i++) await key('Down')
   await waitFor('at T5', "document.querySelector('.formula-bar .address').textContent === 'T5'")
-  await js("document.querySelector('.toolbar .more-button').click()")
-  await js("[...document.querySelectorAll('.more-menu li')].find((l) => l.textContent === 'Dropdown...').click()")
+  await more('Dropdown...')
   await waitFor('dropdown panel', "!!document.querySelector('.panel[aria-label=\"Validation\"] textarea')")
   await typeInto('.panel[aria-label="Validation"] textarea', 'Design\nBuild\nTesting')
   await js("[...document.querySelectorAll('.panel label.check')].find((l) => l.textContent.includes('more than one')).querySelector('input').click()")
@@ -232,8 +227,7 @@ module.exports = async function sheetFiles (t) {
   await sendMod('Home', ['control'])
   await key('Right'); for (let i = 0; i < 3; i++) await key('Down')
   // Colour rule: B1:B3 greater than 1000 gets Excel's light red fill.
-  await js("document.querySelector('.toolbar .more-button').click()")
-  await js("[...document.querySelectorAll('.more-menu li')].find((l) => l.textContent === 'Conditional formatting...').click()")
+  await more('Conditional formatting...')
   await waitFor('colour rule form', "!!document.querySelector('.cf-panel input[aria-label=\"Cells\"]')")
   await setInput('.cf-panel input[aria-label="Cells"]', 'B1:B3')
   await setInput('.cf-panel input[aria-label="Value"]', '1000')
@@ -244,8 +238,7 @@ module.exports = async function sheetFiles (t) {
   // A formula rule (B2 under 1000, green) and an icon set on B1:B3
   // (proposals/2026-10-05-formula-rules-icon-sets.md).
   const addRule = async (kind, fill) => {
-    await js("document.querySelector('.toolbar .more-button').click()")
-    await js("[...document.querySelectorAll('.more-menu li')].find((l) => l.textContent === 'Conditional formatting...').click()")
+    await more('Conditional formatting...')
     await waitFor('rules list', "[...document.querySelectorAll('.cf-panel button')].some((b) => b.textContent.trim() === 'Add a rule')")
     await js("[...document.querySelectorAll('.cf-panel button')].find((b) => b.textContent.trim() === 'Add a rule').click()")
     await waitFor('rule form', "!!document.querySelector('.cf-panel input[aria-label=\"Cells\"]')")
@@ -268,8 +261,7 @@ module.exports = async function sheetFiles (t) {
   await js("document.querySelector('.grid .body').focus()")
   // Named range: B1:B2 as "Budget", used in a formula in Q1, then found
   // again from the name box.
-  await js("document.querySelector('.toolbar .more-button').click()")
-  await js("[...document.querySelectorAll('.more-menu li')].find((l) => l.textContent === 'Named ranges...').click()")
+  await more('Named ranges...')
   await waitFor('names panel', "[...document.querySelectorAll('.names-panel button')].some((b) => b.textContent.trim() === 'Name a range')")
   await js("[...document.querySelectorAll('.names-panel button')].find((b) => b.textContent.trim() === 'Name a range').click()")
   await waitFor('name form', "!!document.querySelector('.names-panel input[aria-label=\"Name\"]')")
@@ -305,7 +297,7 @@ module.exports = async function sheetFiles (t) {
   step('renamed')
 
   // Export to .xlsx, then import that file back through the file picker.
-  await more('Save as an Excel file')
+  await more('Excel (.xlsx)')
   const file = path.join(downloads, 'Household budget.xlsx')
   const start = Date.now()
   while (!(fs.existsSync(file) && fs.statSync(file).size > 1000) && Date.now() - start < 20000) await sleep(200)
@@ -321,7 +313,7 @@ module.exports = async function sheetFiles (t) {
   await js("document.querySelector('.insert-chart').click()")
   await waitFor('chart inserted', "!!document.querySelector('.chart-frame svg') && !!document.querySelector('.chart-panel')")
   await js("document.querySelector('.chart-panel .close').click()")
-  await more('Save as an OpenDocument file (.ods)')
+  await more('OpenDocument (.ods)')
   const odsFile = path.join(downloads, 'Household budget.ods')
   for (const t0 = Date.now(); !(fs.existsSync(odsFile) && fs.statSync(odsFile).size > 1000) && Date.now() - t0 < 10000;) await sleep(200)
   await sleep(300)
@@ -334,12 +326,12 @@ module.exports = async function sheetFiles (t) {
 
   // CSV and PDF of this tab from the More menu; duplicate a tab and delete
   // the copy from the tab menu.
-  await more('Download this tab as CSV')
+  await more('CSV, this tab')
   const csvFile = path.join(downloads, 'Household budget.csv')
   for (const t0 = Date.now(); !fs.existsSync(csvFile) && Date.now() - t0 < 10000;) await sleep(200)
   await sleep(300)
   const csv = fs.existsSync(csvFile) ? fs.readFileSync(csvFile, 'utf8') : ''
-  await more('Save as JSON')
+  await more('JSON')
   const jsonFile = path.join(downloads, 'Household budget.json')
   for (const t0 = Date.now(); !fs.existsSync(jsonFile) && Date.now() - t0 < 10000;) await sleep(200)
   await sleep(300)
@@ -348,7 +340,7 @@ module.exports = async function sheetFiles (t) {
   // The first row names the fields: Rent | 1200, then Food, Total.
   result.json = !!saved && Array.isArray(saved.Sheet1) && saved.Sheet1.some((r) => r.Rent === 'Total' && r['1200'] === 1650.5)
   if (!result.json) throw new Error('json export: ' + JSON.stringify(saved).slice(0, 300))
-  await more('Save this tab as PDF')
+  await more('PDF, this tab')
   const pdfFile = path.join(dataDir, 'Household budget.pdf')
   for (const t0 = Date.now(); !fs.existsSync(pdfFile) && Date.now() - t0 < 15000;) await sleep(200)
   await sleep(300)

@@ -6,6 +6,7 @@ import { DeletePanel } from './DeletePanel.jsx'
 import { TidyPanel } from './TidyPanel.jsx'
 import { MoveToFolderPanel } from './Folders.jsx'
 import { DotsThree, UserPlus } from '@phosphor-icons/react'
+import { Menu, menuItems as menuList } from './Menu.jsx'
 
 // Open in new window (proposals/2026-10-26-file-windows.md): on desktop, and
 // not in a window that already holds just this file.
@@ -25,21 +26,21 @@ export function useMembers (sheetId) {
 // The toolbar parts any kind of file has (proposals/2026-10-06-documents.md):
 // the title, who is in it, Share and the More menu's file items, plus the
 // panels they open. The editor's own tools go in as children, and its own
-// More items as menuItems(close).
+// More items as menuItems(): a list of Menu.jsx items, before File ▸.
 export function FileBar ({ sheetId, noun, title, myRole, frozen, canEdit, badge, phone, members, present, menuItems, onTitleChange, onError, onGone, children }) {
   const [sharing, setSharing] = useState(false)
-  const [more, setMore] = useState(false) // the ⋯ menu
+  const [more, setMore] = useState(null) // the ⋯ menu: { anchor } while open
   const [deleting, setDeleting] = useState(null) // 'local' | 'everyone' | null
   const [tidying, setTidying] = useState(false)
   const [moving, setMoving] = useState(false) // Move to folder
   const ICON = phone ? 20 : 18 // toolbar icon size
-  const close = () => setMore(false)
+  const close = () => setMore(null)
   // A press anywhere outside the menu, or Esc, closes it.
   const moreRef = useRef(null)
   useEffect(() => {
     if (!more) return
-    const away = (e) => { if (moreRef.current && !moreRef.current.contains(e.target)) setMore(false) }
-    const esc = (e) => { if (e.key === 'Escape') { e.stopPropagation(); setMore(false) } }
+    const away = (e) => { if (moreRef.current && !moreRef.current.contains(e.target)) setMore(null) }
+    const esc = (e) => { if (e.key === 'Escape') { e.stopPropagation(); setMore(null) } }
     document.addEventListener('pointerdown', away, true)
     document.addEventListener('keydown', esc, true)
     return () => {
@@ -71,16 +72,30 @@ export function FileBar ({ sheetId, noun, title, myRole, frozen, canEdit, badge,
         {!phone && <button className='share' onClick={() => setSharing(true)}>Share</button>}
         {phone && members.length <= 1 && <button className='share-icon icon-button' aria-label='Share' title='Share' onClick={() => setSharing(true)}><UserPlus size={ICON} /></button>}
         <span className='more' ref={moreRef}>
-          <button className='more-button icon-button' aria-label='More' title='More' onClick={() => setMore(!more)}><DotsThree size={ICON} weight='bold' /></button>
+          <button className='more-button icon-button' aria-label='More' title='More' onClick={(e) => setMore(more ? null : { anchor: e.currentTarget.getBoundingClientRect() })}><DotsThree size={ICON} weight='bold' /></button>
           {more && (
-            <ul className='menu more-menu' role='menu' onClick={close}>
-              {menuItems && menuItems(close)}
-              {OWN_WINDOWS && <li role='menuitem' className='open-window' onClick={() => call('app:openWindow', { sheetId }).catch((err) => onError(err.message))}>Open in new window</li>}
-              <li role='menuitem' onClick={() => setMoving(true)}>Move to folder...</li>
-              <li role='menuitem' onClick={() => setDeleting('local')}>Remove from this device</li>
-              {myRole === 'owner' && !frozen && <li role='menuitem' onClick={() => setTidying(true)}>Tidy up this {noun}...</li>}
-              {myRole === 'owner' && <li role='menuitem' className='danger' onClick={() => setDeleting('everyone')}>Delete for everyone</li>}
-            </ul>
+            <Menu
+              className='more-menu'
+              label='More'
+              where={more}
+              onClose={close}
+              items={menuList([
+                ...(menuItems ? menuItems() : []),
+                '-',
+                {
+                  label: 'File',
+                  className: 'file-sub',
+                  items: [
+                    OWN_WINDOWS && { label: 'Open in new window', className: 'open-window', onSelect: () => call('app:openWindow', { sheetId }).catch((err) => onError(err.message)) },
+                    { label: 'Move to folder...', onSelect: () => setMoving(true) },
+                    myRole === 'owner' && !frozen && { label: 'Tidy up this ' + noun + '...', onSelect: () => setTidying(true) },
+                    '-',
+                    { label: 'Remove from this device', onSelect: () => setDeleting('local') },
+                    myRole === 'owner' && { label: 'Delete for everyone', danger: true, onSelect: () => setDeleting('everyone') }
+                  ]
+                }
+              ])}
+            />
           )}
         </span>
       </header>
