@@ -1179,16 +1179,4 @@ fi
 # ---------------------------------------------------------------------------
 # 13b. Deferred-action reminders
 # ---------------------------------------------------------------------------
-if $APP_STORE_DEFERRED; then
-  echo ""
-  echo "==> Reminder: App Store review submission deferred"
-  echo "    Apple was still processing the build. Once it is done (watch the email"
-  echo "    or App Store Connect), attach it and submit in App Store Connect, or:"
-  echo ""
-  echo "      asc versions list --app $ASC_APP_ID --version $APP_VERSION"
-  echo "      asc builds list --app $ASC_APP_ID --version $APP_VERSION"
-  echo "      asc versions attach-build --version-id <VID> --build <BID>"
-  echo "      asc review submissions-create --app $ASC_APP_ID --platform IOS"
-  echo "      asc review items-add --submission <SID> --item-type appStoreVersions --item-id <VID>"
-  echo "      asc review submissions-submit --id <SID> --confirm"
-fi
+release_deferred_reminders
