@@ -68,11 +68,24 @@ Two things are missing:
 - The changed-text marks come from comparing the old and the current
   document as text, paragraph by paragraph.
 
-## Not in this
+## Sheets and decks (part 2, Tim 2026-10-26)
 
-- Sheets and slide decks. The same log and the same `doc:versions` work
-  for them; showing an old sheet or deck needs its own read-only view.
-  Proposed as the next step if this works out.
+The same list and the same replay, through `file:versions` and
+`file:version` for any file.
+
+- **A sheet:** the picked version's tab as a grid of its cells, values
+  worked out in the worklet (`sheet:versionCells`), cells it added or
+  changed in green (a changed one says what it was), cells it emptied
+  struck through; a tab picker; Copy copies the tab as tab-separated text.
+  Formats are not shown.
+- **A deck:** the picked version's slides, the ones it added or changed
+  outlined and labelled, the ones it deleted after them, faded.
+- **Restore** (`file:restore`, owners and editors): the worklet makes the
+  file match the version as one edit: every part of the file except
+  `meta` (title, schema version, template mark), so a rename since then is
+  kept.
+
+## Not in this
 - Naming a version or pinning one so a tidy-up keeps it.
 - Showing who wrote each word.
 

@@ -102,10 +102,10 @@ test('ops carry their time; the view keeps it, and drops nonsense', async (t) =>
   await add('first')
   await new Promise((resolve) => setTimeout(resolve, 400))
   await add('second')
-  const { versions } = await call(engine, 'doc:versions', { sheetId, pauseMs: 200 })
+  const { versions } = await call(engine, 'file:versions', { sheetId, pauseMs: 200 })
   assert.equal(versions.length, 2)
   assert.ok(versions.every((x) => typeof x.from === 'number' && x.people.length === 1 && x.people[0] === b4a.toString(engine.identity.publicKey, 'hex')))
-  const older = await call(engine, 'doc:version', { sheetId, end: versions[1].end })
+  const older = await call(engine, 'file:version', { sheetId, end: versions[1].end })
   assert.equal(textOf(b4a.from(older.state, 'base64')), 'first')
   // An op with a time that is not a plausible one keeps none.
   const before = Y.encodeStateVector(doc)
@@ -134,4 +134,53 @@ test('what changed between two versions, word by word', async () => {
   assert.deepEqual(words, [{ text: 'a ', op: 'same' }, { text: 'b', op: 'del' }, { text: 'x', op: 'add' }, { text: ' c', op: 'same' }])
   // The first version: everything added.
   assert.deepEqual(d.diffVersions(null, { type: 'doc', content: [p('One')] }).map(show), ['add:p:+One'])
+})
+
+test('a sheet: an old version with its values and changes, and Restore', async (t) => {
+  const engine = createSheetEngine({ corestore: new Corestore(tmpDir()) })
+  t.after(async () => { await engine.close(); cleanup() })
+  await engine.init({})
+  const { sheetId } = await call(engine, 'sheet:create', { title: 'Budget' })
+  await call(engine, 'sheet:setCell', { sheetId, row: 1, col: 1, input: '1' })
+  await new Promise((resolve) => setTimeout(resolve, 400))
+  await call(engine, 'sheet:setCell', { sheetId, row: 1, col: 1, input: '2' })
+  await call(engine, 'sheet:setCell', { sheetId, row: 1, col: 2, input: '=A1*10' })
+  const { versions } = await call(engine, 'file:versions', { sheetId, pauseMs: 200 })
+  assert.equal(versions.length, 2)
+  const cells = async (i) => {
+    const r = await call(engine, 'sheet:versionCells', { sheetId, end: versions[i].end, prevEnd: versions[i + 1] ? versions[i + 1].end : null })
+    return Object.fromEntries(r.cells.map((c) => [c.row + ',' + c.col, c.display + (c.before === undefined ? '' : ' was ' + JSON.stringify(c.before))]))
+  }
+  assert.deepEqual(await cells(1), { '1,1': '1 was ""' }) // the first version: all of it added
+  assert.deepEqual(await cells(0), { '1,1': '2 was "1"', '1,2': '20 was ""' })
+  await call(engine, 'file:setTitle', { sheetId, title: 'Budget 2027' })
+  await call(engine, 'file:restore', { sheetId, end: versions[1].end })
+  const view = await call(engine, 'sheet:view', { sheetId })
+  assert.deepEqual(view.cells.map((c) => c.row + ',' + c.col + '=' + c.display), ['1,1=1'])
+  assert.equal(view.title, 'Budget 2027') // the title is not part of a version
+})
+
+test('restoreInto makes a deck match an older one, keeping its title', () => {
+  const S = require('../src/slides/slidesModel')
+  const older = new Y.Doc()
+  S.initDeck(older, { title: 'Deck' })
+  const live = new Y.Doc()
+  Y.applyUpdate(live, Y.encodeStateAsUpdate(older))
+  const first = S.slideIds(live)[0]
+  S.addSlide(live, { after: first, layout: 'blank' })
+  S.addShape(live, first, 'rect', { x: 10, y: 10, w: 100, h: 100, rot: 0 })
+  live.getMap('meta').set('title', 'Deck, renamed')
+  assert.equal(S.slideIds(live).length, 2)
+  const old = new Y.Doc()
+  Y.applyUpdate(old, Y.encodeStateAsUpdate(older))
+  const other = new Y.Doc() // someone else's copy, to see the restore merge in
+  Y.applyUpdate(other, Y.encodeStateAsUpdate(live))
+  const before = Y.encodeStateVector(live)
+  history.restoreInto(live, old)
+  Y.applyUpdate(other, Y.encodeStateAsUpdate(live, before))
+  for (const d of [live, other]) {
+    assert.equal(S.slideIds(d).length, 1)
+    assert.equal(S.elements(d, first).filter((e) => e.map.get('type') === 'shape').length, 0)
+    assert.equal(d.getMap('meta').get('title'), 'Deck, renamed')
+  }
 })
