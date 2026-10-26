@@ -15,9 +15,12 @@ const { createFileWindows } = require('./file-windows')
 
 const SMOKE = !!process.env.PEAROFFICE_SMOKE
 
-// The smoke test keeps the page's storage (zoom, theme) in its throwaway
-// folder too, so one run cannot leave settings for the next.
-if (SMOKE && process.env.PEAROFFICE_DATA) app.setPath('userData', path.join(process.env.PEAROFFICE_DATA, 'electron'))
+// A copy given its own data folder (npm run desktop, the smoke test) keeps
+// Electron's files there too: the page's storage (zoom, theme), so one smoke
+// run cannot leave settings for the next, and the single-instance lock, so
+// a dev copy runs beside an installed PearOffice instead of handing over to
+// it.
+if (process.env.PEAROFFICE_DATA) app.setPath('userData', path.join(process.env.PEAROFFICE_DATA, 'electron'))
 
 // One running copy per data folder: the worklet holds a lock on its store.
 if (!SMOKE && !app.requestSingleInstanceLock()) app.exit(0)
