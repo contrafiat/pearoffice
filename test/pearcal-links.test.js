@@ -139,3 +139,34 @@ test('desktop app:openUrl opens web and PearCal links and says when PearCal is m
   // A web link that fails still fails as before.
   await assert.rejects(openUrl('https://x.y', { open: fails }), /Failed to open/)
 })
+
+// A link pasted as a cell's whole text (PearCal's Copy link, or PearOffice's
+// own for a file) works like a typed web address.
+test('a cell whose text is a pasted PearCal or PearOffice link is a link', async () => {
+  const esbuild = require('esbuild')
+  const fs = require('node:fs')
+  // Next to the tests, so the bundle's external react resolves from node_modules.
+  const out = path.join(__dirname, '.links-test-' + process.pid + '.cjs')
+  await esbuild.build({
+    entryPoints: [path.join(__dirname, '..', 'src', 'ui', 'sheet', 'links.jsx')],
+    bundle: true, platform: 'node', format: 'cjs', outfile: out, jsx: 'automatic', logLevel: 'silent',
+    external: ['react', 'react/jsx-runtime'],
+    // The icons are ESM-only under node and linkOf draws none: stand them in.
+    plugins: [{
+      name: 'no-icons',
+      setup (b) {
+        b.onResolve({ filter: /^@phosphor-icons\/react$/ }, () => ({ path: 'icons', namespace: 'stub' }))
+        b.onLoad({ filter: /.*/, namespace: 'stub' }, () => ({ contents: 'module.exports = new Proxy({}, { get: () => () => null })', loader: 'js' }))
+      }
+    }]
+  })
+  let linkOf
+  try { linkOf = require(out).linkOf } finally { fs.rmSync(out, { force: true }) }
+  const cell = (display) => ({ kind: 'text', display })
+  assert.deepEqual(linkOf(cell('pearcal://event/g8m5zou/e1793049726792')), { url: 'pearcal://event/g8m5zou/e1793049726792' })
+  assert.deepEqual(linkOf(cell(' pearcal://day/2026-10-27 ')), { url: 'pearcal://day/2026-10-27' })
+  assert.deepEqual(linkOf(cell('pearoffice://file/' + 'A'.repeat(43))), { file: 'A'.repeat(43) })
+  assert.deepEqual(linkOf(cell('https://peerloomllc.com')), { url: 'https://peerloomllc.com' })
+  assert.equal(linkOf(cell('pearcal://day/2026-02-30')), null)
+  assert.equal(linkOf(cell('see pearcal://day/2026-10-27')), null)
+})

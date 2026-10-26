@@ -7,7 +7,7 @@ import { colName } from './a1.js'
 import { parseRange } from '../../sheet/charts.js'
 import { untitled } from '../Files.jsx'
 
-import { pearLink, fileLink, folderLink, pearcalLabel } from '../pearLinks.js'
+import { pearLink, fileLink, folderLink, pearcalLabel, isPearcalLink } from '../pearLinks.js'
 
 const WEB = /^https?:\/\/\S+$/i
 export { fileLink, folderLink }
@@ -16,7 +16,7 @@ export { fileLink, folderLink }
 const quoted = (name) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(name) ? name : "'" + name.replace(/'/g, "''") + "'"
 
 // What a cell's link is: { url } for a web or email link (also a cell whose
-// whole text is a web address), { to } for a place in the file, { gone } when
+// whole text is a web address or a PearCal link), { to } for a place in the file, { gone } when
 // its tab was deleted, { file } or { folder } with the id for another file or
 // a folder, or null. `formula` marks one from HYPERLINK.
 export function linkOf (cell) {
@@ -28,7 +28,14 @@ export function linkOf (cell) {
   if (l) return { url: l, stored: true }
   // From a HYPERLINK formula: opened from here, changed in the formula.
   if (cell.formulaLink) return cell.formulaLink === '#' ? (cell.linkTo ? { to: cell.linkTo, formula: true } : null) : { url: cell.formulaLink, formula: true }
-  if (cell.kind === 'text' && typeof cell.display === 'string' && WEB.test(cell.display.trim())) return { url: cell.display.trim() }
+  if (cell.kind === 'text' && typeof cell.display === 'string') {
+    // A pasted link works like a typed web address: PearCal's Copy link, or
+    // PearOffice's own Copy link for a file or folder.
+    const text = cell.display.trim()
+    if (WEB.test(text) || isPearcalLink(text)) return { url: text }
+    const pasted = pearLink(text)
+    if (pasted) return pasted
+  }
   return null
 }
 
