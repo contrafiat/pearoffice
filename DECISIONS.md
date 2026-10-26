@@ -2,6 +2,19 @@
 
 Append-only, newest on top. Per Constitution §4.
 
+## 2026-10-26 - No on-device AI (QVAC) in PearOffice
+Tier: T0
+Context: a tester suggested QVAC. Uses considered: a formula from a sentence,
+summarising or rewriting a document, a photo of a table into a sheet. PearList
+shipped a QVAC small model and removed it (pearlist/DECISIONS.md, PRs #98 and
+#99): 37% of items placed correctly, 4 to 6.5 s per item, a 0.8 GB download and
+about 2 GB resident, too much for a 3 GB iPhone; on iOS it could not start for
+five weeks and nobody noticed.
+Choice: Tim chose not to add it. The TODO item is removed.
+Consequences: revisit only with new measurements of a model that is fast and
+right enough on the phones we support. A wrong formula or summary costs more
+than doing it by hand.
+
 ## 2026-10-14 - Releases stop carrying the Linux seeder download
 Tier: T1
 Context: the earlier 2026-10-14 entry (below) kept building the Linux seeder download
