@@ -36,6 +36,7 @@
       "preload.js",
       "worklet.js",
       "seeder-process.js",
+      "file-windows.js",
       "paths.js",
       "login.js",
       "appimage.js",

@@ -2,6 +2,8 @@ import React from 'react'
 import { createRoot } from 'react-dom/client'
 import { App } from './App.jsx'
 import { Audience } from './slides/Present.jsx'
+import { FileWindow } from './FileWindow.jsx'
+import { applyTheme } from './theme.js'
 import { FONT_CSS } from './fonts.js'
 
 // The suite font, before first paint.
@@ -14,4 +16,9 @@ document.head.appendChild(fontStyle)
 const query = new URLSearchParams(window.location.search)
 const audience = query.get('audience')
 
-createRoot(document.getElementById('root')).render(audience ? <Audience sheetId={audience} startId={query.get('slide') || null} /> : <App />)
+// A file in a window of its own loads it with ?file=<id>
+// (proposals/2026-10-26-file-windows.md).
+const fileId = query.get('file')
+if (fileId) applyTheme()
+
+createRoot(document.getElementById('root')).render(audience ? <Audience sheetId={audience} startId={query.get('slide') || null} /> : fileId ? <FileWindow fileId={fileId} /> : <App />)

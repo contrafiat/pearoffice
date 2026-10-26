@@ -197,7 +197,11 @@ Code that works for any kind of file sits apart from each editor's own
   `window.pearoffice` (`call`, `on`), which the desktop preload and the mobile
   WebView provide. Built to `dist/ui` by `scripts/build-ui.mjs`.
 - `desktop/` - the Electron shell: `main.js` starts the worklet bundle with
-  the bare-runtime binary and relays IPC, `preload.js` is the bridge,
+  the bare-runtime binary and relays IPC to every window, `file-windows.js`
+  opens a file in a window of its own (one per file, `?file=<id>` drawn by
+  `src/ui/FileWindow.jsx`, reopened after a restart from `windows.json` in
+  the data folder; `app:openWindow`, `app:windowFor`, `app:openInMain`;
+  proposals/2026-10-26-file-windows.md), `preload.js` is the bridge,
   `smoke.js`, `smoke-run.js` and `smoke/` are the offscreen smoke test. Has its own
   `package.json` (Electron): `npm install --prefix desktop`.
 - `src/seeder/` - the blind seeder, which is the suite's shared seeder
@@ -401,7 +405,7 @@ take five scenes: files, sheet, document, slides, sharing.
   bundle must create, edit and read a sheet over stdin/stdout, and the seeder
   bundle must start and print a pairing link.
 - `npm run smoke:desktop`: drives the real UI in Electron with an offscreen
-  window and real key and mouse events, in nineteen parts. Each part is its own
+  window and real key and mouse events, in twenty parts. Each part is its own
   launch with a throwaway data folder and a 60 s limit, and prints one
   `ok`/`not ok` line, then a summary line. `sheets` is the grid editor
   (typing, formulas, pointing at cells while typing one, spilling, fill,
@@ -473,6 +477,12 @@ take five scenes: files, sheet, document, slides, sharing.
   side list, renaming, reopening and deleting (the files stay) (about
   5 s); with `PEAROFFICE_SMOKE_FOLDERS_SHOTS=<folder>` it saves the
   screens.
+  `windows` is files in windows of their own: Open in new window from a
+  card and from the file menu, the main window bringing that window
+  forward, a rename reaching both, a folder link opening in the main
+  window, closing one and a restart reopening the rest where they were
+  (`app:smokeReopenWindows`; about 5 s; `PEAROFFICE_SMOKE_WINDOWS_SHOT=<png>`
+  saves the file window).
   `app` is the shell: the New picker, theme, Seeder and Devices panels
   (Linked devices: this device's default name, renaming, kept after
   reopening and a reload; `PEAROFFICE_SMOKE_DEVICES_SHOT=<png>` saves the

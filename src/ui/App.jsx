@@ -113,7 +113,14 @@ function RestoreCard ({ restore, hidden, onHide, onDone }) {
 
 export function App () {
   const [sheets, setSheets] = useState(null)
-  const [current, setCurrent] = useState(null)
+  const [current, setCurrentNow] = useState(null)
+  // Files in their own windows (desktop, proposals/2026-10-26-file-windows.md):
+  // one of those is brought forward instead of opening here.
+  const windowIds = useRef([])
+  const setCurrent = useCallback((v) => {
+    if (typeof v === 'string' && windowIds.current.includes(v)) { call('app:windowFor', { sheetId: v }).catch(() => {}); return }
+    setCurrentNow(v)
+  }, [])
   const currentRef = useRef(null)
   currentRef.current = current
   const [error, setErrorNow] = useState(null)
@@ -195,6 +202,23 @@ export function App () {
     if (f && sheetId) await call('file:place', { sheetId, folder: f }).catch(() => {})
   }, [])
   const [restoreHidden, setRestoreHidden] = useState(false)
+  // Which files have windows; a file that just got one leaves this window.
+  useEffect(() => {
+    if (!desktop) return
+    const take = (ids) => {
+      windowIds.current = Array.isArray(ids) ? ids : []
+      setCurrentNow((c) => (c && windowIds.current.includes(c) ? null : c))
+    }
+    call('app:windows').then((r) => take(r && r.ids)).catch(() => {})
+    const offs = [
+      on('app:windows', ({ ids }) => take(ids)),
+      // From a file window: a link or chip to another file or a folder.
+      on('app:openFile', ({ id }) => openFileRef.current(id)),
+      on('app:openFolder', ({ id }) => { setCurrentNow(null); setFolder(id) })
+    ]
+    return () => offs.forEach((off) => off())
+  }, [desktop])
+  const openWindow = (id) => { call('app:openWindow', { sheetId: id }).catch((err) => setError(err.message)) }
   // Opening a file from a link in a sheet, as a tap on its card would.
   const openFile = (id, list = sheets) => {
     const f = list && list.find((x) => x.sheetId === id)
@@ -203,6 +227,8 @@ export function App () {
     else if (f.recovery === 'copy') setRecovering(f)
     else setCurrent(id)
   }
+  const openFileRef = useRef(openFile)
+  openFileRef.current = openFile
 
   const refresh = useCallback(async () => {
     try {
@@ -398,6 +424,8 @@ export function App () {
       className={'sheet-link' + (s.sheetId === current ? ' active' : '') + (s.joining ? ' joining' : '') + (s.waiting ? ' waiting' : '') + (s.removed ? ' removed' : '')}
       title={s.waiting ? 'Waiting for someone in this file to come online' : s.removed ? 'You were removed from this file' : undefined}
       onClick={() => (s.waiting ? setWaitingJoin(s.sheetId) : setCurrent(s.sheetId))}
+      onAuxClick={(e) => { if (e.button === 1 && desktop && !s.waiting && !s.removed && !s.joining && !s.recovery) { e.preventDefault(); openWindow(s.sheetId) } }}
+      onContextMenu={desktop && !s.waiting && !s.removed && !s.joining ? (e) => { e.preventDefault(); setCardMenu({ x: e.clientX, y: e.clientY, pointer: true, file: s }) } : undefined}
       draggable={desktop && !s.joining}
       onDragStart={(e) => dragFile(e, s.sheetId)}
     >
@@ -485,6 +513,7 @@ export function App () {
         <>
           <div className='doc-scrim' onPointerDown={() => setCardMenu(null)} />
           <ul className='menu card-menu' role='menu' style={{ ...(cardMenu.pointer ? { left: Math.max(8, Math.min(cardMenu.x, window.innerWidth - 200)) } : { right: Math.max(8, window.innerWidth - cardMenu.x) }), top: Math.min(cardMenu.y + 4, window.innerHeight - 150) }} onClick={() => setCardMenu(null)}>
+            {desktop && cardMenu.file && !cardMenu.file.removed && !cardMenu.file.waiting && !cardMenu.file.recovery && <li role='menuitem' className='open-window' onClick={() => openWindow(cardMenu.file.sheetId)}>Open in new window</li>}
             {cardMenu.file && cardMenu.file.template && !cardMenu.file.removed && <li role='menuitem' onClick={() => fromTemplate(() => call('file:fromTemplate', { sheetId: cardMenu.file.sheetId }))}>New from this template</li>}
             {cardMenu.file && !cardMenu.file.removed && !cardMenu.file.waiting && <li role='menuitem' onClick={() => copyLink('pearoffice://file/' + cardMenu.file.sheetId).catch(() => {})}>Copy link</li>}
             {cardMenu.file && <li role='menuitem' onClick={() => setMoving(cardMenu.file)}>Move to folder...</li>}
@@ -665,6 +694,7 @@ export function App () {
                     onNewFolder={() => setNaming({})}
                     onFolderMenu={(fd, at) => setCardMenu({ ...at, folder: fd })}
                     onFileMenu={(f, at) => setCardMenu({ ...at, file: f })}
+                    onWindow={desktop ? openWindow : null}
                     onDrop={placeFile}
                     desktop={desktop}
                     actions={<StartActions onNew={() => setNewFile(true)} onJoin={() => setJoining('')} onImported={opened} onError={setError} />}

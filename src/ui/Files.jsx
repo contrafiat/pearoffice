@@ -142,7 +142,7 @@ const contextMenu = (desktop, open) => (e) => {
   if (desktop) open(atPointer(e))
 }
 
-function FileCard ({ f, onOpen, onWaiting, onRecover, onMenu, desktop, onHold }) {
+function FileCard ({ f, onOpen, onWaiting, onRecover, onMenu, onWindow, desktop, onHold }) {
   return (
     <li
       className='file-cell'
@@ -155,6 +155,8 @@ function FileCard ({ f, onOpen, onWaiting, onRecover, onMenu, desktop, onHold })
         className={'file-card' + (f.waiting ? ' waiting' : '') + (f.removed ? ' removed' : '')}
         title={f.waiting ? 'Waiting for someone in this file to come online' : f.removed ? 'You were removed from this file' : RECOVERY_TITLES[f.recovery]}
         onClick={() => (f.waiting ? onWaiting(f.sheetId) : f.recovery === 'copy' ? onRecover(f) : onOpen(f.sheetId))}
+        // A middle click opens it in its own window (desktop).
+        onAuxClick={(e) => { if (e.button === 1 && onWindow && !f.waiting && !f.removed && !f.joining && !f.recovery) { e.preventDefault(); onWindow(f.sheetId) } }}
       >
         <KindIcon kind={f.kind} size={28} />
         <span className='file-title'>{f.waiting ? 'Joining...' : (f.title || untitled(f.kind))}</span>
@@ -280,12 +282,12 @@ function useTouchDrag (onDrop, onMenu, canDrag) {
 // The start screen: folders first, then the files in no folder, newest
 // first; or, with a folder open, the files in it
 // (proposals/2026-10-10-folders.md).
-export function FileHome ({ files, actions, onOpen, onWaiting, onRecover = onOpen, folders = [], places = {}, folder = null, onFolder = () => {}, onNewFolder = () => {}, onFolderMenu = () => {}, onFileMenu = () => {}, onDrop = () => {}, desktop = false }) {
+export function FileHome ({ files, actions, onOpen, onWaiting, onRecover = onOpen, folders = [], places = {}, folder = null, onFolder = () => {}, onNewFolder = () => {}, onFolderMenu = () => {}, onFileMenu = () => {}, onWindow = null, onDrop = () => {}, desktop = false }) {
   const open = folder && folders.find((x) => x.id === folder)
   const shown = filesIn([...files].reverse(), places, open ? open.id : null)
   // Phones drag only when there is somewhere to drop.
   const { ghost, hold } = useTouchDrag(onDrop, onFileMenu, !!open || folders.length > 0)
-  const card = (f) => <FileCard key={f.sheetId} f={f} onOpen={onOpen} onWaiting={onWaiting} onRecover={onRecover} onMenu={onFileMenu} desktop={desktop} onHold={desktop ? null : hold} />
+  const card = (f) => <FileCard key={f.sheetId} f={f} onOpen={onOpen} onWaiting={onWaiting} onRecover={onRecover} onMenu={onFileMenu} onWindow={onWindow} desktop={desktop} onHold={desktop ? null : hold} />
   const dragGhost = ghost && (
     <div className='drag-ghost' style={{ left: ghost.x, top: ghost.y }} aria-hidden='true'>
       <KindIcon kind={ghost.kind} size={20} /> {ghost.title}

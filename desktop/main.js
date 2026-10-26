@@ -11,12 +11,16 @@ const { resolvePaths } = require('./paths')
 const { createLoginItem } = require('./login')
 const { startUpdates } = require('./updates')
 const { installMenuEntry } = require('./appimage')
+const { createFileWindows } = require('./file-windows')
 
 const SMOKE = !!process.env.PEAROFFICE_SMOKE
 
-// The smoke test keeps the page's storage (zoom, theme) in its throwaway
-// folder too, so one run cannot leave settings for the next.
-if (SMOKE && process.env.PEAROFFICE_DATA) app.setPath('userData', path.join(process.env.PEAROFFICE_DATA, 'electron'))
+// A copy given its own data folder (npm run desktop, the smoke test) keeps
+// Electron's files there too: the page's storage (zoom, theme), so one smoke
+// run cannot leave settings for the next, and the single-instance lock, so
+// a dev copy runs beside an installed PearOffice instead of handing over to
+// it.
+if (process.env.PEAROFFICE_DATA) app.setPath('userData', path.join(process.env.PEAROFFICE_DATA, 'electron'))
 
 // One running copy per data folder: the worklet holds a lock on its store.
 if (!SMOKE && !app.requestSingleInstanceLock()) app.exit(0)
@@ -167,7 +171,26 @@ function sendTo (w, msg) {
 function sendAll (msg) {
   sendTo(win, msg)
   sendTo(audience, msg)
+  for (const w of fileWindows.all()) sendTo(w, msg)
 }
+
+// Files in their own windows (proposals/2026-10-26-file-windows.md). The
+// main window is told which files have one, so it brings that window
+// forward instead of opening the file itself.
+const fileWindows = createFileWindows({
+  BrowserWindow,
+  screen,
+  uiFile: paths.ui,
+  dataDir,
+  preload: path.join(__dirname, 'preload.js'),
+  icon: process.platform === 'linux' ? ICON : undefined,
+  smoke: SMOKE,
+  guard: (w) => guard(w),
+  mainWindow: () => win,
+  isQuitting: () => quitting,
+  onChange: () => sendTo(win, { name: 'app:windows', data: { ids: fileWindows.ids() } }),
+  log
+})
 
 // --- slide shows (src/ui/slides/Present.jsx) ---------------------------------
 // With one display the main window goes full screen. With two or more, a
@@ -182,22 +205,24 @@ function sendAll (msg) {
 let audience = null
 let presenting = false
 let wasFullScreen = false
+let presenter = null // the window the show was started from
 
 function otherDisplay () {
-  const here = screen.getDisplayMatching(win.getBounds())
+  const here = screen.getDisplayMatching(presenter.getBounds())
   const fake = SMOKE && Number(process.env.PEAROFFICE_FAKE_DISPLAYS)
   if (fake) return fake >= 2 ? { bounds: { ...here.bounds, x: here.bounds.x + here.bounds.width } } : null
   return screen.getAllDisplays().find((d) => d.id !== here.id) || null
 }
 
-function presentStart ({ sheetId, slideId }) {
+function presentStart ({ sheetId, slideId }, from = win) {
   presentEnd({ quiet: true })
-  if (!win || win.isDestroyed()) return { mode: 'single' }
+  presenter = from && !from.isDestroyed() ? from : win
+  if (!presenter || presenter.isDestroyed()) return { mode: 'single' }
   presenting = true
   const other = otherDisplay()
   if (!other) {
-    wasFullScreen = win.isFullScreen()
-    if (!SMOKE && !wasFullScreen) win.setFullScreen(true)
+    wasFullScreen = presenter.isFullScreen()
+    if (!SMOKE && !wasFullScreen) presenter.setFullScreen(true)
     return { mode: 'single' }
   }
   const b = other.bounds
@@ -227,7 +252,7 @@ function presentStart ({ sheetId, slideId }) {
     show.show()
     show.setFullScreen(true)
     // Keys stay with the presenter view.
-    if (win && !win.isDestroyed()) win.focus()
+    if (presenter && !presenter.isDestroyed()) presenter.focus()
   })
   show.on('closed', () => {
     if (audience === show) audience = null
@@ -243,19 +268,42 @@ function presentEnd ({ quiet = false } = {}) {
   const show = audience
   audience = null
   if (show && !show.isDestroyed()) show.close()
-  if (win && !win.isDestroyed() && win.isFullScreen() && !wasFullScreen) win.setFullScreen(false)
+  const p = presenter || win
+  if (p && !p.isDestroyed() && p.isFullScreen() && !wasFullScreen) p.setFullScreen(false)
   wasFullScreen = false
-  if (was && !quiet) sendTo(win, { name: 'app:presentEnded', data: {} })
+  if (was && !quiet) sendTo(p, { name: 'app:presentEnded', data: {} })
   return { ok: true }
 }
 
-ipcMain.handle('worklet:call', async (_e, method, args) => {
-  if (method === 'app:presentStart') return presentStart(args || {})
+ipcMain.handle('worklet:call', async (e, method, args) => {
+  const sender = BrowserWindow.fromWebContents(e.sender) || win
+  if (method === 'app:presentStart') return presentStart(args || {}, sender)
   if (method === 'app:presentEnd') return presentEnd()
   if (method === 'app:presentGo') { sendTo(audience, { name: 'app:presentGo', data: { slideId: String((args && args.slideId) || ''), blank: (args && args.blank) || null } }); return { ok: true } }
-  if (method === 'app:presentInput') { sendTo(win, { name: 'app:presentInput', data: { key: String((args && args.key) || '') } }); return { ok: true } }
+  if (method === 'app:presentInput') { sendTo(presenter || win, { name: 'app:presentInput', data: { key: String((args && args.key) || '') } }); return { ok: true } }
   // Is a show on, and in which window (the smoke test asks).
-  if (method === 'app:presentState') return { presenting, audience: !!(audience && !audience.isDestroyed()), fullScreen: !!(win && !win.isDestroyed() && win.isFullScreen()) }
+  if (method === 'app:presentState') return { presenting, audience: !!(audience && !audience.isDestroyed()), fullScreen: !!((presenter || win) && !(presenter || win).isDestroyed() && (presenter || win).isFullScreen()) }
+  // Files in their own windows (proposals/2026-10-26-file-windows.md).
+  if (method === 'app:openWindow') { const w = fileWindows.openWindow(String((args && args.sheetId) || '')); return { ok: !!w } }
+  if (method === 'app:windows') return { ids: fileWindows.ids() }
+  // Does this file have a window? Then bring it forward.
+  if (method === 'app:windowFor') { const id = String((args && args.sheetId) || ''); const has = fileWindows.ids().includes(id); if (has) fileWindows.openWindow(id); return { open: has } }
+  // From a file window: open a file or folder in the main window.
+  if (method === 'app:openInMain') {
+    if (!win || win.isDestroyed()) return { ok: false }
+    const id = String((args && (args.sheetId || args.folderId)) || '')
+    if (args && args.sheetId && fileWindows.ids().includes(id)) { fileWindows.openWindow(id); return { ok: true } }
+    sendTo(win, { name: args && args.sheetId ? 'app:openFile' : 'app:openFolder', data: { id } })
+    showWindow()
+    return { ok: true }
+  }
+  if (method === 'app:windowMoved') { fileWindows.moved(String((args && args.from) || ''), String((args && args.to) || '')); return { ok: true } }
+  // The smoke test's restart; offScreen puts the first window off every screen.
+  if (SMOKE && method === 'app:smokeReopenWindows') {
+    await fileWindows.reopen(args && args.offScreen ? (list) => list.map((x, i) => (i === 0 ? { ...x, bounds: { ...x.bounds, x: -20000, y: -20000 } } : x)) : undefined)
+    return { ids: fileWindows.ids() }
+  }
+  if (method === 'app:windowGone') { const id = fileWindows.idOf(sender); if (id) fileWindows.gone(id); return { ok: true } }
   // The UI asks for a link that arrived before it was listening.
   if (method === 'app:takeLink') { const url = pendingLink; pendingLink = null; return { url } }
   // The cell menu's Cut, Copy and Paste.
@@ -285,7 +333,7 @@ ipcMain.handle('worklet:call', async (_e, method, args) => {
       // The smoke test saves without asking.
       const file = SMOKE
         ? path.join(dataDir, name)
-        : (await dialog.showSaveDialog(win, { defaultPath: path.join(app.getPath('documents'), name), filters: [{ name: 'PDF', extensions: ['pdf'] }] })).filePath
+        : (await dialog.showSaveDialog(sender, { defaultPath: path.join(app.getPath('documents'), name), filters: [{ name: 'PDF', extensions: ['pdf'] }] })).filePath
       if (!file) return { ok: false }
       fs.writeFileSync(file, pdf)
       return { ok: true, file }
@@ -342,6 +390,7 @@ ipcMain.handle('worklet:call', async (_e, method, args) => {
   if (method === 'app:restart') {
     await worklet.stop()
     await startWorklet()
+    fileWindows.closeAll() // another identity: other files
     if (win && !win.isDestroyed()) win.webContents.reload()
     return { ok: true }
   }
@@ -426,6 +475,23 @@ function editMenu (contents, params) {
   return Menu.buildFromTemplate(items)
 }
 
+// What every window of the UI gets: no menu bar, links in the system
+// browser, no navigation, the text menu.
+function guard (w) {
+  w.removeMenu()
+  w.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^https?:/.test(url)) shell.openExternal(url)
+    return { action: 'deny' }
+  })
+  w.webContents.on('will-navigate', (e) => e.preventDefault())
+  // A show ends with the window it was started from.
+  w.on('closed', () => { if (presenting && presenter === w) presentEnd() })
+  w.webContents.on('context-menu', (e, params) => {
+    const menu = editMenu(w.webContents, params)
+    if (menu) menu.popup({ window: w })
+  })
+}
+
 function createWindow () {
   win = new BrowserWindow({
     width: 1280,
@@ -445,24 +511,20 @@ function createWindow () {
       offscreen: SMOKE
     }
   })
-  win.removeMenu()
+  guard(win)
   win.on('close', (e) => {
-    if (presenting) presentEnd()
+    if (presenting && presenter === win) presentEnd()
     if (!quitting && stayRunning()) {
       e.preventDefault()
       win.hide()
     }
   })
-  // Links open in the system browser, never inside the app.
-  win.webContents.setWindowOpenHandler(({ url }) => {
-    if (/^https?:/.test(url)) shell.openExternal(url)
-    return { action: 'deny' }
-  })
-  win.webContents.on('will-navigate', (e) => e.preventDefault())
-  win.webContents.on('context-menu', (e, params) => {
-    const menu = editMenu(win.webContents, params)
-    if (menu) menu.popup({ window: win })
-  })
+  // Closing the main window closes PearOffice, file windows too (they open
+  // again next time).
+  win.on('closed', () => { if (!quitting) app.quit() })
+  // The file windows open again once the main window shows.
+  if (win.isVisible() || SMOKE) win.webContents.once('did-finish-load', () => fileWindows.restore())
+  else win.once('show', () => fileWindows.restore())
   win.loadFile(paths.ui)
   return win
 }

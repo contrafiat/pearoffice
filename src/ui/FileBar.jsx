@@ -7,6 +7,10 @@ import { TidyPanel } from './TidyPanel.jsx'
 import { MoveToFolderPanel } from './Folders.jsx'
 import { DotsThree, UserPlus } from '@phosphor-icons/react'
 
+// Open in new window (proposals/2026-10-26-file-windows.md): on desktop, and
+// not in a window that already holds just this file.
+const OWN_WINDOWS = typeof window !== 'undefined' && !!(window.pearoffice && window.pearoffice.platform === 'desktop') && !new URLSearchParams(window.location.search).has('file')
+
 // Everyone in a file, for the pictures next to Share.
 export function useMembers (sheetId) {
   const [members, setMembers] = useState([])
@@ -71,6 +75,7 @@ export function FileBar ({ sheetId, noun, title, myRole, frozen, canEdit, badge,
           {more && (
             <ul className='menu more-menu' role='menu' onClick={close}>
               {menuItems && menuItems(close)}
+              {OWN_WINDOWS && <li role='menuitem' className='open-window' onClick={() => call('app:openWindow', { sheetId }).catch((err) => onError(err.message))}>Open in new window</li>}
               <li role='menuitem' onClick={() => setMoving(true)}>Move to folder...</li>
               <li role='menuitem' onClick={() => setDeleting('local')}>Remove from this device</li>
               {myRole === 'owner' && !frozen && <li role='menuitem' onClick={() => setTidying(true)}>Tidy up this {noun}...</li>}

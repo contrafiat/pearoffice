@@ -64,6 +64,8 @@ body { background: var(--paper); overflow: hidden; }
 button, input, select { font: inherit; color: inherit; }
 
 .app { display: grid; grid-template-columns: 220px 1fr; height: 100%; }
+/* A file in its own window: the editor alone (FileWindow.jsx). */
+.app.file-window { grid-template-columns: 1fr; }
 
 .sidebar {
   background: var(--panel);
