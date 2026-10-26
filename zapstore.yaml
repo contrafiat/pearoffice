@@ -30,11 +30,11 @@ license: MIT
 website: https://peerloomllc.com/pearoffice/
 
 images:
-  - ./metadata/store/android/01-files.png
-  - ./metadata/store/android/02-sheet.png
-  - ./metadata/store/android/03-document.png
-  - ./metadata/store/android/04-slides.png
-  - ./metadata/store/android/05-sharing.png
+  - metadata/zapstore/01-android-01-files.webp
+  - metadata/zapstore/02-android-02-sheet.webp
+  - metadata/zapstore/03-android-03-document.webp
+  - metadata/zapstore/04-android-04-slides.webp
+  - metadata/zapstore/05-android-05-sharing.webp
 
 metadata_sources:
   - github
