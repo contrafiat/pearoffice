@@ -175,6 +175,16 @@ test('documents', async (t) => {
     assert.equal((await text(viewer, sheetId)).includes('nope'), false)
   })
 
+  // @ chips (proposals/2026-10-26-document-chips.md).
+  await t.test('the first chip moves the document to version 3, and a viewer cannot', async () => {
+    await assert.rejects(call(viewer, 'doc:useChips', { sheetId }), /view this file but not edit/)
+    assert.equal((await call(owner, 'doc:state', { sheetId, withState: false })).version, 1)
+    assert.deepEqual(await call(editor, 'doc:useChips', { sheetId }), { version: 3 })
+    await waitFor('owner sees version 3', async () => (await call(owner, 'doc:state', { sheetId, withState: false })).version === 3)
+    assert.equal((await call(owner, 'doc:state', { sheetId, withState: false })).newer, false)
+    assert.deepEqual(await call(editor, 'doc:useChips', { sheetId }), { version: 3 })
+  })
+
   await t.test('renaming a document', async () => {
     await call(editor, 'file:setTitle', { sheetId, title: 'Meeting notes' })
     await waitFor('owner sees the title', async () => (await call(owner, 'doc:state', { sheetId })).title === 'Meeting notes')

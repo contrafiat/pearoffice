@@ -184,11 +184,83 @@ export const Picture = Node.create({
   }
 })
 
+// --- @ chips -----------------------------------------------------------------
+
+// An @ chip (proposals/2026-10-26-document-chips.md): a person (identity
+// key), a file or folder (id) or a date (YYYY-MM-DD), inline. `text` is the
+// name when it went in, for exports and for a person who has left. Needs
+// document schema version 3.
+export const CHIP_KINDS = ['person', 'file', 'folder', 'date']
+export const CHIPS_VERSION = 3 // docModel.CHIPS_VERSION
+const CHIP_DATE = /^\d{4}-\d{2}-\d{2}$/
+export function chipOk (a) {
+  if (!a || !CHIP_KINDS.includes(a.kind)) return false
+  if (a.kind === 'date') return CHIP_DATE.test(a.date || '')
+  if (a.kind === 'person') return /^[0-9a-f]{64}$/.test(a.id || '')
+  return /^[A-Za-z0-9_-]{1,64}$/.test(a.id || '')
+}
+
+// A date chip's date as shown: 27 Oct 2026, in the device's language.
+export function chipDate (date) {
+  const d = new Date(date + 'T00:00:00')
+  return isNaN(d) ? String(date || '') : d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
+}
+export const chipText = (a) => (a.kind === 'date' ? chipDate(a.date) : a.text || (a.kind === 'person' ? 'Someone' : a.kind === 'file' ? 'A PearOffice file' : 'A folder'))
+export const chipHref = (a) => (a.kind === 'file' || a.kind === 'folder' ? 'pearoffice://' + a.kind + '/' + a.id : null)
+
+export const Chip = Node.create({
+  name: 'chip',
+  group: 'inline',
+  inline: true,
+  atom: true,
+  selectable: true,
+
+  addAttributes () {
+    return {
+      kind: { default: 'date', parseHTML: (el) => el.getAttribute('data-chip'), renderHTML: (a) => ({ 'data-chip': a.kind }) },
+      id: { default: null, parseHTML: (el) => el.getAttribute('data-id') || null, renderHTML: (a) => (a.id ? { 'data-id': a.id } : {}) },
+      date: { default: null, parseHTML: (el) => el.getAttribute('data-date') || null, renderHTML: (a) => (a.date ? { 'data-date': a.date } : {}) },
+      text: { default: '', parseHTML: (el) => (el.textContent || '').slice(0, 200), renderHTML: () => ({}) }
+    }
+  },
+
+  // Ahead of the link mark's a[href].
+  parseHTML () {
+    const ok = (el) => (chipOk({ kind: el.getAttribute('data-chip'), id: el.getAttribute('data-id'), date: el.getAttribute('data-date') }) ? null : false)
+    return [{ tag: 'span[data-chip]', getAttrs: ok, priority: 100 }, { tag: 'a[data-chip]', getAttrs: ok, priority: 100 }]
+  },
+
+  // A file or folder chip is a link, so it pastes into other apps as one.
+  renderHTML ({ node, HTMLAttributes }) {
+    const href = chipHref(node.attrs)
+    return [href ? 'a' : 'span', mergeAttributes({ class: 'doc-chip' }, href ? { href } : {}, HTMLAttributes), chipText(node.attrs)]
+  },
+
+  renderText ({ node }) {
+    return chipText(node.attrs)
+  }
+})
+
+// The document's JSON with each chip made plain text (a link for a file or
+// folder), for the exports.
+export function flattenChips (json) {
+  const walk = (n) => {
+    if (!n || !n.content) return n
+    return { ...n, content: n.content.map((c) => (c.type === 'chip' ? chipAsText(c) : walk(c))) }
+  }
+  return walk(json)
+}
+function chipAsText (c) {
+  const a = c.attrs || {}
+  const href = chipOk(a) ? chipHref(a) : null
+  return { type: 'text', text: chipText(a), ...(href ? { marks: [...(c.marks || []), { type: 'link', attrs: { href } }] } : c.marks ? { marks: c.marks } : {}) }
+}
+
 // The extensions that make up the document's schema. The editor adds its own
 // (Collaboration, cursors, find, placeholder) on top; import and export use
 // these alone, so both read and write the same nodes and marks.
 export function documentExtensions () {
-  return textExtensions({ tables: true, pictures: true })
+  return textExtensions({ tables: true, pictures: true, chips: true })
 }
 
 // A slide's text box (proposals/2026-10-06-slides.md, Text boxes): the
@@ -216,7 +288,7 @@ export function notesExtensions () {
 }
 
 // Documents and slides share these, in this order.
-function textExtensions ({ starter = {}, tables = false, pictures = false }) {
+function textExtensions ({ starter = {}, tables = false, pictures = false, chips = false }) {
   return [
     StarterKit.configure({
       undoRedo: false, // Collaboration's undo only undoes this person's edits
@@ -237,7 +309,8 @@ function textExtensions ({ starter = {}, tables = false, pictures = false }) {
     Subscript,
     Superscript,
     ParagraphFormat,
-    pictures && Picture
+    pictures && Picture,
+    chips && Chip
   ].filter(Boolean)
 }
 

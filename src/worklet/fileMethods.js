@@ -108,6 +108,7 @@ function createFileHelpers (sheets) {
       // Just joined: the content has not arrived yet.
       loading: !doc.getMap('meta').has('kind'),
       newer: newer(doc),
+      version: doc.getMap('meta').get('version') || 1, // the schema version
       myRole: role,
       frozen: await frozenInfo(ctx, sheetId),
       writable: !!(base && base.writable)

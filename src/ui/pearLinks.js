@@ -29,7 +29,7 @@ export function usePearLinks ({ files = [], folders = [], onOpenFile, onOpenFold
       return d ? { ...l, name: d.name } : { ...l, missing: 'This folder is not one of yours, or it was deleted.' }
     }
     const f = usable.find((x) => x.sheetId === l.file) || usable.find((x) => x.sheetId === moved[l.file])
-    return f ? { ...l, at: f.sheetId, name: f.title || untitled(f.kind) } : { ...l, missing: "You don't have this file. Ask someone who has it to share it with you." }
+    return f ? { ...l, at: f.sheetId, name: f.title || untitled(f.kind), kind: f.kind } : { ...l, missing: "You don't have this file. Ask someone who has it to share it with you." }
   }
   async function follow (id) {
     if (id in followed || usable.some((x) => x.sheetId === id)) return followed
