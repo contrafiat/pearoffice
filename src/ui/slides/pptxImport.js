@@ -21,6 +21,7 @@
 import * as Y from 'yjs'
 import { getSchema } from '@tiptap/core'
 import slidesModel from '../../slides/slidesModel.js'
+import { okLink } from '../../shared/links.js'
 import { slideExtensions, notesExtensions } from '../doc/extensions.js'
 import { THEMES, defaultSize } from './themes.js'
 import { call as bridgeCall } from '../bridge.js'
@@ -385,10 +386,11 @@ async function walk (sc, part, tree, xf, depth, source) {
     // A layout's or master's placeholders show only through the slide's own.
     if (source !== 'slide' && phOf(el)) continue
     const key = source === 'slide' ? null : part.name + '#' + attr(cNvPr(el), 'id')
+    const before = sc.els.length
     switch (el.localName) {
-      case 'sp': shapeEl(sc, part, el, xf, source, key); break
-      case 'cxnSp': shapeEl(sc, part, el, xf, source, key); break
-      case 'pic': picEl(sc, part, el, xf, key); break
+      case 'sp': shapeEl(sc, part, el, xf, source, key); linkOn(sc, part, el, before); break
+      case 'cxnSp': shapeEl(sc, part, el, xf, source, key); linkOn(sc, part, el, before); break
+      case 'pic': picEl(sc, part, el, xf, key); linkOn(sc, part, el, before); break
       case 'grpSp': {
         const g = rawXfrm(el)
         await walk(sc, part, el, g ? groupXf(g, xf) : xf, depth + 1, source)
@@ -398,6 +400,16 @@ async function walk (sc, part, tree, xf, depth, source) {
       case 'contentPart': lose(sc.st, 'other', key); break
     }
   }
+}
+
+// A click link on a picture or shape (proposals/2026-10-26-picture-links.md),
+// put on what it became. Only web, email, file and folder links are kept.
+function linkOn (sc, part, el, before) {
+  const id = attr(kid(cNvPr(el), 'hlinkClick'), 'r:id')
+  const rel = id && part.rels.get(id)
+  const link = rel && rel.external && okLink(rel.target)
+  if (!link) return
+  for (const made of sc.els.slice(before)) if (made.kind === 'picture' || made.kind === 'shape') made.link = link
 }
 
 // Position, with a placeholder's taken from its layout or master when the
@@ -828,6 +840,7 @@ export function buildDeck (parsed, { Y: Yx = Y, title = 'Imported slides', pictu
             made = slidesModel.addChart(doc, id, { chart, data: el.data }, el.frame)
           }
           add(made)
+          if (made && el.link) slidesModel.setLink(doc, id, made, el.link)
           if (!made || el.kind === 'picture' || el.kind === 'chart') continue
           if (el.anchor) slidesModel.setAnchor(doc, id, made, el.anchor)
           if (el.wrap === false) slidesModel.setWrap(doc, id, made, false)

@@ -9,7 +9,7 @@ export function StaticSlide ({ slide, size, theme, scale }) {
   return (
     <div className='slide' data-layout={slide.layout} data-id={slide.id} data-theme={theme.id} style={{ width: size[0], height: size[1], transform: 'scale(' + scale + ')', ...themeStyle(theme) }}>
       {slide.els.map((el) => (
-        <div key={el.id} className='slide-el' data-type={el.type} data-role={el.role || undefined} style={boxStyle(el.frame)}>
+        <div key={el.id} className='slide-el' data-type={el.type} data-role={el.role || undefined} data-link={el.link || undefined} style={boxStyle(el.frame)}>
           <ElementBody el={el} frame={el.frame} theme={theme} text={<TextFrame frame={el.frame} role={el.role} layout={el.layout}><StaticText fragment={el.text} /></TextFrame>} />
         </div>
       ))}

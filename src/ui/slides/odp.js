@@ -22,6 +22,7 @@ import { parsePath, BOX } from './svgPath.js'
 import { fontName, slotHex, hexOf } from './pptxExport.js'
 import { deckSize } from './pptxImport.js'
 import { checkZip } from './importOoxml.js'
+import { okLink } from '../../shared/links.js'
 
 export const ODP = 'application/vnd.oasis.opendocument.presentation'
 export const isOdpFile = (name) => /\.odp$/i.test(String(name || ''))
@@ -272,9 +273,20 @@ export function deckToOdp (doc, { title = '', pictures = new Map() } = {}) {
   for (const s of slidesModel.slides(doc)) {
     const titleSlide = s.map.get('layout') === 'title'
     let shapes = ''
+    // A picture's or shape's link (proposals/2026-10-26-picture-links.md):
+    // what the element wrote goes inside a draw:a, closed when the next
+    // element starts.
+    let linked = null // { at, link }
+    const closeLink = () => {
+      if (linked && shapes.length > linked.at) shapes = shapes.slice(0, linked.at) + '<draw:a xlink:type="simple" xlink:href="' + esc(linked.link) + '">' + shapes.slice(linked.at) + '</draw:a>'
+      linked = null
+    }
     for (const e of slidesModel.elements(doc, s.id)) {
+      closeLink()
       const type = e.map.get('type')
       const f = slidesModel.frame(e.map)
+      const link = slidesModel.linkOf(e.map)
+      if (link) linked = { at: shapes.length, link }
       if (type === 'chart') {
         const value = slidesModel.chartOf(e.map)
         if (!value.data || !value.data.series.length) continue
@@ -371,6 +383,7 @@ export function deckToOdp (doc, { title = '', pictures = new Map() } = {}) {
         shapes += '<draw:custom-shape ' + common + '>' + text + '<draw:enhanced-geometry svg:viewBox="0 0 1000 1000"' + preset + ' draw:enhanced-path="' + esc(path) + '"/></draw:custom-shape>'
       }
     }
+    closeLink()
     // Speaker notes.
     const notes = notesParas(s.map.get('notes'))
     // As Impress writes them: the slide's picture, then the notes on the layout layer.
@@ -916,7 +929,14 @@ export async function readOdp (bytes) {
           els.push({ kind: 'shape', shape, path, radius, frame, ...lk, paras })
           continue
         }
-        if (name === 'draw:a') { visit(el, depth + 1); continue }
+        // A linked picture or shape (proposals/2026-10-26-picture-links.md).
+        if (name === 'draw:a') {
+          const before = els.length
+          visit(el, depth + 1)
+          const link = okLink(el.getAttribute('xlink:href'))
+          if (link) for (const made of els.slice(before)) if (made.kind === 'picture' || made.kind === 'shape') made.link = link
+          continue
+        }
         if (/^(draw|presentation|anim|dr3d):/.test(name) && !/^presentation:(notes)$/.test(name)) lose(name === 'draw:plugin' ? 'media' : 'other')
       }
     }

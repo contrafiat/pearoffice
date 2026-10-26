@@ -40,7 +40,8 @@ export function useToolOverflow (enabled = true) {
     const avail = el.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight) - 4
     const width = (el) => {
       const s = getComputedStyle(el)
-      if (s.display === 'none') return null
+      // Hidden, or a bar that opens under the row (the link bars): not a tool.
+      if (s.display === 'none' || s.position === 'absolute') return null
       const margins = el.classList.contains('tool-keep') ? 0 : parseFloat(s.marginLeft) + parseFloat(s.marginRight)
       return el.getBoundingClientRect().width + margins
     }

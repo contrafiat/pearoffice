@@ -112,6 +112,27 @@ test('the printable page embeds pictures as data: URLs', async () => {
   assert.equal(html.includes('src="data:image/png;base64,' + b64(PIC) + '"'), true)
 })
 
+// Links on pictures (proposals/2026-10-26-picture-links.md).
+test('a linked picture keeps its link through .md, .docx, .odt and the printable page', async () => {
+  const f = await load()
+  const { toOdt } = await import(path.join(__dirname, '..', 'src', 'ui', 'doc', 'odt.js'))
+  const md = '[![Dot](data:image/png;base64,' + b64(PIC) + ')](https://example.com/a)\n\n[![Folder](data:image/png;base64,' + b64(PIC) + ')](pearoffice://folder/abc123)\n'
+  const { json } = await f.fileToJson('a.md', enc(md))
+  const hrefs = (j) => images(j).map((n) => n.attrs.href)
+  assert.deepEqual(hrefs(json), ['https://example.com/a', 'pearoffice://folder/abc123'])
+  const pics = withPictures(json)
+  assert.deepEqual(hrefs((await f.fileToJson('b.md', enc(f.toMarkdown(json, pics)))).json), hrefs(json))
+  assert.deepEqual(hrefs((await f.fileToJson('b.docx', await f.toDocx(json, 'Pic', pics))).json), hrefs(json))
+  assert.deepEqual(hrefs((await f.fileToJson('b.odt', toOdt(json, 'Pic', pics))).json), hrefs(json))
+  assert.equal(f.toHtml(json, 'T', pics).includes('<a href="https://example.com/a"><img'), true)
+})
+
+test('a picture link that is not a web, email, file or folder link is not kept', async () => {
+  const f = await load()
+  const { json } = await f.fileToJson('a.md', enc('[![Dot](data:image/png;base64,' + b64(PIC) + ')](javascript:alert(1))\n'))
+  assert.equal(images(json)[0].attrs.href, null)
+})
+
 test('importing a file stores its pictures and points the document at them', async (t) => {
   const f = await load()
   const testnet = await createTestnet(3)

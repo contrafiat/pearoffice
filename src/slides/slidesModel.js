@@ -25,6 +25,7 @@
 
 const Y = require('yjs')
 const { LAYOUTS, ROLES, boxesFor } = require('./layouts')
+const { okLink } = require('../shared/links')
 
 const VERSION = 1
 const SIZE = [1920, 1080]
@@ -571,6 +572,24 @@ function setAlt (doc, slideId, elId, text) {
   return true
 }
 
+// A picture's or shape's link (proposals/2026-10-26-picture-links.md): a
+// web or email address, a file or a folder; empty removes it.
+function setLink (doc, slideId, elId, href) {
+  const map = element(doc, slideId, elId)
+  if (!map || !LINKABLE.includes(map.get('type'))) return false
+  const link = okLink(href)
+  if (href && !link) return false
+  if (link) map.set('link', link)
+  else map.delete('link')
+  return true
+}
+
+// The link on an element's map, checked, or null.
+function linkOf (map) {
+  return map && LINKABLE.includes(map.get('type')) ? okLink(map.get('link')) : null
+}
+const LINKABLE = ['picture', 'shape']
+
 // Every picture element in the deck, deleted slides included (Restore
 // brings them back), as { ref, hash, alt, map }.
 function pictureRefs (doc) {
@@ -692,6 +711,8 @@ module.exports = {
   setCrop,
   setArrows,
   setAlt,
+  setLink,
+  linkOf,
   pictureRefs,
   setFrame,
   removeElement,

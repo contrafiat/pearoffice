@@ -91,7 +91,9 @@ Code that works for any kind of file sits apart from each editor's own
 `src/doc/` and `src/ui/doc/` the same way, and slides `src/slides/` and
 `src/ui/slides/`.
 
-- `src/shared/` - runs anywhere, for any file: `ids.js`, `phrase.js`
+- `src/shared/` - runs anywhere, for any file: `ids.js`, `links.js`
+  (`okLink`: what a link on a picture or shape may be, web, email, file or
+  folder; proposals/2026-10-26-picture-links.md), `phrase.js`
   (12-word recovery phrase: a 16-byte root, `phrase:root` in localDb, the
   identity seed a keyed hash of it), `qr.js`, Bare shims.
 - `src/doc/` and `src/ui/doc/` - documents (proposals/2026-10-06-documents.md): `docModel.js` (the Yjs doc: `meta`, `body`), `docMethods.js` (`doc:create`, `doc:state`, `doc:update`), `DocView.jsx` (TipTap 3 editor), `docFiles.js` (import .docx/.odt/.md/.txt/.html, export .docx/.odt/.md/.txt/PDF, pictures included; `odt.js` writes .odt from the editor's JSON and turns an .odt into HTML for the same import path; `node scripts/check-doc-export.js [dir]` has LibreOffice read an exported .docx), `pictures.js` (shrinking before upload, the per-document picture cache, the picture node view). Pictures are `image` nodes (`extensions.js`, `Picture`) and move a document to schema version 2 (`docModel.js`); `doc:addPicture` and `doc:picture` are in `docMethods.js`. The editor keeps a Yjs replica and sends batched updates; `doc:updated` brings others' edits.
@@ -189,7 +191,9 @@ Code that works for any kind of file sits apart from each editor's own
   `pearoffice://file/<id>` and `pearoffice://folder/<id>`, named from the
   file list and followed through moves with `file:follow`,
   proposals/2026-10-22-links-to-files.md; the same links from outside the
-  app open the file or folder, and a card's menu has Copy link). Talks only to
+  app open the file or folder, and a card's menu has Copy link;
+  `src/ui/pearLinks.js` names and opens file and folder links for all
+  three editors). Talks only to
   `window.pearoffice` (`call`, `on`), which the desktop preload and the mobile
   WebView provide. Built to `dist/ui` by `scripts/build-ui.mjs`.
 - `desktop/` - the Electron shell: `main.js` starts the worklet bundle with
@@ -420,7 +424,8 @@ take five scenes: files, sheet, document, slides, sharing.
   `docs` is documents, an .odt out and back in included (about 11 s).
   `doc-links` is links in a document: a typed web address, the card under
   the caret (Open, Copy link), Ctrl+click, and links to a file and a folder
-  picked from the link bar and opened (about 4 s).
+  picked from the link bar and opened, and a link on a picture from its
+  bubble (about 5 s).
   `slides` is a deck: two layouts, typing a title, undo and redo, moving,
   resizing and rotating a box with the mouse, nudging, a text box added and
   deleted, someone else's selection, reordering by keys and by drag,
@@ -436,7 +441,7 @@ take five scenes: files, sheet, document, slides, sharing.
   `slides-objects` is shapes and pictures: each of the six shapes inserted,
   resized and moved, a fill, outline and outline width, text in a
   rectangle, a picture from a generated PNG (the pixels match the stored
-  bytes), resized keeping its shape, moved and given alt text, the four
+  bytes), resized keeping its shape, moved and given alt text and a link (opened by a click in the show), the four
   themes in the stage and a thumbnail, the slide duplicated with its
   picture, the show and reopening (about 8 s). With
   `PEAROFFICE_SMOKE_OBJECTS_SHOTS=<folder>` it saves a screenshot per theme

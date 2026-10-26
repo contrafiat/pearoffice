@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as Y from 'yjs'
-import { ArrowCounterClockwise, ArrowClockwise, Textbox, SelectionForeground, SelectionBackground, Trash, ArrowUUpLeft, Play, Shapes, Crop, Image as ImageIcon, ChartBar } from '@phosphor-icons/react'
+import { ArrowCounterClockwise, ArrowClockwise, LinkSimple, ArrowSquareOut, Textbox, SelectionForeground, SelectionBackground, Trash, ArrowUUpLeft, Play, Shapes, Crop, Image as ImageIcon, ChartBar } from '@phosphor-icons/react'
 import { call, on } from '../bridge.js'
 import { FileBar, useMembers } from '../FileBar.jsx'
 import { colourFor } from '../Avatar.jsx'
@@ -25,7 +25,7 @@ import { useToolOverflow } from '../toolOverflow.jsx'
 import { ChartTools, ChartDataPanel } from './ChartTools.jsx'
 import { sampleChart } from './SlideChart.jsx'
 import { usePearLinks, pearLink } from '../pearLinks.js'
-import { linkClick } from '../doc/DocView.jsx'
+import { linkClick, LinkBar } from '../doc/DocView.jsx'
 
 // The slide deck editor (proposals/2026-10-06-slides.md). As with documents
 // it keeps its own copy of the deck's Yjs doc: loaded whole with
@@ -66,6 +66,7 @@ export function SlidesView ({ sheetId, files = [], folders = [], onOpenFile, onO
   // Links in text to web pages, files and folders (pearLinks.js).
   const links = usePearLinks({ files, folders, onOpenFile, onOpenFolder })
   const openHref = (href) => { const p = pearLink(href); links.open(p || { url: href }) }
+  const [objLinking, setObjLinking] = useState(null) // the picture or shape whose link is being typed
   useEffect(() => () => { undo.destroy(); ydoc.destroy() }, [ydoc, undo])
   const [info, setInfo] = useState(null) // slides:state without the state
   const [title, setTitle] = useState('')
@@ -449,6 +450,15 @@ export function SlidesView ({ sheetId, files = [], folders = [], onOpenFile, onO
   const selShapes = layoutEdit && !editing ? els.filter((el) => el.type === 'shape' && shownSel.includes(el.id)) : []
   const selPicture = layoutEdit && !editing && shownSel.length === 1 ? els.find((el) => el.id === shownSel[0] && el.type === 'picture') : null
   const selChart = layoutEdit && !editing && shownSel.length === 1 ? els.find((el) => el.id === shownSel[0] && el.type === 'chart') : null
+  // A link on the one selected picture or shape (proposals/2026-10-26-picture-links.md).
+  const selLinkable = layoutEdit && !editing && shownSel.length === 1 ? els.find((el) => el.id === shownSel[0] && (el.type === 'picture' || el.type === 'shape')) : null
+  if (objLinking && !(selLinkable && selLinkable.id === objLinking)) setObjLinking(null)
+  const linkTools = selLinkable && (
+    <>
+      {btn(selLinkable.link ? 'Edit link' : 'Link', LinkSimple, !!selLinkable.link, () => setObjLinking(objLinking ? null : selLinkable.id), { className: 'object-link' + (selLinkable.link ? ' on' : '') })}
+      {selLinkable.link && !(links.placeOf(pearLink(selLinkable.link) || { url: selLinkable.link }) || {}).missing && btn('Open link', ArrowSquareOut, undefined, () => openHref(selLinkable.link), { className: 'object-open-link' })}
+    </>
+  )
   const chartSlide = current
   // The data panel closes when its chart is no longer the one selected.
   if (dataPanel && !(selChart && selChart.id === dataPanel)) setDataPanel(null)
@@ -516,9 +526,9 @@ export function SlidesView ({ sheetId, files = [], folders = [], onOpenFile, onO
             </>
           )}
           {selShapes.length
-            ? <><ShapeTools shapes={selShapes} theme={deck.theme} phone={phone} setStyle={setShapeStyle} setOpacity={setShapeOpacity} setArrows={setShapeArrows} />{selShapes.some((el) => el.style.shape !== 'line') && <span className='sep' />}{selShapes.some((el) => el.style.shape !== 'line') && anchorTools}</>
+            ? <><ShapeTools shapes={selShapes} theme={deck.theme} phone={phone} setStyle={setShapeStyle} setOpacity={setShapeOpacity} setArrows={setShapeArrows} />{selShapes.length === 1 && linkTools}{selShapes.some((el) => el.style.shape !== 'line') && <span className='sep' />}{selShapes.some((el) => el.style.shape !== 'line') && anchorTools}</>
             : selPicture
-              ? btn(cropping ? 'Finish cropping (Enter)' : 'Crop', Crop, !!cropping, () => (cropping ? setCropping(null) : setCropping(selPicture.id)), { className: 'crop-button' + (cropping ? ' on' : '') })
+              ? <>{btn(cropping ? 'Finish cropping (Enter)' : 'Crop', Crop, !!cropping, () => (cropping ? setCropping(null) : setCropping(selPicture.id)), { className: 'crop-button' + (cropping ? ' on' : '') })}{linkTools}</>
               : selChart
                 ? <ChartTools value={selChart.chart} theme={deck.theme} btn={btn} phone={phone} setChart={(patch) => change((doc) => slidesModel.setChart(doc, chartSlide, selChart.id, { chart: patch }))} onEditData={() => setDataPanel(selChart.id)} />
                 : canEdit && (phone && !toolEditor
@@ -526,10 +536,11 @@ export function SlidesView ({ sheetId, files = [], folders = [], onOpenFile, onO
                   ? <span className='tool-hint'>Tap text to format it</span>
                   : <TextTools editor={toolEditor} links={links} files={links.usable.filter((f) => f.sheetId !== sheetId)} folders={folders} openHref={openHref} defaultSize={defaultSize(deck.theme, editingBox ? editingBox.role : 'body')} phone={phone} btn={btn} afterAlign={anchorTools} />)}
           {toolRow.moreButton}
+          {objLinking && selLinkable && <div className='slides-link'><LinkBar editor={null} initial={selLinkable.link || ''} files={links.usable.filter((f) => f.sheetId !== sheetId)} folders={folders} placeOf={links.placeOf} onSet={(href) => change((doc) => slidesModel.setLink(doc, current, selLinkable.id, href || ''))} onClose={() => setObjLinking(null)} /></div>}
         </div>
         <div className='slides-row'>
           {!listBelow && <SlideList slides={deck.slides} current={current} onPick={setCurrent} size={deck.size} theme={deck.theme} canEdit={canEdit} phone={false} people={bySlide} sheetId={sheetId} onAdd={addSlide} onDuplicate={duplicate} onDelete={remove} onMove={move} />}
-          <div className='slides-main' onClick={(e) => linkClick(e, canEdit, openHref)} onPointerDownCapture={(e) => { if (!e.target.closest('.slide-notes')) setNotesEditor(null) }}>
+          <div className='slides-main' onClick={(e) => { const pic = phone && e.target.closest && e.target.closest(".slide-el[data-type='picture'][data-href]"); if (pic) openHref(pic.dataset.href); else linkClick(e, canEdit, openHref) }} onPointerDownCapture={(e) => { if (!e.target.closest('.slide-notes')) setNotesEditor(null) }}>
             {deleted
               ? (
                 <div className='slide-stage slide-deleted'>

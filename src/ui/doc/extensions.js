@@ -3,6 +3,7 @@
 // Subtitle), and find and replace over the text.
 
 import { Extension, Node, mergeAttributes } from '@tiptap/core'
+import { okLink } from '../../shared/links.js'
 import { Plugin, PluginKey, TextSelection } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import StarterKit from '@tiptap/starter-kit'
@@ -127,7 +128,7 @@ export const ParagraphFormat = Extension.create({
 // reference to the bytes in a picture core (src/worklet/pictures.js), never
 // the bytes. w and h are the picture's pixels, so the page lays out before
 // it arrives; width is a percentage of the page (null: natural size); align
-// is left, center or right. Needs document schema version 2.
+// is left, center or right; href is a link. Needs document schema version 2.
 export const PICTURE_ALIGNS = ['left', 'center', 'right']
 const num = (v) => { const n = parseInt(v, 10); return n > 0 ? n : null }
 const attr = (name, parse = (v) => v || null) => ({
@@ -164,6 +165,12 @@ export const Picture = Node.create({
         default: '',
         parseHTML: (el) => el.getAttribute('alt') || '',
         renderHTML: (a) => (a.alt ? { alt: a.alt } : {})
+      },
+      // A link (proposals/2026-10-26-picture-links.md), checked with okLink.
+      href: {
+        default: null,
+        parseHTML: (el) => okLink(el.getAttribute('data-href')),
+        renderHTML: (a) => (okLink(a.href) ? { 'data-href': a.href } : {})
       }
     }
   },

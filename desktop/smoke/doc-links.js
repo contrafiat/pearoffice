@@ -1,7 +1,8 @@
 // Smoke test part "doc-links": links in a document. A web address typed
 // into the link bar, the card under the caret with Open and Copy link,
 // Ctrl+click, then links to another file and a folder picked from the
-// bar's list, and opening them (proposals/2026-10-22-links-to-files.md).
+// bar's list, and opening them (proposals/2026-10-22-links-to-files.md),
+// then a link on a picture (proposals/2026-10-26-picture-links.md).
 
 const fs = require('node:fs')
 const path = require('node:path')
@@ -89,5 +90,42 @@ module.exports = async function docLinks (t) {
   result.fileLink = true
   step('file link')
 
-  return result.webLink && result.folderLink && result.fileLink
+  // A link on a picture (proposals/2026-10-26-picture-links.md): added from
+  // the picture's bubble, opened from it and by Ctrl+click.
+  await js("[...document.querySelectorAll('.sheet-link')].find((b) => b.textContent.includes('Untitled document')).click()")
+  await waitFor('doc for the picture', `!!${anchor('Budget')}`)
+  await js(`(async () => {
+    const c = document.createElement('canvas')
+    c.width = 320; c.height = 160
+    const g = c.getContext('2d')
+    g.fillStyle = '#3b6e22'; g.fillRect(0, 0, 320, 160)
+    const blob = await new Promise((resolve) => c.toBlob(resolve, 'image/png'))
+    const dt = new DataTransfer()
+    dt.items.add(new File([blob], 'box.png', { type: 'image/png' }))
+    document.querySelector('.doc-body').editor.commands.focus('end')
+    const input = document.querySelector('.doc-tools .picture-input')
+    input.files = dt.files
+    input.dispatchEvent(new Event('change', { bubbles: true }))
+  })()`)
+  await waitFor('picture shown', "(() => { const i = document.querySelector('.doc-body .doc-picture-frame img'); return !!i && !i.hidden && i.naturalWidth === 320 })()")
+  await js("(() => { const ed = document.querySelector('.doc-body').editor; let at = null; ed.state.doc.descendants((n, p) => { if (n.type.name === 'image') at = p }); ed.chain().focus().setNodeSelection(at).run() })()")
+  await waitFor('picture bubble', "!!document.querySelector('.picture-bubble [aria-label=\"Link\"]')")
+  await js("document.querySelector('.picture-bubble [aria-label=\"Link\"]').click()")
+  await waitFor('picture link bar', "!!document.querySelector('.link-bar input') && document.activeElement === document.querySelector('.link-bar input')")
+  await type('example.org/pic')
+  await key('Return')
+  const picHref = "(() => { let h = null; document.querySelector('.doc-body').editor.state.doc.descendants((n) => { if (n.type.name === 'image') h = n.attrs.href }); return h })()"
+  await waitFor('picture linked', `${picHref} === 'https://example.org/pic'`)
+  await waitFor('link mark', "!!document.querySelector('.doc-picture-frame[data-href] .doc-picture-link:not([hidden])') && getComputedStyle(document.querySelector('.doc-picture-link')).display !== 'none'")
+  await waitFor('bubble Open', "!!document.querySelector('.picture-bubble [aria-label=\"Open link\"]')")
+  fs.rmSync(path.join(dataDir, 'opened.txt'), { force: true })
+  await js("document.querySelector('.picture-bubble [aria-label=\"Open link\"]').click()")
+  await openedHas('https://example.org/pic', 'the picture bubble')
+  fs.rmSync(path.join(dataDir, 'opened.txt'), { force: true })
+  await js("document.querySelector('.doc-picture-frame[data-href] img').dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, ctrlKey: true }))")
+  await openedHas('https://example.org/pic', 'Ctrl+click on the picture')
+  result.pictureLink = true
+  step('picture link')
+
+  return result.webLink && result.folderLink && result.fileLink && result.pictureLink
 }

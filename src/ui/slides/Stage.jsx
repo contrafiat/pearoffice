@@ -5,6 +5,7 @@ import { themeStyle } from './themes.js'
 import { LiveText, StaticText, TextFrame, boxStyle, placeholderFor } from './TextBox.jsx'
 import { SNAP_PX, moved, resized, rotated, snapMove, snapTargets, unionOf, cropped, uncropped } from './geometry.js'
 import { ElementBody, SlidePicture, hasText } from './objects.jsx'
+import { LinkSimple } from '@phosphor-icons/react'
 
 // The slide being edited (proposals/2026-10-06-slides.md, Rendering): a div
 // of the deck's size scaled to fit with a CSS transform, each box placed
@@ -298,8 +299,9 @@ export function Stage ({ size, theme, slideId, layout, els, sel, setSel, editing
               return (
                 <div
                   key={el.id}
-                  className={'slide-el' + (live ? ' editing' : '')}
+                  className={'slide-el' + (live ? ' editing' : '') + (sel.includes(el.id) ? ' chosen' : '')}
                   data-id={el.id}
+                  data-href={el.link || undefined}
                   data-type={el.type}
                   data-role={el.role || undefined}
                   style={boxStyle(f)}
@@ -316,6 +318,7 @@ export function Stage ({ size, theme, slideId, layout, els, sel, setSel, editing
                     setMenu({ x: e.clientX, y: e.clientY, alt: null })
                   }}
                 >
+                  {el.link && <span className='slide-link-mark' aria-hidden='true'><LinkSimple size={40} /></span>}
                   <ElementBody
                     el={cropDraft && cropDraft.id === el.id ? { ...el, crop: cropDraft.crop } : el}
                     frame={f}
