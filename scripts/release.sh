@@ -101,32 +101,6 @@ for _k in APP_NAME ARTIFACT_PREFIX BUNDLE_ID RELEASES_REPO ASC_APP_ID; do
 done
 
 # ---------------------------------------------------------------------------
-# Helper: the version the App Store has, including TestFlight and in review
-# (asc), else the live one (iTunes lookup). Returns bare X.Y.Z or "".
-# ---------------------------------------------------------------------------
-_appstore_latest_version() {
-  local ver=""
-  if command -v asc &>/dev/null; then
-    ver=$(asc versions list --app "$ASC_APP_ID" --output json 2>/dev/null \
-      | python3 -c "
-import sys, json
-d = json.load(sys.stdin)
-items = d.get('data', d) if isinstance(d, dict) else d
-vs = [x.get('attributes', x).get('versionString', '') for x in items or []]
-vs = [v for v in vs if v]
-vs.sort(key=lambda v: tuple(int(x) for x in v.split('.') if x.isdigit()), reverse=True)
-print(vs[0] if vs else '')
-" 2>/dev/null || echo "")
-  fi
-  if [ -z "$ver" ]; then
-    ver=$(curl -sf --max-time 8 "https://itunes.apple.com/lookup?bundleId=${BUNDLE_ID}" 2>/dev/null \
-      | python3 -c "import sys,json; r=json.load(sys.stdin).get('results',[]); print(r[0].get('version','') if r else '')" \
-      2>/dev/null || echo "")
-  fi
-  printf '%s' "$ver"
-}
-
-# ---------------------------------------------------------------------------
 # Helper: stop the background Mac build (step 5b) if the run ends early.
 # ---------------------------------------------------------------------------
 _on_exit() {
