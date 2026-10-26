@@ -1433,3 +1433,15 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 .chip-calendar { display: inline-flex; align-items: center; justify-content: center; width: 1.5em; height: 1.5em; min-height: 0; padding: 0; border: 0; border-radius: 6px; background: none; color: var(--ink); cursor: pointer; }
 .chip-calendar:hover { background: var(--head); }
 .chip-date-input { position: absolute; left: 0; bottom: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none; border: 0; padding: 0; }
+/* Tabs (desktop, proposals/2026-10-26-tabs.md). Every open tab keeps its
+   editor; the others are hidden. */
+.tab-pane { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.tab-pane.hidden { display: none; }
+.file-tabs { display: flex; flex: none; gap: 2px; padding: 4px 8px 0; overflow-x: auto; border-bottom: 1px solid var(--line); background: var(--head); scrollbar-width: thin; }
+.file-tab { display: flex; align-items: center; gap: 6px; flex: 0 1 200px; min-width: 90px; height: 32px; padding: 0 4px 0 10px; border: 1px solid transparent; border-bottom: 0; border-radius: 8px 8px 0 0; color: var(--muted); cursor: pointer; user-select: none; }
+.file-tab:hover { background: var(--paper); color: var(--ink); }
+.file-tab.on { background: var(--panel); border-color: var(--line); color: var(--ink); margin-bottom: -1px; }
+.file-tab.dragging { opacity: 0.5; }
+.file-tab-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.file-tab-close { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; min-height: 0; padding: 0; border: 0; border-radius: 6px; background: none; color: inherit; cursor: pointer; opacity: 0.6; }
+.file-tab-close:hover { opacity: 1; background: var(--line); }

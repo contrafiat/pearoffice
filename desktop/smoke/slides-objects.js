@@ -264,6 +264,7 @@ async function run (t) {
 
   // Reopen: shapes, style, text, picture, alt text and theme are kept.
   await sleep(700)
+  await t.sendMod('W', ['control']) // close its tab, so it loads again (src/ui/tabs.jsx)
   await js("document.querySelector('.sheet-link.all-files').click()")
   await waitFor('deck in all files', "[...document.querySelectorAll('.file-card')].some((c) => !!c.querySelector('.kind-icon.kind-slides'))")
   await js("[...document.querySelectorAll('.file-card')].find((c) => !!c.querySelector('.kind-icon.kind-slides')).click()")

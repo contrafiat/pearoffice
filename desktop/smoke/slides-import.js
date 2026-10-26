@@ -223,7 +223,9 @@ async function run (t) {
   result.importNotice = true
   step('notice')
 
-  // Reopened from the file list, it is the same deck.
+  // Closed (its tab keeps it open otherwise, src/ui/tabs.jsx) and reopened
+  // from the file list, it is the same deck.
+  await t.sendMod('W', ['control'])
   await js("document.querySelector('.sheet-link.all-files').click()")
   await waitFor('deck in all files', `[...document.querySelectorAll('.file-card')].some((c) => !!c.querySelector('.kind-icon.kind-slides') && c.querySelector('.file-title').textContent === ${JSON.stringify(title)})`)
   await js(`[...document.querySelectorAll('.file-card')].find((c) => c.querySelector('.file-title').textContent === ${JSON.stringify(title)}).click()`)

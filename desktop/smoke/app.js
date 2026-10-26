@@ -199,6 +199,9 @@ module.exports = async function app (t) {
     const agent = fs.readFileSync(path.join(dataDir, 'autostart', 'com.peerloom.pearoffice.login.plist'), 'utf8')
     result.autostart = agent.includes('<string>--hidden</string>')
   } else result.autostart = true
+  // The checkbox ticks before the shell has the setting: wait for its tray,
+  // or closing quits PearOffice.
+  for (let i = 0; i < 50 && !getTray(); i++) await sleep(100)
   win.close()
   await sleep(500)
   result.keepOnline = !win.isDestroyed() && !!getTray()
@@ -278,7 +281,9 @@ module.exports = async function app (t) {
   result.sheetsAfter = await js("document.querySelectorAll('.sheet-link:not(.all-files)').length")
   step('removed from this device')
 
-  // With nothing open, the start screen lists every file with its kind.
+  // With nothing open, the start screen lists every file with its kind
+  // (the other sheet stays open in its tab, src/ui/tabs.jsx).
+  await js("document.querySelector('.sheet-link.all-files').click()")
   await waitFor('file list', "!!document.querySelector('.files-home') && document.querySelectorAll('.file-card:not(.folder-card):not(.new-folder-card)').length === " + result.sheetsAfter)
   await t.shot('PEAROFFICE_SMOKE_HOME_SHOT', 300)
   result.fileIcons = await js("document.querySelectorAll('.file-card .kind-icon.kind-sheet').length")

@@ -183,6 +183,7 @@ async function run (t) {
 
   // Reopen: order, title, box and notes are all still there.
   await sleep(700) // the editor sends its edits a moment later
+  await t.sendMod('W', ['control']) // close its tab, so it loads again (src/ui/tabs.jsx)
   await js("document.querySelector('.sheet-link.all-files').click()")
   await waitFor('deck in all files', "[...document.querySelectorAll('.file-card')].some((c) => !!c.querySelector('.kind-icon.kind-slides'))")
   await js("[...document.querySelectorAll('.file-card')].find((c) => !!c.querySelector('.kind-icon.kind-slides')).click()")
