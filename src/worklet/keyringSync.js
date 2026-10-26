@@ -53,13 +53,17 @@ function createKeyringSync ({ engine, getSeeding, getOwnDevices, getFolders = ()
     const k = clean(keyring)
     const at = now()
     const here = new Set()
+    // A change made here is always later than the version it replaces, even
+    // within the same millisecond; otherwise the merge's tie-break could keep
+    // the old one (as PearCal's keyringSync.js).
+    const after = (item) => Math.max(at, item ? item.at + 1 : 0)
     for (const e of files) {
       here.add(e.sheetId)
       const item = k.files[e.sheetId]
-      if (!item || item.removed || JSON.stringify(item.entry) !== JSON.stringify(e)) k.files[e.sheetId] = { at, entry: e }
+      if (!item || item.removed || JSON.stringify(item.entry) !== JSON.stringify(e)) k.files[e.sheetId] = { at: after(item), entry: e }
     }
     for (const [id, item] of Object.entries(k.files)) {
-      if (!item.removed && !here.has(id) && await gone(id)) k.files[id] = { at, removed: true }
+      if (!item.removed && !here.has(id) && await gone(id)) k.files[id] = { at: after(item), removed: true }
     }
     for (const s of seederKeys) if (!k.seeders[s] || k.seeders[s].removed) k.seeders[s] = { at }
     k.folders = mergeRecords(k.folders, folders.folders, at)
