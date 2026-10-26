@@ -50,6 +50,9 @@ module.exports = async function docChips (t) {
   await waitFor('date pill', `${dateAttr} === ${JSON.stringify(tomorrow)} && ${pill('date')}.length === 1 && !!document.querySelector('.doc-chip-view[data-chip="date"] .chip-calendar')`)
   await js("(() => { const i = document.querySelector('.doc-chip-view[data-chip=\"date\"] .chip-date-input'); Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(i, '2030-05-17'); i.dispatchEvent(new Event('change', { bubbles: true })); i.dispatchEvent(new Event('input', { bubbles: true })) })()")
   await waitFor('date changed', `${dateAttr} === '2030-05-17' && /2030/.test(${pill('date')}[0])`)
+  // The pills on a line sit at the same height, whatever each holds.
+  const tops = await js("[...document.querySelectorAll('.doc-body .doc-chip-view .smart-chip')].map((x) => { const r = x.getBoundingClientRect(); return [Math.round(r.top), Math.round(r.bottom)] })")
+  if (tops.length !== 3 || tops.some((x) => Math.abs(x[0] - tops[0][0]) > 1 || Math.abs(x[1] - tops[0][1]) > 1)) throw new Error('pills not lined up: ' + JSON.stringify(tops))
   result.date = true
   await shot('PEAROFFICE_SMOKE_DOC_CHIPS_SHOT', 300)
   step('date')
