@@ -646,9 +646,9 @@ export function App () {
             </div>
             )
           : current && kindOf(sheets, current) === 'doc'
-            ? <DocView key={current} sheetId={current} onTitleChange={refresh} onError={setError} onGone={async () => { forget(current); await refresh() }} />
+            ? <DocView key={current} sheetId={current} files={sheets || []} folders={folders} onOpenFile={openFile} onOpenFolder={(id) => { setCurrent(null); setFolder(id) }} onTitleChange={refresh} onError={setError} onGone={async () => { forget(current); await refresh() }} />
             : current && kindOf(sheets, current) === 'slides'
-              ? <SlidesView key={current} sheetId={current} onTitleChange={refresh} onError={setError} onGone={async () => { forget(current); await refresh() }} />
+              ? <SlidesView key={current} sheetId={current} files={sheets || []} folders={folders} onOpenFile={openFile} onOpenFolder={(id) => { setCurrent(null); setFolder(id) }} onTitleChange={refresh} onError={setError} onGone={async () => { forget(current); await refresh() }} />
               : current
               ? <SheetView key={current} sheetId={current} files={sheets || []} folders={folders} onOpenFile={openFile} onOpenFolder={(id) => { setCurrent(null); setFolder(id) }} onTitleChange={refresh} onError={setError} onGone={async () => { forget(current); await refresh() }} />
               : sheets && (sheets.length || folders.length)

@@ -1,10 +1,10 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useEditorState } from '@tiptap/react'
 import {
   TextB, TextItalic, TextUnderline, TextStrikethrough, TextAUnderline, Highlighter,
   ListBullets, ListNumbers, LinkSimple
 } from '@phosphor-icons/react'
-import { COLOURS, HIGHLIGHTS, ALIGNS, LinkBar } from '../doc/DocView.jsx'
+import { COLOURS, HIGHLIGHTS, ALIGNS, LinkBar, TextLinkCard, textLink } from '../doc/DocView.jsx'
 
 // Formatting for the text being edited: a slide's text box or its speaker
 // notes. The notes take only bold, italic and lists; the rest is greyed out
@@ -14,7 +14,7 @@ const FONTS = [['', 'Theme'], ['sans-serif', 'Sans'], ['serif', 'Serif'], ['mono
 export const SLIDE_SIZES = [10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 40, 44, 48, 54, 60, 72, 88, 96] // points
 
 // afterAlign: more buttons after Alignment (where text sits in its box).
-export function TextTools ({ editor: given, defaultSize, phone, btn, afterAlign }) {
+export function TextTools ({ editor: given, links, files, folders, openHref, defaultSize, phone, btn, afterAlign }) {
   const editor = given && !given.isDestroyed ? given : null
   const s = useEditorState({
     editor,
@@ -42,6 +42,10 @@ export function TextTools ({ editor: given, defaultSize, phone, btn, afterAlign 
   })
   const [menu, setMenu] = useState(null) // { kind, top, left }
   const [linking, setLinking] = useState(null)
+  // The card under the caret in a link, as in documents.
+  const atLink = s && s.link && s.href && links ? textLink(s.href, links.placeOf) : null
+  const atFile = atLink && atLink.file
+  useEffect(() => { if (atFile) links.follow(atFile) }, [atFile]) // eslint-disable-line react-hooks/exhaustive-deps
   const off = !editor || !s
   const rich = !off && s.rich
   const openMenu = (kind, button) => {
@@ -96,7 +100,8 @@ export function TextTools ({ editor: given, defaultSize, phone, btn, afterAlign 
           ))}
         </ul>
       )}
-      {linking !== null && rich && <div className='slides-link'><LinkBar editor={editor} initial={linking} onClose={() => setLinking(null)} /></div>}
+      {linking !== null && rich && <div className='slides-link'><LinkBar editor={editor} initial={linking} files={files} folders={folders} placeOf={links && links.placeOf} onClose={() => setLinking(null)} /></div>}
+      {atLink && rich && linking === null && !menu && <TextLinkCard editor={editor} link={atLink} canEdit onOpen={() => openHref(s.href)} onEdit={() => setLinking(s.href)} />}
     </>
   )
 }

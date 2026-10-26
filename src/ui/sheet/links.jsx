@@ -7,11 +7,10 @@ import { colName } from './a1.js'
 import { parseRange } from '../../sheet/charts.js'
 import { untitled } from '../Files.jsx'
 
+import { pearLink, fileLink, folderLink } from '../pearLinks.js'
+
 const WEB = /^https?:\/\/\S+$/i
-// Another file or one of your folders (proposals/2026-10-22-links-to-files.md).
-const PEAR = /^pearoffice:\/\/(file|folder)\/([A-Za-z0-9_-]+)$/
-export const fileLink = (id) => 'pearoffice://file/' + id
-export const folderLink = (id) => 'pearoffice://folder/' + id
+export { fileLink, folderLink }
 
 // 'Costs'!B4, or the tab's name alone.
 const quoted = (name) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(name) ? name : "'" + name.replace(/'/g, "''") + "'"
@@ -24,8 +23,8 @@ export function linkOf (cell) {
   if (!cell) return null
   const l = cell.fmt && cell.fmt.link
   if (l && l[0] === '#') return cell.linkTo && !cell.linkTo.gone ? { to: cell.linkTo } : { gone: true }
-  const pear = PEAR.exec(l || '')
-  if (pear) return { [pear[1]]: pear[2], stored: true }
+  const pear = pearLink(l)
+  if (pear) return { ...pear, stored: true }
   if (l) return { url: l, stored: true }
   // From a HYPERLINK formula: opened from here, changed in the formula.
   if (cell.formulaLink) return cell.formulaLink === '#' ? (cell.linkTo ? { to: cell.linkTo, formula: true } : null) : { url: cell.formulaLink, formula: true }
