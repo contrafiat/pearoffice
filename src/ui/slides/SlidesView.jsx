@@ -27,6 +27,7 @@ import { ChartTools, ChartDataPanel } from './ChartTools.jsx'
 import { sampleChart } from './SlideChart.jsx'
 import { usePearLinks, pearLink } from '../pearLinks.js'
 import { linkClick, LinkBar } from '../doc/DocView.jsx'
+import { History } from '../History.jsx'
 
 // The slide deck editor (proposals/2026-10-06-slides.md). As with documents
 // it keeps its own copy of the deck's Yjs doc: loaded whole with
@@ -340,6 +341,8 @@ export function SlidesView ({ sheetId, files = [], folders = [], onOpenFile, onO
     if (id) { stopEditing(); setSel([id]); setTimeout(focusStage, 0) }
   }
   const [dataPanel, setDataPanel] = useState(null) // the chart whose data is open
+  const [history, setHistory] = useState(false) // version history open (History.jsx)
+  const [restored, setRestored] = useState(null)
 
   // Pictures from the file picker or the clipboard: shrunk and stored as in
   // documents (src/ui/doc/pictures.js), then put on this slide, selected.
@@ -469,7 +472,9 @@ export function SlidesView ({ sheetId, files = [], folders = [], onOpenFile, onO
 
   return (
     <PicturesContext.Provider value={pictures}>
-      <div className={'slides' + (phone ? ' phone' : '')} ref={rootRef} onKeyDown={onKeyDown}>
+      <div className={'slides' + (phone ? ' phone' : '') + (history ? ' with-history' : '')} ref={rootRef} onKeyDown={onKeyDown}>
+        {history && <History kind='slides' sheetId={sheetId} members={members} canEdit={canEdit} phone={phone} onError={onError} onClose={(msg) => { setHistory(false); if (msg) { setRestored(msg); setTimeout(() => setRestored(null), 4000) } }} />}
+        {restored && <div className='toast' role='status'>{restored}</div>}
         <FileBar
           sheetId={sheetId}
           noun='deck'
@@ -488,6 +493,7 @@ export function SlidesView ({ sheetId, files = [], folders = [], onOpenFile, onO
             const save = (format) => exportDeck(ydoc, title, format, sheetId).catch((err) => onError(err.message))
             return (
               <>
+                <li role='menuitem' className='version-history' onClick={() => setHistory(true)}>Version history</li>
                 <li role='menuitem' onClick={() => save('pptx')}>Save as a PowerPoint file</li>
                 <li role='menuitem' onClick={() => save('odp')}>Save as an OpenDocument file (.odp)</li>
                 <li role='menuitem' onClick={() => save('pdf')}>Save as PDF</li>

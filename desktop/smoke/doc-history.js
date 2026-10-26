@@ -1,9 +1,12 @@
 // Smoke test part "doc-history": version history in a document
 // (proposals/2026-10-26-version-history.md). Type, pause, type again; the
 // panel lists two versions, the newest marks what it added, the older one
-// shows the text as it was; Copy; Restore brings the older one back.
+// shows the text as it was; Copy; Restore brings the older one back. Then a
+// sheet (an old version as a grid, changed cells marked, Restore) and a deck
+// (a new slide marked, Restore).
 // A version ends after 1.5 s here (window.__historyPauseMs), not 5 minutes.
-// PEAROFFICE_SMOKE_HISTORY_SHOT=<png> saves the panel.
+// PEAROFFICE_SMOKE_HISTORY_SHOT, _SHEET_SHOT and _DECK_SHOT=<png> save the
+// panel for each.
 
 module.exports = async function docHistory (t) {
   const { js, step, waitFor, type, key, result, sleep, shot } = t
@@ -62,5 +65,55 @@ module.exports = async function docHistory (t) {
   result.restore = true
   step('restore')
 
-  return result.list && result.copy && result.restore
+  // A sheet: an old version as a grid with its changes, and Restore.
+  const ask = (method, args = {}) => js('window.pearoffice.call(' + JSON.stringify(method) + ', ' + JSON.stringify(args) + ')')
+  const openMenu = async () => {
+    await js("document.querySelector('.more-button').click()")
+    await waitFor('file menu', "!!document.querySelector('.more-menu .version-history')")
+    await js("document.querySelector('.more-menu .version-history').click()")
+  }
+  const sheetId = (await ask('sheet:create', { title: 'Costs' })).sheetId
+  await ask('sheet:setCell', { sheetId, row: 1, col: 1, input: '5' })
+  await sleep(1700)
+  await ask('sheet:setCell', { sheetId, row: 1, col: 1, input: '7' })
+  await ask('sheet:setCell', { sheetId, row: 2, col: 1, input: '=A1*2' })
+  await waitFor('Costs listed', "[...document.querySelectorAll('.sheet-link')].some((b) => b.textContent.includes('Costs'))")
+  await js("[...document.querySelectorAll('.sheet-link')].find((b) => b.textContent.includes('Costs')).click()")
+  await waitFor('sheet open', "!!document.querySelector('.grid')")
+  await openMenu()
+  const cell = (r, c) => `(document.querySelectorAll('.history-grid tbody tr')[${r - 1}] || { children: [] }).children[${c}]`
+  await waitFor('newest sheet version', `${items} >= 2 && !!${cell(1, 1)} && ${cell(1, 1)}.textContent === '7' && ${cell(1, 1)}.classList.contains('v-changed') && ${cell(1, 1)}.title === 'Was: 5' && ${cell(2, 1)}.textContent === '14' && ${cell(2, 1)}.classList.contains('v-add')`)
+  await shot('PEAROFFICE_SMOKE_HISTORY_SHEET_SHOT', 300)
+  await js("document.querySelectorAll('.history-item')[1].click()")
+  await waitFor('older sheet version', `!!${cell(1, 1)} && ${cell(1, 1)}.textContent === '5' && document.querySelectorAll('.history-grid tbody tr').length === 1`)
+  await js("document.querySelector('.history-restore').click()")
+  await waitFor('asks first', "!!document.querySelector('.history-restore-yes')")
+  await js("document.querySelector('.history-restore-yes').click()")
+  await waitFor('sheet restored', `!document.querySelector('.history') && window.pearoffice.call('sheet:view', { sheetId: ${JSON.stringify(sheetId)} }).then((v) => v.cells.map((c) => c.display).join() === '5')`)
+  result.sheet = true
+  step('a sheet')
+
+  // A deck: slides added later marked New, and Restore.
+  const deckId = (await ask('slides:create', { title: 'Talk' })).sheetId
+  await waitFor('Talk listed', "[...document.querySelectorAll('.sheet-link')].some((b) => b.textContent.includes('Talk'))")
+  await js("[...document.querySelectorAll('.sheet-link')].find((b) => b.textContent.includes('Talk')).click()")
+  const count = "document.querySelectorAll('.slide-thumbs .slide-thumb[data-id]').length"
+  await waitFor('deck open', `!!document.querySelector('.slide-stage') && ${count} === 1`)
+  await sleep(1700)
+  await js("document.querySelector('.slide-add .add-slide').click()")
+  await waitFor('two slides', `${count} === 2`)
+  await sleep(800)
+  await openMenu()
+  await waitFor('newest deck version', `${items} >= 2 && document.querySelectorAll('.history-deck .history-slide').length === 2 && document.querySelectorAll('.history-deck .history-slide.v-new').length === 1`)
+  await shot('PEAROFFICE_SMOKE_HISTORY_DECK_SHOT', 500)
+  await js("document.querySelectorAll('.history-item')[1].click()")
+  await waitFor('older deck version', "document.querySelectorAll('.history-deck .history-slide').length === 1")
+  await js("document.querySelector('.history-restore').click()")
+  await waitFor('asks first', "!!document.querySelector('.history-restore-yes')")
+  await js("document.querySelector('.history-restore-yes').click()")
+  await waitFor('deck restored', `!document.querySelector('.history') && ${count} === 1`)
+  result.deck = !!deckId
+  step('a deck')
+
+  return result.list && result.copy && result.restore && result.sheet && result.deck
 }

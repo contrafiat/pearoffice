@@ -1,4 +1,5 @@
-// Version history (proposals/2026-10-26-version-history.md). Every edit
+// Version history (proposals/2026-10-26-version-history.md), for any file:
+// documents, sheets and decks. Every edit
 // stays in the file's view under y/<writer>/<seq>, with `at` (when it was
 // written, from builds that say) and `start` (the first edit of a moved
 // file). Runs anywhere; the worklet reads the view and calls these.
@@ -64,4 +65,36 @@ function stateAt (edits, end) {
   }
 }
 
-module.exports = { versions, stateAt, order, PAUSE_MS, LONGEST_MS }
+// Make `target` match `source` (the same kind of file at another version),
+// as one set of changes others can merge with: a sheet's or deck's Restore.
+// `meta` (title, schema version, template mark) is left as it is. `arrays`
+// names the top-level Y.Arrays (a sheet's `tabs`); every other top-level
+// type is a Y.Map.
+function restoreInto (target, source, { arrays = [] } = {}) {
+  const json = (v) => (v instanceof Y.AbstractType ? JSON.stringify(v.toJSON()) : JSON.stringify(v))
+  const copy = (v) => (v instanceof Y.AbstractType ? v.clone() : v)
+  function syncMap (t, s) {
+    for (const k of [...t.keys()]) if (!s.has(k)) t.delete(k)
+    for (const [k, v] of s.entries()) {
+      const cur = t.get(k)
+      if (v instanceof Y.Map && cur instanceof Y.Map) syncMap(cur, v)
+      else if (v instanceof Y.Array && cur instanceof Y.Array) syncArray(cur, v)
+      else if (cur === undefined || json(cur) !== json(v) || (v instanceof Y.AbstractType) !== (cur instanceof Y.AbstractType)) t.set(k, copy(v))
+    }
+  }
+  function syncArray (t, s) {
+    if (json(t) === json(s)) return
+    t.delete(0, t.length)
+    t.insert(0, s.toArray().map(copy))
+  }
+  const names = new Set([...source.share.keys(), ...target.share.keys()])
+  target.transact(() => {
+    for (const name of names) {
+      if (name === 'meta') continue
+      if (arrays.includes(name)) syncArray(target.getArray(name), source.getArray(name))
+      else syncMap(target.getMap(name), source.getMap(name))
+    }
+  })
+}
+
+module.exports = { versions, stateAt, restoreInto, order, PAUSE_MS, LONGEST_MS }

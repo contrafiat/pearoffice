@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { call, on } from '../bridge.js'
 import { useOnScreen, useActiveRef } from '../tabs.jsx'
+import { History } from '../History.jsx'
 import { Grid, MIN_ZOOM, MAX_ZOOM } from './Grid.jsx'
 import { colName } from './a1.js'
 import { changeDecimals, jumpTarget, todaySerial } from './cellTools.js'
@@ -118,6 +119,8 @@ export function SheetView ({ sheetId, files = [], folders = [], onOpenFile, onOp
     setEditingState(value)
   }, [])
   const [menu, setMenu] = useState(null) // { kind, index, x, y } | null
+  const [history, setHistory] = useState(false) // version history open (History.jsx)
+  const [restored, setRestored] = useState(null)
   const [renaming, setRenaming] = useState(null) // { id, value } | null
   // Formula help: where the caret is in the text being edited, the
   // highlighted suggestion, and whether Escape hid the list.
@@ -1051,7 +1054,9 @@ export function SheetView ({ sheetId, files = [], folders = [], onOpenFile, onOp
   const barValue = editing && editing.row === sel.row && editing.col === sel.col ? editing.value : spilled ? (anchor ? anchor.input : '') : (selected ? selected.input : '')
 
   return (
-    <div className='sheet' onClick={() => { if (menu) setMenu(null); if (picking && !phone) setPicking(null) }}>
+    <div className={'sheet' + (history ? ' with-history' : '')} onClick={() => { if (menu) setMenu(null); if (picking && !phone) setPicking(null) }}>
+      {history && <History kind='sheet' sheetId={sheetId} members={members} canEdit={canEdit} phone={phone} onError={onError} onClose={(msg) => { setHistory(false); if (msg) { setRestored(msg); setTimeout(() => setRestored(null), 4000) } }} />}
+      {restored && <div className='toast' role='status'>{restored}</div>}
       <FileBar
         sheetId={sheetId}
         noun='sheet'
@@ -1068,6 +1073,7 @@ export function SheetView ({ sheetId, files = [], folders = [], onOpenFile, onOp
         onGone={onGone}
         menuItems={(close) => (
           <>
+            <li role='menuitem' className='version-history' onClick={() => setHistory(true)}>Version history</li>
             <li role='menuitem' onClick={() => setFinding({ replace: canEdit })}>Find and replace</li>
             {window.pearoffice && <li role='menuitem' onClick={() => exportSheet(sheetId).catch((err) => onError(err.message))}>Save as an Excel file</li>}
             {window.pearoffice && <li role='menuitem' onClick={() => exportOds(sheetId).catch((err) => onError(err.message))}>Save as an OpenDocument file (.ods)</li>}
