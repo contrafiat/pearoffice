@@ -214,7 +214,8 @@ function textExtensions ({ starter = {}, tables = false, pictures = false }) {
     StarterKit.configure({
       undoRedo: false, // Collaboration's undo only undoes this person's edits
       trailingNode: false, // it would add a paragraph on every device at once
-      link: { openOnClick: false, autolink: true, defaultProtocol: 'https' },
+      // pearoffice:// links to a file or folder (TipTap refuses unknown schemes).
+      link: { openOnClick: false, autolink: true, defaultProtocol: 'https', protocols: ['pearoffice'] },
       ...starter
     }),
     TextStyle,

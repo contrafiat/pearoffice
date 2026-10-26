@@ -111,6 +111,9 @@ function useTaps (nav) {
       if (s.button !== 0) return
       const dx = e.clientX - s.x
       const dy = e.clientY - s.y
+      // A web or email link in the slide opens in the browser.
+      const a = e.target.closest && e.target.closest('a[href]')
+      if (a && Math.abs(dx) <= SWIPE_PX && /^(https?:|mailto:)/i.test(a.getAttribute('href'))) { call('app:openUrl', { url: a.getAttribute('href') }).catch(() => {}); return }
       if (s.type === 'touch') haptic('select')
       if (Math.abs(dx) > SWIPE_PX && Math.abs(dx) > Math.abs(dy)) { if (dx < 0) n.next(); else n.prev(); return }
       if (s.type === 'touch') {

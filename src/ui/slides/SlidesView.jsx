@@ -24,6 +24,8 @@ import { usePrintKey } from '../printKey.js'
 import { useToolOverflow } from '../toolOverflow.jsx'
 import { ChartTools, ChartDataPanel } from './ChartTools.jsx'
 import { sampleChart } from './SlideChart.jsx'
+import { usePearLinks, pearLink } from '../pearLinks.js'
+import { linkClick } from '../doc/DocView.jsx'
 
 // The slide deck editor (proposals/2026-10-06-slides.md). As with documents
 // it keeps its own copy of the deck's Yjs doc: loaded whole with
@@ -58,9 +60,12 @@ function useTouchLayout (touch) {
   return value
 }
 
-export function SlidesView ({ sheetId, onTitleChange, onError, onGone }) {
+export function SlidesView ({ sheetId, files = [], folders = [], onOpenFile, onOpenFolder, onTitleChange, onError, onGone }) {
   const ydoc = useMemo(() => new Y.Doc(), [sheetId])
   const undo = useMemo(() => deckUndo(ydoc), [ydoc])
+  // Links in text to web pages, files and folders (pearLinks.js).
+  const links = usePearLinks({ files, folders, onOpenFile, onOpenFolder })
+  const openHref = (href) => { const p = pearLink(href); links.open(p || { url: href }) }
   useEffect(() => () => { undo.destroy(); ydoc.destroy() }, [ydoc, undo])
   const [info, setInfo] = useState(null) // slides:state without the state
   const [title, setTitle] = useState('')
@@ -519,12 +524,12 @@ export function SlidesView ({ sheetId, onTitleChange, onError, onGone }) {
                 : canEdit && (phone && !toolEditor
                   // Phones: a note in place of text tools that cannot work yet.
                   ? <span className='tool-hint'>Tap text to format it</span>
-                  : <TextTools editor={toolEditor} defaultSize={defaultSize(deck.theme, editingBox ? editingBox.role : 'body')} phone={phone} btn={btn} afterAlign={anchorTools} />)}
+                  : <TextTools editor={toolEditor} links={links} files={links.usable.filter((f) => f.sheetId !== sheetId)} folders={folders} openHref={openHref} defaultSize={defaultSize(deck.theme, editingBox ? editingBox.role : 'body')} phone={phone} btn={btn} afterAlign={anchorTools} />)}
           {toolRow.moreButton}
         </div>
         <div className='slides-row'>
           {!listBelow && <SlideList slides={deck.slides} current={current} onPick={setCurrent} size={deck.size} theme={deck.theme} canEdit={canEdit} phone={false} people={bySlide} sheetId={sheetId} onAdd={addSlide} onDuplicate={duplicate} onDelete={remove} onMove={move} />}
-          <div className='slides-main' onPointerDownCapture={(e) => { if (!e.target.closest('.slide-notes')) setNotesEditor(null) }}>
+          <div className='slides-main' onClick={(e) => linkClick(e, canEdit, openHref)} onPointerDownCapture={(e) => { if (!e.target.closest('.slide-notes')) setNotesEditor(null) }}>
             {deleted
               ? (
                 <div className='slide-stage slide-deleted'>

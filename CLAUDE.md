@@ -397,7 +397,7 @@ take five scenes: files, sheet, document, slides, sharing.
   bundle must create, edit and read a sheet over stdin/stdout, and the seeder
   bundle must start and print a pairing link.
 - `npm run smoke:desktop`: drives the real UI in Electron with an offscreen
-  window and real key and mouse events, in seventeen parts. Each part is its own
+  window and real key and mouse events, in eighteen parts. Each part is its own
   launch with a throwaway data folder and a 60 s limit, and prints one
   `ok`/`not ok` line, then a summary line. `sheets` is the grid editor
   (typing, formulas, pointing at cells while typing one, spilling, fill,
@@ -418,6 +418,9 @@ take five scenes: files, sheet, document, slides, sharing.
   (about 5 s; `PEAROFFICE_SMOKE_TEMPLATES_SHOTS=<folder>` saves New and the
   built-ins).
   `docs` is documents, an .odt out and back in included (about 11 s).
+  `doc-links` is links in a document: a typed web address, the card under
+  the caret (Open, Copy link), Ctrl+click, and links to a file and a folder
+  picked from the link bar and opened (about 4 s).
   `slides` is a deck: two layouts, typing a title, undo and redo, moving,
   resizing and rotating a box with the mouse, nudging, a text box added and
   deleted, someone else's selection, reordering by keys and by drag,

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { clipboardPictureFile, looksLikePicture, pastedPictures } from '../clipboardPicture.js'
 import * as Y from 'yjs'
 import { useEditor, useEditorState, EditorContent } from '@tiptap/react'
@@ -16,6 +16,8 @@ import { readPref, writePref } from '../prefs.js'
 import { isMobile } from '../sheet/xlsx.js'
 import { exportDocument, tidyPaste } from './docFiles.js'
 import { usePrintKey } from '../printKey.js'
+import { usePearLinks, pearLink, fileLink, folderLink } from '../pearLinks.js'
+import { untitled } from '../Files.jsx'
 import { useToolOverflow } from '../toolOverflow.jsx'
 import { Outline } from './Outline.jsx'
 import { documentExtensions, FindReplace, findKey, changeCaseCommand, LINE_HEIGHTS, SIZES } from './extensions.js'
@@ -24,7 +26,8 @@ import {
   ArrowCounterClockwise, ArrowClockwise, TextB, TextItalic, TextUnderline, TextStrikethrough, TextAUnderline, Highlighter,
   TextSuperscript, TextSubscript, TextAlignLeft, TextAlignCenter, TextAlignRight, TextAlignJustify, ArrowsDownUp,
   ListBullets, ListNumbers, ListChecks, TextOutdent, TextIndent, LinkSimple, Quotes, CodeBlock, Minus, Table,
-  TextAa, Eraser, MagnifyingGlass, CaretUp, CaretDown, X, Check, TreeView, Image as ImageIcon, Images, FileImage, Trash
+  TextAa, Eraser, MagnifyingGlass, CaretUp, CaretDown, X, Check, TreeView, Image as ImageIcon, Images, FileImage, Trash,
+  ArrowSquareOut, Copy, PencilSimple
 } from '@phosphor-icons/react'
 
 // The document editor (proposals/2026-10-06-documents.md). It keeps its own
@@ -44,7 +47,7 @@ const CURSOR_MS = 150
 const TOAST_MS = 5000
 const OUTLINE_PREF = 'pearoffice:docOutline'
 
-export function DocView ({ sheetId, onTitleChange, onError, onGone }) {
+export function DocView ({ sheetId, files = [], folders = [], onOpenFile, onOpenFolder, onTitleChange, onError, onGone }) {
   const ydoc = useMemo(() => new Y.Doc(), [sheetId])
   useEffect(() => () => ydoc.destroy(), [ydoc])
   // Pictures fetched for this document, kept while it is open.
@@ -258,12 +261,12 @@ export function DocView ({ sheetId, onTitleChange, onError, onGone }) {
         {!phone && <button className='find-button icon-button title-action' title='Find and replace (Ctrl+F)' aria-label='Find' onClick={() => setFinding(!finding)}><MagnifyingGlass size={18} /></button>}
       </FileBar>
       {note && <div className='banner info'>{note}</div>}
-      <DocEditor sheetId={sheetId} pictures={pictures} ydoc={ydoc} canEdit={canEdit} phone={phone} finding={finding} setFinding={setFinding} outline={outline} toggleOutline={toggleOutline} editorRef={editorRef} onBlur={() => flushRef.current()} cursors={cursors} onCursor={onCursor} />
+      <DocEditor files={files} folders={folders} onOpenFile={onOpenFile} onOpenFolder={onOpenFolder} sheetId={sheetId} pictures={pictures} ydoc={ydoc} canEdit={canEdit} phone={phone} finding={finding} setFinding={setFinding} outline={outline} toggleOutline={toggleOutline} editorRef={editorRef} onBlur={() => flushRef.current()} cursors={cursors} onCursor={onCursor} />
     </div>
   )
 }
 
-function DocEditor ({ sheetId, pictures, ydoc, canEdit, phone, finding, setFinding, outline, toggleOutline, editorRef, onBlur, cursors, onCursor }) {
+function DocEditor ({ sheetId, files, folders, onOpenFile, onOpenFolder, pictures, ydoc, canEdit, phone, finding, setFinding, outline, toggleOutline, editorRef, onBlur, cursors, onCursor }) {
   const toolRow = useToolOverflow(!phone)
   const canEditRef = useRef(canEdit)
   canEditRef.current = canEdit
@@ -449,6 +452,12 @@ function DocEditor ({ sheetId, pictures, ydoc, canEdit, phone, finding, setFindi
   // (a row that scrolls sideways would clip it).
   const [menu, setMenu] = useState(null) // { kind, top, left }
   const [linking, setLinking] = useState(null) // the link being typed, or null
+  // Links to web pages, files and folders (pearLinks.js).
+  const links = usePearLinks({ files, folders, onOpenFile, onOpenFolder })
+  const openHref = (href) => { const p = pearLink(href); links.open(p || { url: href }) }
+  const atLink = s && s.link && s.href ? textLink(s.href, links.placeOf) : null
+  const atFile = atLink && atLink.file
+  useEffect(() => { if (atFile) links.follow(atFile) }, [atFile]) // eslint-disable-line react-hooks/exhaustive-deps
   function openMenu (kind, button) {
     if (menu && menu.kind === kind) { setMenu(null); return }
     const r = button.getBoundingClientRect()
@@ -590,12 +599,13 @@ function DocEditor ({ sheetId, pictures, ydoc, canEdit, phone, finding, setFindi
         </ul>
       )}
       {s.picture && canEdit && !menu && <PictureBubble editor={editor} picture={s.picture} />}
-      {linking !== null && canEdit && <LinkBar editor={editor} initial={linking} onClose={() => setLinking(null)} />}
+      {linking !== null && canEdit && <LinkBar editor={editor} initial={linking} files={links.usable.filter((f) => f.sheetId !== sheetId)} folders={folders} placeOf={links.placeOf} onClose={() => setLinking(null)} />}
+      {atLink && linking === null && !menu && !s.picture && <TextLinkCard editor={editor} link={atLink} canEdit={canEdit} onOpen={() => openHref(s.href)} onEdit={() => setLinking(s.href)} />}
       {finding && <FindBar editor={editor} canEdit={canEdit} onClose={() => { editor.commands.setFind({ query: '' }); setFinding(false) }} />}
       <div className='doc-row'>
         {outline && <Outline editor={editor} phone={phone} onClose={toggleOutline} />}
         <div className='doc-scroll' onScroll={() => { if (s.picture) rescrolled((n) => n + 1) }} onMouseDown={(e) => { if (e.target === e.currentTarget) editor.commands.focus('end') }}>
-          <div className='doc-page'>
+          <div className='doc-page' onClick={(e) => linkClick(e, canEdit, openHref)}>
             <EditorContent editor={editor} />
           </div>
         </div>
@@ -726,15 +736,31 @@ function outdent (editor) {
   else c.indent(-1).run()
 }
 
-// A link for the selection (or the link under the caret), typed inline.
-export function LinkBar ({ editor, initial, onClose }) {
-  const [href, setHref] = useState(initial || '')
+// A link for the selection (or the link under the caret), typed inline:
+// a web or email address, or another file or a folder picked from the list
+// (proposals/2026-10-22-links-to-files.md). `placeOf` names a file or folder
+// link (pearLinks.js).
+export function LinkBar ({ editor, initial, files = [], folders = [], placeOf, onClose }) {
+  // `pick` is a file or folder link, kept while the box still shows its name.
+  const [pick, setPick] = useState(() => {
+    const l = pearLink(initial) && placeOf ? placeOf(pearLink(initial)) : null
+    return l && !l.missing ? { text: l.name, link: initial } : null
+  })
+  const [href, setHref] = useState(pick ? pick.text : initial || '')
+  function choose (v) {
+    const f = files.find((x) => 'file:' + x.sheetId === v)
+    const d = folders.find((x) => 'folder:' + x.id === v)
+    if (!f && !d) return
+    const name = f ? f.title || untitled(f.kind) : d.name
+    setHref(name)
+    setPick({ text: name, link: f ? fileLink(f.sheetId) : folderLink(d.id) })
+  }
   function apply () {
     const url = href.trim()
     const c = editor.chain().focus().extendMarkRange('link')
     if (!url) c.unsetLink().run()
     else {
-      const full = /^[a-z][a-z0-9+.-]*:/i.test(url) ? url : 'https://' + url
+      const full = pick && url === pick.text ? pick.link : /^[a-z][a-z0-9+.-]*:/i.test(url) ? url : 'https://' + url
       if (editor.state.selection.empty && !editor.isActive('link')) c.insertContent({ type: 'text', text: url, marks: [{ type: 'link', attrs: { href: full } }] }).run()
       else c.setLink({ href: full }).run()
     }
@@ -751,6 +777,13 @@ export function LinkBar ({ editor, initial, onClose }) {
         onChange={(e) => setHref(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); apply() } if (e.key === 'Escape') { e.preventDefault(); onClose(); editor.commands.focus() } }}
       />
+      {(files.length > 0 || folders.length > 0) && (
+        <select aria-label='Link to a file or folder' value='' onChange={(e) => choose(e.target.value)}>
+          <option value=''>Go to...</option>
+          {files.length > 0 && <optgroup label='Files'>{files.map((f) => <option key={f.sheetId} value={'file:' + f.sheetId}>{f.title || untitled(f.kind)}</option>)}</optgroup>}
+          {folders.length > 0 && <optgroup label='Folders'>{folders.map((d) => <option key={d.id} value={'folder:' + d.id}>{d.name}</option>)}</optgroup>}
+        </select>
+      )}
       <div className='doc-bar-buttons'>
         <button className='primary' onClick={apply}>Apply</button>
         {editor.isActive('link') && <button onClick={() => { editor.chain().focus().extendMarkRange('link').unsetLink().run(); onClose() }}>Remove</button>}
@@ -758,6 +791,58 @@ export function LinkBar ({ editor, initial, onClose }) {
       <button className='icon-button close' aria-label='Close' title='Close' onClick={onClose}><X size={16} /></button>
     </div>
   )
+}
+
+// What a link in text points at: { url } for a web or email address, else
+// { file } or { folder }, named by `placeOf`.
+export const textLink = (href, placeOf) => placeOf(pearLink(href) || { url: href })
+
+// The card under the caret when it is in a link, as under a linked cell:
+// where it goes, Open, Copy link, and for editors Edit and Remove.
+export function TextLinkCard ({ editor, link, canEdit, onOpen, onEdit }) {
+  const [at, setAt] = useState(null)
+  const [copied, setCopied] = useState(false)
+  const href = editor.getAttributes('link').href || ''
+  useLayoutEffect(() => {
+    function place () {
+      if (editor.isDestroyed) return
+      let r = null
+      try { r = editor.view.coordsAtPos(editor.state.selection.from) } catch {}
+      const next = !r || r.bottom < 0 || r.top > window.innerHeight - 20
+        ? null
+        : { top: Math.round(Math.min(r.bottom + 4, window.innerHeight - 60)), left: Math.round(Math.max(8, Math.min(r.left, window.innerWidth - 320))) }
+      setAt((was) => (was && next && was.top === next.top && was.left === next.left) || was === next ? was : next)
+    }
+    place()
+    window.addEventListener('scroll', place, true)
+    window.addEventListener('resize', place)
+    return () => { window.removeEventListener('scroll', place, true); window.removeEventListener('resize', place) }
+  })
+  useEffect(() => setCopied(false), [href])
+  if (!at) return null
+  const label = link.url || link.missing || link.name
+  async function copy () {
+    try { await navigator.clipboard.writeText(href) } catch { await call('app:setClipboard', { text: href }).catch(() => {}) }
+    setCopied(true)
+  }
+  const keep = (e) => e.preventDefault()
+  return (
+    <div className='link-card' role='group' aria-label='Link' style={at} onMouseDown={keep}>
+      <span className='link-card-address' title={label}>{label}</span>
+      {!link.missing && <button className='icon-button' title='Open link' aria-label='Open link' onClick={onOpen}><ArrowSquareOut size={16} /></button>}
+      <button className='icon-button' title={copied ? 'Copied' : 'Copy link'} aria-label='Copy link' onClick={copy}>{copied ? <Check size={16} /> : <Copy size={16} />}</button>
+      {canEdit && <button className='icon-button' title='Edit link' aria-label='Edit link' onClick={onEdit}><PencilSimple size={16} /></button>}
+      {canEdit && <button className='icon-button' title='Remove link' aria-label='Remove link' onClick={() => editor.chain().focus().extendMarkRange('link').unsetLink().run()}><Trash size={16} /></button>}
+    </div>
+  )
+}
+
+// A click on a link opens it for a viewer, or with Ctrl (Cmd) held.
+export function linkClick (e, canEdit, open) {
+  const a = e.target.closest && e.target.closest('a[href]')
+  if (!a || (canEdit && !e.ctrlKey && !e.metaKey)) return
+  e.preventDefault()
+  open(a.getAttribute('href'))
 }
 
 function FindBar ({ editor, canEdit, onClose }) {
