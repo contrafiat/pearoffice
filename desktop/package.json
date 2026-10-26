@@ -37,6 +37,7 @@
       "worklet.js",
       "seeder-process.js",
       "file-windows.js",
+      "open-url.js",
       "paths.js",
       "login.js",
       "appimage.js",

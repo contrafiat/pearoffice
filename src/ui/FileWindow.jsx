@@ -10,6 +10,7 @@ import { DocView } from './doc/DocView.jsx'
 import { SlidesView } from './slides/SlidesView.jsx'
 import { useFolders } from './Folders.jsx'
 import { untitled } from './Files.jsx'
+import { AppMissing } from './AppMissing.jsx'
 
 const EDITORS = { sheet: SheetView, doc: DocView, slides: SlidesView }
 
@@ -81,6 +82,7 @@ export function FileWindow ({ fileId }) {
                 />
                 )}
       </main>
+      <AppMissing />
     </div>
   )
 }

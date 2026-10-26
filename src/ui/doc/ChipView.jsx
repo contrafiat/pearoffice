@@ -4,9 +4,10 @@
 
 import React, { createContext, useContext, useRef } from 'react'
 import { NodeViewWrapper, ReactNodeViewRenderer } from '@tiptap/react'
-import { CalendarBlank } from '@phosphor-icons/react'
+import { CalendarBlank, ArrowSquareOut } from '@phosphor-icons/react'
 import { Chip, chipText, chipHref } from './extensions.js'
 import { SmartChip } from '../sheet/chips.jsx'
+import { openOutside, dayLink } from '../pearLinks.js'
 
 // What the pills need from the editor around them: { sheetId, members,
 // placeOf (pearLinks.js), canEdit }.
@@ -46,6 +47,10 @@ function ChipPill ({ node, updateAttributes }) {
           <button className='chip-calendar' title='Change the date' aria-label='Change the date' contentEditable={false} onMouseDown={(e) => e.preventDefault()} onClick={pick}><CalendarBlank size={14} /></button>
           <input ref={input} type='date' className='chip-date-input' tabIndex={-1} aria-hidden='true' onChange={picked} />
         </>
+      )}
+      {a.kind === 'date' && /^\d{4}-\d{2}-\d{2}$/.test(a.date || '') && (
+        // The day in PearCal (/home/tim/peerloomllc/proposals/2026-10-26-pearcal-pearoffice-links.md).
+        <button className='chip-calendar chip-pearcal' title='Open in PearCal' aria-label='Open in PearCal' contentEditable={false} onMouseDown={(e) => e.preventDefault()} onClick={(e) => { e.preventDefault(); e.stopPropagation(); openOutside(dayLink(a.date)) }}><ArrowSquareOut size={14} /></button>
       )}
     </NodeViewWrapper>
   )
