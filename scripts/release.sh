@@ -687,32 +687,11 @@ fi # end NEEDS_BUILD (commit and tag)
 # On RELEASES_REPO, where the website and the desktop update check link.
 # Every file with its .sha256 sidecar.
 # ---------------------------------------------------------------------------
-# Usage: _upload_asset <repo> <release id> <file>. One file, with curl's
-# progress bar (gh release upload prints nothing until it is done). A file of
-# the same name already on the release is replaced. Without a token, or if
-# curl fails, it falls back to gh.
-_upload_asset() {
-  local repo="$1" id="$2" file="$3" name old
-  name=$(basename "$file")
-  old=$(gh api "repos/$repo/releases/$id/assets" --paginate --jq ".[] | select(.name == \"$name\") | .id" 2>/dev/null || true)
-  if [ -n "$GH_TOKEN" ]; then
-    [ -n "$old" ] && gh api -X DELETE "repos/$repo/releases/assets/$old" >/dev/null 2>&1
-    # The bar ends in a bouncing line while GitHub answers, so clear it after.
-    curl -fS --progress-bar -o /dev/null -X POST -T "$file" \
-      -H "Authorization: Bearer $GH_TOKEN" -H "Content-Type: application/octet-stream" \
-      "https://uploads.github.com/repos/$repo/releases/$id/assets?name=$name" \
-      && { printf '\r\033[K' >&2; return 0; }
-    printf '\r\033[K' >&2
-    echo "    curl upload failed, trying gh..."
-  fi
-  gh release upload "$RELEASE_TAG" -R "$repo" --clobber "$file"
-}
-
 # Usage: _publish_release <repo>. Creates the release as a draft, uploads the
-# files one at a time with progress, then publishes it, so nobody sees it
+# files, then publishes it, so nobody sees it
 # half filled. A release that exists (--retag) gets new notes and files.
 _publish_release() {
-  local repo="$1" id _a _n=0 _of=${#RELEASE_ASSETS[@]} _new=false _ok=true
+  local repo="$1" id _of=${#RELEASE_ASSETS[@]} _new=false _ok=true
   if gh release view "$RELEASE_TAG" -R "$repo" >/dev/null 2>&1; then
     echo "    GitHub release $RELEASE_TAG already exists on $repo -- replacing its notes and assets."
     # A draft left by a failed upload is published once the files are in.
@@ -729,12 +708,12 @@ _publish_release() {
   id=$(gh release view "$RELEASE_TAG" -R "$repo" --json databaseId --jq .databaseId 2>/dev/null || true)
   [ -n "$id" ] || _ok=false
   if $_ok; then
-    echo "==> Uploading $_of files to $repo..."
-    for _a in "${RELEASE_ASSETS[@]}"; do
-      _n=$((_n + 1))
-      echo "    [$_n/$_of] $(basename "$_a") ($(du -h "$_a" | cut -f1))"
-      _upload_asset "$repo" "$id" "$_a" || { _ok=false; break; }
-    done
+    # Several at a time with one progress line (shared library); gh without a token.
+    if [ -n "$GH_TOKEN" ]; then
+      release_upload_assets "https://uploads.github.com/repos/$repo/releases/$id/assets" "${RELEASE_ASSETS[@]}" || _ok=false
+    else
+      gh release upload "$RELEASE_TAG" -R "$repo" --clobber "${RELEASE_ASSETS[@]}" || _ok=false
+    fi
   fi
   if $_ok && $_new; then
     gh release edit "$RELEASE_TAG" -R "$repo" --draft=false >/dev/null || _ok=false
