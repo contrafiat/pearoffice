@@ -283,7 +283,7 @@ writes the release notes from the merged PRs (or starts from
 vi, builds the desktop apps (seeder packages are released from
 `../peerloom-seeder`), then commits the version, pushes
 the tag and publishes, asking before each step: the GitHub release on
-this repo (made as a draft, each file uploaded with a progress bar, then
+this repo (made as a draft, files uploaded several at a time with one progress line, then
 published; a `.sha256` for every file; `peerloomllc/pearoffice-releases`
 had the releases up to 1.1.2 and gets no more),
 Zapstore, Google Play (the API when gcloud is set up, else the
