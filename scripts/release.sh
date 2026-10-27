@@ -844,16 +844,7 @@ if $PUBLISH_APP_STORE; then
       read -r _bid _state < <(_asc_wait_for_build "$APP_VERSION" "$_num") || true
       if [ "${_state:-}" = VALID ] && _asc_attach_build "$_vid" "$_bid"; then
         if _ask "Submit $APP_VERSION for App Review?" y; then
-          _sid=$(asc review submissions-create --app "$ASC_APP_ID" --platform IOS --output json \
-            | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['id'])" 2>/dev/null || echo "")
-          if [ -n "$_sid" ] \
-             && asc review items-add --submission "$_sid" --item-type appStoreVersions --item-id "$_vid" >/dev/null \
-             && asc review submissions-submit --id "$_sid" --confirm >/dev/null; then
-            echo "    Submitted. Watch with: asc review status --app $ASC_APP_ID"
-          else
-            PUBLISH_FAILED=true; APP_STORE_FAILED=true
-            echo "    ERROR: the review submission failed; submit in App Store Connect."
-          fi
+          release_submit_for_review "$_vid" || true
         fi
       else
         APP_STORE_DEFERRED=true
