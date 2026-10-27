@@ -397,12 +397,21 @@ _confirm "app.json version looks correct — proceed with bundle builds?"
 # 1. Canonical verify gate (tests + all bundles)
 #
 # `npm run verify` is PearOffice's merge gate: the unit tests, the real Bare
-# binary with every bundle, and the desktop smoke test. Run unpiped, so a red
-# suite aborts here via set -e. The mobile bundles that ship are rebuilt by
-# step 3's build-android-release.sh and by ios-appstore.sh on the Mac.
+# binary with every bundle, and the desktop smoke test. A red suite aborts
+# here. The output is also kept in dist/release/verify.log, so a test that
+# fails only now and then can be looked into afterwards. The mobile bundles
+# that ship are rebuilt by step 3's build-android-release.sh and by
+# ios-appstore.sh on the Mac.
 # ---------------------------------------------------------------------------
 echo "==> Running the verify gate (tests, Bare bundles, desktop smoke)..."
-npm run verify
+VERIFY_LOG="dist/release/verify.log"
+mkdir -p dist/release
+if ! npm run verify 2>&1 | tee "$VERIFY_LOG"; then
+  echo
+  echo "==> The verify gate failed. The full output is in $VERIFY_LOG"
+  grep -nE '^not ok|^# (pass|fail)' "$VERIFY_LOG" | tail -20 || true
+  exit 1
+fi
 
 # ---------------------------------------------------------------------------
 # 2. Native project preparation
