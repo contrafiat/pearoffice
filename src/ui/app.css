@@ -1354,6 +1354,40 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 .panel .folder-choice-icon { width: 20px; flex: none; color: #c98a12; }
 .panel .folder-choice-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .panel .move-what { margin: 0; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Tags (proposals/2026-10-28-file-tags.md): pills use the dropdown chip
+   colours below. */
+.tag-pill { font-size: 12px; line-height: 20px; max-width: 160px; white-space: nowrap; }
+.card-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; max-width: 100%; }
+.card-tags .tag-pill { max-width: 110px; }
+.tag-more { color: var(--muted); font-size: 12px; }
+.file-card .file-where { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.panel .tag-new { display: flex; gap: 8px; }
+.panel .tag-new input { flex: 1; min-width: 0; }
+.panel .tag-new button { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.panel .tag-choices .tag-pill { font-size: 14px; line-height: 24px; max-width: 70%; }
+.panel .tag-manage .tag-row { display: flex; align-items: center; gap: 8px; padding: 4px 4px 4px 8px; }
+.panel .tag-manage .tag-row .tag-pill { font-size: 14px; line-height: 24px; max-width: 50%; }
+.panel .tag-manage .tag-row input { flex: 1; min-width: 0; }
+.panel .tag-manage .tag-count { flex: 1; font-size: 13px; }
+.panel .manage-tags { margin-top: 4px; }
+.file-search { max-width: 960px; margin: 0 auto 16px; display: flex; flex-direction: column; gap: 8px; }
+.file-search-box { display: flex; align-items: center; gap: 8px; border: 1px solid var(--line-strong); border-radius: 8px; padding: 0 6px 0 10px; background: var(--paper); color: var(--muted); }
+.file-search-box input { flex: 1; min-width: 0; border: 0; outline: none; padding: 9px 0; background: none; color: var(--ink); font: inherit; }
+.file-search-box:focus-within { border-color: var(--pear); }
+.file-search-box .icon-button { display: inline-flex; padding: 4px; background: none; border: 0; color: var(--muted); cursor: pointer; }
+.file-search-box .icon-button:hover { color: var(--ink); }
+.file-search-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag-filter { padding: 2px; border: 2px solid transparent; border-radius: 999px; background: none; cursor: pointer; font: inherit; }
+.tag-filter .tag-pill { font-size: 13px; line-height: 22px; }
+.tag-filter.on { border-color: var(--pear); }
+.tag-filter:not(.on) .tag-pill { opacity: 0.85; }
+@media (max-width: 640px) {
+  /* Phones: the tags scroll sideways in one row. */
+  .file-search-tags { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  .file-search-tags::-webkit-scrollbar { display: none; }
+  .tag-filter { flex: none; }
+}
 .panel .row.center > button { display: inline-flex; align-items: center; gap: 6px; }
 @media (max-width: 720px) {
   .file-cell .file-card { padding-right: 46px; }

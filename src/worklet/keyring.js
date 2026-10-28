@@ -12,12 +12,15 @@
 // A keyring, before encryption:
 //
 //   { v: 1, files: { <sheetId>: item }, seeders: { <seederKey>: item },
-//     folders: { <folderId>: record }, places: { <sheetId>: record } }
+//     folders: { <folderId>: record }, places: { <sheetId>: record },
+//     tags: { <tagId>: record }, tagged: { <sheetId>:<tagId>: record } }
 //   item  { at, entry } for a file, { at } for a seeder, { at, removed: true } when gone
 //
 // `folders` and `places` are folders.js records (proposals/2026-10-10-folders.md),
 // merged the same way. A place for a file the keyring no longer lists is
-// dropped. Older builds drop both sections when they write.
+// dropped. Older builds drop both sections when they write. `tags` and
+// `tagged` are tags.js records (proposals/2026-10-28-file-tags.md), the same
+// way: tagged records for files the keyring does not list are dropped.
 //
 // A file entry is the own-devices entry (ownDevices.js cleanEntry) plus an
 // optional role. Merging keeps, per id, the item with the later `at`;
@@ -36,6 +39,7 @@ const b4a = require('b4a')
 const sodium = require('sodium-universal')
 const { cleanEntry } = require('./ownDevices')
 const { cleanFolders, cleanPlaces, mergeRecords } = require('./folders')
+const { cleanTags, cleanTaggedAll, mergeTags, mergeTagged } = require('./tags')
 const { hash, signed, checkSealed, topicOf, signClaim, MAX_BYTES } = require('../seeder/keyringRecord')
 
 const NS = {
@@ -62,7 +66,7 @@ function deriveKeys (seed) {
 }
 
 function empty () {
-  return { v: 1, files: {}, seeders: {}, folders: {}, places: {} }
+  return { v: 1, files: {}, seeders: {}, folders: {}, places: {}, tags: {}, tagged: {} }
 }
 
 function seal (keyring, keys, seq) {
@@ -129,6 +133,8 @@ function clean (k) {
   }
   out.folders = cleanFolders(k.folders)
   out.places = cleanPlaces(k.places)
+  out.tags = cleanTags(k.tags)
+  out.tagged = cleanTaggedAll(k.tagged)
   return out
 }
 
@@ -161,6 +167,9 @@ function merge (a, b, now = Date.now()) {
   out.folders = mergeRecords(a.folders, b.folders, now)
   out.places = mergeRecords(a.places, b.places, now)
   for (const id of Object.keys(out.places)) if (!out.files[id]) delete out.places[id]
+  out.tags = mergeTags(a.tags, b.tags, now)
+  out.tagged = mergeTagged(a.tagged, b.tagged, now)
+  for (const key of Object.keys(out.tagged)) if (!out.files[key.split(':')[0]]) delete out.tagged[key]
   return out
 }
 

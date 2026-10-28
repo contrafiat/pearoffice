@@ -17,6 +17,7 @@ import { haptic, hapticTaps } from './haptic.js'
 import { BUILT_IN, makeBuiltIn } from './templates.js'
 import { FileHome, KindIcon, NewPanel, RecoverPanel, dragFile, dropTarget, untitled } from './Files.jsx'
 import { DeleteFolderPanel, FolderNamePanel, MoveToFolderPanel, filesIn, useFolders } from './Folders.jsx'
+import { TagsPanel, useTags } from './Tags.jsx'
 import { DeletePanel } from './DeletePanel.jsx'
 import { DonationReminder } from './About.jsx'
 import { Onboarding } from './Onboarding.jsx'
@@ -212,6 +213,9 @@ export function App () {
   const [naming, setNaming] = useState(null) // { folder } to rename, {} for a new one
   const [droppingFolder, setDroppingFolder] = useState(null)
   const [moving, setMoving] = useState(null) // a file to move to a folder
+  // Tags (proposals/2026-10-28-file-tags.md).
+  const tags = useTags()
+  const [tagging, setTagging] = useState(null) // a file whose tags are being changed
   const [cardMenu, setCardMenu] = useState(null) // { x, y, file } or { x, y, folder }
   const [deleting, setDeleting] = useState(null) // { file, kind: 'local' or 'everyone' }
   // Folders open in the side list, per device.
@@ -626,6 +630,7 @@ export function App () {
                     '-',
                     !f.removed && !f.waiting && { label: 'Copy link', onSelect: () => copyLink('pearoffice://file/' + f.sheetId).catch(() => {}) },
                     { label: 'Move to folder...', onSelect: () => setMoving(f) },
+                    { label: 'Tags...', onSelect: () => setTagging(f) },
                     !f.removed && (f.myRole === 'owner' || f.myRole === 'editor') && { label: f.template ? 'Stop using as a template' : 'Use as a template', onSelect: () => setTemplate(f, !f.template) },
                     '-',
                     { label: 'Remove from this device', onSelect: () => setDeleting({ file: f, kind: 'local' }) },
@@ -713,6 +718,7 @@ export function App () {
         />
       )}
       {moving && <MoveToFolderPanel sheetId={moving.sheetId} title={moving.title || untitled(moving.kind)} onClose={() => setMoving(null)} onError={setError} />}
+      {tagging && <TagsPanel sheetId={tagging.sheetId} title={tagging.title || untitled(tagging.kind)} onClose={() => setTagging(null)} onError={setError} />}
       {recovering && (
         <RecoverPanel
           file={recovering}
@@ -835,6 +841,7 @@ export function App () {
                     onWindow={desktop ? openWindow : null}
                     onDrop={placeFile}
                     desktop={desktop}
+                    tags={tags}
                     actions={<StartActions onNew={() => setNewFile(true)} onJoin={() => setJoining('')} onImported={opened} onError={setError} />}
                   />
                   )

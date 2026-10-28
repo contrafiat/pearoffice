@@ -5,6 +5,7 @@ import { PeopleStack } from './Avatar.jsx'
 import { DeletePanel } from './DeletePanel.jsx'
 import { TidyPanel } from './TidyPanel.jsx'
 import { MoveToFolderPanel } from './Folders.jsx'
+import { TagsPanel } from './Tags.jsx'
 import { DotsThree, UserPlus } from '@phosphor-icons/react'
 import { Menu, menuItems as menuList } from './Menu.jsx'
 
@@ -33,6 +34,7 @@ export function FileBar ({ sheetId, noun, title, myRole, frozen, canEdit, badge,
   const [deleting, setDeleting] = useState(null) // 'local' | 'everyone' | null
   const [tidying, setTidying] = useState(false)
   const [moving, setMoving] = useState(false) // Move to folder
+  const [tagging, setTagging] = useState(false) // Tags...
   const ICON = phone ? 20 : 18 // toolbar icon size
   const close = () => setMore(null)
   // A press anywhere outside the menu, or Esc, closes it.
@@ -88,6 +90,7 @@ export function FileBar ({ sheetId, noun, title, myRole, frozen, canEdit, badge,
                   items: [
                     OWN_WINDOWS && { label: 'Open in new window', className: 'open-window', onSelect: () => call('app:openWindow', { sheetId }).catch((err) => onError(err.message)) },
                     { label: 'Move to folder...', onSelect: () => setMoving(true) },
+                    { label: 'Tags...', onSelect: () => setTagging(true) },
                     myRole === 'owner' && !frozen && { label: 'Tidy up this ' + noun + '...', onSelect: () => setTidying(true) },
                     '-',
                     { label: 'Remove from this device', onSelect: () => setDeleting('local') },
@@ -101,6 +104,7 @@ export function FileBar ({ sheetId, noun, title, myRole, frozen, canEdit, badge,
       </header>
       {sharing && <SharePanel sheetId={sheetId} noun={noun} onClose={() => setSharing(false)} onError={onError} />}
       {moving && <MoveToFolderPanel sheetId={sheetId} title={title} onClose={() => setMoving(false)} onError={onError} />}
+      {tagging && <TagsPanel sheetId={sheetId} title={title} onClose={() => setTagging(false)} onError={onError} />}
       {tidying && <TidyPanel sheetId={sheetId} title={title} noun={noun} onClose={() => setTidying(false)} onError={onError} onDone={() => setTidying(false)} />}
       {deleting && <DeletePanel sheetId={sheetId} title={title} noun={noun} kind={deleting} onClose={() => setDeleting(null)} onError={onError} onDone={() => { setDeleting(null); onGone() }} />}
     </>

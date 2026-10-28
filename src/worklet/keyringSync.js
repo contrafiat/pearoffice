@@ -20,10 +20,11 @@
 const b4a = require('b4a')
 const { deriveKeys, empty, seal, open, clean, merge } = require('./keyring')
 const { mergeRecords } = require('./folders')
+const { mergeTags, mergeTagged } = require('./tags')
 
 const hex = (buf) => b4a.toString(buf, 'hex')
 
-function createKeyringSync ({ engine, getSeeding, getOwnDevices, getFolders = () => null, emit = () => {}, log = () => {}, now = () => Date.now(), gapMs = 60 * 1000, checkMs = 60 * 1000, settleMs = 3000 }) {
+function createKeyringSync ({ engine, getSeeding, getOwnDevices, getFolders = () => null, getTags = () => null, emit = () => {}, log = () => {}, now = () => Date.now(), gapMs = 60 * 1000, checkMs = 60 * 1000, settleMs = 3000 }) {
   let keys = null
   let keysFor = null
   let timer = null
@@ -68,6 +69,8 @@ function createKeyringSync ({ engine, getSeeding, getOwnDevices, getFolders = ()
     for (const s of seederKeys) if (!k.seeders[s] || k.seeders[s].removed) k.seeders[s] = { at }
     k.folders = mergeRecords(k.folders, folders.folders, at)
     k.places = mergeRecords(k.places, folders.places, at)
+    k.tags = mergeTags(k.tags, folders.tags, at)
+    k.tagged = mergeTagged(k.tagged, folders.tagged, at)
     return k
   }
 
@@ -78,7 +81,8 @@ function createKeyringSync ({ engine, getSeeding, getOwnDevices, getFolders = ()
     const seederKeys = (await seeding.list()).map((s) => s.seederKey)
     if (!seederKeys.length) return { written: false }
     const files = await own.entries()
-    const folders = getFolders() ? await getFolders().all() : { folders: {}, places: {} }
+    // Folders and tags (tags.js) go in together.
+    const folders = { ...(getFolders() ? await getFolders().all() : { folders: {}, places: {} }), ...(getTags() ? await getTags().all() : { tags: {}, tagged: {} }) }
     const last = await local()
     const fingerprint = fingerprintOf(files, seederKeys, folders)
     if (!force && fingerprint === last.fingerprint && seederKeys.every((s) => last.held.includes(s))) return { written: false }
@@ -98,6 +102,7 @@ function createKeyringSync ({ engine, getSeeding, getOwnDevices, getFolders = ()
     keyring = merge(keyring, empty(), now()) // drops removals older than 30 days
     // Folders changed on a device this one has not met lately.
     if (getFolders()) await getFolders().take({ folders: keyring.folders, places: keyring.places })
+    if (getTags()) await getTags().take({ tags: keyring.tags, tagged: keyring.tagged })
     seq = Math.max(seq + 1, 1)
     const rec = seal(keyring, ks, seq)
     const held = []
