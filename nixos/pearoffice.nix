@@ -42,11 +42,11 @@
 
 stdenv.mkDerivation rec {
   pname = "pearoffice";
-  version = "1.1.3";
+  version = "1.1.4";
 
   src = fetchurl {
     url = "https://github.com/peerloomllc/pearoffice/releases/download/v${version}/pearoffice-${version}-linux-amd64.deb";
-    hash = "sha256-9ydW4jrpGTWa+2J0DhEh6yZSLdcePrLaWCWTQDgsjAE=";
+    hash = "sha256-YNkB3eAOJI0ZGq2+D8FYuXkvPN5E9RdmzvNsyQnP9Sw=";
   };
 
   nativeBuildInputs = [
