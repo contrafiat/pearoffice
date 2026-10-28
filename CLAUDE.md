@@ -151,6 +151,13 @@ Code that works for any kind of file sits apart from each editor's own
   `folders` and `places`, carried when a file moves; `file:folders`,
   `file:newFolder`, `file:renameFolder`, `file:deleteFolder`, `file:place`,
   event `folders:changed`; proposals/2026-10-10-folders.md),
+  `tags.js` (your tags, yours alone, many per file: localDb `tag:<id>`
+  (name, colour from the dropdown chip set) and `tagged:<sheetId>:<tagId>`
+  (`on`), one record per file and tag so adds made apart both stay; same
+  names made apart show as one; sent as `tags` on the own-devices channel,
+  kept in the keyring's `tags` and `tagged`, carried when a file moves;
+  `file:tags`, `file:newTag`, `file:renameTag`, `file:deleteTag`,
+  `file:tag`, event `tags:changed`; proposals/2026-10-28-file-tags.md),
   `devices.js` (your linked devices and their names: localDb
   `devices:<deviceKey>`, the signed `deviceName` op on each file's
   `device/<writerKey>` record, a first name from the platform; `app:devices`,
@@ -175,7 +182,10 @@ Code that works for any kind of file sits apart from each editor's own
   as an .xlsx (a tab per list of records, the rest on a Summary tab).
 - `src/ui/` - the React UI: the app shell, file list with folders
   (`Files.jsx`, `Folders.jsx`: folder cards, inside a folder, Move to
-  folder, drag onto a folder on desktop, folders in the side list), sharing, seeder,
+  folder, drag onto a folder on desktop, folders in the side list; search
+  by name and tags above the files, picked tags meaning all of them, every
+  file at the top level and one folder inside it; `Tags.jsx`: the pills,
+  Tags... and Manage tags), sharing, seeder,
   devices and settings panels, About and donations (`About.jsx`), the phrase entry
   (`PhraseInput.jsx`: one word at a time on phones, 12 boxes on desktop,
   suggestions from the word list), the first-run welcome and tour (`Onboarding.jsx`), Ctrl+P (Cmd+P on a Mac)
@@ -421,7 +431,7 @@ take five scenes: files, sheet, document, slides, sharing.
   bundle must create, edit and read a sheet over stdin/stdout, and the seeder
   bundle must start and print a pairing link.
 - `npm run smoke:desktop`: drives the real UI in Electron with an offscreen
-  window and real key and mouse events, in twenty-two parts. Each part is its own
+  window and real key and mouse events, in twenty-three parts. Each part is its own
   launch with a throwaway data folder and a 60 s limit, and prints one
   `ok`/`not ok` line, then a summary line. `sheets` is the grid editor
   (typing, formulas, pointing at cells while typing one, spilling, fill,
@@ -497,6 +507,12 @@ take five scenes: files, sheet, document, slides, sharing.
   side list, renaming, reopening and deleting (the files stay) (about
   5 s); with `PEAROFFICE_SMOKE_FOLDERS_SHOTS=<folder>` it saves the
   screens.
+  `tags` is tags and search: Tags... from the file menu and a card, a new
+  tag and the same name in another case, coloured pills, search by name, one
+  tag and two (all of them), a file in a folder found from the top level and
+  a search inside the folder, reopening, rename and delete in Manage tags
+  (about 7 s; `PEAROFFICE_SMOKE_TAGS_SHOT=<png>` saves the start screen and
+  `-panel.png` the panel).
   `windows` is files in windows of their own: Open in new window from a
   card and from the file menu, the main window bringing that window
   forward, a rename reaching both, a folder link opening in the main
