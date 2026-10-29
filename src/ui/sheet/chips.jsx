@@ -3,7 +3,7 @@
 // or folder link or a date chip are drawn as.
 
 import React, { useLayoutEffect, useState } from 'react'
-import { CalendarBlank, FolderSimple } from '@phosphor-icons/react'
+import { CalendarBlank, CaretCircleDown, FolderSimple } from '@phosphor-icons/react'
 import { MemberAvatar } from '../Avatar.jsx'
 import { KindIcon, untitled } from '../Files.jsx'
 
@@ -11,7 +11,8 @@ const PEAR = /^pearoffice:\/\/(file|folder)\/([A-Za-z0-9_-]+)$/
 
 // What the @ menu offers for the text after the @: people in the file, your
 // files and folders, then dates. Each is { kind, label, ... }.
-export function atItems (query, { members = [], files = [], folders = [] }) {
+// `dropdown`: also offer Dropdown (documents, proposals/2026-10-29-document-dropdowns.md).
+export function atItems (query, { members = [], files = [], folders = [], dropdown = false }) {
   const q = String(query || '').trim().toLowerCase()
   const has = (label) => !q || label.toLowerCase().includes(q)
   const out = []
@@ -20,6 +21,7 @@ export function atItems (query, { members = [], files = [], folders = [] }) {
   for (const d of folders) if (has(d.name)) out.push({ kind: 'folder', label: d.name, folder: d })
   for (const [label, days] of [['Today', 0], ['Tomorrow', 1]]) if (has(label)) out.push({ kind: 'date', label, days })
   if (has('Pick a date')) out.push({ kind: 'date', label: 'Pick a date', pick: true })
+  if (dropdown && has('Dropdown')) out.push({ kind: 'dropdown', label: 'Dropdown' })
   return out
 }
 
@@ -39,7 +41,7 @@ export function AtMenu ({ items, selected, sheetId, onPick, anchor }) {
   return (
     <div className='formula-help at-menu' style={pos} role='listbox' aria-label='Insert a chip' onMouseDown={(e) => e.preventDefault()}>
       {items.map((it, i) => {
-        const head = { person: 'People', file: 'Files', folder: 'Files', date: 'Dates' }[it.kind]
+        const head = { person: 'People', file: 'Files', folder: 'Files', date: 'Dates', dropdown: 'Insert' }[it.kind]
         const title = head !== group ? (group = head) : null
         return (
           <React.Fragment key={it.kind + ':' + (it.member ? it.member.identity : it.file ? it.file.sheetId : it.folder ? it.folder.id : it.label)}>
@@ -49,6 +51,7 @@ export function AtMenu ({ items, selected, sheetId, onPick, anchor }) {
               {it.kind === 'file' && <KindIcon kind={it.file.kind} size={18} />}
               {it.kind === 'folder' && <FolderSimple size={18} weight='duotone' />}
               {it.kind === 'date' && <CalendarBlank size={18} />}
+              {it.kind === 'dropdown' && <CaretCircleDown size={18} />}
               <span>{it.label}</span>
             </div>
           </React.Fragment>

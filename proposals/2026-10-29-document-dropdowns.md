@@ -65,8 +65,8 @@ without dropdowns stay at their version.
 - PDF and printing: the pill is drawn.
 - Import makes no dropdowns.
 - Copy and paste inside the same document keeps dropdowns. Pasted into
-  another document they become text, since the list belongs to the
-  document it came from.
+  another document they show their last choice in grey, since the list
+  belongs to the document it came from.
 - Templates (proposals/2026-10-18-templates.md): `lists` is copied with
   the content, so a shopping list template keeps its choices.
 - Version history shows a changed choice as a change to that text.

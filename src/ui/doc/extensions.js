@@ -5,6 +5,7 @@
 import { Extension, Node, mergeAttributes } from '@tiptap/core'
 import { okLink } from '../../shared/links.js'
 import { isPearcalLink } from '../../shared/pearcal.js'
+import { CHIP_COLORS, CHIP_NAMES } from '../../sheet/validation.js'
 import { Plugin, PluginKey, TextSelection } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import StarterKit from '@tiptap/starter-kit'
@@ -242,14 +243,61 @@ export const Chip = Node.create({
   }
 })
 
+// --- dropdowns ----------------------------------------------------------------
+
+// A dropdown pill (proposals/2026-10-29-document-dropdowns.md): one of the
+// document's lists of choices (lists.js) and the chosen item, or none yet.
+// `text` and `color` are the item as last seen, for exports and for an item
+// or list that is gone. Needs document schema version 4.
+export const DROPDOWNS_VERSION = 4 // docModel.DROPDOWNS_VERSION
+const LIST_ID = /^[A-Za-z0-9_-]{1,64}$/
+export const dropdownText = (a) => (a.item && a.text) || 'Choose'
+
+export const Dropdown = Node.create({
+  name: 'dropdown',
+  group: 'inline',
+  inline: true,
+  atom: true,
+  selectable: true,
+
+  addAttributes () {
+    return {
+      list: { default: '', parseHTML: (el) => el.getAttribute('data-dropdown') || '', renderHTML: (a) => ({ 'data-dropdown': a.list }) },
+      item: { default: '', parseHTML: (el) => el.getAttribute('data-item') || '', renderHTML: (a) => (a.item ? { 'data-item': a.item } : {}) },
+      text: { default: '', parseHTML: (el) => (el.getAttribute('data-item') ? (el.textContent || '').slice(0, 100) : ''), renderHTML: () => ({}) },
+      color: { default: 'grey', parseHTML: (el) => (CHIP_NAMES.includes(el.getAttribute('data-color')) ? el.getAttribute('data-color') : 'grey'), renderHTML: (a) => ({ 'data-color': a.color }) }
+    }
+  },
+
+  parseHTML () {
+    return [{ tag: 'span[data-dropdown]', getAttrs: (el) => (LIST_ID.test(el.getAttribute('data-dropdown') || '') ? null : false), priority: 100 }]
+  },
+
+  renderHTML ({ node, HTMLAttributes }) {
+    return ['span', mergeAttributes({ class: 'doc-dropdown chip chip-' + (node.attrs.item ? node.attrs.color : 'grey') }, HTMLAttributes), dropdownText(node.attrs)]
+  },
+
+  renderText ({ node }) {
+    return node.attrs.item ? node.attrs.text : ''
+  }
+})
+
 // The document's JSON with each chip made plain text (a link for a file or
-// folder), for the exports.
+// folder) and each chosen dropdown its text in the item's colours, for the
+// exports. A dropdown with no choice goes out as nothing.
 export function flattenChips (json) {
   const walk = (n) => {
     if (!n || !n.content) return n
-    return { ...n, content: n.content.map((c) => (c.type === 'chip' ? chipAsText(c) : walk(c))) }
+    return { ...n, content: n.content.flatMap((c) => (c.type === 'chip' ? [chipAsText(c)] : c.type === 'dropdown' ? dropdownAsText(c) : [walk(c)])) }
   }
   return walk(json)
+}
+function dropdownAsText (c) {
+  const a = c.attrs || {}
+  if (!a.item || !a.text) return []
+  const [fill, ink] = CHIP_COLORS[a.color] || CHIP_COLORS.grey
+  const marks = (c.marks || []).filter((m) => m.type !== 'highlight' && m.type !== 'textStyle')
+  return [{ type: 'text', text: a.text, marks: [...marks, { type: 'highlight', attrs: { color: fill } }, { type: 'textStyle', attrs: { color: ink } }] }]
 }
 function chipAsText (c) {
   const a = c.attrs || {}
@@ -261,7 +309,7 @@ function chipAsText (c) {
 // (Collaboration, cursors, find, placeholder) on top; import and export use
 // these alone, so both read and write the same nodes and marks.
 export function documentExtensions () {
-  return textExtensions({ tables: true, pictures: true, chips: true })
+  return textExtensions({ tables: true, pictures: true, chips: true, dropdowns: true })
 }
 
 // A slide's text box (proposals/2026-10-06-slides.md, Text boxes): the
@@ -293,7 +341,7 @@ export function notesExtensions () {
 export const linkAllowed = (url, ctx) => (/^\s*pearcal:/i.test(url || '') ? isPearcalLink(url) : ctx.defaultValidate(url))
 
 // Documents and slides share these, in this order.
-function textExtensions ({ starter = {}, tables = false, pictures = false, chips = false }) {
+function textExtensions ({ starter = {}, tables = false, pictures = false, chips = false, dropdowns = false }) {
   return [
     StarterKit.configure({
       undoRedo: false, // Collaboration's undo only undoes this person's edits
@@ -317,7 +365,8 @@ function textExtensions ({ starter = {}, tables = false, pictures = false, chips
     Superscript,
     ParagraphFormat,
     pictures && Picture,
-    chips && Chip
+    chips && Chip,
+    dropdowns && Dropdown
   ].filter(Boolean)
 }
 

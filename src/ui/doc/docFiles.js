@@ -17,8 +17,10 @@ import JSZip from 'jszip'
 import { marked } from 'marked'
 import { checkZip } from '../slides/importOoxml.js'
 import * as D from 'docx'
+import { readLists, itemOf } from './lists.js'
 import { documentExtensions, flattenChips, SIZES, LINE_HEIGHTS, MAX_INDENT } from './extensions.js'
 import { okLink } from '../../shared/links.js'
+import { CHIP_COLORS } from '../../sheet/validation.js'
 import { call } from '../bridge.js'
 import { fileName, saveFile, isMobile } from '../save.js'
 import { preparePicture, wordPicture, toB64, fromB64 } from './pictures.js'
@@ -705,8 +707,17 @@ export function jsonToUpdate (json) {
 }
 
 // The document's body as the editor's JSON, every attribute filled in.
+// A dropdown shows its item's text and colour as they are now (lists.js).
 export function docToJson (ydoc) {
-  return yXmlFragmentToProseMirrorRootNode(ydoc.getXmlFragment(FIELD), getSchema(documentExtensions())).toJSON()
+  const json = yXmlFragmentToProseMirrorRootNode(ydoc.getXmlFragment(FIELD), getSchema(documentExtensions())).toJSON()
+  const lists = readLists(ydoc)
+  eachNode(json, (n) => {
+    if (n.type !== 'dropdown' || !n.attrs) return
+    const it = itemOf(lists, n.attrs.list, n.attrs.item)
+    if (it) n.attrs = { ...n.attrs, text: it.text, color: it.color }
+    else if (n.attrs.item) n.attrs = { ...n.attrs, color: 'grey' }
+  })
+  return json
 }
 
 // Import a file as a new document. Resolves to { sheetId, dropped }.
@@ -923,6 +934,8 @@ function fontName (v) {
   return FONT_NAMES[first] || first || undefined
 }
 
+const CHIP_FILLS = new Set(Object.values(CHIP_COLORS).map(([fill]) => fill))
+
 function textRun (n, base) {
   const o = { ...base, text: n.text }
   for (const m of marksOf(n)) {
@@ -935,8 +948,11 @@ function textRun (n, base) {
     else if (m.type === 'superscript') o.superScript = true
     else if (m.type === 'code') o.font = MONO
     else if (m.type === 'link') o.style = 'Hyperlink'
-    else if (m.type === 'highlight') o.highlight = nearestHighlight(a.color || '#fef08a')
-    else if (m.type === 'textStyle') {
+    else if (m.type === 'highlight') {
+      // A dropdown's colour (flattenChips) as exact shading; Word's highlights are a few fixed colours.
+      if (CHIP_FILLS.has(String(a.color || '').toLowerCase())) o.shading = { type: D.ShadingType.CLEAR, color: 'auto', fill: a.color.slice(1).toUpperCase() }
+      else o.highlight = nearestHighlight(a.color || '#fef08a')
+    } else if (m.type === 'textStyle') {
       if (hexColour(a.color)) o.color = hexColour(a.color)
       if (fontSize(a.fontSize)) o.size = fontSize(a.fontSize)
       if (fontName(a.fontFamily)) o.font = fontName(a.fontFamily)
