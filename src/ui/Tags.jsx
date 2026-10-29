@@ -174,3 +174,29 @@ function ManageTags ({ state, onBack, onClose, onError }) {
     </div>
   )
 }
+
+// After New from a template that you tagged: "Use the same tags as the
+// template?" Yes tags the new file with them.
+export function TemplateTagsPanel ({ sheetId, tags, onClose, onError }) {
+  const yes = async () => {
+    onClose()
+    try {
+      for (const t of tags) await call('file:tag', { sheetId, id: t.id, on: true })
+    } catch (err) { onError(err.message) }
+  }
+  return (
+    <div className='panel-backdrop' onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
+      <section className='panel template-tags' role='alertdialog' aria-label='Use the same tags as the template?'>
+        <header>
+          <h2>Use the same tags as the template?</h2>
+          <button className='close' aria-label='Close' onClick={onClose}><X size={18} /></button>
+        </header>
+        <p className='card-tags'>{tags.map((t) => <TagPill key={t.id} tag={t} />)}</p>
+        <div className='row equal'>
+          <button onClick={onClose}>No</button>
+          <button className='primary' onClick={yes}>Yes</button>
+        </div>
+      </section>
+    </div>
+  )
+}

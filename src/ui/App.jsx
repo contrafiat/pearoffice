@@ -17,7 +17,7 @@ import { haptic, hapticTaps } from './haptic.js'
 import { BUILT_IN, makeBuiltIn } from './templates.js'
 import { FileHome, KindIcon, NewPanel, RecoverPanel, dragFile, dropTarget, untitled } from './Files.jsx'
 import { DeleteFolderPanel, FolderNamePanel, MoveToFolderPanel, filesIn, useFolders } from './Folders.jsx'
-import { TagsPanel, useTags } from './Tags.jsx'
+import { TagsPanel, TemplateTagsPanel, tagsOf, useTags } from './Tags.jsx'
 import { DeletePanel } from './DeletePanel.jsx'
 import { DonationReminder } from './About.jsx'
 import { Onboarding } from './Onboarding.jsx'
@@ -215,6 +215,7 @@ export function App () {
   const [moving, setMoving] = useState(null) // a file to move to a folder
   // Tags (proposals/2026-10-28-file-tags.md).
   const tags = useTags()
+  const [templateTags, setTemplateTags] = useState(null) // { sheetId, tags } offered after New from a template
   const [tagging, setTagging] = useState(null) // a file whose tags are being changed
   const [cardMenu, setCardMenu] = useState(null) // { x, y, file } or { x, y, folder }
   const [deleting, setDeleting] = useState(null) // { file, kind: 'local' or 'everyone' }
@@ -488,13 +489,16 @@ export function App () {
 
   // A new file from a template, yours or shared (worklet file:fromTemplate),
   // or built in (src/ui/templates.js).
-  async function fromTemplate (make) {
+  // With `template` (its sheetId), your tags on it are offered for the new file.
+  async function fromTemplate (make, template) {
     try {
       const { sheetId } = await make()
       setNewFile(false)
       await fileHere(sheetId)
       await refresh()
       setCurrent(sheetId)
+      const from = template && tagsOf(tags, template)
+      if (from && from.length) setTemplateTags({ sheetId, tags: from })
     } catch (err) {
       setError(err.message)
     }
@@ -608,7 +612,7 @@ export function App () {
           onPick={create}
           templates={(sheets || []).filter((f) => f.template && !f.removed && !f.joining).sort((a, b) => (a.title || untitled(a.kind)).localeCompare(b.title || untitled(b.kind)))}
           builtIn={BUILT_IN}
-          onTemplate={(f) => fromTemplate(() => call('file:fromTemplate', { sheetId: f.sheetId }))}
+          onTemplate={(f) => fromTemplate(() => call('file:fromTemplate', { sheetId: f.sheetId }), f.sheetId)}
           onBuiltIn={(id) => fromTemplate(() => makeBuiltIn(id))}
           onClose={() => setNewFile(false)}
         />
@@ -626,7 +630,7 @@ export function App () {
                   const f = cardMenu.file
                   return [
                     desktop && !f.removed && !f.waiting && !f.recovery && { label: 'Open in new window', className: 'open-window', onSelect: () => openWindow(f.sheetId) },
-                    f.template && !f.removed && { label: 'New from this template', onSelect: () => fromTemplate(() => call('file:fromTemplate', { sheetId: f.sheetId })) },
+                    f.template && !f.removed && { label: 'New from this template', onSelect: () => fromTemplate(() => call('file:fromTemplate', { sheetId: f.sheetId }), f.sheetId) },
                     '-',
                     !f.removed && !f.waiting && { label: 'Copy link', onSelect: () => copyLink('pearoffice://file/' + f.sheetId).catch(() => {}) },
                     { label: 'Move to folder...', onSelect: () => setMoving(f) },
@@ -718,6 +722,7 @@ export function App () {
         />
       )}
       {moving && <MoveToFolderPanel sheetId={moving.sheetId} title={moving.title || untitled(moving.kind)} onClose={() => setMoving(null)} onError={setError} />}
+      {templateTags && <TemplateTagsPanel sheetId={templateTags.sheetId} tags={templateTags.tags} onClose={() => setTemplateTags(null)} onError={setError} />}
       {tagging && <TagsPanel sheetId={tagging.sheetId} title={tagging.title || untitled(tagging.kind)} onClose={() => setTagging(null)} onError={setError} />}
       {recovering && (
         <RecoverPanel
