@@ -11,7 +11,8 @@
 // seeders (seeding.js), referred by the file's base key.
 //
 // Bounds, since any member can write any reference into the document:
-// - a reference must claim 1 byte to 2 MB, in no more blocks than that needs;
+// - a reference must claim 1 byte to 2 MB, in no more blocks than that needs
+//   (25 MB in a PDF or picture file, proposals/2026-10-29-pdf-and-picture-files.md);
 // - per file, only the first (devices in the file + 2) picture core keys the
 //   document names are opened at all (at least 4); each device has one core
 //   per file, so others are not real picture cores of this file;
@@ -25,6 +26,7 @@ const Hyperblobs = require('hyperblobs')
 const docModel = require('../doc/docModel')
 const slidesModel = require('../slides/slidesModel')
 const model = require('../sheet/sheetModel')
+const mediaModel = require('../media/mediaModel')
 
 const MAX_BYTES = 1024 * 1024 // per picture, after the UI shrank it
 const MAX_FETCH = 2 * 1024 * 1024 // a reference to more than this is not downloaded
@@ -66,12 +68,15 @@ function parseRef (ref) {
 // Kinds of file that can hold pictures.
 function hasPictures (doc) {
   const kind = model.kind(doc)
-  return kind === 'doc' || kind === 'slides'
+  return kind === 'doc' || kind === 'slides' || mediaModel.KINDS.includes(kind)
 }
 
-function sizeOk (r) {
+// The most a reference in this file may claim.
+const maxFetch = (doc) => (doc && mediaModel.isMedia(doc) ? mediaModel.MAX_BYTES : MAX_FETCH)
+
+function sizeOk (r, max = MAX_FETCH) {
   const len = r.id.byteLength
-  return len >= 1 && len <= MAX_FETCH && r.id.blockLength >= 1 && r.id.blockLength <= Math.ceil(len / BLOCK) + 1
+  return len >= 1 && len <= max && r.id.blockLength >= 1 && r.id.blockLength <= Math.ceil(len / BLOCK) + 1
 }
 
 function createPictures ({ engine, sheets, getSeeding = () => null, log = () => {} }) {
@@ -143,8 +148,9 @@ function createPictures ({ engine, sheets, getSeeding = () => null, log = () => 
   }
 
   // Store a picture in this device's core for the file.
-  async function put (sheetId, bytes) {
-    if (bytes.byteLength > MAX_BYTES) throw new Error(TOO_BIG)
+  // `max`: the most it may be (a PDF or picture file's own limit).
+  async function put (sheetId, bytes, { max = MAX_BYTES } = {}) {
+    if (bytes.byteLength > max) throw new Error(TOO_BIG)
     const { core, blobs } = await own(sheetId)
     const id = await blobs.put(bytes)
     return { ref: formatRef(core.key, id), hash: hashOf(bytes), size: bytes.byteLength }
@@ -172,8 +178,8 @@ function createPictures ({ engine, sheets, getSeeding = () => null, log = () => 
   async function get (sheetId, ref, hash, { timeout = GET_TIMEOUT_MS, doc = null } = {}) {
     const r = parseRef(ref)
     if (!r) throw new Error('This picture reference is not valid')
-    if (!sizeOk(r)) throw new Error('This picture is too big to show')
     const from = doc || (sheets.peek(sheetId) || { guarded: {} }).guarded.doc
+    if (!sizeOk(r, maxFetch(from))) throw new Error('This picture is too big to show')
     if (from && !(await allowedKeys(sheetId, from)).has(r.key)) throw new Error('This picture is not from this file')
     const { blobs } = await byKey(sheetId, r.key)
     const bytes = await blobs.get(r.id, { timeout }).catch(() => null)
@@ -197,6 +203,9 @@ function createPictures ({ engine, sheets, getSeeding = () => null, log = () => 
       for (const p of slidesModel.pictureRefs(doc)) {
         if (parseRef(p.ref)) out.push({ ref: p.ref, hash: p.hash, alt: p.alt, point: (r) => p.map.set('ref', r) })
       }
+    } else if (mediaModel.isMedia(doc)) {
+      const m = mediaModel.mediaOf(doc)
+      if (m && parseRef(m.ref)) out.push({ ref: m.ref, hash: m.hash, alt: m.name, point: (r) => mediaModel.pointMedia(doc, r) })
     }
     return out
   }
@@ -212,7 +221,7 @@ function createPictures ({ engine, sheets, getSeeding = () => null, log = () => 
       const k = sheetId + ' ' + ref
       if (fetched.has(k)) continue
       const r = parseRef(ref)
-      if (!sizeOk(r) || !allowed.has(r.key)) continue
+      if (!sizeOk(r, maxFetch(e.guarded.doc)) || !allowed.has(r.key)) continue
       const bytes = (claimed.get(sheetId) || 0) + r.id.byteLength
       if (bytes > FETCH_BYTES_PER_FILE) break
       claimed.set(sheetId, bytes)
@@ -287,7 +296,7 @@ function createPictures ({ engine, sheets, getSeeding = () => null, log = () => 
       if (!which(ref)) continue
       if (!done.has(ref)) {
         const bytes = await get(fromId, ref, hash, { doc })
-        done.set(ref, (await put(toId, bytes)).ref)
+        done.set(ref, (await put(toId, bytes, { max: maxFetch(doc) })).ref)
       }
       changes.push([point, done.get(ref)])
     }

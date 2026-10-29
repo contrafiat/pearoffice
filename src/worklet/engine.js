@@ -9,6 +9,7 @@ const { createApplyOps } = require('./sheetWire')
 const { createSheetMethods } = require('../sheet/sheetMethods')
 const { createFileMethods } = require('./fileMethods')
 const { createDocMethods } = require('../doc/docMethods')
+const { createMediaMethods } = require('../media/mediaMethods')
 const { createSlidesMethods } = require('../slides/slidesMethods')
 const { createHistoryMethods } = require('./historyMethods')
 const { createJoinService } = require('./join')
@@ -106,6 +107,7 @@ function createSheetEngine (opts = {}) {
     ...createFileMethods(sheets, deps),
     ...createSheetMethods(sheets, deps),
     ...createDocMethods(sheets, deps),
+    ...createMediaMethods(sheets, deps),
     ...createSlidesMethods(sheets, deps),
     ...createHistoryMethods(sheets),
     // Who has a sheet open (proposals/2026-10-05-presence.md).

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { CaretLeft, CaretRight, DotsThree, FileText, FolderPlus, FolderSimple, MagnifyingGlass, PresentationChart, Table, X } from '@phosphor-icons/react'
+import { CaretLeft, CaretRight, DotsThree, FilePdf, FileText, FolderPlus, FolderSimple, Image as ImageIcon, MagnifyingGlass, PresentationChart, Table, X } from '@phosphor-icons/react'
 import { MemberAvatar } from './Avatar.jsx'
 import { filesIn, countLabel } from './Folders.jsx'
 import { haptic } from './haptic.js'
@@ -13,7 +13,16 @@ export const KINDS = [
   { kind: 'slides', label: 'Slides', Icon: PresentationChart }
 ]
 
-const byKind = (kind) => KINDS.find((k) => k.kind === kind) || KINDS[0]
+// PDFs and pictures are imported, not made with New
+// (proposals/2026-10-29-pdf-and-picture-files.md).
+export const MEDIA_KINDS = [
+  { kind: 'pdf', label: 'PDF', Icon: FilePdf },
+  { kind: 'picture', label: 'Picture', Icon: ImageIcon }
+]
+const byKind = (kind) => KINDS.find((k) => k.kind === kind) || MEDIA_KINDS.find((k) => k.kind === kind) || KINDS[0]
+export const isMediaKind = (kind) => MEDIA_KINDS.some((k) => k.kind === kind)
+// What a kind of file is called in sentences ("Delete this deck").
+export const nounOf = (kind) => ({ doc: 'document', slides: 'deck', pdf: 'PDF', picture: 'picture' })[kind] || 'sheet'
 
 // The name shown for a file with no title, as New names them.
 export const untitled = (kind) => 'Untitled ' + (kind === 'sheet' || !kind ? 'sheet' : byKind(kind).label.toLowerCase())

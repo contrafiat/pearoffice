@@ -28,7 +28,8 @@ export function useMembers (sheetId) {
 // the title, who is in it, Share and the More menu's file items, plus the
 // panels they open. The editor's own tools go in as children, and its own
 // More items as menuItems(): a list of Menu.jsx items, before File ▸.
-export function FileBar ({ sheetId, noun, title, myRole, frozen, canEdit, badge, phone, members, present, menuItems, onTitleChange, onError, onGone, children }) {
+// `tidy`: offer Tidy up (not for PDFs and pictures, which have no history to tidy).
+export function FileBar ({ sheetId, noun, title, myRole, frozen, canEdit, badge, phone, members, present, menuItems, tidy = true, onTitleChange, onError, onGone, children }) {
   const [sharing, setSharing] = useState(false)
   const [more, setMore] = useState(null) // the ⋯ menu: { anchor } while open
   const [deleting, setDeleting] = useState(null) // 'local' | 'everyone' | null
@@ -91,7 +92,7 @@ export function FileBar ({ sheetId, noun, title, myRole, frozen, canEdit, badge,
                     OWN_WINDOWS && { label: 'Open in new window', className: 'open-window', onSelect: () => call('app:openWindow', { sheetId }).catch((err) => onError(err.message)) },
                     { label: 'Move to folder...', onSelect: () => setMoving(true) },
                     { label: 'Tags...', onSelect: () => setTagging(true) },
-                    myRole === 'owner' && !frozen && { label: 'Tidy up this ' + noun + '...', onSelect: () => setTidying(true) },
+                    tidy && myRole === 'owner' && !frozen && { label: 'Tidy up this ' + noun + '...', onSelect: () => setTidying(true) },
                     '-',
                     { label: 'Remove from this device', onSelect: () => setDeleting('local') },
                     myRole === 'owner' && { label: 'Delete for everyone', danger: true, onSelect: () => setDeleting('everyone') }
