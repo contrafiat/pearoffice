@@ -53,6 +53,23 @@ module.exports = async function tags (t) {
   result.tagFromMenu = true
   step('tagged from the file menu')
 
+  // Share: send my tags with the file (proposals/2026-10-29-shared-tags.md),
+  // then Tags... marks the tag as shared.
+  await js("document.querySelector('.toolbar button.share').click()")
+  await waitFor('share tags', "!!document.querySelector('.check.share-tags input') && document.querySelector('.share-tag-pills').textContent === 'Budget' && !document.querySelector('.check.share-tags input').checked")
+  await js("document.querySelector('.check.share-tags input').click()")
+  await waitFor('sharing', "document.querySelector('.check.share-tags input').checked")
+  await t.shot('PEAROFFICE_SMOKE_SHARE_TAGS_SHOT', 300)
+  const groceries = await js("window.pearoffice.call('file:list').then((l) => l.find((f) => f.title === 'Groceries').sheetId)")
+  await waitFor('shared on the file', `window.pearoffice.call('file:shareTags', { sheetId: ${JSON.stringify(groceries)} }).then((r) => r.sharing && r.tags.map((x) => x.name).join() === 'Budget')`)
+  await js("[...document.querySelectorAll('.panel .close')].pop().click()")
+  await waitFor('share closed', "!document.querySelector('.check.share-tags')")
+  await more('Tags...')
+  await waitFor('marked shared', "[...document.querySelectorAll('.tags-panel .tag-shared')].length === 1")
+  await closePanel()
+  result.shared = true
+  step('shared with the file')
+
   // Tags... from a card: two new tags and an existing one.
   await home()
   await waitFor('search box', "!!document.querySelector('.file-search input')")

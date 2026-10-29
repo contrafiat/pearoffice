@@ -43,6 +43,19 @@ function cleanTag (rec) {
   return { at: rec.at, name, color: CHIP_NAMES.includes(rec.color) ? rec.color : 'grey' }
 }
 
+// A file's shared tags (meta.tags, proposals/2026-10-29-shared-tags.md):
+// up to MAX_PER_FILE { name, color }, one per name.
+function cleanShared (list) {
+  const out = []
+  for (const t of Array.isArray(list) ? list : []) {
+    if (out.length >= MAX_PER_FILE) break
+    const name = cleanName(t && t.name)
+    if (!name || out.some((x) => sameName(x.name, name))) continue
+    out.push({ name, color: COLORS.includes(t.color) ? t.color : 'grey' })
+  }
+  return out
+}
+
 function cleanTagged (rec) {
   if (!rec || typeof rec !== 'object' || !Number.isSafeInteger(rec.at) || rec.at < 0 || typeof rec.on !== 'boolean') return null
   return { at: rec.at, on: rec.on }
@@ -124,7 +137,7 @@ function withAll (sheetIds, files, picked) {
   return sheetIds.filter((id) => picked.every((t) => (files[id] || []).includes(t)))
 }
 
-function createTags ({ engine, emit = () => {}, getOwnDevices = () => null, getKeyring = () => null, now = () => Date.now() }) {
+function createTags ({ engine, emit = () => {}, getOwnDevices = () => null, getKeyring = () => null, onFileTags = () => {}, now = () => Date.now() }) {
   let queue = Promise.resolve()
   const serial = (fn) => {
     const p = queue.then(fn)
@@ -169,8 +182,9 @@ function createTags ({ engine, emit = () => {}, getOwnDevices = () => null, getK
     if (keyring) keyring.poke()
   }
 
-  // A new tag, or the one already called that (any case).
-  function create (name) {
+  // A new tag, or the one already called that (any case). `color`: the
+  // colour a new one takes (a shared tag's); else the next in turn.
+  function create (name, color) {
     return serial(async () => {
       const clean = cleanName(name)
       if (!clean) throw new Error('A tag needs a name')
@@ -181,7 +195,7 @@ function createTags ({ engine, emit = () => {}, getOwnDevices = () => null, getK
       if (shown.length >= MAX_TAGS) throw new Error('You have ' + MAX_TAGS + ' tags, the most PearOffice keeps')
       const used = Object.values(tags).filter((r) => !r.removed).length
       const id = b4a.toString(randomBytes(16), 'hex')
-      const rec = { at: now(), name: clean, color: COLORS[used % COLORS.length] }
+      const rec = { at: now(), name: clean, color: COLORS.includes(color) ? color : COLORS[used % COLORS.length] }
       await engine.localDb.put('tag:' + id, rec)
       changed({ tags: { [id]: rec } })
       return { id, name: clean, color: rec.color }
@@ -246,8 +260,50 @@ function createTags ({ engine, emit = () => {}, getOwnDevices = () => null, getK
       const rec = { at: await stamp(key), on: !!on }
       await engine.localDb.put(key, rec)
       changed({ tagged: { [sheetId + ':' + id]: rec } })
+      onFileTags(sheetId)
       return { ok: true }
     })
+  }
+
+  // This person's tags on a file, as { name, color }, for sharing.
+  async function onFile (sheetId) {
+    const v = await list()
+    return (v.files[sheetId] || []).map((id) => v.tags.find((t) => t.id === id)).filter(Boolean).map(({ name, color }) => ({ name, color }))
+  }
+
+  // A file's shared tags (proposals/2026-10-29-shared-tags.md): each name
+  // this device has not seen on the file before is put on it as this
+  // person's own tag, made in the shared colour if they have none, unless
+  // the file already has a record for a tag of that name (on or off), maybe
+  // from another of their devices. Seen names are kept per file in
+  // `sharedTags:<sheetId>`, so a tag taken off does not come back.
+  let sharing = Promise.resolve()
+  function applyShared (sheetId, list) {
+    const p = sharing.then(async () => {
+      const shared = cleanShared(list)
+      if (!shared.length || typeof sheetId !== 'string' || !SHEET_ID.test(sheetId)) return
+      const key = 'sharedTags:' + sheetId
+      const was = (await engine.localDb.get(key))?.value
+      const seen = Array.isArray(was && was.names) ? was.names.filter((n) => typeof n === 'string') : []
+      const fresh = shared.filter((t) => !seen.some((n) => sameName(n, t.name)))
+      if (!fresh.length) return
+      const { tags, tagged } = await all()
+      for (const t of fresh) {
+        const decided = Object.keys(tagged).some((k) => {
+          const m = TAGGED_KEY.exec(k)
+          const r = m && m[1] === sheetId ? tags[m[2]] : null
+          return r && !r.removed && sameName(r.name, t.name)
+        })
+        if (decided) continue
+        try {
+          const made = await create(t.name, t.color)
+          await tag(sheetId, made.id, true)
+        } catch {} // too many tags: leave it
+      }
+      await engine.localDb.put(key, { names: [...seen, ...fresh.map((t) => t.name)].slice(-MAX_PER_FILE * 5) })
+    })
+    sharing = p.catch(() => {})
+    return p
   }
 
   // Records from another device or the keyring: keep each one that is later
@@ -301,7 +357,7 @@ function createTags ({ engine, emit = () => {}, getOwnDevices = () => null, getK
     })
   }
 
-  return { all, list, create, rename, remove, tag, take, carry, prune }
+  return { all, list, create, rename, remove, tag, take, carry, prune, onFile, applyShared }
 }
 
 function randomBytes (n) {
@@ -310,4 +366,4 @@ function randomBytes (n) {
   return out
 }
 
-module.exports = { createTags, cleanTags, cleanTaggedAll, mergeTags, mergeTagged, view, withAll, cleanName, COLORS, MAX_TAGS, MAX_PER_FILE, MAX_NAME }
+module.exports = { createTags, cleanShared, cleanTags, cleanTaggedAll, mergeTags, mergeTagged, view, withAll, cleanName, COLORS, MAX_TAGS, MAX_PER_FILE, MAX_NAME }
