@@ -1,6 +1,6 @@
 # PDFs and pictures as files
 
-**Status:** draft, for Tim. A tester (TODO.md, tester feedback 2026-10-29):
+**Status:** approved by Tim 2026-10-29: no replacing for now, 25 MB. A tester (TODO.md, tester feedback 2026-10-29):
 "is it hard to add the possibility to put pdf and pictures in to the
 folders as well?" Tim, 2026-10-29: PearOffice is not to become a cloud
 drive; limit it to sensible file types.
@@ -105,8 +105,7 @@ or `picture` file may claim up to 25 MB; other files keep the 2 MB limit.
 Revert. Files already made open as the read-only empty sheet described
 under Compat; their bytes stay in their picture cores.
 
-## Open questions
+## Decided
 
-1. Should editors be able to replace the PDF or picture with a new
-   version (same file, same people), or is a new import enough?
-2. Is 25 MB the right limit?
+1. No replacing a file's contents for now; a newer version is a new import.
+2. 25 MB a file.
