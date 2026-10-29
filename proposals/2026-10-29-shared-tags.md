@@ -1,6 +1,7 @@
 # Sharing tags with a file
 
-**Status:** draft, for Tim. A tester (TODO.md, tester feedback
+**Status:** approved by Tim 2026-10-29: received tags are added without
+asking, and turning sharing off leaves them with the others. A tester (TODO.md, tester feedback
 2026-10-29): "where i share a document/folder to another account, that it
 also gets the tag with it. for example before i send the link i can give
 the right to also send over the tag i have it under. so the person also
@@ -83,10 +84,8 @@ it when they write the file.
 Revert the PR. `meta.tags` stays in files as an ignored key; tags already
 applied stay as personal tags.
 
-## Open questions
+## Decided
 
-1. Should a received tag be added without asking (as above), or should
-   the file list ask "Ada shared the tag Shopping with this file. Add it?"
-   the first time?
-2. Should turning sharing off also take the tag off for the others? As
-   written, it does not: they keep it as their own.
+1. A received tag is added without asking.
+2. Turning sharing off does not take the tag off for the others; they keep
+   it as their own.
