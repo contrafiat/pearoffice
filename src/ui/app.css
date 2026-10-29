@@ -1473,6 +1473,32 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 .chip-calendar { display: inline-flex; align-items: center; justify-content: center; width: 1.5em; height: 1.5em; min-height: 0; padding: 0; border: 0; border-radius: 6px; background: none; color: var(--ink); cursor: pointer; }
 .chip-calendar:hover { background: var(--head); }
 .chip-date-input { position: absolute; left: 0; bottom: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none; border: 0; padding: 0; }
+/* Dropdowns in documents (proposals/2026-10-29-document-dropdowns.md). */
+.doc-dropdown-node { display: inline; }
+.doc-dropdown-view { display: inline-flex; align-items: center; height: 1.5em; vertical-align: middle; line-height: 1; white-space: nowrap; }
+.doc-dropdown-view .chip { display: inline-flex; align-items: center; gap: 4px; box-sizing: border-box; height: 1.5em; font-size: 0.92em; line-height: 1; }
+.doc-dropdown-view .chip.can-pick { cursor: pointer; }
+.doc-dropdown-view .chip.empty { font-style: italic; }
+.doc-dropdown-view.gone .chip { opacity: 0.6; }
+.dropdown-caret { flex: none; opacity: 0.7; }
+.ProseMirror-selectednode > .doc-dropdown-view .chip { outline: 2px solid var(--pear); outline-offset: 1px; }
+.doc-choices.pick-menu { z-index: 41; }
+.dropdown-menu { min-width: 200px; max-width: 320px; }
+.dropdown-menu .dropdown-list { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.dropdown-list-items { display: flex; gap: 4px; flex-wrap: wrap; }
+.dropdown-list-items .chip { font-size: 12px; line-height: 20px; }
+.dropdown-menu .dropdown-new { border-top: 1px solid var(--line); display: flex; align-items: center; gap: 6px; }
+.panel.list-panel .field { display: flex; flex-direction: column; gap: 4px; }
+.panel.list-panel .field input { width: 100%; box-sizing: border-box; }
+.panel.list-panel .list-items { list-style: none; margin: 8px 0; padding: 0; max-height: 45vh; overflow-y: auto; }
+.panel.list-panel .list-items li { display: flex; align-items: center; gap: 6px; padding: 3px 0; }
+.panel.list-panel .list-items input { flex: 1; min-width: 0; }
+.panel.list-panel .chip-dot { flex: none; width: 24px; height: 24px; min-height: 0; padding: 0; border-radius: 50%; border: 1px solid var(--line-strong); background: var(--chip-bg); cursor: pointer; }
+.panel.list-panel .chip-dot.on { outline: 2px solid var(--ink); outline-offset: 1px; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .panel.list-panel .chip-dot { background: var(--chip-bg-dark); } }
+:root[data-theme="dark"] .panel.list-panel .chip-dot { background: var(--chip-bg-dark); }
+.panel.list-panel .list-add { display: flex; align-items: center; gap: 6px; margin: 8px 0 12px; }
+.panel.list-panel .list-add input { flex: 1; min-width: 0; }
 /* Tabs (desktop, proposals/2026-10-26-tabs.md). Every open tab keeps its
    editor; the others are hidden. */
 .tab-pane { flex: 1; min-height: 0; display: flex; flex-direction: column; }

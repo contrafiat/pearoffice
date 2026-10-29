@@ -21,18 +21,20 @@ import { usePearLinks, pearLink, fileLink, folderLink, pearcalLabel } from '../p
 import { AtMenu, atItems } from '../sheet/chips.jsx'
 import { History } from '../History.jsx'
 import { ChipView, ChipContext, atTrigger, chipFor, addsChip } from './ChipView.jsx'
+import { DropdownView, DropdownContext, useLists, insertDropdown, addsDropdown, ListPanel, ChoicePill } from './DropdownView.jsx'
+import { newList } from './lists.js'
 import { okLink } from '../../shared/links.js'
 import { untitled } from '../Files.jsx'
 import { useToolOverflow } from '../toolOverflow.jsx'
 import { Outline } from './Outline.jsx'
-import { documentExtensions, FindReplace, findKey, changeCaseCommand, LINE_HEIGHTS, SIZES, CHIPS_VERSION } from './extensions.js'
+import { documentExtensions, FindReplace, findKey, changeCaseCommand, LINE_HEIGHTS, SIZES, CHIPS_VERSION, DROPDOWNS_VERSION } from './extensions.js'
 import { PictureView, pictureCache, preparePicture, isPicture, toB64, fromB64, noteCopied, pictureClipboard, foreignPictures, adoptPictures } from './pictures.js'
 import {
   ArrowCounterClockwise, ArrowClockwise, TextB, TextItalic, TextUnderline, TextStrikethrough, TextAUnderline, Highlighter,
   TextSuperscript, TextSubscript, TextAlignLeft, TextAlignCenter, TextAlignRight, TextAlignJustify, ArrowsDownUp,
   ListBullets, ListNumbers, ListChecks, TextOutdent, TextIndent, LinkSimple, Quotes, CodeBlock, Minus, Table,
   TextAa, Eraser, MagnifyingGlass, CaretUp, CaretDown, X, Check, TreeView, Image as ImageIcon, Images, FileImage, Trash,
-  ArrowSquareOut, Copy, PencilSimple
+  ArrowSquareOut, Copy, PencilSimple, CaretCircleDown, Plus
 } from '@phosphor-icons/react'
 
 // The document editor (proposals/2026-10-06-documents.md). It keeps its own
@@ -339,9 +341,10 @@ function DocEditor ({ sheetId, files, folders, members, onOpenFile, onOpenFolder
   const editor = useEditor({
     editable: canEdit,
     extensions: [
-      ...documentExtensions().filter((x) => x.name !== 'image' && x.name !== 'chip'),
+      ...documentExtensions().filter((x) => x.name !== 'image' && x.name !== 'chip' && x.name !== 'dropdown'),
       PictureView.configure({ cache: pictures }),
       ChipView,
+      DropdownView,
       Collaboration.configure({ document: ydoc, field: 'body' }),
       Typography,
       Placeholder.configure({ placeholder: () => (canEditRef.current ? 'Type here to start your document.' : 'This document is empty.') }),
@@ -438,6 +441,8 @@ function DocEditor ({ sheetId, files, folders, members, onOpenFile, onOpenFolder
         return was && next && was.from === next.from && was.to === next.to && was.query === next.query ? was : next
       })
       if (transaction && canEditRef.current && addsChip(transaction) && (ydoc.getMap('meta').get('version') || 1) < CHIPS_VERSION) call('doc:useChips', { sheetId }).catch(() => {})
+      // Dropdowns (proposals/2026-10-29-document-dropdowns.md) need version 4.
+      if (transaction && canEditRef.current && addsDropdown(transaction) && (ydoc.getMap('meta').get('version') || 1) < DROPDOWNS_VERSION) call('doc:useDropdowns', { sheetId }).catch(() => {})
     }
     editor.on('transaction', look)
     return () => editor.off('transaction', look)
@@ -493,9 +498,16 @@ function DocEditor ({ sheetId, files, folders, members, onOpenFile, onOpenFolder
   const [picLinking, setPicLinking] = useState(null) // the picture whose link is being typed, or null
   // Links to web pages, files and folders (pearLinks.js).
   const links = usePearLinks({ files, folders, onOpenFile, onOpenFolder })
-  const atList = useMemo(() => (at ? atItems(at.query, { members, files: links.usable.filter((f) => f.sheetId !== sheetId), folders }) : []), [at, members, files, folders]) // eslint-disable-line react-hooks/exhaustive-deps
+  const atList = useMemo(() => (at ? atItems(at.query, { members, files: links.usable.filter((f) => f.sheetId !== sheetId), folders, dropdown: true }) : []), [at, members, files, folders]) // eslint-disable-line react-hooks/exhaustive-deps
   function pickAt (it) {
     if (!at || !it) return
+    // Dropdown: the @ goes and the dropdown menu opens at the caret.
+    if (it.kind === 'dropdown') {
+      editor.chain().focus().deleteRange({ from: at.from, to: at.to }).run()
+      const c = editor.view.coordsAtPos(at.from)
+      setMenu({ kind: 'dropdown', top: c.bottom + 4, left: Math.max(4, Math.min(c.left, window.innerWidth - 220)) })
+      return
+    }
     editor.chain().focus().insertContentAt({ from: at.from, to: at.to }, [{ type: 'chip', attrs: chipFor(it) }, { type: 'text', text: ' ' }]).run()
     // Pick a date: today, then the calendar.
     if (it.pick) {
@@ -513,6 +525,18 @@ function DocEditor ({ sheetId, files, folders, members, onOpenFile, onOpenFolder
         return false
       }
     : null
+  // Dropdowns: the document's lists, the pills' context and Edit choices.
+  const lists = useLists(ydoc)
+  const [editingList, setEditingList] = useState(null) // a list id
+  const dropCtx = useMemo(() => ({ ydoc, canEdit, phone, onEditList: setEditingList }), [ydoc, canEdit, phone])
+  const addDropdown = (listId) => { setMenu(null); insertDropdown(editor, listId) }
+  const addList = () => {
+    try {
+      const id = newList(ydoc, 'Choices')
+      addDropdown(id)
+      setEditingList(id)
+    } catch (err) { showToast.current(err.message) }
+  }
   const chipCtx = useMemo(() => ({ sheetId, members, placeOf: links.placeOf, canEdit }), [sheetId, members, files, folders, canEdit]) // eslint-disable-line react-hooks/exhaustive-deps
   const openHref = (href) => { const p = pearLink(href); links.open(p || { url: href }) }
   const atLink = s && s.link && s.href ? textLink(s.href, links.placeOf) : null
@@ -593,6 +617,7 @@ function DocEditor ({ sheetId, files, folders, members, onOpenFile, onOpenFolder
         {btn('Bulleted list', ListBullets, s.bullet, () => editor.chain().focus().toggleBulletList().run())}
         {btn('Numbered list', ListNumbers, s.ordered, () => editor.chain().focus().toggleOrderedList().run())}
         {btn('Checklist', ListChecks, s.task, () => editor.chain().focus().toggleTaskList().run())}
+        {btn('Dropdown', CaretCircleDown, undefined, (e) => openMenu('dropdown', e.currentTarget), { 'aria-haspopup': 'menu', className: 'dropdown-button' })}
         {btn('Decrease indent (Shift+Tab)', TextOutdent, undefined, () => outdent(editor))}
         {btn('Increase indent (Tab)', TextIndent, undefined, () => indent(editor))}
         <span className='sep' />
@@ -650,6 +675,17 @@ function DocEditor ({ sheetId, files, folders, members, onOpenFile, onOpenFolder
           <li role='menuitem' className='danger' onClick={() => run((c) => c.deleteTable())}>Delete the table</li>
         </ul>
       )}
+      {menu && menu.kind === 'dropdown' && (
+        <ul className='menu doc-pop dropdown-menu' role='menu' style={{ top: menu.top, left: menu.left }}>
+          {lists.map((l) => (
+            <li key={l.id} role='menuitem' className='dropdown-list' onClick={() => addDropdown(l.id)}>
+              <span className='dropdown-list-name'>{l.name}</span>
+              <span className='dropdown-list-items'>{l.items.slice(0, 3).map((it) => <ChoicePill key={it.id} text={it.text} color={it.color} />)}</span>
+            </li>
+          ))}
+          <li role='menuitem' className='dropdown-new' onClick={addList}><Plus size={16} /> New list</li>
+        </ul>
+      )}
       {menu && menu.kind === 'case' && (
         <ul className='menu doc-pop' role='menu' style={{ top: menu.top, left: menu.left }}>
           <li role='menuitem' onClick={() => run((c) => c.command(changeCaseCommand('upper')))}>UPPERCASE</li>
@@ -662,6 +698,7 @@ function DocEditor ({ sheetId, files, folders, members, onOpenFile, onOpenFolder
       {picLinking !== null && canEdit && s.picture && <LinkBar editor={editor} initial={s.picture.href} files={links.usable.filter((f) => f.sheetId !== sheetId)} folders={folders} placeOf={links.placeOf} onSet={(href) => editor.chain().focus().setNodeSelection(picLinking).updateAttributes('image', { href }).setNodeSelection(picLinking).run()} onClose={() => setPicLinking(null)} />}
       {linking !== null && canEdit && <LinkBar editor={editor} initial={linking} files={links.usable.filter((f) => f.sheetId !== sheetId)} folders={folders} placeOf={links.placeOf} onClose={() => setLinking(null)} />}
       {atLink && linking === null && !menu && !s.picture && <TextLinkCard editor={editor} link={atLink} canEdit={canEdit} onOpen={() => openHref(s.href)} onEdit={() => setLinking(s.href)} />}
+      {editingList && <ListPanel ydoc={ydoc} listId={editingList} lists={lists} onClose={() => setEditingList(null)} onError={(m) => showToast.current(m)} />}
       {atList.length > 0 && <AtMenu items={atList} selected={atSel} sheetId={sheetId} onPick={pickAt} anchor={{ getBoundingClientRect: () => editor.view.coordsAtPos(at.from) }} />}
       {finding && <FindBar editor={editor} canEdit={canEdit} onClose={() => { editor.commands.setFind({ query: '' }); setFinding(false) }} />}
       <div className='doc-row'>
@@ -669,7 +706,9 @@ function DocEditor ({ sheetId, files, folders, members, onOpenFile, onOpenFolder
         <div className='doc-scroll' onScroll={() => { if (s.picture) rescrolled((n) => n + 1) }} onMouseDown={(e) => { if (e.target === e.currentTarget) editor.commands.focus('end') }}>
           <div className='doc-page' onClick={(e) => linkClick(e, canEdit, openHref)}>
             <ChipContext.Provider value={chipCtx}>
-              <EditorContent editor={editor} />
+              <DropdownContext.Provider value={dropCtx}>
+                <EditorContent editor={editor} />
+              </DropdownContext.Provider>
             </ChipContext.Provider>
           </div>
         </div>

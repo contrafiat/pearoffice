@@ -17,6 +17,15 @@ const hex = (buf) => b4a.toString(buf, 'hex')
 function createDocMethods (sheets, { getJoin, getPictures }) {
   const { profileName, requireEdit, commit, docFor, replicaState, replicaUpdate } = createFileHelpers(sheets)
 
+  async function useVersion (ctx, sheetId, v) {
+    await requireEdit(ctx, sheetId)
+    const { doc } = await docFor(sheetId)
+    if (model.kind(doc) !== 'doc') throw new Error('Not a document')
+    if (docModel.version(doc) >= v) return { version: docModel.version(doc) }
+    await commit(ctx, sheetId, docModel.capture(doc, () => docModel.raiseVersion(doc, v)))
+    return { version: v }
+  }
+
   const methods = {
     'doc:create': async ({ title = 'Untitled document' } = {}, ctx) => {
       const { groupId } = await ctx.createGroup({ name: title })
@@ -43,14 +52,11 @@ function createDocMethods (sheets, { getJoin, getPictures }) {
     // The editor put an @ chip in the document
     // (proposals/2026-10-26-document-chips.md): it moves to the schema
     // version with chips, so older builds open it read-only.
-    'doc:useChips': async ({ sheetId } = {}, ctx) => {
-      await requireEdit(ctx, sheetId)
-      const { doc } = await docFor(sheetId)
-      if (model.kind(doc) !== 'doc') throw new Error('Not a document')
-      if (docModel.version(doc) >= docModel.CHIPS_VERSION) return { version: docModel.version(doc) }
-      await commit(ctx, sheetId, docModel.capture(doc, () => docModel.raiseVersion(doc, docModel.CHIPS_VERSION)))
-      return { version: docModel.CHIPS_VERSION }
-    },
+    'doc:useChips': ({ sheetId } = {}, ctx) => useVersion(ctx, sheetId, docModel.CHIPS_VERSION),
+
+    // The same for the first dropdown
+    // (proposals/2026-10-29-document-dropdowns.md).
+    'doc:useDropdowns': ({ sheetId } = {}, ctx) => useVersion(ctx, sheetId, docModel.DROPDOWNS_VERSION),
 
     // A picture for the document (proposals/2026-10-06-document-images.md):
     // stored in this device's picture core for the file, and the document

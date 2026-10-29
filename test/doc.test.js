@@ -185,6 +185,15 @@ test('documents', async (t) => {
     assert.deepEqual(await call(editor, 'doc:useChips', { sheetId }), { version: 3 })
   })
 
+  // Dropdowns (proposals/2026-10-29-document-dropdowns.md).
+  await t.test('the first dropdown moves the document to version 4, and a viewer cannot', async () => {
+    await assert.rejects(call(viewer, 'doc:useDropdowns', { sheetId }), /view this file but not edit/)
+    assert.deepEqual(await call(editor, 'doc:useDropdowns', { sheetId }), { version: 4 })
+    await waitFor('owner sees version 4', async () => (await call(owner, 'doc:state', { sheetId, withState: false })).version === 4)
+    assert.equal((await call(owner, 'doc:state', { sheetId, withState: false })).newer, false)
+    assert.deepEqual(await call(editor, 'doc:useChips', { sheetId }), { version: 4 })
+  })
+
   await t.test('renaming a document', async () => {
     await call(editor, 'file:setTitle', { sheetId, title: 'Meeting notes' })
     await waitFor('owner sees the title', async () => (await call(owner, 'doc:state', { sheetId })).title === 'Meeting notes')
