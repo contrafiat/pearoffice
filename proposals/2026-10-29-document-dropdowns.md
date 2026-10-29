@@ -1,6 +1,7 @@
 # Coloured dropdowns in documents
 
-**Status:** draft, for Tim. A tester (TODO.md, tester feedback
+**Status:** approved by Tim 2026-10-29, with Yes and No as the starting
+choices and Enter carrying the dropdown. A tester (TODO.md, tester feedback
 2026-10-29): "a checkbox system with different labels that you can create
 on your own and with different colours. like the shopping list example in
 a document. Beans -> click on the dropdown menu, yes, no, is not in store
@@ -87,9 +88,9 @@ without dropdowns stay at their version.
 Revert the PR. Version 4 documents then open read-only on that build, as
 an older build would; nothing else changes.
 
-## Open questions
+## Decided
 
-1. Starting choices for a new list: Yes and No, or empty?
-2. Should Enter in a list carry the dropdown to the next item?
+1. A new list starts with Yes (green) and No (red).
+2. Enter in a list carries the dropdown to the next item.
 3. Sheets keep their own dropdowns per range. Sharing lists between a
    sheet and a document is not planned.
