@@ -143,7 +143,23 @@ const contextMenu = (desktop, open) => (e) => {
   if (desktop) open(atPointer(e))
 }
 
+// The first few people in a file, the owner first, overlapping, then how
+// many more.
+function FaceStack ({ f }) {
+  const more = f.people - f.members.length
+  const label = f.people + ' people' + (f.owner ? ', owned by ' + (f.owner.isMe ? 'you' : f.owner.name || 'someone') : '')
+  return (
+    <span className='face-stack' title={label} aria-label={label}>
+      {/* Each face over the next, so the owner's is whole. */}
+      {f.members.map((m, i) => <span key={m.identity} className='face' style={{ zIndex: f.members.length - i }}><MemberAvatar sheetId={f.sheetId} member={m} size={22} /></span>)}
+      {more > 0 && <span className='face-more'>+{more}</span>}
+    </span>
+  )
+}
+
 function FileCard ({ f, onOpen, onWaiting, onRecover, onMenu, onWindow, desktop, onHold, tags = [], where = null }) {
+  // On phones a shared file shows its people as overlapping faces.
+  const stack = !desktop && !f.joining && f.people > 1 && (f.members || []).length > 0
   return (
     <li
       className='file-cell'
@@ -162,7 +178,8 @@ function FileCard ({ f, onOpen, onWaiting, onRecover, onMenu, onWindow, desktop,
         <KindIcon kind={f.kind} size={28} />
         <span className='file-title'>{f.waiting ? 'Joining...' : (f.title || untitled(f.kind))}</span>
         <span className='file-meta'>
-          {f.owner && (
+          {stack && <FaceStack f={f} />}
+          {!stack && f.owner && (
             <span className='sheet-owner' title={f.owner.isMe ? 'Yours' : 'Owned by ' + (f.owner.name || 'someone')}>
               <MemberAvatar sheetId={f.sheetId} member={f.owner} size={20} />
             </span>
@@ -171,7 +188,7 @@ function FileCard ({ f, onOpen, onWaiting, onRecover, onMenu, onWindow, desktop,
           {f.joining && !f.waiting && <span className='badge'>joining</span>}
           {f.recovery === 'waiting' && <span className='badge'>waiting to be let in</span>}
           {f.recovery === 'copy' && <span className='badge view-only'>make your copy</span>}
-          {!f.joining && f.people > 1 && <span className='people-count'>{f.people} people</span>}
+          {!stack && !f.joining && f.people > 1 && <span className='people-count'>{f.people} people</span>}
         </span>
         {where && <span className='file-where muted'><FolderSimple size={14} weight='duotone' aria-hidden='true' /> {where}</span>}
         <CardTags tags={tags} />

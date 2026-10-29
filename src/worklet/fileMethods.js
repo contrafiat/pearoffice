@@ -15,6 +15,9 @@ const INVITE_HOURS = 24
 const hex = (buf) => b4a.toString(buf, 'hex')
 
 // Helpers shared with each file kind's own methods.
+// How many people a file card shows as faces.
+const FIRST_PEOPLE = 4
+
 function createFileHelpers (sheets) {
   async function profileName (ctx) {
     const p = await ctx.localDb.get('profile')
@@ -29,7 +32,8 @@ function createFileHelpers (sheets) {
     return node ? node.value : null
   }
 
-  // Who owns a file and how many people are in it, for the file list.
+  // Who owns a file, how many people are in it and the first few of them
+  // (the owner first), for the file list.
   async function peopleOf (ctx, sheetId) {
     const base = ctx.bases.get(sheetId)
     if (!base) return {}
@@ -40,13 +44,17 @@ function createFileHelpers (sheets) {
       let owner = null
       let myRole
       const me = hex(ctx.identity.publicKey)
+      const first = []
       for await (const { value } of base.view.createReadStream({ gt: 'member/', lt: 'member/~' })) {
         people++
         if (sheet && value.identity === sheet.owner) owner = value
+        else if (first.length < FIRST_PEOPLE) first.push(value)
         if (value.identity === me) myRole = value.role
       }
-      if (!owner) return { people, myRole }
-      return { people, myRole, owner: { identity: owner.identity, name: owner.name || '', avatarHash: owner.avatarHash || null, isMe: owner.identity === me } }
+      const brief = (v) => ({ identity: v.identity, name: v.name || '', avatarHash: v.avatarHash || null })
+      const members = (owner ? [owner, ...first] : first).slice(0, FIRST_PEOPLE).map(brief)
+      if (!owner) return { people, myRole, members }
+      return { people, myRole, members, owner: { ...brief(owner), isMe: owner.identity === me } }
     } catch { return {} }
   }
 

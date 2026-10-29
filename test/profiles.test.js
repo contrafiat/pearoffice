@@ -78,10 +78,14 @@ test('profiles with avatars', async (t) => {
     assert.equal((await call(owner, 'sheet:avatar', { sheetId, identity: V })).data, viPic.data)
   })
 
-  await t.test('the sheet list shows the owner and how many people', async () => {
+  await t.test('the sheet list shows the owner, how many people and who, the owner first', async () => {
     const mine = (await call(owner, 'sheet:list')).find((x) => x.sheetId === sheetId)
     assert.equal(mine.people, 3)
     assert.equal(mine.owner.isMe, true)
+    assert.equal(mine.members.length, 3)
+    assert.equal(mine.members[0].name, 'Olive')
+    assert.equal(mine.members[0].avatarHash, olivePic.hash)
+    assert.ok(mine.members.some((x) => x.name === 'Violet' && x.avatarHash))
     const theirs = (await call(viewer, 'sheet:list')).find((x) => x.sheetId === sheetId)
     assert.equal(theirs.owner.isMe, false)
     assert.equal(theirs.owner.name, 'Olive')
