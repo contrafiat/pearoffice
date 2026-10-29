@@ -157,7 +157,12 @@ Code that works for any kind of file sits apart from each editor's own
   names made apart show as one; sent as `tags` on the own-devices channel,
   kept in the keyring's `tags` and `tagged`, carried when a file moves;
   `file:tags`, `file:newTag`, `file:renameTag`, `file:deleteTag`,
-  `file:tag`, event `tags:changed`; proposals/2026-10-28-file-tags.md),
+  `file:tag`, event `tags:changed`; proposals/2026-10-28-file-tags.md;
+  shared tags: `meta.tags` in the file (`sheetModel.setSharedTags`), set
+  by `file:shareTags` from Share and kept up to date while localDb
+  `shareTags:<sheetId>` is on; each device puts a new shared name on the
+  file as its own tag once (`applyShared`, seen names in
+  `sharedTags:<sheetId>`); proposals/2026-10-29-shared-tags.md),
   `devices.js` (your linked devices and their names: localDb
   `devices:<deviceKey>`, the signed `deviceName` op on each file's
   `device/<writerKey>` record, a first name from the platform; `app:devices`,
@@ -513,7 +518,7 @@ take five scenes: files, sheet, document, slides, sharing.
   5 s); with `PEAROFFICE_SMOKE_FOLDERS_SHOTS=<folder>` it saves the
   screens.
   `tags` is tags and search: Tags... from the file menu and a card, a new
-  tag and the same name in another case, coloured pills, search by name, one
+  tag, Send my tags in Share and the shared mark in Tags... and the same name in another case, coloured pills, search by name, one
   tag and two (all of them), a file in a folder found from the top level and
   a search inside the folder, reopening, rename and delete in Manage tags
   (about 7 s; `PEAROFFICE_SMOKE_TAGS_SHOT=<png>` saves the start screen and

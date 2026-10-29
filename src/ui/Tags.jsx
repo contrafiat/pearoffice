@@ -62,6 +62,11 @@ export function TagsPanel ({ sheetId, title, onClose, onError }) {
     } catch (err) { onError(err.message) }
   }
 
+  // Tags shared with everyone in the file (proposals/2026-10-29-shared-tags.md).
+  const [shared, setShared] = useState([])
+  useEffect(() => { call('file:shareTags', { sheetId }).then((r) => setShared(r.tags)).catch(() => {}) }, [sheetId, state.files[sheetId] && state.files[sheetId].join()]) // eslint-disable-line react-hooks/exhaustive-deps
+  const isShared = (t) => shared.some((x) => x.name.localeCompare(t.name, undefined, { sensitivity: 'base' }) === 0)
+
   if (managing) return <ManageTags state={state} onBack={() => setManaging(false)} onClose={onClose} onError={onError} />
   return (
     <div className='panel-backdrop' onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }}>
@@ -89,14 +94,14 @@ export function TagsPanel ({ sheetId, title, onClose, onError }) {
               <li key={t.id}>
                 <button className={'folder-choice' + (has ? ' current' : '')} role='menuitemcheckbox' aria-checked={has} onClick={() => flip(t)}>
                   <TagPill tag={t} />
-                  <span className='folder-choice-name' />
+                  <span className='folder-choice-name'>{has && isShared(t) && <span className='small muted tag-shared'>Shared with everyone in this file</span>}</span>
                   {has && <Check size={18} aria-hidden='true' />}
                 </button>
               </li>
             )
           })}
         </ul>
-        {state.loaded && !state.tags.length && <p className='muted template-hint'>Tags help you find files later, such as Bicycle or Budget. Only you see them.</p>}
+        {state.loaded && !state.tags.length && <p className='muted template-hint'>Tags help you find files later, such as Bicycle or Budget. Only you see them, unless you send them with a file from Share.</p>}
         {state.tags.length > 0 && (
           <div className='row center'>
             <button className='link-button manage-tags' onClick={() => setManaging(true)}>Manage tags</button>

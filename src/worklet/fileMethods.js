@@ -8,6 +8,7 @@ const model = require('../sheet/sheetModel')
 const m = require('./membership')
 const { yOps } = require('./yOps')
 const { hasPictures } = require('./pictures')
+const { cleanShared } = require('./tags')
 
 const DONATE_AFTER_MS = 14 * 24 * 3600 * 1000
 const INVITE_HOURS = 24
@@ -139,7 +140,7 @@ function createFileHelpers (sheets) {
   return { profileName, viewGet, peopleOf, myRole, frozenInfo, isFrozen, requireOwner, requireEdit, commit, docFor, replicaState, replicaUpdate }
 }
 
-function createFileMethods (sheets, { getJoin, getMoves, getProfiles, getPictures = () => null, getRestoring = () => null }) {
+function createFileMethods (sheets, { getJoin, getMoves, getProfiles, getPictures = () => null, getRestoring = () => null, getTags = () => null }) {
   const { profileName, viewGet, peopleOf, requireOwner, requireEdit, commit, docFor } = createFileHelpers(sheets)
   // The kind each join's invite named, for a just-joined file whose content
   // has not arrived yet (it would otherwise show as a sheet).
@@ -195,6 +196,26 @@ function createFileMethods (sheets, { getJoin, getMoves, getProfiles, getPicture
 
     // Templates (proposals/2026-10-18-templates.md). The mark is in the file,
     // so everyone in it sees it; viewers cannot change it.
+    // Tags shared with everyone in the file
+    // (proposals/2026-10-29-shared-tags.md). `on` true: your tags on the
+    // file become its shared tags, and keep following them (localDb
+    // `shareTags:<sheetId>`); false: none. Without `on`, the state:
+    // { tags, sharing } (sharing: this device keeps them up to date).
+    shareTags: async ({ sheetId, on } = {}, ctx) => {
+      const { doc } = await docFor(sheetId)
+      const key = 'shareTags:' + sheetId
+      if (on !== undefined) {
+        await requireEdit(ctx, sheetId)
+        const tags = getTags()
+        const list = on && tags ? cleanShared(await tags.onFile(sheetId)) : []
+        await commit(ctx, sheetId, model.setSharedTags(doc, list))
+        if (on && list.length) await ctx.localDb.put(key, { on: true })
+        else await ctx.localDb.del(key)
+        sheets.changed(sheetId)
+      }
+      return { tags: cleanShared(model.sharedTags(doc)), sharing: !!(await ctx.localDb.get(key))?.value }
+    },
+
     setTemplate: async ({ sheetId, template }, ctx) => {
       await requireEdit(ctx, sheetId)
       const { doc } = await docFor(sheetId)

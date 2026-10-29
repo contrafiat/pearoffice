@@ -65,8 +65,20 @@ function createSheetEngine (opts = {}) {
     getLocalDb: () => engine && engine.localDb,
     getStore: () => engine && engine.store,
     onSnapshot: (sheetId) => autoCompact(sheetId).catch((e) => log('tidy-up failed: ' + e.message)),
-    onChange: (sheetId) => { if (pictures) pictures.changed(sheetId) }
+    onChange: (sheetId) => { if (pictures) pictures.changed(sheetId); sharedTagsChanged(sheetId) }
   })
+
+  // A file's shared tags (proposals/2026-10-29-shared-tags.md): when they
+  // change, put new ones on the file as this person's own tags (tags.js).
+  const sharedSeen = new Map() // sheetId -> meta.tags as last seen, JSON
+  function sharedTagsChanged (sheetId) {
+    if (!tags) return
+    const list = model.sharedTags(sheets.entryFor(sheetId).guarded.doc)
+    const json = JSON.stringify(list)
+    if (sharedSeen.get(sheetId) === json) return
+    sharedSeen.set(sheetId, json)
+    if (list.length) tags.applyShared(sheetId, list).catch((e) => log('shared tags not applied: ' + e.message))
+  }
 
   // The owner's device tidies up a sheet by itself once its history passes
   // COMPACT_AT updates (proposals/2026-10-05-shared-compaction.md), unless an
@@ -89,7 +101,7 @@ function createSheetEngine (opts = {}) {
     }
   }
 
-  const deps = { getJoin: () => join, getMoves: () => moves, getProfiles: () => profiles, getDevices: () => devices, getPictures: () => pictures, getRestoring: () => restoring }
+  const deps = { getJoin: () => join, getMoves: () => moves, getProfiles: () => profiles, getDevices: () => devices, getPictures: () => pictures, getRestoring: () => restoring, getTags: () => tags }
   const methods = {
     ...createFileMethods(sheets, deps),
     ...createSheetMethods(sheets, deps),
@@ -234,7 +246,12 @@ function createSheetEngine (opts = {}) {
       setTimeout(() => seeding.start(), 0)
       folders = createFolders({ engine, emit, getOwnDevices: () => ownDevices, getKeyring: () => keyring, log })
       setTimeout(() => folders.prune().catch(() => {}), 0)
-      tags = createTags({ engine, emit, getOwnDevices: () => ownDevices, getKeyring: () => keyring })
+      // While this device shares a file's tags, a change to them updates the
+      // file (file:shareTags).
+      const onFileTags = (sheetId) => {
+        engine.localDb.get('shareTags:' + sheetId).then((r) => (r && r.value ? methods['file:shareTags']({ sheetId, on: true }, engine) : null)).catch((e) => log('shared tags not updated: ' + e.message))
+      }
+      tags = createTags({ engine, emit, getOwnDevices: () => ownDevices, getKeyring: () => keyring, onFileTags })
       setTimeout(() => tags.prune().catch(() => {}), 0)
       // A file that moves to fresh keys stays in its folder and keeps its tags.
       const movesEmit = (event, data) => {

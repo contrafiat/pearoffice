@@ -1415,6 +1415,20 @@ function isTemplate (doc) {
   return doc.getMap('meta').get('template') === true
 }
 
+// Tags shared with everyone in the file (proposals/2026-10-29-shared-tags.md):
+// `meta.tags`, a list of { name, color }. src/worklet/tags.js cleans it.
+function sharedTags (doc) {
+  const v = doc.getMap('meta').get('tags')
+  return Array.isArray(v) ? v : []
+}
+
+function setSharedTags (doc, list) {
+  return capture(doc, () => {
+    const meta = doc.getMap('meta')
+    if (list.length) { if (JSON.stringify(meta.get('tags')) !== JSON.stringify(list)) meta.set('tags', list) } else if (meta.has('tags')) meta.delete('tags')
+  })
+}
+
 function setTemplate (doc, on) {
   return capture(doc, () => {
     const meta = doc.getMap('meta')
@@ -1445,6 +1459,8 @@ function templateState (doc) {
 module.exports = {
   isTemplate,
   setTemplate,
+  sharedTags,
+  setSharedTags,
   templateState,
   VERSION,
   version,
