@@ -21,7 +21,7 @@ import b4a from 'b4a'
 import { requestLocalNetworkPermission } from '../modules/local-network'
 import { isPearcalLink } from '../src/shared/pearcal'
 
-const ALLOWED = /^(sheet|file|doc|slides|app|seeder|link|donation):[A-Za-z]+$/
+const ALLOWED = /^(sheet|file|doc|slides|media|app|seeder|link|donation):[A-Za-z]+$/
 // The UI's own page. The WebView must never show anything else: any page it
 // shows can talk to the worklet (the recovery phrase included), so a link
 // tapped in a document opens in the browser instead (onShouldStartLoad).
@@ -91,7 +91,7 @@ async function shellMethod (method, args) {
   if (method === 'app:pickFile') {
     // A picture file for a document (args.images) or a file to import.
     const res = await DocumentPicker.getDocumentAsync({
-      type: args && args.images ? ['image/*'] : ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.oasis.opendocument.spreadsheet', 'text/csv', 'text/comma-separated-values', 'text/tab-separated-values', 'application/json', 'text/json', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.oasis.opendocument.text', 'application/vnd.openxmlformats-officedocument.presentationml.presentation', 'application/vnd.oasis.opendocument.presentation', 'text/markdown', 'text/x-markdown', 'text/plain', 'text/html', 'application/octet-stream'],
+      type: args && args.images ? ['image/*'] : ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.oasis.opendocument.spreadsheet', 'text/csv', 'text/comma-separated-values', 'text/tab-separated-values', 'application/json', 'text/json', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'application/vnd.oasis.opendocument.text', 'application/vnd.openxmlformats-officedocument.presentationml.presentation', 'application/vnd.oasis.opendocument.presentation', 'text/markdown', 'text/x-markdown', 'text/plain', 'text/html', 'application/pdf', 'image/*', 'application/octet-stream'],
       copyToCacheDirectory: true
     })
     if (res.canceled || !res.assets || !res.assets[0]) return { canceled: true }

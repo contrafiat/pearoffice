@@ -1564,3 +1564,21 @@ h1, h2, h3, .brand, .new-sheet, .sheet-link.active, .empty h1, .title, .tab.acti
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .history-grid td.v-add, :root:not([data-theme="light"]) .history-grid td.v-changed { background: #1f4d2a; color: #c8f2cf; } :root:not([data-theme="light"]) .history-grid td.v-del { background: #5a2323; color: #f6caca; } }
 :root[data-theme="dark"] .history-grid td.v-add, :root[data-theme="dark"] .history-grid td.v-changed { background: #1f4d2a; color: #c8f2cf; }
 :root[data-theme="dark"] .history-grid td.v-del { background: #5a2323; color: #f6caca; }
+
+/* PDFs and pictures as files (proposals/2026-10-29-pdf-and-picture-files.md). */
+.media { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.media-wait { margin: 24px auto; text-align: center; }
+.media-failed { margin: auto; }
+.media-zoom { display: inline-flex; align-items: center; gap: 2px; }
+.media-zoom-level { min-width: 44px; text-align: center; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.media-stage { position: relative; flex: 1; min-height: 0; background: var(--head); touch-action: none; user-select: none; }
+.picture-stage { display: flex; align-items: center; justify-content: center; overflow: hidden; cursor: zoom-in; }
+.picture-stage.zoomed { cursor: grab; }
+.media-image { max-width: 100%; max-height: 100%; object-fit: contain; transform-origin: center; }
+.pdf-stage { overflow: auto; touch-action: pan-x pan-y; padding: 16px; box-sizing: border-box; }
+.pdf-page { position: relative; margin: 0 auto 16px; background: #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2); }
+.pdf-page canvas { display: block; }
+.pdf-link { position: absolute; display: block; }
+.pdf-count { position: sticky; bottom: 8px; display: table; margin: 0 auto; padding: 4px 10px; border-radius: 999px; background: var(--panel); color: var(--ink); font-size: 13px; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2); }
+.kind-pdf { color: #c2410c; }
+.kind-picture { color: #7e22ce; }

@@ -44,7 +44,7 @@ const HELLO_MAX_AGE_MS = 10 * 60 * 1000
 const MAX_FILES = 5000
 const PART = 500 // entries per `files` message, places per `folders` message, tagged per `tags` message
 const NOTIFY_AFTER_MS = 300
-const KINDS = ['sheet', 'doc', 'slides']
+const KINDS = ['sheet', 'doc', 'slides', 'pdf', 'picture']
 const hex = (buf) => b4a.toString(buf, 'hex')
 
 const ID = /^[A-Za-z0-9_-]{43}$/

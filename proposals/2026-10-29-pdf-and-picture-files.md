@@ -30,11 +30,7 @@ A file of these kinds is an ordinary PearOffice file (its own keys,
 members, roles, invites, tags, folder) whose Yjs doc holds:
 
 - `meta`: `title` (the file's name without its extension), `kind`
-  (`pdf` or `picture`) and `version` 100. The high version is on purpose:
-  an older build opens an unknown kind as a sheet, and with version 100
-  (sheets are 1) it shows it read-only with "This sheet was made with a
-  newer version of PearOffice. Update PearOffice to edit it." One empty
-  tab is added so it shows that note instead of loading forever.
+  (`pdf` or `picture`) and `version` 1.
 - `media`: `ref` and `hash` (as a document's picture, in this device's
   picture core for the file, encrypted under the file key), `mime`,
   `size`, `name` (the original file name, for Save a copy), `w` and `h`
@@ -76,10 +72,12 @@ or `picture` file may claim up to 25 MB; other files keep the 2 MB limit.
 
 ## Compat
 
-- Older builds: the file shows in the list with a sheet's icon and opens
-  as an empty read-only sheet with the update note. They do not download
-  or seed the bytes, so a person whose only devices are old cannot open
-  it until they update.
+- Older builds: every build from 0.1.0 on shows a file of a kind it does
+  not know in the list and, when opened, "Update PearOffice to open this
+  file." Their invite links already refuse kinds they do not know ("This
+  invite needs a newer version of PearOffice"). They do not download or
+  seed the bytes, so a person whose only devices are old cannot open it
+  until they update.
 - An older build that moves such a file to fresh keys (removing someone,
   tidying up) does not copy the bytes, and the new copy has none. Only
   an owner on an old build can do that, and only to a file a newer device
@@ -89,7 +87,7 @@ or `picture` file may claim up to 25 MB; other files keep the 2 MB limit.
 
 - Unit: kind and `media` checks, the 25 MB limit only for these kinds,
   parts in and out, HEIC refused where it cannot be read, a JPEG's EXIF
-  gone after adding, `sheet:view` on a `pdf` file saying newer.
+  gone after adding, an invite link for a PDF.
 - Engines over the test DHT: an editor imports a PDF, a viewer who joins
   gets the same bytes offline, a seeder alone serves them, removing a
   member moves the file with its bytes.
@@ -102,8 +100,8 @@ or `picture` file may claim up to 25 MB; other files keep the 2 MB limit.
 
 ## Rollback
 
-Revert. Files already made open as the read-only empty sheet described
-under Compat; their bytes stay in their picture cores.
+Revert. Files already made show "Update PearOffice to open this file" as
+described under Compat; their bytes stay in their picture cores.
 
 ## Decided
 

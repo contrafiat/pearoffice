@@ -9,6 +9,7 @@ const m = require('./membership')
 const { yOps } = require('./yOps')
 const { hasPictures } = require('./pictures')
 const { cleanShared } = require('./tags')
+const mediaModel = require('../media/mediaModel')
 
 const DONATE_AFTER_MS = 14 * 24 * 3600 * 1000
 const INVITE_HOURS = 24
@@ -219,6 +220,7 @@ function createFileMethods (sheets, { getJoin, getMoves, getProfiles, getPicture
     setTemplate: async ({ sheetId, template }, ctx) => {
       await requireEdit(ctx, sheetId)
       const { doc } = await docFor(sheetId)
+      if (template && mediaModel.isMedia(doc)) throw new Error('A PDF or picture cannot be a template')
       const r = await commit(ctx, sheetId, model.setTemplate(doc, !!template))
       sheets.changed(sheetId)
       return r

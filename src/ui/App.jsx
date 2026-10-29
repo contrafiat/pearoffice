@@ -1,9 +1,12 @@
+import { createPortal } from 'react-dom'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { call, on } from './bridge.js'
 import { AppMissing } from './AppMissing.jsx'
 import { readPref, writePref } from './prefs.js'
 import { SheetView } from './sheet/SheetView.jsx'
 import { DocView } from './doc/DocView.jsx'
+import { MediaView } from './media/MediaView.jsx'
+import { MEDIA_ACCEPT } from './media/mediaFiles.js'
 import { SlidesView } from './slides/SlidesView.jsx'
 import { JoinPanel, JoinProgress, JoinPill } from './JoinPanel.jsx'
 import { SeederPanel } from './SeederPanel.jsx'
@@ -15,7 +18,7 @@ import { UpdateBar } from './UpdateBar.jsx'
 import { applyTheme } from './theme.js'
 import { haptic, hapticTaps } from './haptic.js'
 import { BUILT_IN, makeBuiltIn } from './templates.js'
-import { FileHome, KindIcon, NewPanel, RecoverPanel, dragFile, dropTarget, untitled } from './Files.jsx'
+import { FileHome, KindIcon, NewPanel, RecoverPanel, dragFile, dropTarget, untitled, isMediaKind, nounOf } from './Files.jsx'
 import { DeleteFolderPanel, FolderNamePanel, MoveToFolderPanel, filesIn, useFolders } from './Folders.jsx'
 import { TagsPanel, TemplateTagsPanel, tagsOf, useTags } from './Tags.jsx'
 import { DeletePanel } from './DeletePanel.jsx'
@@ -29,23 +32,28 @@ import { Menu, menuItems } from './Menu.jsx'
 applyTheme()
 
 // Import a file: .xlsx, .ods, .csv, .tsv or .json make a sheet; .docx, .odt, .md, .txt
-// or .html a document; .pptx or .odp a slide deck. A file input on desktop, the
-// shell's file picker on phones. onImported gets the new file's id and the
-// import's result.
+// or .html a document; .pptx or .odp a slide deck; a PDF or picture is kept
+// as it is (proposals/2026-10-29-pdf-and-picture-files.md). A file input on
+// desktop; on phones a choice of the shell's file picker or photo picker.
+// onImported gets the new file's id and the import's result.
 function ImportButton ({ className, onImported, onError }) {
+  const [menu, setMenu] = useState(null)
   if (isMobile()) {
+    const pick = async (photo) => {
+      setMenu(null)
+      try {
+        const r = await pickAndImport({ photo })
+        if (r) await onImported(r.sheetId, r)
+      } catch (err) { onError('Could not import: ' + err.message) }
+    }
     return (
-      <button
-        className={className}
-        onClick={async () => {
-          try {
-            const r = await pickAndImport()
-            if (r) await onImported(r.sheetId, r)
-          } catch (err) { onError('Could not import: ' + err.message) }
-        }}
-      >
-        <FileArrowUp size={16} /> Import a file
-      </button>
+      <>
+        <button className={className + ' import'} onClick={(e) => setMenu({ anchor: e.currentTarget.getBoundingClientRect() })}>
+          <FileArrowUp size={16} /> Import a file
+        </button>
+        {/* On the page itself, away from the button row's layout. */}
+        {menu && createPortal(<Menu className='import-menu' label='Import' where={menu} onClose={() => setMenu(null)} items={[{ label: 'Choose a file', onSelect: () => pick(false) }, { label: 'Choose a photo', onSelect: () => pick(true) }]} />, document.body)}
+      </>
     )
   }
   return (
@@ -53,7 +61,7 @@ function ImportButton ({ className, onImported, onError }) {
       <FileArrowUp size={16} /> Import a file
       <input
         type='file'
-        accept='.xlsx,.ods,.csv,.tsv,.json,.docx,.odt,.md,.markdown,.txt,.html,.htm,.pptx,.odp'
+        accept={'.xlsx,.ods,.csv,.tsv,.json,.docx,.odt,.md,.markdown,.txt,.html,.htm,.pptx,.odp,' + MEDIA_ACCEPT}
         hidden
         onChange={async (e) => {
           const file = e.target.files && e.target.files[0]
@@ -73,7 +81,7 @@ function ImportButton ({ className, onImported, onError }) {
 
 // Whether this build has an editor for the file's kind. Older builds learn
 // about newer kinds through device linking (proposals/2026-10-06-documents.md).
-const EDITORS = ['sheet', 'doc', 'slides']
+const EDITORS = ['sheet', 'doc', 'slides', 'pdf', 'picture']
 function kindOf (files, sheetId) {
   const f = files && files.find((x) => x.sheetId === sheetId)
   return (f && f.kind) || 'sheet'
@@ -552,7 +560,7 @@ export function App () {
     }
     const props = { sheetId: id, files: sheets || [], folders, onOpenFile: openFile, onOpenFolder: (fd) => { setCurrent(null); setFolder(fd) }, onTitleChange: refresh, onError: setError, onGone: async () => { forget(id); await refresh() } }
     const kind = kindOf(sheets, id)
-    return kind === 'doc' ? <DocView {...props} /> : kind === 'slides' ? <SlidesView {...props} /> : <SheetView {...props} />
+    return kind === 'doc' ? <DocView {...props} /> : kind === 'slides' ? <SlidesView {...props} /> : isMediaKind(kind) ? <MediaView {...props} kind={kind} /> : <SheetView {...props} />
   }
   const panes = desktop ? tabs.filter((id) => loaded.includes(id) || id === current) : current ? [current] : []
 
@@ -635,7 +643,7 @@ export function App () {
                     !f.removed && !f.waiting && { label: 'Copy link', onSelect: () => copyLink('pearoffice://file/' + f.sheetId).catch(() => {}) },
                     { label: 'Move to folder...', onSelect: () => setMoving(f) },
                     { label: 'Tags...', onSelect: () => setTagging(f) },
-                    !f.removed && (f.myRole === 'owner' || f.myRole === 'editor') && { label: f.template ? 'Stop using as a template' : 'Use as a template', onSelect: () => setTemplate(f, !f.template) },
+                    !f.removed && !isMediaKind(f.kind) && (f.myRole === 'owner' || f.myRole === 'editor') && { label: f.template ? 'Stop using as a template' : 'Use as a template', onSelect: () => setTemplate(f, !f.template) },
                     '-',
                     { label: 'Remove from this device', onSelect: () => setDeleting({ file: f, kind: 'local' }) },
                     f.owner && f.owner.isMe && !f.removed && { label: 'Delete for everyone', danger: true, onSelect: () => setDeleting({ file: f, kind: 'everyone' }) }
@@ -714,7 +722,7 @@ export function App () {
         <DeletePanel
           sheetId={deleting.file.sheetId}
           title={deleting.file.title || untitled(deleting.file.kind)}
-          noun={deleting.file.kind === 'doc' ? 'document' : deleting.file.kind === 'slides' ? 'deck' : 'sheet'}
+          noun={nounOf(deleting.file.kind)}
           kind={deleting.kind}
           onClose={() => setDeleting(null)}
           onError={setError}
