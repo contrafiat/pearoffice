@@ -102,7 +102,20 @@ Code that works for any kind of file sits apart from each editor's own
   ../proposals/2026-10-26-pearcal-pearoffice-links.md), `phrase.js`
   (12-word recovery phrase: a 16-byte root, `phrase:root` in localDb, the
   identity seed a keyed hash of it), `qr.js`, Bare shims.
-- `src/doc/` and `src/ui/doc/` - documents (proposals/2026-10-06-documents.md): `docModel.js` (the Yjs doc: `meta`, `body`), `docMethods.js` (`doc:create`, `doc:state`, `doc:update`), `DocView.jsx` (TipTap 3 editor), `docFiles.js` (import .docx/.odt/.md/.txt/.html, export .docx/.odt/.md/.txt/PDF, pictures included; `odt.js` writes .odt from the editor's JSON and turns an .odt into HTML for the same import path; `node scripts/check-doc-export.js [dir]` has LibreOffice read an exported .docx), `pictures.js` (shrinking before upload, the per-document picture cache, the picture node view). Pictures are `image` nodes (`extensions.js`, `Picture`) and move a document to schema version 2 (`docModel.js`); @ chips are `chip` nodes (`extensions.js`, `Chip`; the pill, the @ menu's trigger and picking in `ChipView.jsx`, using the sheet's `AtMenu` and `SmartChip`), move a document to version 3 through `doc:useChips` and go out as text (`flattenChips`) (proposals/2026-10-26-document-chips.md); version history (proposals/2026-10-26-version-history.md): each `y` op carries `at` and the view keeps it (`yOps.js`, `sheetWire.js`; a moved file's first edit carries `start`), `src/doc/history.js` groups edits into versions and replays one (`file:versions`, `file:version`), `src/ui/History.jsx` shows them (documents with the changes from `versionDiff.js`, Restore by `setContent` in the editor; sheets as a grid from `sheet:versionCells` and decks as slides, Restore by `file:restore`, which uses `history.restoreInto`; `src/worklet/historyMethods.js`); `doc:addPicture` and `doc:picture` are in `docMethods.js`. The editor keeps a Yjs replica and sends batched updates; `doc:updated` brings others' edits.
+- `src/doc/` and `src/ui/doc/` - documents (proposals/2026-10-06-documents.md): `docModel.js` (the Yjs doc: `meta`, `body`), `docMethods.js` (`doc:create`, `doc:state`, `doc:update`), `DocView.jsx` (TipTap 3 editor), `docFiles.js` (import .docx/.odt/.md/.txt/.html, export .docx/.odt/.md/.txt/PDF, pictures included; `odt.js` writes .odt from the editor's JSON and turns an .odt into HTML for the same import path; `node scripts/check-doc-export.js [dir]` has LibreOffice read an exported .docx), `pictures.js` (shrinking before upload, the per-document picture cache, the picture node view). Pictures are `image` nodes (`extensions.js`, `Picture`) and move a document to schema version 2 (`docModel.js`); @ chips are `chip` nodes (`extensions.js`, `Chip`; the pill, the @ menu's trigger and picking in `ChipView.jsx`, using the sheet's `AtMenu` and `SmartChip`), move a document to version 3 through `doc:useChips` and go out as text (`flattenChips`) (proposals/2026-10-26-document-chips.md); dropdowns are `dropdown` nodes (`extensions.js`, `Dropdown`; the pill, its choices, Edit choices and Enter carrying it to the next list item in `DropdownView.jsx`) naming one of the document's lists of choices (`lists.js`, root map `lists`), move a document to version 4 through `doc:useDropdowns` and go out as their text in the item's colours (proposals/2026-10-29-document-dropdowns.md); version history (proposals/2026-10-26-version-history.md): each `y` op carries `at` and the view keeps it (`yOps.js`, `sheetWire.js`; a moved file's first edit carries `start`), `src/doc/history.js` groups edits into versions and replays one (`file:versions`, `file:version`), `src/ui/History.jsx` shows them (documents with the changes from `versionDiff.js`, Restore by `setContent` in the editor; sheets as a grid from `sheet:versionCells` and decks as slides, Restore by `file:restore`, which uses `history.restoreInto`; `src/worklet/historyMethods.js`); `doc:addPicture` and `doc:picture` are in `docMethods.js`. The editor keeps a Yjs replica and sends batched updates; `doc:updated` brings others' edits.
+- `src/media/` and `src/ui/media/` - PDFs and pictures as files
+  (proposals/2026-10-29-pdf-and-picture-files.md): kinds `pdf` and
+  `picture`, 25 MB at most, nothing else. `mediaModel.js` (`meta` and a
+  `media` map pointing at the bytes in the file's picture cores,
+  `src/worklet/pictures.js`, which allows 25 MB references in these
+  kinds), `mediaMethods.js` (`media:begin`, `media:part`, `media:end`
+  to add one in 1 MB parts, `media:info`, `media:read` a part at a
+  time). `mediaFiles.js` (Import: a JPEG or HEIC is drawn again, which
+  drops EXIF and location; `pdf.js` runs pdf.js 6 on the page, its
+  worker bundled, since the phone's page only runs bundled scripts) and
+  `MediaView.jsx` (pictures with zoom and pan, PDF pages drawn as they
+  come on screen, links, Save a copy, Print). Builds that do not know
+  these kinds say "Update PearOffice to open this file".
 - `src/slides/` and `src/ui/slides/` - slide decks (proposals/2026-10-06-slides.md): `slidesModel.js` (the Yjs doc: `meta`, `deck`, `slides`; order by fractional index keys; every change goes through its functions), `layouts.js`, `slidesMethods.js` (`slides:create`, `slides:state`, `slides:update`). `SlidesView.jsx` (the replica, toolbar, notes, presence and one Y.UndoManager over `slides` and `deck`, shared with TipTap's undo plugin through `text.js`, so text and moves undo in one history), `SlideList.jsx` (thumbnails as static DOM, reorder by drag, Ctrl+Up/Down or the slide menu), `Stage.jsx` (the slide scaled with a CSS transform; selection, our own move, resize and rotate handles, snapping with guides in `geometry.js`; a drag writes the frame once, on release), `TextBox.jsx` (a live TipTap editor only in the box being edited, static DOM for the rest; text is drawn 1.5 times larger so sizes are PowerPoint points), `TextTools.jsx`, `Notes.jsx`, `themes.js` (four themes: `plain`, `midnight`, `paper`, `vivid`; colours and fonts as CSS variables on the slide), `objects.jsx` (shapes as inline SVG filling the frame, a line across the middle of its frame with SVG arrowheads, a custom shape's path from its 1000 x 1000 box (`svgPath.js`), fill and outline opacity; pictures cropped by drawing the whole picture larger inside a clipping box; pictures as `<img>` from a per-deck cache fetched with `slides:picture`, grey with the alt text until they arrive; `PicturesContext`, which the editor and the audience window each provide; a theme colour slot is drawn as the slide's CSS variable, so a new theme recolours shapes), `ShapeTools.jsx` (Insert shape menu; fill, outline colour, width, their opacity, a rounded rectangle's corners and arrowheads for the selected shapes; top, middle and bottom for text; desktop only; Crop and Wrap text are in `Stage.jsx`), `SlideChart.jsx` (chart elements drawn with the sheet's `chartOption.js` as ECharts SVG text, in the theme's accents, the chart's text colour (else the theme's) and font; horizontal bars run from the bottom up as in PowerPoint and small pies keep labels inside; kept per data, theme and size so thumbnails reuse it), `ChartTools.jsx` (the tools of a selected chart: type, title, legend, values, stacked, smooth lines and text colour; the Edit data panel writes `slidesModel.setChart` once typing pauses; desktop only), `deck.js` (the deck as drawn from a replica), `StaticSlide.jsx` (a slide as static DOM, for thumbnails and the show), `Present.jsx` (presenting: Present or F5 from the first slide, Shift+F5 from this one, for viewers too; PowerPoint's keys; one display goes full screen; with two, `desktop/main.js` opens an audience window on the other display, which loads the UI with `?audience=<id>` and keeps its own replica, and the main window becomes the presenter view with notes, next slide and a timer; `app:presentStart`, `app:presentGo`, `app:presentInput` and `app:presentEnd` are handled in main; on phones, tap halves or swipe in landscape, notes under the slide in portrait; `mobile/App.js` hides the status bar and ends the show on Back). Pictures are added with `slides:addPicture` after the same shrinking as documents (`src/ui/doc/pictures.js`), then `slidesModel.addPicture`; a corner handle keeps a picture's shape (Shift frees it). The schema is `slideExtensions()` in `src/ui/doc/extensions.js`. Phones edit text (in boxes and shapes), notes and slide order only; they and viewers draw shapes and pictures. Export: `pptxExport.js` (pptxgenjs, fixed up after writing; charts as PowerPoint charts) and `pdfExport.jsx` (one page per slide through `app:savePdf`/`app:print`, which take a `pageSize` in inches); `node scripts/check-slides-export.js [dir]` has LibreOffice read an exported .pptx (needs `soffice` and `pdftotext`). Import: `pptxImport.js` (our own reader: layout and master inheritance, theme colours and fonts, groups, notes, opacity, text anchor and wrap, crops, line ends, SmartArt from its saved drawing, charts from their cached values in `importChart.js`; a notice lists what was lost), `customGeom.js` (custGeom paths into the 1000 box), `importOoxml.js` (the zip with size limits, theme, colours) and `importText.js`; the deck goes in with `slides:import` and its pictures after. OpenDocument: `odp.js` writes .odp from the deck (titles and bodies as Impress placeholders, rounded rectangles, triangles and arrows as Impress's own shapes, line ends with Impress's PowerPoint marker names, charts as embedded chart documents with a local table, notes on the master's notes style) and `readOdp` reads one into the same plain data as `readPresentation`, so `buildDeck` makes the deck; `test/slides-odp.test.js` checks both against LibreOffice.
 - `src/sheet/` - the spreadsheet, runs anywhere (Bare, Node, browser):
   `sheetModel.js` (the Yjs document), `refs.js` (A1 <-> id formula
@@ -151,6 +164,18 @@ Code that works for any kind of file sits apart from each editor's own
   `folders` and `places`, carried when a file moves; `file:folders`,
   `file:newFolder`, `file:renameFolder`, `file:deleteFolder`, `file:place`,
   event `folders:changed`; proposals/2026-10-10-folders.md),
+  `tags.js` (your tags, yours alone, many per file: localDb `tag:<id>`
+  (name, colour from the dropdown chip set) and `tagged:<sheetId>:<tagId>`
+  (`on`), one record per file and tag so adds made apart both stay; same
+  names made apart show as one; sent as `tags` on the own-devices channel,
+  kept in the keyring's `tags` and `tagged`, carried when a file moves;
+  `file:tags`, `file:newTag`, `file:renameTag`, `file:deleteTag`,
+  `file:tag`, event `tags:changed`; proposals/2026-10-28-file-tags.md;
+  shared tags: `meta.tags` in the file (`sheetModel.setSharedTags`), set
+  by `file:shareTags` from Share and kept up to date while localDb
+  `shareTags:<sheetId>` is on; each device puts a new shared name on the
+  file as its own tag once (`applyShared`, seen names in
+  `sharedTags:<sheetId>`); proposals/2026-10-29-shared-tags.md),
   `devices.js` (your linked devices and their names: localDb
   `devices:<deviceKey>`, the signed `deviceName` op on each file's
   `device/<writerKey>` record, a first name from the platform; `app:devices`,
@@ -175,7 +200,10 @@ Code that works for any kind of file sits apart from each editor's own
   as an .xlsx (a tab per list of records, the rest on a Summary tab).
 - `src/ui/` - the React UI: the app shell, file list with folders
   (`Files.jsx`, `Folders.jsx`: folder cards, inside a folder, Move to
-  folder, drag onto a folder on desktop, folders in the side list), sharing, seeder,
+  folder, drag onto a folder on desktop, folders in the side list; search
+  by name and tags above the files, picked tags meaning all of them, every
+  file at the top level and one folder inside it; `Tags.jsx`: the pills,
+  Tags... and Manage tags), sharing, seeder,
   devices and settings panels, About and donations (`About.jsx`), the phrase entry
   (`PhraseInput.jsx`: one word at a time on phones, 12 boxes on desktop,
   suggestions from the word list), the first-run welcome and tour (`Onboarding.jsx`), Ctrl+P (Cmd+P on a Mac)
@@ -421,7 +449,7 @@ take five scenes: files, sheet, document, slides, sharing.
   bundle must create, edit and read a sheet over stdin/stdout, and the seeder
   bundle must start and print a pairing link.
 - `npm run smoke:desktop`: drives the real UI in Electron with an offscreen
-  window and real key and mouse events, in twenty-two parts. Each part is its own
+  window and real key and mouse events, in twenty-five parts. Each part is its own
   launch with a throwaway data folder and a 60 s limit, and prints one
   `ok`/`not ok` line, then a summary line. `sheets` is the grid editor
   (typing, formulas, pointing at cells while typing one, spilling, fill,
@@ -448,7 +476,16 @@ take five scenes: files, sheet, document, slides, sharing.
   bubble (about 5 s). `doc-chips` is @ chips in a document: a person
   whose pill follows a rename, a file opened from its pill, Tomorrow
   changed with the calendar, Esc, version 3 and reopening (about 4 s;
-  `PEAROFFICE_SMOKE_DOC_CHIPS_SHOT=<png>` saves the pills). `doc-history`
+  `PEAROFFICE_SMOKE_DOC_CHIPS_SHOT=<png>` saves the pills). `doc-dropdowns`
+  is dropdowns in a document: a new list from the toolbar in a checklist,
+  renamed, a choice added in orange, picking, Enter carrying the dropdown
+  and leaving the list, a choice renamed on its pill and reopening (about
+  3 s; `PEAROFFICE_SMOKE_DOC_DROPDOWNS_SHOT` and `_PANEL_SHOT=<png>`).
+  `media-files` is PDFs and pictures as files: a two-page PDF with a link
+  and a PNG through Import a file, pages drawn, Page 1 of 2, the link,
+  zoom, Save a copy giving back the same bytes, a tag, the cards and
+  reopening (about 3 s; `PEAROFFICE_SMOKE_MEDIA_SHOTS=<folder>`).
+  `doc-history`
   is version history: two versions (a 1.5 s pause through
   `window.__historyPauseMs`), the changes marked, Copy and Restore, then a
   sheet and a deck (about 14 s; `PEAROFFICE_SMOKE_HISTORY_SHOT`,
@@ -497,6 +534,12 @@ take five scenes: files, sheet, document, slides, sharing.
   side list, renaming, reopening and deleting (the files stay) (about
   5 s); with `PEAROFFICE_SMOKE_FOLDERS_SHOTS=<folder>` it saves the
   screens.
+  `tags` is tags and search: Tags... from the file menu and a card, a new
+  tag, Send my tags in Share and the shared mark in Tags... and the same name in another case, coloured pills, search by name, one
+  tag and two (all of them), a file in a folder found from the top level and
+  a search inside the folder, reopening, rename and delete in Manage tags
+  (about 7 s; `PEAROFFICE_SMOKE_TAGS_SHOT=<png>` saves the start screen and
+  `-panel.png` the panel).
   `windows` is files in windows of their own: Open in new window from a
   card and from the file menu, the main window bringing that window
   forward, a rename reaching both, a folder link opening in the main

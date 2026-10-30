@@ -8,6 +8,8 @@ const model = require('../sheet/sheetModel')
 const m = require('./membership')
 const { yOps } = require('./yOps')
 const { hasPictures } = require('./pictures')
+const { cleanShared } = require('./tags')
+const mediaModel = require('../media/mediaModel')
 
 const DONATE_AFTER_MS = 14 * 24 * 3600 * 1000
 const INVITE_HOURS = 24
@@ -15,6 +17,9 @@ const INVITE_HOURS = 24
 const hex = (buf) => b4a.toString(buf, 'hex')
 
 // Helpers shared with each file kind's own methods.
+// How many people a file card shows as faces.
+const FIRST_PEOPLE = 4
+
 function createFileHelpers (sheets) {
   async function profileName (ctx) {
     const p = await ctx.localDb.get('profile')
@@ -29,7 +34,8 @@ function createFileHelpers (sheets) {
     return node ? node.value : null
   }
 
-  // Who owns a file and how many people are in it, for the file list.
+  // Who owns a file, how many people are in it and the first few of them
+  // (the owner first), for the file list.
   async function peopleOf (ctx, sheetId) {
     const base = ctx.bases.get(sheetId)
     if (!base) return {}
@@ -40,13 +46,17 @@ function createFileHelpers (sheets) {
       let owner = null
       let myRole
       const me = hex(ctx.identity.publicKey)
+      const first = []
       for await (const { value } of base.view.createReadStream({ gt: 'member/', lt: 'member/~' })) {
         people++
         if (sheet && value.identity === sheet.owner) owner = value
+        else if (first.length < FIRST_PEOPLE) first.push(value)
         if (value.identity === me) myRole = value.role
       }
-      if (!owner) return { people, myRole }
-      return { people, myRole, owner: { identity: owner.identity, name: owner.name || '', avatarHash: owner.avatarHash || null, isMe: owner.identity === me } }
+      const brief = (v) => ({ identity: v.identity, name: v.name || '', avatarHash: v.avatarHash || null })
+      const members = (owner ? [owner, ...first] : first).slice(0, FIRST_PEOPLE).map(brief)
+      if (!owner) return { people, myRole, members }
+      return { people, myRole, members, owner: { ...brief(owner), isMe: owner.identity === me } }
     } catch { return {} }
   }
 
@@ -131,7 +141,7 @@ function createFileHelpers (sheets) {
   return { profileName, viewGet, peopleOf, myRole, frozenInfo, isFrozen, requireOwner, requireEdit, commit, docFor, replicaState, replicaUpdate }
 }
 
-function createFileMethods (sheets, { getJoin, getMoves, getProfiles, getPictures = () => null, getRestoring = () => null }) {
+function createFileMethods (sheets, { getJoin, getMoves, getProfiles, getPictures = () => null, getRestoring = () => null, getTags = () => null }) {
   const { profileName, viewGet, peopleOf, requireOwner, requireEdit, commit, docFor } = createFileHelpers(sheets)
   // The kind each join's invite named, for a just-joined file whose content
   // has not arrived yet (it would otherwise show as a sheet).
@@ -187,9 +197,30 @@ function createFileMethods (sheets, { getJoin, getMoves, getProfiles, getPicture
 
     // Templates (proposals/2026-10-18-templates.md). The mark is in the file,
     // so everyone in it sees it; viewers cannot change it.
+    // Tags shared with everyone in the file
+    // (proposals/2026-10-29-shared-tags.md). `on` true: your tags on the
+    // file become its shared tags, and keep following them (localDb
+    // `shareTags:<sheetId>`); false: none. Without `on`, the state:
+    // { tags, sharing } (sharing: this device keeps them up to date).
+    shareTags: async ({ sheetId, on } = {}, ctx) => {
+      const { doc } = await docFor(sheetId)
+      const key = 'shareTags:' + sheetId
+      if (on !== undefined) {
+        await requireEdit(ctx, sheetId)
+        const tags = getTags()
+        const list = on && tags ? cleanShared(await tags.onFile(sheetId)) : []
+        await commit(ctx, sheetId, model.setSharedTags(doc, list))
+        if (on && list.length) await ctx.localDb.put(key, { on: true })
+        else await ctx.localDb.del(key)
+        sheets.changed(sheetId)
+      }
+      return { tags: cleanShared(model.sharedTags(doc)), sharing: !!(await ctx.localDb.get(key))?.value }
+    },
+
     setTemplate: async ({ sheetId, template }, ctx) => {
       await requireEdit(ctx, sheetId)
       const { doc } = await docFor(sheetId)
+      if (template && mediaModel.isMedia(doc)) throw new Error('A PDF or picture cannot be a template')
       const r = await commit(ctx, sheetId, model.setTemplate(doc, !!template))
       sheets.changed(sheetId)
       return r

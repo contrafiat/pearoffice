@@ -13,6 +13,7 @@ import { chartsFromXlsx } from '../../sheet/xlsxChartsRead.js'
 import { jsonFileToTabs } from '../../sheet/jsonImport.js'
 import { csvBytesToTabs } from '../../sheet/csvImport.js'
 import { sheetToJson } from '../../sheet/jsonExport.js'
+import { isMediaFile, importMedia } from '../media/mediaFiles.js'
 import { call } from '../bridge.js'
 import { writePref } from '../prefs.js'
 import { isMobile, fileName, saveFile } from '../save.js'
@@ -90,6 +91,7 @@ function importText (bytes, name) {
 // decks (src/ui/slides/pptxImport.js), the rest sheets.
 export async function importFile (file) {
   const data = new Uint8Array(await file.arrayBuffer())
+  if (isMediaFile(file.name)) return importMedia(data, file.name)
   if (isPptxFile(file.name)) return importPresentation(data, file.name)
   if (isOdpFile(file.name)) return importPresentation(data, file.name, { read: readOdp })
   if (isDocFile(file.name)) return importDocument(data, file.name)
@@ -97,11 +99,20 @@ export async function importFile (file) {
   return readWorkbook(data, file.name)
 }
 
-// Phones: the shell's file picker. Resolves to null if cancelled.
-export async function pickAndImport () {
-  const picked = await call('app:pickFile')
+// Phones: the shell's file picker, or with `photo` the photo picker.
+// Resolves to null if cancelled.
+export async function pickAndImport ({ photo = false } = {}) {
+  const picked = await call('app:pickFile', photo ? { images: true, source: 'photos' } : {})
   if (!picked || picked.canceled) return null
+  // Android's photo picker gives a number for a name (30 or 30.jpg): call
+  // it Photo and the day, with the extension from its type.
+  if (photo && (!isMediaFile(picked.name) || /^\d*(\.[a-z0-9]+)?$/i.test(String(picked.name || '')))) {
+    const d = new Date()
+    const day = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0')
+    picked.name = 'Photo ' + day + '.' + ({ 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif', 'image/heic': 'heic' }[picked.mime] || 'jpg')
+  }
   const bytes = Uint8Array.from(atob(picked.base64), (ch) => ch.charCodeAt(0))
+  if (isMediaFile(picked.name)) return importMedia(bytes, picked.name)
   if (isPptxFile(picked.name)) return importPresentation(bytes, picked.name)
   if (isOdpFile(picked.name)) return importPresentation(bytes, picked.name, { read: readOdp })
   if (isDocFile(picked.name)) return importDocument(bytes, picked.name)

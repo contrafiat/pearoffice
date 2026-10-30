@@ -3,6 +3,7 @@ import { Copy, Eye, PencilSimple, X } from '@phosphor-icons/react'
 import { call, on } from './bridge.js'
 import { QrCode } from './Qr.jsx'
 import { MemberAvatar } from './Avatar.jsx'
+import { TagPill, tagsOf, useTags } from './Tags.jsx'
 
 const ROLE_LABEL = { owner: 'Owner', editor: 'Can edit', viewer: 'Can view' }
 
@@ -95,6 +96,8 @@ export function SharePanel ({ sheetId, noun = 'file', onClose, onError }) {
             {!isOwner && <p className='muted'>Only the owner can invite people or change roles.</p>}
             {isOwner && confirming && <p className='warn'>Removing someone moves the {noun} to new keys. They keep what they already had and see nothing new. Anyone editing the old copy at that moment may lose that last change.</p>}
 
+            {(data.myRole === 'owner' || data.myRole === 'editor') && <ShareTags sheetId={sheetId} noun={noun} onError={onError} />}
+
             <h3>People</h3>
             <ul className='people'>
               {data.members.map((p) => (
@@ -155,6 +158,31 @@ export function SharePanel ({ sheetId, noun = 'file', onClose, onError }) {
 }
 
 // The seeders this sheet backs up to (proposals/2026-10-04-stop-backing-up.md).
+// Send my tags with this file (proposals/2026-10-29-shared-tags.md): your
+// tags on it go to everyone in it, who get them as their own.
+function ShareTags ({ sheetId, noun, onError }) {
+  const tags = useTags()
+  const mine = tagsOf(tags, sheetId)
+  const [state, setState] = useState(null) // { tags, sharing }
+  const load = useCallback(() => call('file:shareTags', { sheetId }).then(setState).catch(() => {}), [sheetId])
+  useEffect(() => { load() }, [load, mine.map((t) => t.name).join()]) // eslint-disable-line react-hooks/exhaustive-deps
+  if (!state || (!mine.length && !state.tags.length)) return null
+  const flip = async (on) => {
+    try { setState(await call('file:shareTags', { sheetId, on })) } catch (err) { onError(err.message) }
+  }
+  const shown = state.sharing || !state.tags.length ? mine : state.tags
+  return (
+    <>
+      <h3>Tags</h3>
+      <label className='check share-tags'>
+        <input type='checkbox' checked={state.sharing || state.tags.length > 0} disabled={!mine.length && !state.tags.length} onChange={(e) => flip(e.target.checked)} />
+        <span>Send my tags with this {noun}<br /><span className='small muted'>Everyone in it gets them as their own tags.</span></span>
+      </label>
+      <p className='card-tags share-tag-pills'>{shown.map((t) => <TagPill key={t.name} tag={{ ...t, id: t.name }} />)}</p>
+    </>
+  )
+}
+
 function Backups ({ sheetId, noun, members, onError }) {
   const [info, setInfo] = useState(null)
   const [busy, setBusy] = useState(null) // seeder key being changed

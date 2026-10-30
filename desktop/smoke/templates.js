@@ -1,7 +1,7 @@
 // Smoke test part "templates" (proposals/2026-10-18-templates.md): a sheet
 // marked as a template from its card's menu, the badge, New listing it, a
 // file made from it (the content comes along, the badge does not), New from
-// this template on the card, unmarking, a long list (search, kind buttons,
+// this template on the card (a tagged template asks to copy its tags), unmarking, a long list (search, kind buttons,
 // the built-in ones folded), then each built-in template. With
 // PEAROFFICE_SMOKE_TEMPLATES_SHOTS=<folder> it saves New and each built-in.
 
@@ -98,13 +98,23 @@ module.exports = async function templates (t) {
   await js("document.querySelector('.panel.new-file .close').click()")
   step('long list')
 
-  // From the card's menu too, then unmark.
+  // From the card's menu too, with the template tagged: Yes gives the copy
+  // the same tags. Then unmark.
+  await js(`(async () => {
+    const tpl = (await window.pearoffice.call('file:list')).find((f) => f.template && f.title === 'Recipe card')
+    const tag = await window.pearoffice.call('file:newTag', { name: 'Shopping' })
+    await window.pearoffice.call('file:tag', { sheetId: tpl.sheetId, id: tag.id, on: true })
+  })()`)
+  await waitFor('template tagged', `${cards('Recipe card')}.find((c) => c.querySelector('.template-badge')).querySelector('.tag-pill') !== null`)
   await js(`${cards('Recipe card')}.find((c) => c.querySelector('.template-badge')).querySelector('.card-more').click()`)
   await waitFor('menu', "[...document.querySelectorAll('.card-menu li')].some((l) => l.textContent === 'New from this template')")
   await js("[...document.querySelectorAll('.card-menu li')].find((l) => l.textContent === 'New from this template').click()")
   await waitFor('second copy open', "document.querySelector('.toolbar .title').value === 'Recipe card' && [...document.querySelectorAll('.cell')].some((c) => c.textContent === 'Flour')")
+  await waitFor('same tags asked', "!!document.querySelector('.panel.template-tags') && document.querySelector('.panel.template-tags').textContent.includes('Shopping')")
+  await js("[...document.querySelectorAll('.panel.template-tags button')].find((b) => b.textContent === 'Yes').click()")
+  await waitFor('asked once', "!document.querySelector('.panel.template-tags')")
   await home()
-  await waitFor('three cards', `${cards('Recipe card')}.length === 3`)
+  await waitFor('three cards, two tagged', `${cards('Recipe card')}.length === 3 && ${cards('Recipe card')}.filter((c) => c.querySelector('.tag-pill')).length === 2`)
   await js(`${cards('Recipe card')}.find((c) => c.querySelector('.template-badge')).querySelector('.card-more').click()`)
   await waitFor('menu', "[...document.querySelectorAll('.card-menu li')].some((l) => l.textContent === 'Stop using as a template')")
   await js("[...document.querySelectorAll('.card-menu li')].find((l) => l.textContent === 'Stop using as a template').click()")

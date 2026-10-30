@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { CaretLeft, CaretRight, DotsThree, FileText, FolderPlus, FolderSimple, PresentationChart, Table, X } from '@phosphor-icons/react'
+import { CaretLeft, CaretRight, DotsThree, FilePdf, FileText, FolderPlus, FolderSimple, Image as ImageIcon, MagnifyingGlass, PresentationChart, Table, X } from '@phosphor-icons/react'
 import { MemberAvatar } from './Avatar.jsx'
 import { filesIn, countLabel } from './Folders.jsx'
 import { haptic } from './haptic.js'
+import { CardTags, TagPill, tagsOf, withAll } from './Tags.jsx'
 
 // The kinds of file PearOffice makes (proposals/2026-10-06-rename-to-pearoffice.md,
 // 2026-10-06-slides.md). A kind marked `soon` shows in New as coming soon.
@@ -12,7 +13,16 @@ export const KINDS = [
   { kind: 'slides', label: 'Slides', Icon: PresentationChart }
 ]
 
-const byKind = (kind) => KINDS.find((k) => k.kind === kind) || KINDS[0]
+// PDFs and pictures are imported, not made with New
+// (proposals/2026-10-29-pdf-and-picture-files.md).
+export const MEDIA_KINDS = [
+  { kind: 'pdf', label: 'PDF', Icon: FilePdf },
+  { kind: 'picture', label: 'Picture', Icon: ImageIcon }
+]
+const byKind = (kind) => KINDS.find((k) => k.kind === kind) || MEDIA_KINDS.find((k) => k.kind === kind) || KINDS[0]
+export const isMediaKind = (kind) => MEDIA_KINDS.some((k) => k.kind === kind)
+// What a kind of file is called in sentences ("Delete this deck").
+export const nounOf = (kind) => ({ doc: 'document', slides: 'deck', pdf: 'PDF', picture: 'picture' })[kind] || 'sheet'
 
 // The name shown for a file with no title, as New names them.
 export const untitled = (kind) => 'Untitled ' + (kind === 'sheet' || !kind ? 'sheet' : byKind(kind).label.toLowerCase())
@@ -142,7 +152,23 @@ const contextMenu = (desktop, open) => (e) => {
   if (desktop) open(atPointer(e))
 }
 
-function FileCard ({ f, onOpen, onWaiting, onRecover, onMenu, onWindow, desktop, onHold }) {
+// The first few people in a file, the owner first, overlapping, then how
+// many more.
+function FaceStack ({ f }) {
+  const more = f.people - f.members.length
+  const label = f.people + ' people' + (f.owner ? ', owned by ' + (f.owner.isMe ? 'you' : f.owner.name || 'someone') : '')
+  return (
+    <span className='face-stack' title={label} aria-label={label}>
+      {/* Each face over the next, so the owner's is whole. */}
+      {f.members.map((m, i) => <span key={m.identity} className='face' style={{ zIndex: f.members.length - i }}><MemberAvatar sheetId={f.sheetId} member={m} size={22} /></span>)}
+      {more > 0 && <span className='face-more'>+{more}</span>}
+    </span>
+  )
+}
+
+function FileCard ({ f, onOpen, onWaiting, onRecover, onMenu, onWindow, desktop, onHold, tags = [], where = null }) {
+  // On phones a shared file shows its people as overlapping faces.
+  const stack = !desktop && !f.joining && f.people > 1 && (f.members || []).length > 0
   return (
     <li
       className='file-cell'
@@ -161,7 +187,8 @@ function FileCard ({ f, onOpen, onWaiting, onRecover, onMenu, onWindow, desktop,
         <KindIcon kind={f.kind} size={28} />
         <span className='file-title'>{f.waiting ? 'Joining...' : (f.title || untitled(f.kind))}</span>
         <span className='file-meta'>
-          {f.owner && (
+          {stack && <FaceStack f={f} />}
+          {!stack && f.owner && (
             <span className='sheet-owner' title={f.owner.isMe ? 'Yours' : 'Owned by ' + (f.owner.name || 'someone')}>
               <MemberAvatar sheetId={f.sheetId} member={f.owner} size={20} />
             </span>
@@ -170,8 +197,10 @@ function FileCard ({ f, onOpen, onWaiting, onRecover, onMenu, onWindow, desktop,
           {f.joining && !f.waiting && <span className='badge'>joining</span>}
           {f.recovery === 'waiting' && <span className='badge'>waiting to be let in</span>}
           {f.recovery === 'copy' && <span className='badge view-only'>make your copy</span>}
-          {!f.joining && f.people > 1 && <span className='people-count'>{f.people} people</span>}
+          {!stack && !f.joining && f.people > 1 && <span className='people-count'>{f.people} people</span>}
         </span>
+        {where && <span className='file-where muted'><FolderSimple size={14} weight='duotone' aria-hidden='true' /> {where}</span>}
+        <CardTags tags={tags} />
       </button>
       {!f.joining && (
         <button className='card-more icon-button' aria-label='File menu' title='File menu' onClick={(e) => onMenu(f, below(e))}><DotsThree size={18} weight='bold' /></button>
@@ -279,15 +308,51 @@ function useTouchDrag (onDrop, onMenu, canDrag) {
   return { ghost, hold }
 }
 
+// Search above the files (proposals/2026-10-28-file-tags.md): names as you
+// type, and your tags to pick; picked tags show files that have all of them.
+function FileSearch ({ query, setQuery, picked, setPicked, tags }) {
+  const flip = (id) => setPicked(picked.includes(id) ? picked.filter((x) => x !== id) : [...picked, id])
+  return (
+    <div className='file-search'>
+      <div className='file-search-box'>
+        <MagnifyingGlass size={16} aria-hidden='true' />
+        <input type='search' aria-label='Search files' placeholder='Search files' value={query} onChange={(e) => setQuery(e.target.value)} />
+        {(query || picked.length > 0) && <button className='icon-button' aria-label='Clear search' title='Clear search' onClick={() => { setQuery(''); setPicked([]) }}><X size={16} /></button>}
+      </div>
+      {tags.length > 0 && (
+        <div className='file-search-tags' role='group' aria-label='Tags'>
+          {tags.map((t) => (
+            <button key={t.id} className={'tag-filter' + (picked.includes(t.id) ? ' on' : '')} aria-pressed={picked.includes(t.id)} onClick={() => flip(t.id)}>
+              <TagPill tag={t} />
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // The start screen: folders first, then the files in no folder, newest
 // first; or, with a folder open, the files in it
-// (proposals/2026-10-10-folders.md).
-export function FileHome ({ files, actions, onOpen, onWaiting, onRecover = onOpen, folders = [], places = {}, folder = null, onFolder = () => {}, onNewFolder = () => {}, onFolderMenu = () => {}, onFileMenu = () => {}, onWindow = null, onDrop = () => {}, desktop = false }) {
+// (proposals/2026-10-10-folders.md). While searching at the top level, every
+// file that matches, with its folder's name.
+export function FileHome ({ files, actions, onOpen, onWaiting, onRecover = onOpen, folders = [], places = {}, folder = null, onFolder = () => {}, onNewFolder = () => {}, onFolderMenu = () => {}, onFileMenu = () => {}, onWindow = null, onDrop = () => {}, desktop = false, tags = { tags: [], files: {} } }) {
   const open = folder && folders.find((x) => x.id === folder)
-  const shown = filesIn([...files].reverse(), places, open ? open.id : null)
+  const [query, setQuery] = useState('')
+  const [pickedIds, setPicked] = useState([])
+  useEffect(() => { setQuery(''); setPicked([]) }, [open ? open.id : null]) // eslint-disable-line react-hooks/exhaustive-deps
+  const picked = pickedIds.filter((id) => tags.tags.some((t) => t.id === id))
+  const q = query.trim().toLowerCase()
+  const searching = !!q || picked.length > 0
+  const newest = [...files].reverse()
+  const pool = open ? filesIn(newest, places, open.id) : searching ? newest : filesIn(newest, places, null)
+  const shown = withAll(pool, tags, picked).filter((f) => !q || (f.title || untitled(f.kind)).toLowerCase().includes(q))
+  const folderName = (f) => { const id = places[f.sheetId]; const fd = id && folders.find((x) => x.id === id); return fd ? fd.name : null }
   // Phones drag only when there is somewhere to drop.
   const { ghost, hold } = useTouchDrag(onDrop, onFileMenu, !!open || folders.length > 0)
-  const card = (f) => <FileCard key={f.sheetId} f={f} onOpen={onOpen} onWaiting={onWaiting} onRecover={onRecover} onMenu={onFileMenu} onWindow={onWindow} desktop={desktop} onHold={desktop ? null : hold} />
+  const card = (f) => <FileCard key={f.sheetId} f={f} onOpen={onOpen} onWaiting={onWaiting} onRecover={onRecover} onMenu={onFileMenu} onWindow={onWindow} desktop={desktop} onHold={desktop ? null : hold} tags={tagsOf(tags, f.sheetId)} where={searching && !open ? folderName(f) : null} />
+  const search = files.length > 0 && <FileSearch query={query} setQuery={setQuery} picked={picked} setPicked={setPicked} tags={tags.tags} />
+  const none = searching && shown.length === 0 && <p className='muted folder-empty'>No files match.</p>
   const dragGhost = ghost && (
     <div className='drag-ghost' style={{ left: ghost.x, top: ghost.y }} aria-hidden='true'>
       <KindIcon kind={ghost.kind} size={20} /> {ghost.title}
@@ -302,7 +367,9 @@ export function FileHome ({ files, actions, onOpen, onWaiting, onRecover = onOpe
           <button className='icon-button folder-more' aria-label='Folder menu' title='Folder menu' onClick={(e) => onFolderMenu(open, below(e))}><DotsThree size={20} weight='bold' /></button>
         </div>
         <div className='files-actions'>{actions}</div>
-        {shown.length === 0 && <p className='muted folder-empty'>{desktop ? 'This folder is empty. Drag a file here, or use Move to folder in a file\'s menu.' : 'This folder is empty. Use Move to folder in a file\'s menu.'}</p>}
+        {pool.length > 0 && search}
+        {none}
+        {!searching && shown.length === 0 && <p className='muted folder-empty'>{desktop ? 'This folder is empty. Drag a file here, or use Move to folder in a file\'s menu.' : 'This folder is empty. Use Move to folder in a file\'s menu.'}</p>}
         <ul className='file-grid' aria-label={open.name}>{shown.map(card)}</ul>
         {dragGhost}
       </div>
@@ -312,8 +379,10 @@ export function FileHome ({ files, actions, onOpen, onWaiting, onRecover = onOpe
     <div className='files-home'>
       <h1>Your files</h1>
       <div className='files-actions'>{actions}</div>
-      <ul className='file-grid' aria-label='Your files'>
-        {folders.map((x) => {
+      {search}
+      {none}
+      <ul className='file-grid' aria-label={searching ? 'Search results' : 'Your files'}>
+        {!searching && folders.map((x) => {
           const n = filesIn(files, places, x.id).length
           return (
             <li key={x.id} className='file-cell' onContextMenu={contextMenu(desktop, (at) => onFolderMenu(x, at))}>
@@ -326,12 +395,14 @@ export function FileHome ({ files, actions, onOpen, onWaiting, onRecover = onOpe
             </li>
           )
         })}
-        <li className='file-cell'>
-          <button className='file-card new-folder-card' onClick={onNewFolder}>
-            <FolderPlus size={28} aria-hidden='true' />
-            <span className='file-title'>New folder</span>
-          </button>
-        </li>
+        {!searching && (
+          <li className='file-cell'>
+            <button className='file-card new-folder-card' onClick={onNewFolder}>
+              <FolderPlus size={28} aria-hidden='true' />
+              <span className='file-title'>New folder</span>
+            </button>
+          </li>
+        )}
         {shown.map(card)}
       </ul>
       {dragGhost}
