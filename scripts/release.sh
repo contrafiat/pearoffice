@@ -599,6 +599,19 @@ for _artifact in "${DESKTOP_ARTIFACTS[@]}"; do
   echo "    sha256  $(cut -d' ' -f1 < "${_artifact}.sha256")  $(basename "$_artifact")"
 done
 
+# The NixOS package (nixos/pearoffice.nix, used by flake.nix) installs the
+# released .deb, so it takes this version and the .deb's hash in Nix's SRI form.
+# Step 6 commits it with the other bumps.
+_NIX_DEB="$REPO_ROOT/desktop/dist/pearoffice-$APP_VERSION-linux-amd64.deb"
+if [ -f nixos/pearoffice.nix ] && [ -f "${_NIX_DEB}.sha256" ]; then
+  _nix_hash="sha256-$(cut -d' ' -f1 < "${_NIX_DEB}.sha256" | xxd -r -p | base64 -w0)"
+  sed -i -E \
+    -e "s|^(  version = )\"[^\"]*\";|\1\"$APP_VERSION\";|" \
+    -e "s|^(    hash = )\"sha256-[^\"]*\";|\1\"$_nix_hash\";|" \
+    nixos/pearoffice.nix
+  echo "    nix     $_nix_hash  nixos/pearoffice.nix"
+fi
+
 fi # end NEEDS_BUILD (slow builds)
 
 echo ""
@@ -658,6 +671,7 @@ _bump_paths=(
   desktop/package.json
   desktop/package-lock.json
   app.json
+  nixos/pearoffice.nix
   "metadata/ios/version/$APP_VERSION"
   "$HAND_NOTES"
 )

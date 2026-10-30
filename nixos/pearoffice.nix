@@ -42,11 +42,11 @@
 
 stdenv.mkDerivation rec {
   pname = "pearoffice";
-  version = "1.1.4";
+  version = "1.1.5";
 
   src = fetchurl {
     url = "https://github.com/peerloomllc/pearoffice/releases/download/v${version}/pearoffice-${version}-linux-amd64.deb";
-    hash = "sha256-YNkB3eAOJI0ZGq2+D8FYuXkvPN5E9RdmzvNsyQnP9Sw=";
+    hash = "sha256-pFTOIab+WDmSNDCtx+NlRK44la0jRK4odF2Ts00XaOU=";
   };
 
   nativeBuildInputs = [
@@ -126,12 +126,13 @@ stdenv.mkDerivation rec {
     makeWrapper $out/opt/PearOffice/pearoffice-desktop.bin $out/bin/pearoffice \
       "''${gappsWrapperArgs[@]}" \
       --prefix PATH : ${lib.makeBinPath [ xdg-utils ]} \
+      --set PEAROFFICE_NO_UPDATE_CHECK 1 \
       --add-flags "\''${NIXOS_OZONE_WL:+\''${WAYLAND_DISPLAY:+--ozone-platform-hint=auto --enable-features=WaylandWindowDecorations}}"
   '';
 
   meta = {
     description = "Peer-to-peer spreadsheets, documents and slides";
-    homepage = "https://github.com/peerloomllc/pearoffice-releases";
+    homepage = "https://github.com/peerloomllc/pearoffice";
     license = lib.licenses.mit;
     platforms = [ "x86_64-linux" ];
     sourceProvenance = [ lib.sourceTypes.binaryNativeCode ];
